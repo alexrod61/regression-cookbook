@@ -166,7 +166,7 @@ Let us recall what a `r colourize("discrete random variable", "blue")` is. This 
 | Bernoulli | $Y \sim \text{Bern}(\pi)$ with probability of success $\pi \in [0, 1]$ | $y \in \{ 0, 1 \}$ | $\pi$ | $\pi (1 - \pi)$ | 
 | Binomial | $Y \sim \text{Bin}(n, \pi)$ with number of trials $n \in \mathbb{N}$ and probability of success $\pi \in [0, 1]$ | $y \in \{ 0, 1, \dots, n \}$| $n \pi$ | $n \pi (1 - \pi)$ |
 | Negative Binomial | $Y \sim \text{NegBin}(k, \pi)$ with number of successes $k \in \{ 0, 1, 2 \dots\}$ and probability of success $\pi \in [0, 1]$| $y \in \{ 0, 1, 2 \dots\}$ | $\frac{k (1 - \pi)}{\pi}$ | $\frac{k (1 - \pi)}{\pi^2}$ |
-| Poisson | $Y \sim \text{Pois}(\lambda)$ with continuous average rate $\lambda \in (0, \infty)$ | $y \in \{ 0, 1, 2 \dots\}$ | $\lambda$ | $\lambda$ | 
+| Poisson | $Y \sim \text{Pois}(\lambda)$ with continuous average rate $\lambda \in (0, \infty)$ | $y \in \{ 0, 1, 2, \dots\}$ | $\lambda$ | $\lambda$ | 
 
 : Univariate discrete probability distributions for a random variable $Y$; including parameter(s), support, mean, and variance. {#tbl-distributions-discrete .striped .hover}
 
@@ -882,20 +882,179 @@ $$
 
 ## Classical Poisson
 
+Suppose you observe the count of events happening in a **fixed interval of time or space**, for instance. Let $Y$ be the number of counts considered of integer type. Then, $Y$ is said to have a **classical Poisson distribution** with a `r colourize("continuous parameter", "blue")` $\lambda$:
+
+$$
+Y \sim \text{Pois}(\lambda).
+$$
+
+### Probability Mass Function
+
+The `r colourize("PMF", "blue")` of this count-type $Y$ is the following:
+
+$$
+P \left( Y = y \mid \lambda \right) = \frac{\lambda^y \exp{(-\lambda)}}{y!} \quad \text{for $y \in \{ 0, 1, 2, \dots\}$,}
+$${#eq-app-classical-poisson-pmf}
+
+where $\exp{(\cdot)}$ depicts the base $e$ (also known as **Euler's number**, $e = 2.71828...$) and $y!$ is the factorial
+
+$$
+y! = y \times (y - 1) \times (y - 2) \times (y - 3) \times \cdots \times 3 \times 2 \times 1.  
+$$
+
+with 
+
+$$
+0! = 1.
+$$
+
+The `r colourize("continuous parameter", "blue")` $\lambda \in (0, \infty)$ represents the average rate at which these events happen (e.g., events per area unit or events per time unit). Curiously, even though the `r colourize("random variable", "blue")` $Y$ is considered `r colourize("discrete", "blue")` in this case, $\lambda$ is modelled as `r colourize("continuous", "blue")`!
+
+> **How can we verify that @eq-app-classical-poisson-pmf is a proper `r colourize("PMF", "blue")` (i.e., all the standalone `r colourize("probabilities", "blue")` over the support of $Y$ add up to one)?**
+
+To elaborate on this, we need to use some mathematical tools called the **Taylor series expansions** and a derived result called **Maclaurin series expansions**.
 
 ::: {#Headsup-sample .Heads-up}
 ::::{.Heads-up-header}
 Heads-up on the Taylor and Maclaurin series expansions!
 ::::
 ::::{.Heads-up-container}
-The Poisson distribution...
+In mathematics, there are helpful tools known as **Taylor series expansions**, which were officially published by English mathematician Brook Taylor in *Methodus Incrementorum Directa & Inversa* [@taylor1715]. 
 
-@taylor1715
+![Portrait of mathematician Brook Taylor [@earlom-1793].](img/brook-taylor.jpg){width="300"}
 
-@maclaurin1742
+However, it is essential to note that Scottish mathematician James Gregory introduced the notion of these series expansions in his work *Vera Circuli et Hyperbolae Quadratura* [@gregory1668]. 
 
+![Portrait of mathematician James Gregory [@watson1886].](img/james-gregory.jpg){width="300"}
+
+These series approximate complex mathematical functions through an infinite sum of polynomial terms. For example, in **machine learning**, the Taylor series expansions can be utilized in **gradient-based optimization methods**. Specifically, **Newton's method** uses these expansions to find roots of equations that cannot be solved analytically, which is common in `r colourize("maximum likelihood-based parameter", "blue")` estimation for the varied regression models discussed throughout this book. Moreover, we can find these series in **different engineering and scientific fields such as physics**.
+
+Suppose we have **real function** $f(u)$ around a point $u = a$, then the one-dimensional **infinite** Taylor series expansion is given by the expression 
+
+$$
+\begin{align*}
+f(u) &= f(a) + f'(a) (u - a) + \frac{f''(a)}{2!} (u - a)^2 + \\
+& \qquad \frac{f^{(3)}(a)}{3!} (u - a)^3 + \frac{f^{(4)}(a)}{4!} (u - a)^4 + \\
+& \qquad \frac{f^{(5)}(a)}{5!} (u - a)^5 + \cdots \\
+&= \sum_{j = 0}^{\infty} \frac{f^{(j)}(a)}{j!} (u - a)^j.
+\end{align*}
+$${#eq-taylor-series}
+
+A complete mathematical derivation of @eq-taylor-series can be found in @weisstein. Moving along, specifically in the last line of this equation which shows an infinite summation, note the following:
+
+- $f(a)$ indicates function $f(u)$ evaluated at point $a$.
+- $f^{(j)}(a)$ indicates the $j$th order derivative of $f(u)$ and evaluated at point $a$.
+- $j!$ implicates the factorial of $j$ such that
+
+$$
+j! = j \times (j - 1) \times (j - 2) \times (j - 3) \times \cdots \times 3 \times 2 \times 1.
+$$
+
+with 
+
+$$
+0! = 1.
+$$
+
+If we go even further with @eq-taylor-series, we have a specific case when $a = 0$ called the **Maclaurin series expansions**. This case was introduced by the Scottish mathematician Colin Maclaurin in his work *A Treatise of Fluxions* [@maclaurin1742].
+
+![Portrait of mathematician Colin Maclaurin [@harding1798].](img/colin-maclaurin.jpg){width="300"}
+
+Hence, in a Mclaurin series, @eq-taylor-series becomes:
+
+$$
+\begin{align*}
+f(u) &= f(0) + f'(0) (u) + \frac{f''(0)}{2!} u^2 + \\
+& \qquad \frac{f^{(3)}(0)}{3!} u^3 + \frac{f^{(4)}(0)}{4!} u^4 + \\
+& \qquad \frac{f^{(5)}(0)}{5!} u^5 + \cdots \\
+&= \sum_{j = 0}^{\infty} \frac{f^{(j)}(0)}{j!} u^j.
+\end{align*}
+$${#eq-maclaurin-series}
+
+Different statistical proofs make use of Taylor series expansions as well as the Mclaurin series, and the Poisson distribution is not an exception at all! 
 ::::
 :::
+
+The above Mclaurin series in @eq-maclaurin-series will help us to show that our Poisson `r colourize("PMF", "blue")` in @eq-app-classical-poisson-pmf actually adds up to one all over the support of the `r colourize("random variable", "blue")`:
+
+::: {.proof}
+$$
+\begin{align*}
+\sum_{y = 0}^{\infty} P \left( Y = y \mid \lambda \right) &= \sum_{y = 0}^{\infty} \frac{\lambda^y \exp{(-\lambda)}}{y!} \\
+&= \exp{(-\lambda)} \sum_{y = 0}^{\infty} \frac{\lambda^y}{y!} \\
+& \quad \qquad \text{factoring out $\exp{(-\lambda)}$,} \\
+& \quad \qquad \text{since it does not depend on $y$.}
+\end{align*}
+$${#eq-proof-poisson-PMF-sum}
+
+Now, we will focus on the above summation 
+
+$$
+\sum_{y = 0}^{\infty} \frac{\lambda^y}{y!}
+$$
+and use the Mclaurin series from @eq-maclaurin-series by letting
+
+$$
+f(u) = \exp(u).
+$${#eq-base-e}
+
+We know that all derivatives of the above function are equal
+
+$$
+f'(u) = f''(u) = f^{(3)}(u) = f^{(4)}(u) = f^{(5)}(u) = \cdots = \exp{(u)},
+$$
+which allows us to conclude that the $j$th derivative is
+
+$$
+f^{(j)}(u) = \exp(u).
+$$
+
+This $j$th derivative evaluated at $u = 0$ becomes
+
+$$
+f^{(j)}(0) = \exp(0) = 1.
+$$
+Therefore, the Mclaurin series for @eq-base-e is the following:
+
+$$
+\begin{align*}
+f(u) &= \exp(u) \\
+&= \sum_{j = 0}^{\infty} \frac{\exp(0)}{j!} u^j \\
+&= \sum_{j = 0}^{\infty} \frac{u^j }{j!}.
+\end{align*}
+$${#eq-maclaurin-series-base-e}
+
+That said, using @eq-maclaurin-series-base-e, let:
+
+$$
+\begin{gather*}
+u  = \lambda\\
+j = y.
+\end{gather*}
+$$
+
+Thus, we have the following:
+
+$$
+\sum_{y = 0}^{\infty} \frac{\lambda^y}{y!} = \exp{(\lambda)}.
+$$
+
+Finally, going back to @eq-proof-poisson-PMF-sum:
+
+$$
+\begin{align*}
+\sum_{y = 0}^{\infty} P \left( Y = y \mid \lambda \right) &= \exp{(-\lambda)} \overbrace{\sum_{y = 0}^{\infty} \frac{\lambda^y}{y!}}^{\exp{(\lambda)}} \\
+&= \exp{(-\lambda)} \times \exp{(\lambda)} \\
+&= \exp{(-\lambda + \lambda)} \\
+&= \exp{(0)} \\
+&= 1. \qquad \qquad \qquad \qquad \square
+\end{align*}
+$${#eq-proof-poisson-PMF-adds-to-1}
+
+> **Indeed, the Poisson `r colourize("PMF", "blue")` is a proper `r colourize("probability distribution", "blue")`!**
+:::
+
+### Expected Value
 
 ## Generalized Poisson
 
