@@ -23,6 +23,27 @@ colourize <- function(x, color) {
 }
 ```
 
+```{r setup, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(ggplot2)
+library(ggcorrplot)
+library(cookbook)
+library(tidyverse)
+
+data_path <- system.file("data", "ols_data.rda", package = "cookbook")
+
+if (file.exists(data_path)) {
+  load(data_path)  # Loads the dataset
+} else {
+  stop("Error: 'ols_data.rda' not found in the cookbook package.")
+}
+
+loaded_objects <- ls()
+data <- OLS
+```
+
 **Ordinary Least Squares (OLS)** is a foundational method in regression analysis that estimates the relationship between a dependent variable and one or more independent variables. At its core, OLS aims to minimize the difference, or "error," between the observed values and the values predicted by the model. It does this by finding the best-fitting line (or hyperplane in the case of multiple variables) that minimizes the sum of the squared differences between the observed and predicted values.
 
 The importance of OLS lies in its simplicity, interpretability, and wide applicability. As one of the earliest and most widely used techniques in statistics and machine learning, OLS provides a straightforward approach to understanding how variables influence each other. In areas such as economics, biology, and social sciences, OLS has enabled researchers to model and quantify relationships, making it a powerful tool for both inference and prediction.
@@ -55,11 +76,13 @@ In this case study, we have collected data on various aspects of students' finan
 
 Here’s a sample of what the data looks like:
 
+<div style="overflow-x: auto; white-space: nowrap;">
 | **Has_Job** | **Year_of_Study** | **Financially_Dependent** | **Monthly_Allowance** | **Cooks_at_Home** | **Living_Situation** | **Housing_Type** | **Goes_Out_Spends_Money** | **Drinks_Alcohol** | **Net_Money** | **Monthly_Earnings** |
 |-------------|--------------------|---------------------------|-----------------------|-------------------|----------------------|------------------|---------------------------|--------------------|---------------|----------------------|
 | 0           | 1                  | 0                         | 658.99                | 0                 | 3                    | 1                | 6                           | 0                  | 529.34        | 0.00                 |
 | 1           | 3                  | 0                         | 592.55                | 0                 | 3                    | 2                | 3                           | 1                  | 992.72        | 941.92               |
 | 1           | 4                  | 1                         | 602.54                | 0                 | 2                    | 2                | 2                           | 1                  | 557.30        | 876.57               |
+</div>
 
 ### The Problem We’re Trying to Solve
 
@@ -112,9 +135,207 @@ For a study like ours, data on students’ financial behaviors could have been c
 
 ### Data Wrangling
 
-Now that we have our dataset, the primary focus is on cleaning and organizing it for analysis using Ordinary Least Squares (OLS). The first step is ensuring **data integrity**. This involves checking for missing values or inconsistencies. For example, if some students don’t have recorded earnings or net money, we need to decide how to handle those gaps. Removing incomplete records is one option, but in some cases, it may be more appropriate to impute missing values using logical estimates or averages from the dataset.
+Now that we have our dataset, the primary focus is on cleaning and organizing it for analysis using Ordinary Least Squares (OLS). The first step is ensuring **data integrity**. This involves checking for missing values or inconsistencies. For example, if some students don’t have recorded earnings or net money, we need to decide how to handle those gaps. Removing incomplete records is one option, but in some cases, it may be more appropriate to impute missing values using logical estimates or averages from the dataset. In our toy dataset, we can see that we have no missing values.
+
+```{r check_missing_value}
+colSums(is.na(data))
+```
 
 Next, we need to transform certain variables so they are ready for regression analysis. For example, categorical variables like *Has_Job* and *Drinks_Alcohol* need to be encoded into numerical values (e.g., 1 for "Yes" and 0 for "No"). Additionally, continuous variables such as *Monthly_Earnings* and *Net_Money* should be examined for extreme outliers—students with unusually high incomes or spending might distort the model, so it’s important to assess whether these values should be adjusted or removed.
 
+```{r convert_binary_to_factor}
+# Convert binary categorical variables to factors
+data <- data |>
+  mutate(Has_Job = as.factor(Has_Job),
+         Drinks_Alcohol = as.factor(Drinks_Alcohol),
+         Financially_Dependent = as.factor(Financially_Dependent),
+         Cooks_at_Home = as.factor(Cooks_at_Home))
+```
+
+```{r outliers}
+# Using IQR method to filter out extreme values in continuous variables
+remove_outliers <- function(x) {
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  x[x < (Q1 - 1.5 * IQR) | x > (Q3 + 1.5 * IQR)] <- NA
+  return(x)
+}
+
+data <- data |>
+  mutate(across(c(Monthly_Earnings, Net_Money), remove_outliers))
+
+# Remove rows with newly introduced NAs due to outlier handling
+data <- na.omit(data)
+```
 After cleaning and transforming the data, the final preparation step is splitting the dataset. Typically, we divide the data into two sets: one for training the model and the other for testing its performance. The training set is used to build the OLS model, while the test set allows us to assess how well the model generalizes to unseen data. This ensures that our model doesn’t just perform well on the current dataset but is also robust enough to make reliable predictions or insights beyond this specific sample.
+
+```{r train_test_split}
+# Splitting the dataset into training and testing sets
+set.seed(123)  # For reproducibility
+train_indices <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
+train_data <- data[train_indices, ]
+test_data <- data[-train_indices, ]
+```
+
+## Exploratory Data Analysis (EDA)
+
+Before diving into data modeling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. This stage, known as Exploratory Data Analysis (EDA), helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modeling decisions.
+
+### Classifying Variables
+
+The first step in EDA is to classify variables according to their types. This classification guides the selection of appropriate visualization techniques and modeling strategies. In our toy dataset, we categorize variables as follows:
+
+Response Variable:
+
+- `Net_Money`: Continuous (bounded, as it is limited by realistic income and expenses)
+
+Regressors:
+
+- **Binary**: `Has_Job`, `Financially_Dependent`, `Cooks_at_Home`, `Drinks_Alcohol`
+- **Categorical**: `Living_Situation`, `Housing_Type`
+- **Ordinal**: `Year_of_Study`, `Goes_Out_Spends_Money` (scale 1-5)
+- **Continuous**: `Monthly_Allowance`, `Monthly_Earnings`
+
+This classification ensures that we apply the correct statistical methods and visualizations in the next steps.
+
+### Visualizing Variable Distributions
+
+Once variables are classified, the next step is to explore their distributions to understand their characteristics. We employ different visualizations depending on the variable type:
+
+#### Continuous Variables
+
+- **Histograms**: Used to inspect the distribution of numerical variables.
+- **Boxplots**: Useful for identifying outliers and comparing distributions.
+
+```{r eda-histogram}
+# Histogram of Net_Money
+hist(train_data$Net_Money, 
+     main = "Distribution of Net Money", 
+     xlab = "Net Money", 
+     col = "blue", 
+     border = "white")
+```
+
+```{r eda-boxplot}
+# Boxplot of Net Money
+boxplot(train_data$Net_Money, 
+        main = "Boxplot of Net Money", 
+        ylab = "Net Money", 
+        col = "lightblue")
+```
+
+#### Categorical and Ordinal Variables
+
+- **Bar charts**: Display frequency counts for categorical variables.
+
+```{r eda-barcharts}
+# Bar plot of Living Situation
+barplot(table(train_data$Living_Situation), 
+        main = "Living Situation Distribution", 
+        xlab = "Living Situation", 
+        ylab = "Frequency", 
+        col = "purple")
+```
+
+#### Exploring Relationships Between Variables
+
+- **Correlation Matrices**: Help identify strong relationships between continuous predictors and the response variable.
+- **Scatter Plots**: Assess linear relationships between numerical variables.
+- **Boxplots**: Compare how different categories influence a continuous response variable.
+
+```{r eda-corr-matrix}
+# Correlation matrix
+cor_matrix <- cor(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")], use = "complete.obs")
+print(cor_matrix)
+```
+
+```{r eda-scatterplot}
+# Scatter plot of Monthly Allowance vs. Net Money
+plot(train_data$Monthly_Allowance, train_data$Net_Money, 
+     main = "Net Money vs. Monthly Allowance", 
+     xlab = "Monthly Allowance", 
+     ylab = "Net Money", 
+     col = "blue", 
+     pch = 19)
+abline(lm(Net_Money ~ Monthly_Allowance, data = train_data), col = "red", lwd = 2)
+```
+
+```{r eda-multiple-boxplots}
+# Boxplot of Net Money by Living Situation
+boxplot(Net_Money ~ Living_Situation, 
+        data = train_data, 
+        main = "Net Money by Living Situation", 
+        xlab = "Living Situation", 
+        ylab = "Net Money", 
+        col = "lightgreen")
+```
+
+
+#### Summary Statistics
+Alongside visualizations, we compute descriptive statistics to summarize key characteristics of the data:
+
+```{r eda-summary-stats}
+# Summary statistics for numerical variables
+summary(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")])
+```
+
+This step provides insights into the central tendency (mean, median) and dispersion (standard deviation, range) of each variable, which will inform our model selection and feature engineering.
+
+## Data Modelling
+
+Following Exploratory Data Analysis (EDA), we now move to data modeling, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modeling linear relationships.
+
+### Choosing a Suitable Regression Model
+
+The choice of regression model depends on the patterns identified in EDA and the objectives of the analysis. Below are common regression approaches:
+
+- **Simple Linear Regression**: Suitable when modeling a single predictor’s linear effect on the response variable.
+- **Multiple Linear Regression:** Used when multiple predictors contribute to the response variable.
+- **Polynomial Regression**: Captures non-linear relationships by incorporating polynomial terms.
+- **Log-Linear Models**: Applied when transforming skewed distributions improves interpretability.
+- **Ridge and Lasso Regression**: Useful when dealing with multicollinearity or performing feature selection through regularization.
+
+Since our analysis focuses on understanding financial habits with multiple contributing factors, we use Multiple Linear Regression via OLS to quantify the relationships between the response (Net_Money) and predictors.
+
+### Defining Modeling Parameters
+
+After selecting OLS as our regression model, we define key modeling components:
+
+Response Variable (Y):
+
+- `Net_Money`: The dependent variable representing financial balance.
+
+Predictors (X):
+
+- Continuous: `Monthly_Allowance`, `Monthly_Earnings`
+- Categorical: `Living_Situation`
+- Ordinal: `Year_of_Study`
+
+Each predictor is selected based on EDA insights, ensuring relevance in explaining `Net_Money`. If interaction effects exist, such as `Living_Situation` modifying the effect of `Monthly_Allowance`, we incorporate interaction terms.
+
+### Setting Up the Modeling Equation
+
+The OLS regression equation expresses how predictors influence the response variable:
+
+$$
+\begin{align}
+\text{Net_Money} = &\ \beta_0 \\
+               & + \beta_1 \times \text{Monthly_Allowance} \\
+               & + \beta_2 \times \text{Monthly_Earnings} \\
+               & + \beta_3 \times \text{Year_of_Study} \\
+               & + \beta_4 \times \text{Living_Situation} \\
+               & + \epsilon
+\end{align}
+$$
+
+where:
+
+- $\beta_0$​ is the intercept (baseline Net_Money when all predictors are zero),
+- $\beta_1, \beta_2, \beta_3, \beta_4$ are regression coefficients, quantifying how each predictor affects `Net_Money`,
+- $\epsilon$ is the error term, capturing unexplained variance.
+
+This equation provides a formal structure to estimate how financial behavior is influenced by multiple factors. The next step will involve estimation, where we compute these coefficients and assess their significance.
+
+
 
