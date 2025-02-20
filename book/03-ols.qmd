@@ -31,6 +31,8 @@ library(ggplot2)
 library(ggcorrplot)
 library(cookbook)
 library(tidyverse)
+library(car)
+library(lmtest)
 
 data_path <- system.file("data", "ols_data.rda", package = "cookbook")
 
@@ -364,3 +366,107 @@ After fitting the model, we examine the estimated coefficients to understand the
 - Monthly_Allowance ($\beta_1 = 1.43$): Each $1 increase in Monthly_Allowance is associated with a $1.43 increase in Net_Money.
 - Monthly_Earnings ($\beta_2 = 0.98$): Each $1 increase in Monthly_Earnings increases Net_Money by $0.98.
 - Year_of_Study ($\beta_3 = -104.34$): Being in a later year of study decreases Net_Money by -$104.34 on average.
+
+## Goodness of Fit
+
+After estimating the regression coefficients, we now assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This step ensures that our conclusions are statistically valid and that our model generalizes well to new data.
+
+### Checking Model Assumptions
+
+OLS regression relies on several key assumptions. We use diagnostic plots and statistical tests to verify these assumptions:
+
+#### Linearity
+
+The relationship between predictors and the response should be linear.
+
+- **Diagnostic Plot**: A residual vs. fitted values plot should show a random spread (no patterns).
+- **Solution if Violated**: Apply polynomial terms or transformations (e.g., log transformation).
+
+```{r model-assumption-linearity}
+# Residuals vs Fitted plot (R)
+plot(ols_model$fitted.values, residuals(ols_model), 
+     main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+#### Independence of Errors
+
+Residuals should not be correlated (especially in time-series data).
+
+- **Diagnostic Test**: Durbin-Watson test detects autocorrelation.
+
+```{r model-assumption-indep-of-error}
+dwtest(ols_model)
+```
+
+#### Homoscedasticity (Constant Variance of Errors)
+
+The variance of residuals should remain constant across all fitted values.
+
+- **Diagnostic Plot**: Residuals vs. fitted values plot.
+- **Solution if Violated**: Use weighted least squares regression.
+
+```{r model-assumption-homoscedasticity}
+ncvTest(ols_model)  # Test for homoscedasticity
+```
+
+#### Normality of Residuals
+
+Residuals should be normally distributed for valid hypothesis testing.
+
+- **Diagnostic Plot**: Q-Q plot (Quantile-Quantile plot) shows if residuals follow a normal distribution.
+
+
+```{r model-assumption-normality-residuals}
+qqnorm(residuals(ols_model))
+qqline(residuals(ols_model), col = "red")
+```
+
+### Evaluating Model Fit
+
+A good model should explain a large proportion of variance in the response variable.
+
+#### R-Squared
+
+- Definition: Measures the proportion of variance in the response variable explained by predictors.
+- Interpretation: An R-squared of 0.85 means that 85% of the variation in Net_Money is explained by the predictors.
+
+```{r r-squared}
+summary(ols_model)$r.squared  # R-squared value
+```
+
+Limitations:
+- A high R-squared does not imply causation.
+- Adding predictors always increases R-squared, even if they are irrelevant.
+- Adjusted R-squared accounts for unnecessary predictors.
+
+
+```{r adjusted-r-squared}
+summary(ols_model)$adj.r.squared  # Adjusted R-squared
+```
+
+#### Identifying Outliers and Influential Points
+
+Extreme values can distort regression estimates. We detect them using:
+
+Residual Plots
+
+- Large residuals may indicate outliers.
+
+```{r residual-plots}
+plot(residuals(ols_model), main = "Residual Plot", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+Cook’s Distance
+
+- Definition: Measures how much a data point influences regression results.
+- Threshold: If Cook’s distance > 0.5, the point may be influential.
+
+```{r cooks-distance}
+cook_values <- cooks.distance(ols_model)
+plot(cook_values, type = "h", main = "Cook's Distance")
+```
+
+By validating these assumptions and model fit, we ensure that our regression analysis is reliable and informative. Next, we move to interpreting and communicating the results.
+
