@@ -438,73 +438,102 @@ By conducting a thorough Exploratory Data Analysis, we gain critical insights in
 
 ## Data Modelling
 
-Following Exploratory Data Analysis (EDA), we now move to data modeling, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modeling linear relationships.
+After conducting Exploratory Data Analysis (EDA), we transition to the modeling stage, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modeling linear relationships.
+
+OLS aims to estimate the effect of multiple predictors on an outcome variable by minimizing the sum of squared differences between observed and predicted values. This approach helps quantify financial behaviors, allowing us to interpret the impact of various factors on students’ net financial balance.
 
 ### Choosing a Suitable Regression Model
 
-The choice of regression model depends on the patterns identified in EDA and the objectives of the analysis. Below are common regression approaches:
+The choice of regression model depends on the patterns identified in EDA and the objectives of our analysis. Regression techniques vary in complexity, with some handling simple linear relationships and others accounting for more nuanced effects. Below are common approaches:
 
-- **Simple Linear Regression**: Suitable when modeling a single predictor’s linear effect on the response variable.
-- **Multiple Linear Regression:** Used when multiple predictors contribute to the response variable.
-- **Polynomial Regression**: Captures non-linear relationships by incorporating polynomial terms.
-- **Log-Linear Models**: Applied when transforming skewed distributions improves interpretability.
-- **Ridge and Lasso Regression**: Useful when dealing with multicollinearity or performing feature selection through regularization.
+- **Simple Linear Regression** models the relationship between a single predictor and the response variable. This approach is suitable when we suspect a dominant factor driving financial balance.
+- **Multiple Linear Regression** extends simple regression by incorporating multiple predictors, allowing us to account for various financial influences simultaneously.
+- **Polynomial Regression** captures non-linear relationships by introducing polynomial terms of predictors, useful when relationships observed in scatter plots are curved rather than strictly linear.
+- **Log-Linear Models** transform skewed distributions to improve interpretability and meet regression assumptions.
+- **Regularized Regression (Ridge and Lasso)** applies penalties to regression coefficients to handle multicollinearity and enhance model generalization by reducing overfitting.
 
-Since our analysis focuses on understanding financial habits with multiple contributing factors, we use Multiple Linear Regression via OLS to quantify the relationships between the response (Net_Money) and predictors.
+Given that our goal is to examine how multiple factors—such as income, expenses, and living arrangements—affect students’ financial balance, we select Multiple Linear Regression via OLS. This method allows us to quantify the influence of each predictor while controlling for confounding effects.
 
 ### Defining Modeling Parameters
 
-After selecting OLS as our regression model, we define key modeling components:
+Once we select OLS regression, we define the key modeling components: the response variable (dependent variable) and the predictor variables (independent variables).
 
-Response Variable (Y):
+#### Response Variable (Y):
+
+The response variable, also known as the dependent variable, represents the financial outcome we aim to explain:
 
 - `Net_Money`: The dependent variable representing financial balance.
 
-Predictors (X):
+#### Predictor Variables (X):
 
-- Continuous: `Monthly_Allowance`, `Monthly_Earnings`
-- Categorical: `Living_Situation`
-- Ordinal: `Year_of_Study`
+Each predictor variable is chosen based on its theoretical and statistical relevance in explaining financial behavior:
 
-Each predictor is selected based on EDA insights, ensuring relevance in explaining `Net_Money`. If interaction effects exist, such as `Living_Situation` modifying the effect of `Monthly_Allowance`, we incorporate interaction terms.
+- `Has_Job` (Binary) – Indicates whether the student has a job (1 = Yes, 0 = No).
+- `Financially_Dependent` (Binary) – Identifies students who rely on external financial support.
+- `Year_of_Study` (Ordinal) – Represents academic seniority (higher values indicate later years).
+- `Goes_Out_Spends_Money` (Ordinal) – Measures spending behavior on a scale from 1 to 6.
+- `Drinks_Alcohol` (Binary) – Identifies whether a student consumes alcohol, which may impact discretionary spending.
+- `Monthly_Allowance` (Continuous) – Represents financial support received from family or scholarships.
+- `Monthly_Earnings` (Continuous) – Reflects the student’s personal income from work.
+- `Living_Situation` (Categorical) – Encodes different living arrangements (e.g., dormitory, shared apartment, living with family).
+- `Housing_Type` (Categorical) – Further distinguishes between different types of housing situations.
+- `Cooks_at_Home` (Binary) – Indicates whether the student regularly prepares meals at home.
+
+These predictors capture a mix of economic, behavioral, and lifestyle factors, providing a comprehensive view of the drivers of student financial balance.
 
 ### Setting Up the Modeling Equation
 
-The OLS regression equation expresses how predictors influence the response variable:
+With all predictors defined, the OLS regression equation models the relationship between Net_Money and the predictor variables:
 
 $$
 \begin{align}
-\text{Net_Money} = &\ \beta_0 \\
-               & + \beta_1 \times \text{Monthly_Allowance} \\
-               & + \beta_2 \times \text{Monthly_Earnings} \\
+\text{Net_Money} = \beta_0 \\
+               & + \beta_1 \times \text{Has_Job} \\
+               & + \beta_2 \times \text{Financially_Dependent} \\
                & + \beta_3 \times \text{Year_of_Study} \\
-               & + \beta_4 \times \text{Living_Situation} \\
+               & + \beta_4 \times \text{Goes_Out_Spends_Money} \\
+               & + \beta_5 \times \text{Drinks_Alcohol} \\
+               & + \beta_6 \times \text{Monthly_Allowance} \\
+               & + \beta_7 \times \text{Monthly_Earnings} \\
+               & + \beta_8 \times \text{Living_Situation} \\
+               & + \beta_9 \times \text{Housing_Type} \\
+               & + \beta_{10} \times \text{Cooks_at_Home} \\
                & + \epsilon
 \end{align}
 $$
 
 where:
 
-- $\beta_0$​ is the intercept (baseline Net_Money when all predictors are zero),
-- $\beta_1, \beta_2, \beta_3, \beta_4$ are regression coefficients, quantifying how each predictor affects `Net_Money`,
-- $\epsilon$ is the error term, capturing unexplained variance.
+- $\beta_0$ represents the intercept, or the baseline Net Money when all predictors are set to zero.
+- $\beta_1, \beta_2, ..., \beta_{10}$ are the regression coefficients, quantifying the impact of each predictor on financial balance.
+- $\epsilon$ is the error term, accounting for unexplained variability and random noise.
 
-This equation provides a formal structure to estimate how financial behavior is influenced by multiple factors. The next step will involve estimation, where we compute these coefficients and assess their significance.
+Each coefficient provides insight into how `Net_Money` changes when a specific predictor increases by one unit, holding all other factors constant. For example:
+
+- $\beta_5$ (Drinks Alcohol) measures the financial impact of alcohol consumption, which may reflect higher discretionary spending.
+- $\beta_6$ (Monthly Allowance) quantifies the increase in Net_Money per additional dollar of allowance.
+- $\beta_10$ (Cooks at Home) indicates how much more (or less) financially stable students are when they cook at home instead of eating out.
+
+If significant interaction effects exist—such as students who live independently having a different financial impact from increased earnings compared to those living with family—we can extend the model by adding interaction terms.
 
 ## Estimation
 
-With the data modeling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model and interpret its coefficients. This step provides numerical estimates for how much each predictor contributes to the response variable, allowing us to quantify their effects.
+With the data modeling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each predictor contributes to the response variable, allowing us to measure their individual effects on Net Money.
+
+The goal of estimation is to determine the best-fitting regression line by minimizing the sum of squared residuals—the differences between the observed and predicted values. This step provides a mathematical basis for analyzing financial behaviors in students.
 
 ### Fitting the Model
 
-To estimate the regression coefficients, we fit the OLS model to the training data using Python (statsmodels) or R (lm).
+To estimate the regression coefficients, we fit the OLS model to the training data using Python (`statsmodels`) or R (`lm`). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions.
+
+In R, we can fit the regression model using the `lm()` function:
 
 ```{r fitting-ols}
 # Load necessary library
 library(stats)
 
 # Fit the OLS model
-ols_model <- lm(Net_Money ~ Monthly_Allowance + Monthly_Earnings + Year_of_Study, data=train_data)
+ols_model <- lm(Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home, data = train_data)
 
 # Display summary of model results
 summary(ols_model)
@@ -512,27 +541,52 @@ summary(ols_model)
 
 ### Interpreting the Coefficients
 
-After fitting the model, we examine the estimated coefficients to understand their impact. Each coefficient represents the effect of a predictor on Net_Money, assuming all other factors are constant:
+After fitting the model, we examine the estimated coefficients to understand their impact. Each coefficient obtained from the OLS regression represents the expected change in Net_Money for a one-unit increase in the corresponding predictor, holding all other variables constant. The estimated regression equation can be expressed as:
 
-- Intercept ($\beta_0 = -826.01$): If all predictors are zero, the expected Net_Money is -$826.01.
-- Monthly_Allowance ($\beta_1 = 1.43$): Each $1 increase in Monthly_Allowance is associated with a $1.43 increase in Net_Money.
-- Monthly_Earnings ($\beta_2 = 0.98$): Each $1 increase in Monthly_Earnings increases Net_Money by $0.98.
-- Year_of_Study ($\beta_3 = -104.34$): Being in a later year of study decreases Net_Money by -$104.34 on average.
+$$
+\begin{align}
+\text{Net_Money} = -595.37 \\
+               & + 73.93 \times \text{Has_Job} \\
+               & - 499.36 \times \text{Financially_Dependent} \\
+               & - 96.52 \times \text{Year_of_Study} \\
+               & - 54.60 \times \text{Goes_Out_Spends_Money} \\
+               & - 145.11 \times \text{Drinks_Alcohol} \\
+               & + 1.47 \times \text{Monthly_Allowance} \\
+               & + 0.95 \times \text{Monthly_Earnings} \\
+               & + 102.95 \times \text{Living_Situation} \\
+               & + 56.65 \times \text{Housing_Type} \\
+               & - 96.31 \times \text{Cooks_at_Home} \\
+               & + \epsilon
+\end{align}
+$$
+
+For example:
+
+- The intercept ($\beta_0=-595.37$) represents the expected financial balance for a student who has zero income, allowance, and falls at the baseline category for all categorical variables.
+- A $1 increase in Monthly Allowance ($\beta_6=1.47$) is associated with a $1.47 increase in Net Money, meaning students with higher allowances tend to have a higher financial balance.
+
+These estimates provide an initial understanding of the direction and magnitude of relationships between predictors and financial balance. However, before drawing conclusions, we need to validate model assumptions and evaluate the statistical significance of each coefficient.
 
 ## Goodness of Fit
 
-After estimating the regression coefficients, we now assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This step ensures that our conclusions are statistically valid and that our model generalizes well to new data.
+After estimating the regression coefficients, the next step is to assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation ensures that the model is not only statistically valid but also generalizes well to unseen data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are violated, model estimates may be biased, leading to misleading conclusions.
 
 ### Checking Model Assumptions
 
-OLS regression relies on several key assumptions. We use diagnostic plots and statistical tests to verify these assumptions:
+OLS regression is built on several fundamental assumptions:
+
+- linearity
+- independence of errors
+- homoscedasticity
+- normality of residuals
+
+If these assumptions hold, OLS provides unbiased, efficient, and consistent estimates. We assess each assumption through diagnostic plots and statistical tests.
 
 #### Linearity
 
-The relationship between predictors and the response should be linear.
+A core assumption of OLS is that the relationship between each predictor and the response variable is linear. If this assumption is violated, the model may systematically under- or overestimate Net_Money, leading to biased predictions. The Residuals vs. Fitted values plot is a common diagnostic tool for checking linearity. In a well-specified linear model, residuals should be randomly scattered around zero, without any discernible patterns. If the residuals exhibit a U-shaped or curved pattern, this suggests a non-linear relationship, indicating that transformations such as logarithmic, square root, or polynomial terms may be necessary.
 
-- **Diagnostic Plot**: A residual vs. fitted values plot should show a random spread (no patterns).
-- **Solution if Violated**: Apply polynomial terms or transformations (e.g., log transformation).
+To visualize linearity, we plot the residuals against the fitted values:
 
 ```{r model-assumption-linearity}
 # Residuals vs Fitted plot (R)
@@ -540,39 +594,44 @@ plot(ols_model$fitted.values, residuals(ols_model),
      main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals")
 abline(h = 0, col = "red")
 ```
+If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure.
 
 #### Independence of Errors
 
-Residuals should not be correlated (especially in time-series data).
+The residuals, or errors, in an OLS model should be independent of one another. This assumption is particularly relevant in time-series or sequential data, where errors from one observation might influence subsequent observations, leading to autocorrelation. If the errors are correlated, the estimated standard errors will be biased, making hypothesis testing unreliable.
 
-- **Diagnostic Test**: Durbin-Watson test detects autocorrelation.
+The Durbin-Watson test is commonly used to detect autocorrelation. This test produces a statistic that ranges between 0 and 4, where values close to 2 indicate no significant autocorrelation, while values near 0 or 4 suggest positive or negative correlation in the residuals.
 
 ```{r model-assumption-indep-of-error}
 dwtest(ols_model)
 ```
 
+If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.
+
 #### Homoscedasticity (Constant Variance of Errors)
 
-The variance of residuals should remain constant across all fitted values.
+OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
 
-- **Diagnostic Plot**: Residuals vs. fitted values plot.
-- **Solution if Violated**: Use weighted least squares regression.
+To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.
 
 ```{r model-assumption-homoscedasticity}
 ncvTest(ols_model)  # Test for homoscedasticity
 ```
 
+If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
+
 #### Normality of Residuals
 
-Residuals should be normally distributed for valid hypothesis testing.
+For valid hypothesis testing and confidence interval estimation, OLS assumes that residuals follow a normal distribution. If residuals deviate significantly from normality, statistical inference may be unreliable, particularly for small sample sizes.
 
-- **Diagnostic Plot**: Q-Q plot (Quantile-Quantile plot) shows if residuals follow a normal distribution.
-
+A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
 
 ```{r model-assumption-normality-residuals}
 qqnorm(residuals(ols_model))
 qqline(residuals(ols_model), col = "red")
 ```
+
+If the plot reveals heavy tails or skewness, potential solutions include applying log or Box-Cox transformations to normalize the distribution. In cases where normality is severely violated, using a non-parametric model or bootstrapping confidence intervals may be appropriate.
 
 ### Evaluating Model Fit
 
@@ -580,70 +639,64 @@ A good model should explain a large proportion of variance in the response varia
 
 #### R-Squared
 
-- Definition: Measures the proportion of variance in the response variable explained by predictors.
-- Interpretation: An R-squared of 0.85 means that 85% of the variation in Net_Money is explained by the predictors.
+Beyond checking assumptions, it is essential to assess how well the model explains variability in the response variable. One of the most commonly used metrics is R-Squared ($R^2$), which measures the proportion of variance in Net_Money that is explained by the predictors. An $R^2$ value close to 1 indicates a strong model fit, whereas a low value suggests that important predictors may be missing or that the model is poorly specified.
+
+We can retrieve the R-squared and Adjusted R-squared values from the model summary:
 
 ```{r r-squared}
 summary(ols_model)$r.squared  # R-squared value
-```
-
-Limitations:
-- A high R-squared does not imply causation.
-- Adding predictors always increases R-squared, even if they are irrelevant.
-- Adjusted R-squared accounts for unnecessary predictors.
-
-
-```{r adjusted-r-squared}
 summary(ols_model)$adj.r.squared  # Adjusted R-squared
 ```
 
+While $R^2$ provides insight into model fit, it has limitations. Adding more predictors will always increase $R^2$, even if those predictors have little explanatory power. Adjusted R-squared accounts for this by penalizing unnecessary variables, making it a better indicator of true model performance.
+
+A high $R^2$ does not imply causation, nor does it confirm that the model is free from omitted variable bias or multicollinearity. Therefore, a strong goodness-of-fit measure should be complemented by careful assessment of residual behavior and coefficient significance.
+
 #### Identifying Outliers and Influential Points
 
-Extreme values can distort regression estimates. We detect them using:
-
-Residual Plots
-
-- Large residuals may indicate outliers.
+Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.
 
 ```{r residual-plots}
 plot(residuals(ols_model), main = "Residual Plot", ylab = "Residuals")
 abline(h = 0, col = "red")
 ```
 
-Cook’s Distance
-
-- Definition: Measures how much a data point influences regression results.
-- Threshold: If Cook’s distance > 0.5, the point may be influential.
+Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.
 
 ```{r cooks-distance}
 cook_values <- cooks.distance(ols_model)
 plot(cook_values, type = "h", main = "Cook's Distance")
 ```
 
-By validating these assumptions and model fit, we ensure that our regression analysis is reliable and informative. Next, we move to interpreting and communicating the results.
+If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
 
 ## Results
 
-After validating the model’s goodness of fit, we now assess its predictive performance and inferential insights. This step involves using the trained model to make predictions and evaluating how well it generalizes to unseen data.
+After validating the goodness of fit, we now assess how well the model performs in both predictive analysis and inferential analysis. This step involves using the trained model to generate predictions on unseen data and evaluating how well it generalizes beyond the training set. Additionally, we analyze the estimated regression coefficients to draw meaningful conclusions about student financial behaviors.
 
 ### Predictive Analysis
 
-To assess our model’s effectiveness, we generate predictions on the test set and compute evaluation metrics. In Python and R, we use the trained OLS model to predict Net_Money for the test set.
+A key objective of regression modeling is to generate reliable predictions. To assess how well our model generalizes, we apply it to the test dataset—a portion of the original data that was not used for model training. If the model’s predictions align closely with actual outcomes, we can conclude that it has strong predictive power.
+
+In R, we use the predict() function to apply the trained OLS model to the test dataset:
 
 ```{r predict-on-test}
 # Generate predictions on the test set
 y_pred <- predict(ols_model, newdata=test_data)
 ```
 
+Once predictions are generated, we evaluate their accuracy using common regression error metrics.
+
 #### Performance Metrics
 
-To measure the accuracy of predictions, we compute standard regression error metrics:
+Model accuracy is assessed using four standard error metrics:
 
-- Mean Absolute Error (MAE): Measures average absolute differences between predicted and actual values.
-- Mean Squared Error (MSE): Penalizes larger errors more heavily.
-- Root Mean Squared Error (RMSE): Similar to MSE but in the same units as Net_Money.
-- R-squared: Proportion of variance in Net_Money explained by the model.
+1. **Mean Absolute Error (MAE)** measures the average absolute differences between predicted and actual values. A lower MAE indicates better model accuracy.
+2. **Mean Squared Error (MSE)** calculates the average squared differences between predicted and actual values, penalizing larger errors more heavily.
+3. **Root Mean Squared Error (RMSE)** is the square root of MSE, making it easier to interpret since it retains the same units as the dependent variable (Net_Money).
+4. **R-squared ($R^2$)** quantifies the proportion of variance in Net_Money explained by the model. A higher $R^2$ value indicates better model performance.
 
+These metrics can be computed as follows:
 ```{r prediction-results}
 # Extract response variable from test data
 y_test <- test_data$Net_Money
@@ -657,17 +710,23 @@ r2 <- summary(ols_model)$r.squared
 cat(sprintf("MAE: %.2f, MSE: %.2f, RMSE: %.2f, R-squared: %.2f", mae, mse, rmse, r2))
 ```
 
+If the RMSE is significantly larger than MAE, it suggests that the model is highly sensitive to large prediction errors, meaning that certain extreme values are having a disproportionate impact on the model’s performance. If the R-squared value is low, it may indicate that important predictors are missing from the model or that the relationship between predictors and Net_Money is more complex than a linear relationship can capture.
+
 ### Inferential Analysis
 
-Even though our primary focus is prediction, we can derive meaningful insights from the estimated coefficients.
+Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in Net_Money for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.
 
 #### Insights from Regression Coefficients
 
-- Monthly_Allowance has a positive coefficient, indicating that higher allowances lead to greater financial balance (Net_Money).
-- Year_of_Study has a negative coefficient, suggesting that students in later years tend to have lower Net_Money, possibly due to increased expenses or reduced financial support.
-- If Living_Situation is significant, it may indicate that housing type influences financial balance.
+Here are a few insights that we can extract from the regression model result:
 
-With these insights, we move to the final stage: storytelling, where we communicate findings in a clear and actionable manner.
+- The intercept (-595.37) represents the estimated financial balance for a baseline student (someone with Has_Job = 0, Financially_Dependent = 0, Year_of_Study = 0, etc.). Since a zero value for Year_of_Study is not meaningful in our context, the intercept itself has limited interpretability but serves as the starting point for estimating Net_Money based on predictor values.
+- Financial Dependency (Financially_Dependent) has a strong negative effect (-499.36, p < 2e-16), meaning that students who rely financially on others (e.g., parents, guardians) tend to have significantly lower Net_Money. This could be due to a lack of independent income sources or higher expenses associated with dependence on external financial support.
+- Social Spending Habits (Goes_Out_Spends_Money) also have a negative impact (-54.60, p < 2e-16), meaning that students who frequently go out and spend money experience a decline in Net_Money. This result aligns with expectations, as higher discretionary spending directly reduces available financial balance.
+- Cooking at Home (Cooks_at_Home) has a negative effect (-96.31, p = 1.83e-09), which might seem counterintuitive at first. One possible explanation is that students who cook at home may already have lower budgets, leading them to adopt cost-saving habits, rather than the habit itself directly causing financial decline.
+- Overall, the model explains 90.18% of the variance in Net_Money ($R^2$ = 0.9018, Adjusted $R^2$ = 0.9006), suggesting a strong predictive capability. The F-statistic (722.1, p < 2.2e-16) confirms that the model as a whole is statistically significant.
+
+These findings provide a comprehensive view of student financial behaviors, reinforcing expected relationships (such as the role of allowances and earnings) while also highlighting unexpected trends (such as the negative effect of cooking at home). The next step is to integrate these results into a cohesive narrative, translating statistical insights into actionable recommendations.
 
 ## Storytelling
 
