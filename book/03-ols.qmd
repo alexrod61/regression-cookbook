@@ -48,30 +48,136 @@ data <- OLS
 
 ## Learning Objectives
 
-- Understand how OLS estimates relationships by minimizing the sum of squared residuals.
-- Identify when OLS is an appropriate modeling choice.
+By the end of this chapter, you will be able to:
+- Explain how Ordinary Least Squares (OLS) estimates relationships by minimizing the sum of squared residuals.
+- Determine when OLS is an appropriate modeling choice.
 - Fit an OLS model using Python or R.
-- Interpret regression coefficients to understand the impact of predictors on the response variable.
-- Check key OLS assumptions (linearity, independence, homoscedasticity, and normality of residuals).
-- Evaluate model fit using R-squared and error metrics (MAE, MSE, RMSE).
+- Interpret regression coefficients to assess the impact of predictors on the response variable.
+- Check key OLS assumptions, including linearity, independence, homoscedasticity, and normality of residuals.
+- Evaluate model performance using R-squared and error metrics such as MAE, MSE, and RMSE.
 
 ## Introduction
 
-**Ordinary Least Squares (OLS)** is a foundational method in regression analysis that estimates the relationship between a dependent variable and one or more independent variables. At its core, OLS aims to minimize the difference, or "error," between the observed values and the values predicted by the model. It does this by finding the best-fitting line (or hyperplane in the case of multiple variables) that minimizes the sum of the squared differences between the observed and predicted values.
+**Ordinary Least Squares (OLS)** is a fundamental method in regression analysis for estimating the relationship between a dependent variable and one or more independent variables. OLS finds the best-fitting line (or hyperplane for multiple predictors) by minimizing the sum of squared differences between observed and predicted values, ensuring the smallest overall error.
 
-The importance of OLS lies in its simplicity, interpretability, and wide applicability. As one of the earliest and most widely used techniques in statistics and machine learning, OLS provides a straightforward approach to understanding how variables influence each other. In areas such as economics, biology, and social sciences, OLS has enabled researchers to model and quantify relationships, making it a powerful tool for both inference and prediction.
+OLS is widely used due to its simplicity, interpretability, and broad applicability. As one of the earliest and most fundamental techniques in statistics and machine learning, it provides a structured way to understand variable relationships. Fields such as economics, biology, and social sciences rely on OLS to quantify associations and make informed decisions.
 
-The usefulness of OLS extends beyond its ease of use. Its ability to provide clear parameter estimates—coefficients that describe the strength and direction of relationships between variables—makes it a valuable tool for decision-making. Whether predicting financial outcomes, assessing medical treatments, or understanding consumer behavior, OLS offers a framework for transforming raw data into actionable insights.
+Beyond ease of use, OLS offers clear parameter estimates—coefficients that describe the strength and direction of relationships between variables. This makes it valuable for applications ranging from financial forecasting and medical research to consumer behavior analysis.
 
-In this chapter, we will explore how OLS works, its assumptions, and how we can apply it to real-world data to solve problems, while also understanding its limitations. Through this, we aim to build a strong foundation in regression analysis that will serve as a stepping stone to more advanced techniques.
+In this chapter, we will explore how OLS works, its assumptions, and its real-world applications. We will also examine its limitations, providing a solid foundation in regression analysis as a stepping stone to more advanced techniques.
+
+## The "Best Line"
+
+When fitting a regression line using Ordinary Least Squares (OLS), the goal is to find the line that best captures the relationship between the dependent variable $Y$ and the independent variable $X$. But how do we define "best"?
+
+Imagine we have a scatter plot of data points and we draw two different lines:
+
+- **Line A**: A reasonably well-fitted line that follows the general trend of the data.
+- **Line B**: A slightly worse line that doesn’t fit the data as closely.
+
+```{r two_lines, echo=FALSE}
+# Sample data
+set.seed(42)
+X <- c(1000, 1200, 1500, 1800, 2000)
+Y <- c(200, 230, 250, 290, 310)
+
+# Create a data frame
+df <- data.frame(Size = X, Price = Y)
+
+# Fit the correct OLS model
+correct_model <- lm(Price ~ Size, data = df)
+
+# Create predictions for the two lines
+df$Predicted_Correct <- predict(correct_model, newdata = df)
+df$Predicted_Wrong <- 110 + 0.08 * df$Size  # Adjusted manually
+
+# Reshape data for ggplot (to add legend)
+df_long <- data.frame(
+  Size = rep(df$Size, 2),
+  Price = c(df$Predicted_Correct, df$Predicted_Wrong),
+  Line = rep(c("Line A (Best Fit)", "Line B (Worse Fit)"), each = nrow(df))
+)
+
+# Store the plot with a legend
+plot <- ggplot() +
+  geom_point(data = df, aes(x = Size, y = Price), size = 3, color = "black") +  # Scatter plot
+  geom_line(data = df_long, aes(x = Size, y = Price, color = Line), linewidth = 1.2) +
+  scale_color_manual(values = c("Line A (Best Fit)" = "blue", "Line B (Worse Fit)" = "red")) +
+  labs(title = "Comparing Regression Line Fits",
+       x = "House Size (sq ft)",
+       y = "House Price (in $1000s)",
+       color = "Regression Line") +  # Legend title
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
+        legend.position = "bottom")  # Move legend to bottom
+
+plot
+```
+
+Now, let’s compare them:
+
+- For each data point, the residual is the vertical distance between the observed Y value ($Y$) and the predicted Y value ($\hat{Y}$) from the line.
+- If a line fits well, these residuals will be smaller on average, meaning the predictions are closer to reality.
+- OLS chooses the best line by minimizing the sum of squared residuals—this ensures that the chosen line has the smallest total error.
+
+### Why Squared Errors?
+
+Squaring the residuals achieves two things:
+
+- It avoids cancelation. Some residuals are positive (the line underestimates the true value), and some are negative (the line overestimates). Squaring makes sure all errors are treated equally.
+- It penalizes large errors more. A bad prediction (a large residual) contributes significantly more to the total error than a small one, which helps OLS focus on overall accuracy.
+
+### The Mathematical Formulation of the OLS Model
+
+Now that we understand how OLS determines the best-fitting line by minimizing residuals, let's express this formally with a mathematical equation.
+
+For a simple linear regression model with one predictor, the equation of the regression line is:
+
+$$
+Y=\beta_0+\beta_1X+\epsilon
+$$
+
+where:
+
+- $Y$ is the dependent variable (outcome of interest).
+- $X$ is the independent variable (predictor).
+- $\beta_0$ (intercept) represents the predicted value of $Y$ when $X=0$.
+- $\beta_1(slope) quantifies the change in $Y$ for a one-unit increase in $X$.
+- $\epsilon$ (error term) accounts for random variability not explained by the model.
+
+#### Example: Predicting House Prices
+
+To better understand these notations, let's take a look an example. Say we want to predict the price of a house ($Y$ in thousands of dollars) based on its size ($X$ in square feet). Suppose we have the following data:
+
+| House Size ($X$ in sq ft) | Price ($Y$ in \$1000s) |
+|----------------|---------------|
+| 1000          | 200           |
+| 1200          | 230           |
+| 1500          | 250           |
+| 1800          | 290           |
+| 2000          | 310           |
+
+Our regression equation would look like:
+
+$$
+\text{Price} = \beta_0 + \beta_1 (\text{Size}) + \epsilon
+$$
+
+where:  
+
+- $\beta_0$ (intercept) represents the estimated price of a house when the size is zero (which may not be meaningful but is mathematically required).  
+- $\beta_1$ (slope) represents the expected increase in price per additional square foot.  
+
+For instance, if the regression model estimates that each additional square foot adds **$107** to the house price, and the intercept represents a base price (even at 0 sq ft), then we can interpret the model coefficients meaningfully.
 
 ## Case Study: Understanding Financial Behaviors
 
-Before we dive into the math behind Ordinary Least Squares (OLS), let's start by framing the problem we're trying to solve and the data we'll be working with. We’ll be using a toy dataset to understand the financial behaviors of students and identify the factors that influence their net money—the amount of money left over at the end of each month.
+To demonstrate Ordinary Least Squares (OLS) in action, we will walk through a case study using a toy dataset. This case study will help us understand the financial behaviors of students and identify the factors that influence their `Net_Money`, the amount of money left over at the end of each month. We will approach this case study using the data science workflow described in a previous chapter, ensuring a structured approach to problem-solving and model building.
 
 ### The Dataset
 
-In this case study, we have collected data on various aspects of students' financial lives. Each row in our dataset represents a single student, and the columns capture different characteristics of the student. Here's a breakdown of the variables:
+Our dataset captures various aspects of students' financial lives. Each row represents a student, and the columns describe different characteristics. Below is a breakdown of the variables:
 
 | **Variable Name**         | **Description**                                                       |
 |---------------------------|-----------------------------------------------------------------------|
@@ -87,7 +193,7 @@ In this case study, we have collected data on various aspects of students' finan
 | **Net_Money**             | The amount of money the student has left at the end of the month after income and expenses. |
 | **Monthly_Earnings**      | The student’s earnings from any part-time jobs or other income sources. |
 
-Here’s a sample of what the data looks like:
+Here’s a sample of the dataset:
 
 <div style="overflow-x: auto; white-space: nowrap;">
 | **Has_Job** | **Year_of_Study** | **Financially_Dependent** | **Monthly_Allowance** | **Cooks_at_Home** | **Living_Situation** | **Housing_Type** | **Goes_Out_Spends_Money** | **Drinks_Alcohol** | **Net_Money** | **Monthly_Earnings** |
@@ -97,25 +203,29 @@ Here’s a sample of what the data looks like:
 | 1           | 4                  | 1                         | 602.54                | 0                 | 2                    | 2                | 2                           | 1                  | 557.30        | 876.57               |
 </div>
 
+This dataset provides a structured way to analyze the financial habits of students and determine which factors contribute most to their financial stability. In the next section, we will apply OLS to quantify these relationships within the data science workflow framework.
+
 ### The Problem We’re Trying to Solve
 
-Our goal in this case study is to understand which factors impact a student’s Net Money. We’re interested in identifying which characteristics (like having a job, monthly earnings, or receiving financial support) explain why some students have more money left over at the end of the month than others.
+Our goal in this case study is to understand which factors impact a student’s net money. Specifically, we aim to identify which characteristics—such as having a job, monthly earnings, or financial support—explain why some students have more money left over at the end of the month than others.
 
-The key question we want to answer is: Which factors have the biggest influence on how much net money a student has?
+The key question we want to answer is:
 
-By analyzing this dataset using OLS, we can explore how each factor contributes to the variation in Net Money and quantify the relationships between them.
+> **Which factors have the biggest influence on a student’s net money?**
+
+By applying OLS to this dataset, we can quantify how each factor contributes to variations in net money and determine the strength of these relationships.
 
 ### Why This Matters
 
-This case study is a simple but practical example of how regression analysis can be used to study financial behavior. In real-world situations, understanding such relationships can help individuals or institutions make informed decisions—like how much financial aid to offer or what type of part-time job is most effective for students.
+This case study provides a practical demonstration of how regression analysis can be used to study financial behavior. In real-world scenarios, understanding these relationships can help individuals and institutions make informed decisions—for example, determining how much financial aid to provide or identifying which types of part-time jobs are most beneficial for students.
 
-By the end of this analysis, we’ll be able to:
+By the end of this analysis, we will:
 
-- Identify which factors (like having a job or monthly earnings) most strongly affect students' net money.
+- Identify which factors (e.g., having a job, monthly earnings) most strongly influence a student’s net money.
 - Estimate how much each factor contributes to changes in net money.
-- Understand whether these relationships are statistically significant.
+- Determine whether these relationships are statistically significant.
 
-## Study Design
+### Study Design
 
 With our case study and dataset introduced, the next step is to define the **main statistical inquiries** we aim to address. In this stage, we will clarify the focus of our analysis: **What factors influence a student’s _Net Money_ at the end of the month?** To answer this, we need to determine whether we’re aiming to understand relationships between variables or make accurate predictions. This distinction between **inferential** and **predictive** analysis shapes the methods we will use, including the application of Ordinary Least Squares (OLS).
 
@@ -140,21 +250,33 @@ Alternatively, if our goal were to build a tool that predicts future _Net Money_
 
 ## Data Collection and Wrangling
 
-With the statistical questions clearly defined, the next step is to ensure that the data is appropriately prepared for analysis. Although we already have the dataset, it’s worth considering how this data could have been collected to better understand the context of the information.
+With the statistical questions clearly defined, the next step is to ensure that the data is appropriately prepared for analysis. Although we already have the dataset, it is valuable to consider how this data could have been collected to better understand its context and potential limitations.
 
 ### Data Collection
 
-For a study like ours, data on students’ financial behaviors could have been collected through several methods. **Surveys** might have been distributed to students, asking about their work status, earnings, and spending habits. Alternatively, **administrative data** from universities or employers could provide reliable information about student income and employment. **Financial tracking apps** could also be a rich source of detailed, real-time spending and income data. Regardless of the method used, each brings its own set of challenges—such as missing data or potential biases—that need to be accounted for in the cleaning process.
+For a study like ours, data on students’ financial behaviors could have been collected through various methods:
+
+- **Surveys**: Students might have been asked about their employment status, earnings, and spending habits through structured questionnaires. While surveys can capture self-reported financial behaviors, they may suffer from recall bias or social desirability bias.
+- **Administrative Data**: Universities or employers may maintain records on student income and employment, providing a more objective source of financial information. However, access to such data may be limited due to privacy regulations.
+- **Financial Tracking Apps**: Digital financial management tools can offer detailed, real-time data on student income and spending patterns. While these apps provide high granularity, they may introduce selection bias, as only students who use such apps would be represented in the dataset.
+
+Regardless of the data collection method, each approach presents challenges, such as missing data, reporting errors, or sample biases. Addressing these issues is a critical aspect of data wrangling.
 
 ### Data Wrangling
 
-Now that we have our dataset, the primary focus is on cleaning and organizing it for analysis using Ordinary Least Squares (OLS). The first step is ensuring **data integrity**. This involves checking for missing values or inconsistencies. For example, if some students don’t have recorded earnings or net money, we need to decide how to handle those gaps. Removing incomplete records is one option, but in some cases, it may be more appropriate to impute missing values using logical estimates or averages from the dataset. In our toy dataset, we can see that we have no missing values.
+With our dataset in hand, the primary focus now shifts to cleaning and organizing the data for analysis using Ordinary Least Squares (OLS).
+
+#### Handling Missing Data
+
+Ensuring **data integrity** is the first step. This involves identifying missing values and deciding how to handle them. If certain students lack recorded earnings or net money values, we must determine the best approach to address these gaps. One option is to remove incomplete records, but if missingness is systematic, imputing missing values using logical estimates or averages may be more appropriate. Fortunately, in our toy dataset, there are no missing values.
 
 ```{r check_missing_value}
 colSums(is.na(data))
 ```
 
-Next, we need to transform certain variables so they are ready for regression analysis. For example, categorical variables like *Has_Job* and *Drinks_Alcohol* need to be encoded into numerical values (e.g., 1 for "Yes" and 0 for "No"). Additionally, continuous variables such as *Monthly_Earnings* and *Net_Money* should be examined for extreme outliers—students with unusually high incomes or spending might distort the model, so it’s important to assess whether these values should be adjusted or removed.
+#### Encoding Categorical Variables
+
+Categorical variables need to be transformed into numerical representations for regression analysis. Binary variables, such as Has_Job and Drinks_Alcohol, are converted into factors to ensure correct interpretation in the model.
 
 ```{r convert_binary_to_factor}
 # Convert binary categorical variables to factors
@@ -164,6 +286,10 @@ data <- data |>
          Financially_Dependent = as.factor(Financially_Dependent),
          Cooks_at_Home = as.factor(Cooks_at_Home))
 ```
+
+#### Detecting and Handling Outliers
+
+Extreme values in continuous variables, such as Monthly_Earnings and Net_Money, can distort the regression model. We use the Interquartile Range (IQR) method to identify and handle outliers. Observations that fall outside 1.5 times the IQR below the first quartile (Q1) or above the third quartile (Q3) are treated as missing values and subsequently removed.
 
 ```{r outliers}
 # Using IQR method to filter out extreme values in continuous variables
@@ -181,7 +307,10 @@ data <- data |>
 # Remove rows with newly introduced NAs due to outlier handling
 data <- na.omit(data)
 ```
-After cleaning and transforming the data, the final preparation step is splitting the dataset. Typically, we divide the data into two sets: one for training the model and the other for testing its performance. The training set is used to build the OLS model, while the test set allows us to assess how well the model generalizes to unseen data. This ensures that our model doesn’t just perform well on the current dataset but is also robust enough to make reliable predictions or insights beyond this specific sample.
+
+#### Splitting the Data for Model Training
+
+Once the data is cleaned and transformed, the final preparation step is splitting the dataset into training and testing subsets. This ensures that our model generalizes beyond the current dataset and performs well on unseen data. The training set is used to estimate model parameters, while the test set evaluates model performance.
 
 ```{r train_test_split}
 # Splitting the dataset into training and testing sets
@@ -190,6 +319,8 @@ train_indices <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
 train_data <- data[train_indices, ]
 test_data <- data[-train_indices, ]
 ```
+
+By following these data preparation steps, we ensure that our dataset is well-structured, free of inconsistencies, and suitable for regression analysis using OLS.
 
 ## Exploratory Data Analysis (EDA)
 
