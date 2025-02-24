@@ -49,6 +49,7 @@ data <- OLS
 ## Learning Objectives
 
 By the end of this chapter, you will be able to:
+
 - Explain how Ordinary Least Squares (OLS) estimates relationships by minimizing the sum of squared residuals.
 - Determine when OLS is an appropriate modeling choice.
 - Fit an OLS model using Python or R.
@@ -58,22 +59,33 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-**Ordinary Least Squares (OLS)** is a fundamental method in regression analysis for estimating the relationship between a dependent variable and one or more independent variables. OLS finds the best-fitting line (or hyperplane for multiple predictors) by minimizing the sum of squared differences between observed and predicted values, ensuring the smallest overall error.
+When looking at data, we often want to know how different factors affect each other. For instance, if you have data on student finances, you might ask:
 
-OLS is widely used due to its simplicity, interpretability, and broad applicability. As one of the earliest and most fundamental techniques in statistics and machine learning, it provides a structured way to understand variable relationships. Fields such as economics, biology, and social sciences rely on OLS to quantify associations and make informed decisions.
+- How does having a job affect a student's leftover money at the end of the month?
+- What impact does receiving a monthly allowance have on their net savings?
 
-Beyond ease of use, OLS offers clear parameter estimates—coefficients that describe the strength and direction of relationships between variables. This makes it valuable for applications ranging from financial forecasting and medical research to consumer behavior analysis.
+Once you have this financial data, the next step is to analyze it to find answers. One straightforward method for doing this is through regression analysis, and the simplest form is called **Ordinary Least Squares (OLS)**.
 
-In this chapter, we will explore how OLS works, its assumptions, and its real-world applications. We will also examine its limitations, providing a solid foundation in regression analysis as a stepping stone to more advanced techniques.
+## What is Ordinary Least Squares (OLS)?
+
+**Ordinary Least Squares (OLS)** is a fundamental method in regression analysis for estimating the relationship between a dependent variable and one or more independent variables. In simple terms, OLS is like drawing the best straight line through a scatterplot of data points. Imagine you plotted students' net savings on a graph, and each point represents a student’s financial outcome. OLS finds the line that best follows the trend of these points by minimizing the overall distance (error) between what the line predicts and what the actual data shows.
+
+OLS is widely used because it is:
+
+- **Simple**: Easy to understand and compute.
+- **Clear**: Provides straightforward numbers (coefficients) that tell you how much each factor influences the outcome.
+- **Versatile**: Applicable in many fields, from economics to social sciences, to help make informed decisions.
+
+In this chapter, we will break down how OLS works in plain language, explore its underlying assumptions, and discuss its practical applications and limitations. This will give you a solid foundation in regression analysis, paving the way for more advanced techniques later on.
 
 ## The "Best Line"
 
-When fitting a regression line using Ordinary Least Squares (OLS), the goal is to find the line that best captures the relationship between the dependent variable $Y$ and the independent variable $X$. But how do we define "best"?
+When using Ordinary Least Squares (OLS) to fit a regression line, our goal is to find the line that best represents the relationship between our dependent variable $Y$ and independent variable $X$. But what does “best” mean?
 
-Imagine we have a scatter plot of data points and we draw two different lines:
+Imagine you have a scatter plot of data points. Now, consider drawing two different lines through this plot. Each one of these lines represent a set of predictions. They also represent a way to represent the relationship between the dependent variable $Y$ and independent variable $X$
 
-- **Line A**: A reasonably well-fitted line that follows the general trend of the data.
-- **Line B**: A slightly worse line that doesn’t fit the data as closely.
+- **Line A (Blue)**: A line that follows the general trend of the data very well.
+- **Line B (Red)**: A line that doesn’t capture the trend as accurately.
 
 ```{r two_lines, echo=FALSE}
 # Sample data
@@ -115,61 +127,67 @@ plot <- ggplot() +
 plot
 ```
 
-Now, let’s compare them:
+### Understanding Residuals
 
-- For each data point, the residual is the vertical distance between the observed Y value ($Y$) and the predicted Y value ($\hat{Y}$) from the line.
-- If a line fits well, these residuals will be smaller on average, meaning the predictions are closer to reality.
-- OLS chooses the best line by minimizing the sum of squared residuals—this ensures that the chosen line has the smallest total error.
+For each data point, the residual is the vertical distance between the actual $Y$ value and the predicted $Y$ value (denoted $\hat{Y}$) on the line. In simple terms, it tells us how far off our prediction is for each point given the same $X$ value. If a line fits well, these residuals will be small, meaning our predictions of the $Y$ variable are close to the actual value.
+
+OLS quantifies how well a line fits the data by calculating the Sum of Squared Errors (SSE). The SSE is obtained by:
+
+1. Computing the residual for each data point.
+2. Squaring each residual (this ensures that errors do not cancel each other out).
+3. Summing all these squared values.
+
+$$
+SSE=\sum_{i=1}^{n} (Y_i - \hat{Y}_i)^2
+$$
+
+A lower SSE indicates a line that is closer to the actual data points. OLS chooses the best line by finding the one with the smallest SSE.
+
+### Quantifying the Fit with SSE
+
+We can compare the two lines by computing their SSE. The code below calculates and prints the SSE for each line:
+
+```{r two_lines_sse}
+# Calculate the Sum of Squared Errors for the correct model (Blue)
+sse_correct <- sum((df$Price - df$Predicted_Correct)^2)
+
+# Calculate the Sum of Squared Errors for the manually adjusted model (Red)
+sse_wrong <- sum((df$Price - df$Predicted_Wrong)^2)
+
+# Print the SSEs for each line
+cat("SSE for Best-Fit Line (Blue line):", sse_correct, "\n")
+cat("SSE for Worse-Fit Line (Red line):", sse_wrong, "\n")
+```
+
+When you run this code, you’ll observe that the blue line (Line A) has a much lower SSE compared to the red line (Line B). This tells us that the blue line is a better fit for the data because its predictions are, on average, closer to the actual values.
+
+In summary, OLS selects the “best line” by minimizing the sum of squared errors, ensuring that the total error between predicted and actual values is as small as possible.
 
 ### Why Squared Errors?
 
-Squaring the residuals achieves two things:
+When measuring how far off our predictions are, errors can be positive (if our prediction is too low) or negative (if it’s too high). If we simply added these errors together, they could cancel each other out, hiding the true size of the mistakes. By squaring each error, we convert all numbers to positive values so that every mistake counts.
 
-- It avoids cancelation. Some residuals are positive (the line underestimates the true value), and some are negative (the line overestimates). Squaring makes sure all errors are treated equally.
-- It penalizes large errors more. A bad prediction (a large residual) contributes significantly more to the total error than a small one, which helps OLS focus on overall accuracy.
+In addition, squaring makes big errors count a lot more than small ones. This means that a large mistake will have a much bigger impact on the overall error, encouraging the model to reduce those large errors and improve its overall accuracy.
 
 ### The Mathematical Formulation of the OLS Model
 
-Now that we understand how OLS determines the best-fitting line by minimizing residuals, let's express this formally with a mathematical equation.
+Now that we understand how OLS finds the best-fitting line by minimizing the differences between the actual and predicted values, let's look at the math behind it.
 
-For a simple linear regression model with one predictor, the equation of the regression line is:
+In a simple linear regression with one predictor, we express the relationship between the outcome $Y$ and the predictor $X$ using the following equation. Note that OLS fits a straight line to the data, which is why the equation takes the familiar form of a straight line:
 
 $$
 Y=\beta_0+\beta_1X+\epsilon
 $$
 
-where:
+Here's what each part of the equation means:
 
-- $Y$ is the dependent variable (outcome of interest).
-- $X$ is the independent variable (predictor).
-- $\beta_0$ (intercept) represents the predicted value of $Y$ when $X=0$.
-- $\beta_1(slope) quantifies the change in $Y$ for a one-unit increase in $X$.
-- $\epsilon$ (error term) accounts for random variability not explained by the model.
+- $Y$ is the dependent variable or the outcome we want to predict.
+- $X$ is the independent variable or the predictor that we believe influences $Y$.
+- $\beta_0$ is the **intercept**. It represents the predicted value of $Y$ when $X=0$.
+- $\beta_1$ is the **slope**. It tells us how much $Y$ is expected to change for each one-unit increase in $X$.
+- $\epsilon$ is the **error term**. It captures the random variation in $Y$ that cannot be explained by $X$.
 
-#### Example: Predicting House Prices
-
-To better understand these notations, let's take a look an example. Say we want to predict the price of a house ($Y$ in thousands of dollars) based on its size ($X$ in square feet). Suppose we have the following data:
-
-| House Size ($X$ in sq ft) | Price ($Y$ in \$1000s) |
-|----------------|---------------|
-| 1000          | 200           |
-| 1200          | 230           |
-| 1500          | 250           |
-| 1800          | 290           |
-| 2000          | 310           |
-
-Our regression equation would look like:
-
-$$
-\text{Price} = \beta_0 + \beta_1 (\text{Size}) + \epsilon
-$$
-
-where:  
-
-- $\beta_0$ (intercept) represents the estimated price of a house when the size is zero (which may not be meaningful but is mathematically required).  
-- $\beta_1$ (slope) represents the expected increase in price per additional square foot.  
-
-For instance, if the regression model estimates that each additional square foot adds **$107** to the house price, and the intercept represents a base price (even at 0 sq ft), then we can interpret the model coefficients meaningfully.
+This equation provides a clear mathematical framework for understanding how changes in $X$ are expected to affect $Y$, while also accounting for random variation. In the upcoming section, we will explore our toy dataset to showcase this equation in action.
 
 ## Case Study: Understanding Financial Behaviors
 
