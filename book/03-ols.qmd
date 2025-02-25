@@ -372,9 +372,11 @@ Once variables are classified, the next step is to explore their distributions. 
 
 #### Continuous Variables
 
-We begin by examining continuous variables, where histograms reveal the overall shape of the data and boxplots help detect extreme values.
+We begin by examining continuous variables, which are best visualized using histograms and boxplots.
 
-A histogram of Net_Money allows us to check for normality and skewness. If the distribution is heavily skewed, transformations such as logarithms may be needed to improve model performance.
+##### Histograms
+
+Histograms display the frequency distribution of a continuous variable. They allow us to assess the overall shape, central tendency, and spread of the data. For example, the histogram of Net_Money helps us determine if the variable follows a roughly normal distribution or if it is skewed. A normal distribution often appears bell-shaped, while skewness can indicate that the data might benefit from transformations (like logarithmic transformations) to meet the assumptions of regression analysis. In our case, the histogram below shows that Net_Money appears roughly normal.
 
 ```{r eda-histogram}
 # Histogram of Net_Money
@@ -385,7 +387,9 @@ hist(train_data$Net_Money,
      border = "white")
 ```
 
-Boxplots highlight the presence of outliers, which could represent extreme financial behaviors among students. If outliers are significantly distorting the analysis, we may consider trimming or transforming the data.
+##### Boxplots
+
+Boxplots provide a concise summary of a variable’s distribution by displaying its quartiles and highlighting potential outliers. Outliers are typically defined as data points that fall below Q1 - 1.5 * IQR or above Q3 + 1.5 * IQR. The boxplot below visualizes Net_Money and helps us quickly assess if there are any extreme values that might skew the analysis. In this case, the boxplot suggests that there are no significant outliers according to the IQR method (the method commonly used by ggplot to identify outliers).
 
 ```{r eda-boxplot}
 # Boxplot of Net Money
@@ -395,9 +399,13 @@ boxplot(train_data$Net_Money,
         col = "lightblue")
 ```
 
+By visualizing the distribution of Net_Money with these plots, we gain valuable insights into its behavior. This understanding not only informs whether transformations are needed but also prepares us for deeper analysis as we move forward with regression modeling.
+
 #### Categorical and Ordinal Variables
 
-Categorical variables require a different approach. Bar charts display the frequency of each category, providing insight into the distribution of qualitative attributes. If certain categories are underrepresented, we might need to group them or apply techniques such as one-hot encoding to ensure they contribute effectively to the model.
+Categorical variables require a different approach from continuous ones because they represent distinct groups rather than numerical values. For these variables, bar charts are very effective. They display the frequency of each category, helping us understand the distribution of qualitative attributes.
+
+For example, consider the variable Living_Situation. The bar chart below shows how many students fall into each category. From the chart, we can see that category 1 is more heavily represented, while categories 2 and 3 have roughly similar counts. This insight can be critical—if a category is underrepresented, you might need to consider grouping it with similar categories or applying techniques such as one-hot encoding to ensure that each category contributes appropriately to the model.
 
 ```{r eda-barcharts}
 # Bar plot of Living Situation
@@ -408,11 +416,15 @@ barplot(table(train_data$Living_Situation),
         col = "purple")
 ```
 
+For ordinal variables (which have a natural order but not a fixed numerical interval), you might still use bar charts to show the ranking or frequency of each level. Additionally, understanding these distributions can help you decide whether to treat them as categorical variables or convert them into numeric scores for analysis.
+
 #### Exploring Relationships Between Variables
 
-Beyond examining individual variables, it is crucial to explore relationships between predictors and the response variable. Correlation matrices help quantify the strength of associations between continuous variables.
+Beyond examining individual variables, it is crucial to explore how they interact with one another—especially the predictors and the response variable. Understanding these relationships helps identify which predictors might be influential in the model and whether any issues, like multicollinearity, could affect regression estimates.
 
-If two predictors are highly correlated, they may introduce multicollinearity, which can distort regression estimates. In such cases, we might consider removing one of the variables or using dimensionality reduction techniques.
+##### Correlation Matrices
+
+For continuous variables, correlation matrices provide a numerical summary of how strongly pairs of variables are related. High correlations between predictors might signal multicollinearity, which can distort model estimates. For demonstration, consider the correlation matrix computed for Net_Money, Monthly_Allowance, and Monthly_Earnings:
 
 ```{r eda-corr-matrix}
 # Correlation matrix
@@ -420,7 +432,11 @@ cor_matrix <- cor(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earn
 print(cor_matrix)
 ```
 
-Scatter plots further illustrate how continuous variables interact. Plotting Monthly Allowance against Net Money, for example, allows us to visually assess whether students with higher allowances tend to save more or spend beyond their means. If a clear linear trend exists, this variable is likely a strong predictor in our OLS model. If the relationship appears nonlinear, we might need to explore polynomial transformations or interaction terms.
+In the output, we observe a strong positive correlation (corr = 0.757) between Monthly_Earnings and Net_Money. This result is intuitive. Higher earnings typically lead to more money left at the end of the month, resulting in a higher Net_Money.
+
+#### Scatterplots
+
+Scatter plots visually depict the relationship between two continuous variables. For example, plotting Monthly_Allowance against Net_Money helps us assess whether students with higher allowances tend to have higher or lower net savings. In the scatter plot below, a slightly positive trend is visible. However, the points are quite scattered, indicating that while there may be a relationship, it is not overwhelmingly strong. Such visual insights might prompt further investigation, perhaps considering polynomial transformations or interaction terms if nonlinearity is suspected.
 
 ```{r eda-scatterplot}
 # Scatter plot of Monthly Allowance vs. Net Money
@@ -433,7 +449,9 @@ plot(train_data$Monthly_Allowance, train_data$Net_Money,
 abline(lm(Net_Money ~ Monthly_Allowance, data = train_data), col = "red", lwd = 2)
 ```
 
-For categorical variables, boxplots can compare how different groups influence the response variable. Examining how Net Money varies by Living Situation can reveal financial disparities between students who live at home versus those who rent independently. A significant difference between categories may indicate that Living Situation should be included in the model as an important predictor.
+##### Boxplots for Categorical Variables
+
+For categorical predictors, boxplots are an excellent tool to compare the distribution of the response variable across different groups. For instance, examining how Net_Money varies by Living_Situation can reveal whether students in different living arrangements experience different financial outcomes. In the boxplot below, the distributions of Net_Money across categories of Living_Situation appear quite similar. This similarity may suggest that Living_Situation has little impact on Net_Money in our dataset.
 
 ```{r eda-multiple-boxplots}
 # Boxplot of Net Money by Living Situation
@@ -448,9 +466,9 @@ boxplot(Net_Money ~ Living_Situation,
 
 #### Summary Statistics
 
-In addition to visual exploration, descriptive statistics provide a numerical summary of the dataset. Key metrics such as the mean, median, and standard deviation help quantify central tendencies and variability.
+In addition to visual exploration, descriptive statistics provide a numerical summary of the dataset that is especially useful for beginners. Summary statistics give you a snapshot of the central tendency and spread of your data, helping you quickly grasp its overall characteristics.
 
-Large discrepancies between the mean and median suggest skewed distributions, while high standard deviations indicate substantial variability. These insights guide decisions on whether data transformations or scaling are necessary.
+For instance, if you notice that the mean of Monthly_Earning is significantly higher than its median, it might suggest that a few high values (or outliers) are skewing the data. 
 
 ```{r eda-summary-stats}
 # Summary statistics for numerical variables
@@ -459,7 +477,9 @@ summary(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")])
 
 ### Key Takeaways from EDA
 
-By conducting a thorough Exploratory Data Analysis, we gain critical insights into the dataset before proceeding to regression modeling. We have identified key predictor variables, assessed their distributions, explored relationships, and flagged potential issues such as skewness, multicollinearity, and outliers. With this foundation, we are now prepared to move forward with Ordinary Least Squares (OLS) regression, ensuring that our model is built on well-understood and properly prepared data.
+Conducting Exploratory Data Analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For instance, a strong correlation between two variables, like Monthly_Earnings and Net_Money, signals that earnings are likely a key driver of net savings. At the same time, observing differences in distributions or spotting similar patterns across groups in boxplots can inform us about the impact of categorical factors like Living_Situation.
+
+It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modeling strategy. With this foundation, we are better prepared to build a robust Ordinary Least Squares (OLS) regression model on data that has been carefully examined and understood.
 
 ## Data Modelling
 
