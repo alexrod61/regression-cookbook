@@ -1,5 +1,9 @@
 <!-- Google tag (gtag.js) -->
+
+```{=html}
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7PRVEBE1EF"></script>
+```
+```{=html}
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -7,7 +11,7 @@
 
   gtag('config', 'G-7PRVEBE1EF');
 </script>
-
+```
 # Bubblarious Classical Poisson Regression {#sec-classical-poisson}
 
 ```{r}
@@ -23,15 +27,30 @@ colourize <- function(x, color) {
 }
 ```
 
+```{r setup, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(ggplot2)
+library(ggcorrplot)
+library(cookbook)
+library(tidyverse)
+library(car)
+library(lmtest)
+
+data_path <- system.file("data", "poisson.rda", package = "cookbook")
+
+loaded_objects <- ls()
+loaded_objects
+```
 
 ## Learning Objectives
 
 By the end of this chapter, you will be able to:
 
-
 ## Introduction
 
-Let’s imagine you're someone who receives a steady stream of emails throughout the workday. You’ve noticed over the past month that you typically get about 10 emails per day, but the actual number varies — some days it’s 8, other days it’s 12, and occasionally it spikes to 15 or drops to 4. You start to wonder: 
+Let’s imagine you're someone who receives a steady stream of emails throughout the workday. You’ve noticed over the past month that you typically get about 10 emails per day, but the actual number varies — some days it’s 8, other days it’s 12, and occasionally it spikes to 15 or drops to 4. You start to wonder:
 
 > Is there a pattern to how many emails I get? Can I predict the likelihood of receiving a certain number tomorrow?
 
@@ -49,17 +68,15 @@ Rather than predicting a precise outcome, the Poisson distribution gives us a pr
 
 So far, we’ve seen how the Poisson distribution can be used to model the number of emails someone receives per day. If you typically get 10 emails a day, we might want to answer questions like:
 
-> “What’s the chance I get exactly 7 emails tomorrow?”
-> “How likely is it that I’ll receive 0 emails?”
-> “What’s the probability I’ll get 15 or more?”
+> “What’s the chance I get exactly 7 emails tomorrow?” “How likely is it that I’ll receive 0 emails?” “What’s the probability I’ll get 15 or more?”
 
 To answer these, we need to formally define the Poisson distribution and understand how it behaves mathematically.
 
 The Poisson distribution models the probability of observing a given number of events, say $y$, in a fixed interval of time or space, given that:
 
-1. The events occur independently of each other.
-2. The events occur at a constant average rate, denoted by λ (lambda).
-3. The events are discrete, meaning we count them as whole numbers (e.g., you can’t receive 3.7 emails).
+1.  The events occur independently of each other.
+2.  The events occur at a constant average rate, denoted by λ (lambda).
+3.  The events are discrete, meaning we count them as whole numbers (e.g., you can’t receive 3.7 emails).
 
 In this context, $\lambda$ represents the expected number of events per interval. In our email example, that’s $\lambda=10$ emails per day.
 
@@ -70,14 +87,14 @@ The probability of observing exactly $y$ events in a fixed interval, when the av
 $$
 P(Y = y) = \frac{\lambda^y e^{-\lambda}}{y!}
 $$
- 
+
 This formula might look a little intimidating at first, but let’s break it down:
 
-- $Y$ is the random variable representing the number of events (e.g., emails).
-- $y$ is the specific count we’re interested in (e.g., exactly 7 emails).
-- $\lambda$ is the average number of events per interval (e.g., 10 emails per day).
-- $e$ is the mathematical constant approximately equal to 2.718.
-- $y!$ is the factorial of $y$, which just means $y \times (y-1) \times \cdots \times 1$.
+-   $Y$ is the random variable representing the number of events (e.g., emails).
+-   $y$ is the specific count we’re interested in (e.g., exactly 7 emails).
+-   $\lambda$ is the average number of events per interval (e.g., 10 emails per day).
+-   $e$ is the mathematical constant approximately equal to 2.718.
+-   $y!$ is the factorial of $y$, which just means $y \times (y-1) \times \cdots \times 1$.
 
 Using this formula, we can compute the probability of receiving exactly 7 emails tomorrow, or any other count we care about, as long as we know the average rate.
 
@@ -86,9 +103,8 @@ For instance, if $\lambda=10$, and we want the probability of receiving exactly 
 $$
 P(Y = 7) = \frac{10^7 e^{-10}}{7!}
 $$
- 
-This can be computed using a calculator or software like Python or R, which we’ll get to in a later section.
 
+This can be computed using a calculator or software like Python or R, which we’ll get to in a later section.
 
 ## Key Properties of the Poisson Distribution
 
@@ -98,7 +114,7 @@ One of the most interesting things about the Poisson distribution is that its me
 
 To build an even better intuition for the Poisson distribution, let’s take a look at how it behaves for different values of $\lambda$.
 
-When the average rate $\lambda$ is small, such as around 1 or 2, most of the probability is concentrated near zero. This aligns with our expectations: 
+When the average rate $\lambda$ is small, such as around 1 or 2, most of the probability is concentrated near zero. This aligns with our expectations:
 
 > If an event happens only once a day on average, then getting zero or one occurrence is quite common, while observing five or more is unusual.
 
@@ -111,9 +127,6 @@ This is one reason the Poisson distribution is sometimes referred to as the coun
 Here is the R code to generate a set of plots that illustrate how the Poisson distribution changes shape as $\lambda$ increases:
 
 ```{r}
-# Load required package
-library(ggplot2)
-
 # Set up lambda values
 lambda_values <- c(1, 5, 15, 30)
 poisson_df <- data.frame()
@@ -136,13 +149,39 @@ ggplot(poisson_df, aes(x = y, y = prob)) +
 
 ```
 
-::: {.Warning}
-::::{.Warning-header}
+## When Should We Use a Poisson Distribution?
+
+The Poisson distribution is a natural fit when you're modeling the number of times an event occurs within a fixed interval, and the events happen randomly, independently, and at a steady average rate. These assumptions may sound technical, but they often hold in practical situations. For example:
+
+-   The number of phone calls a help desk receives per hour.
+-   The number of times a webpage is accessed per minute.
+-   The number of customer arrivals at a store in a day.
+-   The number of defects in a length of fabric or per manufactured item.
+
+In all of these cases, we’re dealing with counts, often of rare events, where there's no natural upper bound on how many can occur. That's what makes the Poisson model so appealing: it's simple, interpretable, and widely applicable.
+
+However, it’s worth noting that the assumption that the mean equals the variance (both equal to $\lambda$) is strong. In real-world data, it’s common to find **overdispersion**, where the variance is much greater than the mean. In those cases, we might need to use more flexible models like the **negative binomial distribution**, which we’ll explore in a later chapter.
+
+## From Distribution to Regression
+
+So far, we’ve focused on using the Poisson distribution to describe a single variable (eg. the number of emails per day). But what if we believe that the rate at which emails arrive depends on other factors like the day of the week, whether it's a holiday, or even the time of year?
+
+This is where **Poisson regression** comes into play. Just like how linear regression models a continuous outcome using predictor variables, Poisson regression allows us to model count outcomes as a function of one or more predictors.
+
+In the next section, we’ll walk through a real case study and use Poisson regression to understand what influences the number of events. But before we dive in, we’ll briefly introduce the dataset and the study design.
+
+```{r}
+poisson_df
+```
+
+::: Warning
+::: Warning-header
 Fun fact!
-::::
-::::{.Warning-container}
+:::
+
+::: Warning-container
 **Bubblarious!** For all the boba, fizzy drinks, and seltzers that go pop!
-::::
+:::
 :::
 
 ::: {#fig-classical-poisson-regression}
