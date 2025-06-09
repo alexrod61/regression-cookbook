@@ -13,6 +13,32 @@
 ```{r}
 #| include: false
 
+library(tidyverse)
+library(reticulate)
+library(DT)
+
+# Setting up Python dependencies
+py_require("pandas")
+py_require("numpy")
+pandas <- import("pandas")
+numpy <- import("numpy")
+
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string')) 
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr', 
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
+
 colourize <- function(x, color) {
   if (knitr::is_latex_output()) {
     sprintf("\\textcolor{%s}{%s}", color, x)
@@ -29,15 +55,38 @@ colourize <- function(x, color) {
 {{< include ../learning_objectives/lo-ch-02.qmd >}}
 -->
 
-This chapter will delve into probability and frequentist statistical inference. We can view these sections as a quick review of introductory probability and statistics concepts. Moreover, this review will be important to understanding the philosophy of modelling parameter estimation as outlined in @sec-ds-workflow-estimation. Then, we will pave the way to the rationale behind statistical inference in the *results* stage (as in @sec-ds-workflow-results) in our workflow from @fig-ds-workflow. Note that we aim to explain all these statistical and probabilistic concepts in the most possible practical way via a made-up case study throughout this chapter. Still, we will use an appropriate level of jargon and will follow the colour convention found in @sec-dictionary along with the [**definition callout box**](#Definition-sample).
+This chapter will delve into probability and frequentist statistical inference. We can view these sections as a quick review of introductory probability and statistics concepts. Moreover, this review will be important to understanding the philosophy of modelling parameter estimation as outlined in @sec-ds-workflow-estimation. Then, we will pave the way to the rationale behind statistical inference in the **Results** stage (as in @sec-ds-workflow-results) in our workflow from @fig-ds-workflow. Note that we aim to explain all these statistical and probabilistic concepts in the most possible practical way via a made-up case study throughout this chapter **(while still presenting useful theoretical admonitions as explained in @sec-intro)**. Note we will use an appropriate level of jargon and will follow the colour convention found in @sec-dictionary along with the [definition callout box](#Definition-sample).
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- Discuss why having **a complete conceptual understanding of the process of statistical inference** is key when conducting studies for **general audiences**.
+- Explain **why probability is the language of statistics**.
+- Recall **foundational probabilistic insights**.
+- Break down the differences between **the two schools of statistical thinking**: **frequentist** and **Bayesian**.
+- Apply the philosophy of **generative modelling** along with **probability distributions** in **parameter estimation**.
+- Justify using **measures of central tendency** and **uncertainty** to characterize probability distributions.
+- Illustrate how **random sampling** can be used in **parameter estimation**.
+- Describe conceptually **what maximum likelihood estimation entails** in a frequentist framework.
+- Formulate a **maximum likelihood estimation-based approach** in **parameter estimation**.
+- Outline **the process of a frequentist classical-based hypothesis testing** to solve general inferential inquiries.
+- Contrast **the differences and simmilarities** between **supervised learning** and **regression analysis**.
+::::
+:::
 
 ![Image by [*OpenClipart-Vectors*](https://pixabay.com/users/openclipart-vectors-30363/) via [*Pixabay*](https://pixabay.com/vectors/panda-cute-bear-blue-question-149818/).](img/panda.png){width="400"} 
 
+> **Let us start with a relatable story!** 
+
 Imagine you are an undergraduate engineering student. Moreover, last term, you just took and passed your first course in probability and statistics (inference included!) in an industrial engineering context. Moreover, as it could happen while taking an introductory course in probability and statistics, you used to feel quite overwhelmed by the large amount of jargon and formulas one had to grasp and use regularly for primary engineering fields such as quality control in a manufacturing facility. *Population parameters*, *hypothesis testing*, *tests statistics*, *significance level*, *$p$-values*, and *confidence intervals* (**do not worry, our `r colourize("statistical", "blue")`/`r colourize("machine learning", "magenta")` scheme will come in later in this review**) were appearing here and there! And to your frustration, you could never find a statistical connection between all these inferential tools! Instead, you relied on mechanistic procedures when solving assignments or exam problems. 
 
-For instance, when performing hypothesis testing for a two-sample $t$-test, you struggled to reflect what the hypotheses were trying to indicate for the corresponding population parameter(s) or how the test statistic was related to these hypotheses. Moreover, your interpretation of the resulting $p$-value and/or confidence interval was purely mechanical with the inherent claim: 
+For instance, when performing hypothesis testing for a two-sample $t$-test, you struggled to reflect what the hypotheses were trying to indicate for the corresponding population parameters or how the test statistic was related to these hypotheses. Moreover, your interpretation of the resulting $p$-value and/or confidence interval was purely mechanical with the inherent claim: 
 
-> *With a significance level $\alpha = 0.05$, we reject (**or fail to reject, if that is the case!**) the null hypothesis given that...* 
+> *With a significance level $\alpha = 0.05$, we reject (**or fail to reject, if that is the case!**) the null hypothesis in given that...* 
 
 Truthfully, this whole mechanical way of doing statistics is not ideal in a teaching, research or industry environment. Along the same lines, the above situation should also not happen when we learn key statistical topics for the very first time as undergraduate students. That is why we will investigate a more intuitive way of viewing probability and its crucial role in statistical inference. This matter will help us deliver more coherent storytelling (as in @sec-ds-workflow-storytelling) when presenting our results in practice during any regression analysis to our peers or stakeholders. Note that the role of probability also extends to model training (as in @sec-ds-workflow-estimation) when it comes to supervised learning and not just regarding statistical inference.
 
@@ -47,35 +96,39 @@ Having said all this, it is time to introduce a statement that is key when teach
 
 That is quite a bold statement! Nonetheless, once one starts teaching statistical topics to audiences not entirely familiar with the usual field jargon, the idea of randomness always persists across many different tools. And, of course, regression analysis is not an exception at all since it also involves inference on population parameters of interest! This is why we have allocated this section in the textbook to explain core probabilistic and inferential concepts to pave the way to its role in regression analysis.
 
-::: {#headsup-mechanical .Heads-up}
+::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up on why we mean as a non-ideal mechanical analysis!
 ::::
 ::::{.Heads-up-container}
 The reader might need clarification on why the mechanical way of performing hypothesis testing is considered **non-ideal**, mainly when the term **cookbook** is used in the book's title. The **cookbook** concept here actually refers to a homogenized recipe for data modelling, as seen in the workflow from @fig-ds-workflow. However, there's a crucial distinction between this and the non-ideal mechanical way of hypothesis testing.
 
-On the one hand, the non-ideal mechanical way refers to **the use of a tool without understanding the rationale of what this tool stands for**, resulting in vacuous and standard statements that we would not be able to explain any way further, such as the statement we previously indicated:\
+On the one hand, the non-ideal mechanical way refers to **the use of a tool without understanding the rationale of what this tool stands for**, resulting in vacuous and standard statements that we would not be able to explain any way further, such as the statement we previously indicated:
 
-> *With a significance level $\alpha = 0.05$, we reject (**or fail to reject, if that is the case!**) the null hypothesis given that...*\
+> *With a significance level $\alpha = 0.05$, we reject (**or fail to reject, if that is the case!**) the null hypothesis given that...*
 
-What if a stakeholder of our analysis asks us in plain words what a significance level means? Why are we phrasing our conclusion on the null hypothesis and not directly on the alternative one? As a data scientist, one should be able to explain why the whole inference process yields that statement without misleading the stakeholders' understanding. **For sure, this also implicates appropriate communication skills that cater to general audiences rather than just statistical ones.**\
+What if a stakeholder of our analysis asks us in plain words what a significance level means? Why are we phrasing our conclusion on the null hypothesis and not directly on the alternative one? As a data scientist, one should be able to explain why the whole inference process yields that statement without misleading the stakeholders' understanding. **For sure, this also implicates appropriate communication skills that cater to general audiences rather than just technical ones.**
 
-Conversely, the data modelling workflow in @fig-ds-workflow involves stages that necessitate a comprehensive and precise understanding of our analysis. Progressing to the next stage without a complete grasp of the current one risks perpetuating false insights, potentially leading to faulty data storytelling of the entire analysis.
+Conversely, the data modelling workflow in @fig-ds-workflow involves stages that necessitate a comprehensive and precise understanding of our analysis. Progressing to the next stage (without a complete grasp of the current one) risks perpetuating false insights, potentially leading to faulty data storytelling of the entire analysis.
 ::::
 :::
 
-Finally, even though this book has suggested reviews related to the basics of probability via different distributions and the fundamentals of frequentist statistical inference as stated in **Audience and Scope**, we will retake essential concepts as follows:
+Finally, even though this book has suggested reviews related to the basics of probability via different distributions and the fundamentals of frequentist statistical inference as stated in [Audience and Scope](https://alexrod61.github.io/regression-cookbook/book/audience-scope.html), we will retake essential concepts as follows:
 
 - The role of *random variables* and *probability distributions* and the governance of *population (or system) parameters* (i.e., the so-called Greek letters we usually see in statistical inference and regression analysis). @sec-basics-prob will explore these topics more in detail while connecting them to the subsequent inferential terrain under a *frequentist context*.
 - When delving into supervised learning and regression analysis, we might wonder how randomness is incorporated into *model fitting* (i.e., *parameter estimation*). That is quite a fascinating aspect, implemented via a crucial statistical tool known as *maximum likelihood estimation*. This tool is heavily related to the concept of *loss function* in supervised learning. @sec-mle will explore these matters in more detail and how the idea of a *random sample* is connected to this estimation tool.
-- @sec-basics-inf will explore the basics of *hypothesis testing* and its intrinsic components such as *null* and *alternative hypotheses*, *type I* and *type II* errors, *test statistic*, *standard error*, *$p$-value*, and *confidence interval*.
+- @sec-basics-inf will explore the basics of *hypothesis testing* and its intrinsic components such as *null* and *alternative hypotheses*, *type I* and *type II* errors, *significance level*, *power*, *observed effect*, *standard error*, *test statistic*, *critical value*, *$p$-value*, and *confidence interval*.
 - Finally, @sec-sup-learning-regression will briefly discuss the connections between supervised learning and regression analysis regarding terminology.
 
 Without further ado, let us start with reviewing core concepts in probability via quite a tasty example.
 
 ## Basics of Probability {#sec-basics-prob}
 
-In terms of `r colourize("regression analysis", "blue")` and its `r colourize("supervised learning", "magenta")` counterpart (either on an **inferential** or **predictive** framework), `r colourize("probability", "blue")` can be viewed as the solid foundation on which more complex tools, including estimation and `r colourize("hypothesis testing", "blue")`, are built upon. Under this foundation, our data is coming from a given `r colourize("population", "blue")` or system of interest. Moreover, the `r colourize("population", "blue")` or system is assumed to be governed by `r colourize("parameters", "blue")` which, as data scientists or researchers, they are of their best interest to study. That said, the terms `r colourize("population", "blue")` and `r colourize("parameter", "blue")` will pave the way to our first statistical definitions.
+In terms of `r colourize("regression analysis", "blue")` and its `r colourize("supervised learning", "magenta")` counterpart (either on an **inferential** or **predictive** framework), `r colourize("probability", "blue")` can be viewed as the solid foundation on which more complex tools, including estimation and `r colourize("hypothesis testing", "blue")`, are built upon. Having said that, let us scaffold across all the necessary probabilistic concepts that will allow us to move forward into these more complex tools.
+
+### First Insights {#sec-first-insights}
+
+To start building up our solid probabilistic foundation, we assume our data is coming from a given `r colourize("population", "blue")` or system of interest. Moreover, the `r colourize("population", "blue")` or system is assumed to be governed by `r colourize("parameters", "blue")` which, as data scientists or researchers, they are of our best interest to study. That said, the terms `r colourize("population", "blue")` and `r colourize("parameter", "blue")` will pave the way to our first statistical definitions.
 
 ::: {#Definition-population .definition}
 ::::{.definition-header}
@@ -115,7 +168,7 @@ It is a characteristic (**numerical** or even **non-numerical**, such as a **dis
 
 ![Image by [*meineresterampe*](https://pixabay.com/users/meineresterampe-26089/) via [*Pixabay*](https://pixabay.com/photos/typewriter-old-retro-office-1899760/).](img/typewriter.jpg){width="450"} 
 
-Note the **standard mathematical notation** for `r colourize("population parameters", "blue")` are **Greek letters**. Moreover, in practice, these `r colourize("population parameter(s)", "blue")` of interest will be **unknown** to the data scientist or researcher. Instead, they would use formal statistical inference to **estimate** them.
+Note the **standard mathematical notation** for `r colourize("population parameters", "blue")` are **Greek letters** (for more insights, you can check @sec-greek-alphabet). Moreover, in practice, these `r colourize("population parameter(s)", "blue")` of interest will be **unknown** to the data scientist or researcher. Instead, they would use formal statistical inference to **estimate** them.
 ::::
 :::
 
@@ -125,7 +178,7 @@ The `r colourize("parameter", "blue")` [definition](#Definition-parameter) point
 
 Given this fact, it would be pretty unfortunate and inconvenient if we eventually wanted to discover any significant insights about the `r colourize("population", "blue")` or system. Therefore, let us proceed to our so-called tasty example so we can dive into the need for statistical inference and why `r colourize("probability", "blue")` is our perfect ally in this `r colourize("parameter", "blue")` quest.
 
-Imagine you are the owner of a large fleet of ice cream carts, around 900 to be exact. These ice cream carts operate across different parks in the following Canadian cities: *Vancouver*, *Victoria*, *Edmonton*, *Calgary*, *Winnipeg*, *Ottawa*, *Toronto*, and *Montréal*. In the past, to optimize operational costs, you decided to limit ice cream cones to only two items: *vanilla* and *chocolate* flavours, as in @fig-ice-cream.
+Imagine you are the owner of a large fleet of ice cream carts, around 900 to be exact. These ice cream carts operate across different parks in the following Canadian cities: *Vancouver*, *Victoria*, *Edmonton*, *Calgary*, *Winnipeg*, *Ottawa*, *Toronto*, and *Montreal*. In the past, to optimize operational costs, you decided to limit ice cream cones to only two items: *vanilla* and *chocolate* flavours, as in @fig-ice-cream.
 
 ::: {#fig-ice-cream}
 ![](img/ice-cream.jpg){width="390"}
@@ -144,33 +197,48 @@ Note that the nature of the aforementioned **time query** is more related to a l
 Summer time represents the most profitable season from a business perspective, thus solving these above two queries is a significant priority for your company. Hence, you decide to organize a meeting with your eight general managers (one per Canadian city). Finally, during the meeting with the general managers, it was decided to do the following:
 
 1. For the **demand query**, a comprehensive market study will be run on the `r colourize("population", "blue")` of interest across the eight Canadian cities right before next Summer; suppose we are currently in Spring.
-2. For the **time query**, since the operations team has not previously recorded any historical data, **ALL** vendor staff from 900 carts will start collecting data on **the waiting time in seconds** between each customer this upcoming Summer.
+2. For the **time query**, since the operations team has not previously recorded any historical data (surprisingly!), **ALL** vendor staff from 900 carts will start collecting data on **the waiting time in seconds** between each customer this upcoming Summer.
 
-Surprisingly, when discussing study requirements for the marketing firm who would be in charge of it for the **demand query**, *Vancouver's general manager* dares to state the following:
+When discussing study requirements for the marketing firm who would be in charge of it for the **demand query**, *Vancouver's general manager* dares to state the following:
 
 > *Since we're already planning to collect consumer data on these cities, let's mimic a census-type study to ensure we can have the **MOST PRECISE** results on their preferences.*
 
 On the other hand, when agreeing on the specific operations protocol to start recording waiting times for all the 900 vending carts this upcoming Summer, *Ottawa's general manager* provides a comment for further statistical food for thought:
 
-> *The operations protocol for recording waiting times in the 900 vending carts looks too cumbersome to implement straightforwardly this upcoming Summer. Why don't we select **A SMALLER GROUP** of ice cream carts across the eight cities to have a more efficient process implementation that would allow us to optimize operational costs?*
+> *The operations protocol for recording waiting times in the 900 vending carts looks too cumbersome to implement straightforwardly this upcoming Summer. Why don't we select **A SMALLER SET** of waiting times between two general customers across the 900 ice cream carts in the eight cities to have a more efficient process implementation that would allow us to optimize operational costs?*
 
-Bingo! *Ottawa's general manager* just nailed the probabilistic way of making inference on our `r colourize("population parameter", "blue")` of interest for the **time query**. Indeed, their comment was primarily framed from a business perspective of optimizing operational costs. Still, this fact does not take away a crucial insight on which statistical inference is built: a `r colourize("random sample", "blue")` ( as in its [corresponding definition](#Definition-random-sample)). As for *Vancouver's general manager*, ironically, their statement is **NOT PRECISE** at all! Mimicking a census-type study might not be the most optimal decision for the **demand query** given the time constraint and the potential size of its target `r colourize("population", "blue")`. 
+Bingo! *Ottawa's general manager* just nailed the probabilistic way of making inference on our `r colourize("population parameter", "blue")` of interest for the **time query**. Indeed, their comment was primarily framed from a business perspective of optimizing operational costs. Still, this fact does not take away a crucial insight on which statistical inference is built: a `r colourize("random sample", "blue")` (as in its [corresponding definition](#Definition-random-sample)). As for *Vancouver's general manager*, ironically, their statement is **NOT PRECISE** (from an inferential point of view)! Mimicking a census-type study might not be the most optimal decision for the **demand query** given the time constraint and the potential size of its target `r colourize("population", "blue")`. 
 
-> **Realistically, there is no cheap and efficient way to conduct a census-type study for any of the two queries!**
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the use random sampling with probabilistic foundations!
+::::
+::::{.Heads-up-container}
+Let us clarify things from the start, especially from a statistical perspective:
+
+> **Realistically, there is no cheap and efficient way to conduct a census-type study for either of the two queries.** 
+
+We must rely on probabilistic **random sampling**, selecting two small subsets of individuals from our two `r colourize("populations", "blue")` of interest. This approach allows us to save both financial and operational resources compared to conducting a complete census. However, random sampling requires us to use various **probabilistic and inferential tools** to manage and report the **uncertainty** associated with the **estimation** of the corresponding `r colourize("population parameters", "blue")`, which will help us answer our initial main queries.
+
+![Image by [*manfredsteger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-group-3702061/).](img/sample-piece.png){width="350"}
+
+**Therefore, having said all this, let us assume that in this ice cream case, the company decided to go ahead with random sampling to answer both queries**.
+::::
+:::
 
 Moving on to one of the core topics in this chapter, we can state that `r colourize("probability", "blue")` is viewed as the language to decode random phenomena that occur in any given `r colourize("population", "blue")` or system of interest. In our example, we have two random phenomena:
 
 1. For the **demand query**, a phenomenon can be represented by the preferred ice cream cone flavour of **any randomly selected child between 4 and 11 years old attending the parks of the above eight Canadian cities during the Summer weekends**. 
-1. Regarding the **time query**, a phenomenon of this kind can be represented by **any randomly recorded waiting time between two customers during a Summer weekend in any of the above eight Canadian cities**. 
+1. Regarding the **time query**, a phenomenon of this kind can be represented by **any randomly recorded waiting time between two customers during a Summer weekend in any of the above eight Canadian cities across the 900 ice cream carts**. 
 
-Hence, let us finally define what we mean by `r colourize("probability", "blue")` along with the inherent concept of `r colourize("sample space", "blue")`.
+Now, let us finally define what we mean by `r colourize("probability", "blue")` along with the inherent concept of `r colourize("sample space", "blue")`.
 
 ::: {#Definition-probability .definition}
 ::::{.definition-header}
 Definition of probability
 ::::
 ::::{.definition-container}
-Let $A$ be an event of interest in a random phenomenon, in a `r colourize("population", "blue")` or **system** of interest, whose all possible outcomes belong to a given `r colourize("sample space", "blue")` $S$. Generally, the `r colourize("probability", "blue")` for this event $A$ happening can be mathematically depicted as $P(A)$. Moreover, **suppose we observe the random phenomenon $n$ times** such as we were running some class of experiment, then $P(A)$ is defined as the following ratio:
+Let $A$ be an event of interest in a random phenomenon of a `r colourize("population", "blue")` or **system** of interest, whose all possible outcomes belong to a given `r colourize("sample space", "blue")` $S$. Generally, the `r colourize("probability", "blue")` for this event $A$ happening can be mathematically depicted as $P(A)$. Moreover, **suppose we observe the random phenomenon $n$ times** such as we were running some class of experiment, then $P(A)$ is defined as the following ratio:
 
 $$
 P(A) = \frac{\text{Number of times event $A$ is observed}}{n},
@@ -191,9 +259,9 @@ $$
 Definition of sample space
 ::::
 ::::{.definition-container}
-Let $A$ be an event of interest in a random phenomenon in a `r colourize("population", "blue")` or **system** of interest. The `r colourize("sample space", "blue")` $S$ of event $A$ denotes the set of all the possible **random outcomes** we might encounter every time we randomly observe $A$ such as we were running some class of experiment.\
+Let $A$ be an event of interest in a random phenomenon of a `r colourize("population", "blue")` or **system** of interest. The `r colourize("sample space", "blue")` $S$ of event $A$ denotes the set of all the possible **random outcomes** we might encounter every time we randomly observe $A$ such as we were running some class of experiment.\
 
-Note each of these outcomes has a determined probability associated with them. If we add up all these `r colourize("probabilities", "blue")`, the `r colourize("probability", "blue")` of the `r colourize("sample space", "blue")` $S$ will be one, i.e.,
+Note each of these outcomes has a determined `r colourize("probability", "blue")` associated with them. If we add up all these `r colourize("probabilities", "blue")`, the `r colourize("probability", "blue")` of the `r colourize("sample space", "blue")` $S$ will be one, i.e.,
 
 $$
 P(S) = 1.
@@ -201,11 +269,13 @@ $${#eq-sample-space}
 ::::
 :::
 
-Note the definition of the `r colourize("probability", "blue")` for an event $A$ in the [**definition of probability**](#Definition-probability) specifically highlights the following:
+### Schools of Statistical Thinking {#sec-stats-schools}
+
+Note the above [definition](#Definition-probability) for the `r colourize("probability", "blue")` of an event $A$ specifically highlights the following:
 
 >**... as the $n$ times we observe the random phenomenon goes to infinity.**
 
-The "*infinity*" term is key when it comes to understanding the philosophy behind the `r colourize("frequentist", "blue")` school of statistical thinking in contrast to its `r colourize("Bayesian", "blue")`  counterpart. In general, the `r colourize("frequentist", "blue")` way of practicing statistics in terms of `r colourize("probability", "blue")` and inference is the approach we usually learn in introductory courses, more specifically when it comes to `r colourize("hypothesis testing", "blue")` and `r colourize("confidence intervals", "blue")` which will be explored in @sec-basics-inf. That said, the Bayesian approach is another way of practicing statistical inference. Its philosophy differs in what information is used to infer our `r colourize("population parameters", "blue")` of interest. Below, we briefly define both schools of thinking.
+The "*infinity*" term is key when it comes to understanding the philosophy behind the `r colourize("frequentist", "blue")` school of statistical thinking in contrast to its `r colourize("Bayesian", "blue")`  counterpart. In general, the `r colourize("frequentist", "blue")` way of practicing statistics in terms of `r colourize("probability", "blue")` and inference is the approach we usually learn in introductory courses, more specifically when it comes to `r colourize("hypothesis testing", "blue")` and `r colourize("confidence intervals", "blue")` which will be explored in @sec-basics-inf. That said, the `r colourize("Bayesian", "blue")` approach is another way of practicing statistical inference. Its philosophy differs in what information is used to infer our `r colourize("population parameters", "blue")` of interest. Below, we briefly define both schools of thinking.
 
 ::: {#Definition-frequentist-stats .definition}
 ::::{.definition-header}
@@ -227,7 +297,7 @@ $$
 Definition of Bayesian statistics
 ::::
 ::::{.definition-container}
-This statistical school of thinking also relies on the **frequency of events** to estimate specific `r colourize("parameters", "blue")` of interest in a `r colourize("population", "blue")` or **system**.  Nevertheless, unlike `r colourize("frequentist", "blue")` statistics, `r colourize("Bayesian", "blue")` statisticians use **prior knowledge** on the `r colourize("population parameters", "blue")` to update their estimations on them along with the **current evidence** they can gather. This evidence is in the form of the repetition of $n$ experiments involving a random phenomenon. All these ingredients allow `r colourize("Bayesian", "blue")` statisticians to make inference by conducting  appropriate `r colourize("hypothesis testings", "blue")`, which are designed differently from their mainstream `r colourize("frequentist", "blue")` counterpart.\
+This statistical school of thinking also relies on the **frequency of events** to estimate specific `r colourize("parameters", "blue")` of interest in a `r colourize("population", "blue")` or **system**.  Nevertheless, unlike `r colourize("frequentist", "blue")` statistics, `r colourize("Bayesian", "blue")` statisticians use **prior knowledge** on the `r colourize("population parameters", "blue")` to update their estimations on them along with the **current evidence** they can gather. This evidence is in the form of the repetition of $n$ experiments involving a random phenomenon. All these ingredients allow `r colourize("Bayesian", "blue")` statisticians to make inference by conducting  appropriate `r colourize("hypothesis testings", "blue")`, which are designed differently from their mainstream `r colourize("frequentist", "blue")` counterpart.
 
 ![The unique known portrait of Reverend Thomas Bayes according to @odonnell1936, even though @bellhouse2004 argues it might not be a Bayes' portrait.](img/thomas-bayes.jpg){width="300"}
 
@@ -235,14 +305,14 @@ Under the umbrella of this approach, we assume that our governing `r colourize("
 ::::
 :::
 
-Let us put the definitions for the above schools of statistical thinking into a more concrete example. We can use the **demand query** from our ice cream case as a starting point. More concretely, we can dig more into a standalone `r colourize("population parameter", "blue")` such as the `r colourize("probability", "blue")` that a randomly selected child between 4 and 11 years old, attending the parks of the above eight Canadian cities during the Summer weekends, prefers the chocolate-flavoured ice cream cone over the vanilla one. Think about the following two hypothetical questions:
+Let us put the definitions for these two schools of statistical thinking into a more concrete example. We can use the **demand query** from our ice cream case as a starting point. More concretely, we can dig more into a standalone `r colourize("population parameter", "blue")` such as the `r colourize("probability", "blue")` that a randomly selected child between 4 and 11 years old, attending the parks of the above eight Canadian cities during the Summer weekends, prefers the chocolate-flavoured ice cream cone over the vanilla one. Think about the following two hypothetical questions:
 
 a. From a `r colourize("frequentist", "blue")` point of view, what is the **estimated** `r colourize("probability", "blue")` of **preferring chocolate over vanilla** after **randomly** surveying $n = 100$ children from our `r colourize("population", "blue")` of interest?
 b. Using a `r colourize("Bayesian", "blue")` approach, suppose the marketing team has found ten **prior** market studies on similar children `r colourize("populations", "blue")` on their preferred ice cream flavour (between chocolate and vanilla). Therefore, along with our actual **random** survey of $n = 100$ children from our `r colourize("population", "blue")` of interest, what is the **posterior estimation** of the `r colourize("probability", "blue")` of **preferring chocolate over vanilla**?
 
-By comparing the above (a) and (b), we can see one characteristic in common when it comes to the estimation of the `r colourize("probability", "blue")` of **preferring chocolate over vanilla**: both `r colourize("frequentist", "blue")` and `r colourize("Bayesian", "blue")` rely on the gathered **evidence** coming from the **random** survey of $n = 100$ children from our `r colourize("population", "blue")` of interest. On the one hand, the `r colourize("frequentist", "blue")` approach solely relies on **observed data** to **estimate** this single `r colourize("probability", "blue")` of **preferring chocolate over vanilla**. On the other hand, the `r colourize("Bayesian", "blue")` approach uses the **observed data** in conjunction with the **prior** knowledge provided by the ten estimated `r colourize("probabilities", "blue")` to deliver a whole posterior distribution (i.e., the **posterior estimation**) of the `r colourize("probability", "blue")` of **preferring chocolate over vanilla**.
+By comparing the above (a) and (b), we can see one characteristic in common when it comes to the estimation of the `r colourize("probability", "blue")` of **preferring chocolate over vanilla**: both `r colourize("frequentist", "blue")` and `r colourize("Bayesian", "blue")` approaches rely on the gathered **evidence** coming from the **random** survey of $n = 100$ children from our `r colourize("population", "blue")` of interest. On the one hand, the `r colourize("frequentist", "blue")` approach solely relies on **observed data** to **estimate** this single `r colourize("probability", "blue")` of **preferring chocolate over vanilla**. On the other hand, the `r colourize("Bayesian", "blue")` approach uses the **observed data** in conjunction with the **prior** knowledge provided by the ten estimated `r colourize("probabilities", "blue")` to deliver a whole posterior distribution (i.e., the **posterior estimation**) of the `r colourize("probability", "blue")` of **preferring chocolate over vanilla**.
 
-::: {#Headsup-frequentist-vs-bayesian .Heads-up}
+::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up on the debate between frequentist and Bayesian statistics!
 ::::
@@ -255,7 +325,7 @@ In the statistical community, there could be a fascinating debate between the **
 ::::
 :::
 
-::: {#Tip-bayesian-resource .Tip}
+::: {.Tip}
 ::::{.Tip-header}
 Tip on further Bayesian and frequentist insights!
 ::::
@@ -267,11 +337,36 @@ Let us check the following two examples (**aside from our ice cream case**) to i
 ::::
 :::
 
-Having said all this, it is important to reiterate that the focus of this textbook is purely `r colourize("frequentist", "blue")` in regards to data modelling in `r colourize("regression analysis", "blue")`. If you would like to explore the fundamentals of the `r colourize("Bayesian", "blue")` paradigm; @johnson2022 have developed an amazing textbook on the basic `r colourize("probability", "blue")` theory behind this school of statistical thinking along with a whole variety regression techniques including the `r colourize("parameter", "blue")` estimation rationale.
+Having said all this, it is important to reiterate that the focus of this textbook is **purely `r colourize("frequentist", "blue")`** in regards to data modelling in `r colourize("regression analysis", "blue")`. If you would like to explore the fundamentals of the `r colourize("Bayesian", "blue")` paradigm; @johnson2022 have developed an amazing textbook on the basic `r colourize("probability", "blue")` theory behind this school of statistical thinking along with a whole variety regression techniques including the `r colourize("parameter", "blue")` estimation rationale.
 
-Moving along...
+### The Random Variables {#sec-random-variables}
 
-@casella2024 and @soch2023
+As we continue our `r colourize("frequentist", "blue")` quest to review the probabilistic insights related to `r colourize("parameter", "blue")` estimation and statistical inference, we will focus on our ice cream case while providing a comprehensive array of definitions. Many of these definitions are inspired by the work of @casella2024 and @soch2023. 
+
+Each time we introduce a new probabilistic or statistical concept, we will apply it immediately to this ice cream case, allowing for hands-on practice that meets the learning objectives of this chapter. It is important to pay close attention to the **definition** and **heads-up** admonitions, as they are essential for fully understanding how these concepts apply to the ice cream case. On the other hand, the **tip** admonitions are designed to offer additional theoretical insights that may interest you, but they can be skipped if you prefer.
+
+|       | **Demand Query** | **Time Query** |
+|:-----:|:-----:|:-----:|
+| **Statement** | We would like to know **which** ice cream flavour is the favourite one (either **chocolate** or **vanilla**) and by **how much**. | We would like to know the **average** waiting time from one customer to the next one in any given ice cream cart. |
+| **Population of interest** | **Children between 4 and 11 years old** attending different parks in Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal during Summer weekends. | **All our general customer-to-customer waiting times** in the different parks of Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal during Summer weekends across the 900 ice cream carts. |
+| **Parameter**| **Proportion** of individuals from the population of interest **who prefer the chocolate flavour versus the vanilla flavour**. | **Average** waiting time from one customer to the next one. |
+
+: Table containing the general statements, populations, and parameters of interest for our **demand** and **time** queries. {#tbl-queries-1 .striped .hover}
+
+@tbl-queries-1 presents the general statements and `r colourize("populations", "blue")` of interest derived from our two queries: **demand** and **time**. It is important to note that these general statements are based on the storytelling we initiated in @sec-first-insights. In practice, summarizing the overarching statistical problem is essential. This will enable us to translate the corresponding issue into a specific statement and `r colourize("population", "blue")`, from which we can define the `r colourize("parameters", "blue")` we aim to estimate later in our statistical process.
+
+Now, recall that in our initial meeting with the general managers, *Ottawa's general manager* provided valuable statistical insights regarding the foundation of a `r colourize("random sample", "blue")`. For the **time query**, they suggested selecting a smaller set of waiting times between two general customers across the 900 ice cream carts. We already addressed this process as sampling, more specifically **random sampling** in technical language. 
+
+Similarly, we can apply this concept to the **demand query** by selecting a subgroup of children aged 4 to 11 who are visiting different parks in these eight cities. Then, we can ask them about their favorite ice cream flavour, specifically whether they prefer **chocolate** or **vanilla**. It is important to note that we are not conducting any census-type studies; instead, we are carrying out two studies that heavily rely on sampling to estimate `r colourize("population parameters", "blue")`.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teaching-to-learn-wiki-3976301/).](img/board.png){width="500"}
+
+Furthermore, we want to ensure that our two groups of observations—both children and waiting times—are representative of their respective `r colourize("populations", "blue")`. So, how can we achieve this? The **baseline** key is through what we call **simple random sampling**. This process involves the following per query:
+
+1. For the **demand query**, let us assume there are $N_D$ observations in our `r colourize("population", "blue")` of interest. In a **simple random sampling scheme**, our `r colourize("random sample", "blue")` will consist of $n_D$ observations (noting that $n_D << N_D$), each having the same `r colourize("probability", "blue")` of being selected for our estimation and inferential purposes, which is given by $\frac{1}{N_D}$.
+2. For the **time query**, assume there are $N_T$ observations in our `r colourize("population", "blue")` of interest. Again, in a **simple random sampling scheme**, our `r colourize("random sample", "blue")` will consist of $n_T$ observations (noting that $n_T << N_T$), each having the same `r colourize("probability", "blue")` of selection for estimation and inferential purposes, which is $\frac{1}{N_T}$. 
+
+We can observe the concept of randomness reflected throughout the sampling schemes mentioned above. This aligns with what we referred to as **random phenomena** in both queries back in @sec-first-insights. Consequently, there should be a way to mathematically represent these phenomena, and the `r colourize("random variable", "blue")` is the starting point in this process.
 
 ::: {#Definition-random-variable .definition}
 ::::{.definition-header}
@@ -283,6 +378,48 @@ A `r colourize("random variable", "blue")` is a function where the input values 
 $$Y \in \mathbb{R}.$$
 ::::
 :::
+
+To begin experimenting with `r colourize("random variables", "blue")` in this ice cream case, we need to define them clearly. It is important to be as clear as possible when defining `r colourize("random variables", "blue")`, and we should also remember to use uppercase letters as follows:
+
+$$
+\begin{align*}
+D_i &= \text{A favourite ice cream flavour of a randomly surveyed $i$th child} \\
+& \qquad \text{between 4 and 11 years old attending the parks of} \\
+& \qquad \text{Vancouver, Victoria, Edmonton, Calgary,} \\
+& \qquad \text{Winnipeg, Ottawa, Toronto, and Montreal} \\ 
+& \qquad \text{during the Summer weekends} \\
+& \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \text{for $i = 1, \dots, n_D.$}  \\
+\\
+T_j &= \text{A randomly recorded $j$th waiting time in minutes between two} \\
+& \qquad \text{customers during a Summer weekend in any of the above} \\
+& \qquad \text{eight Canadian cities across the 900 ice cream carts} \\
+& \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \text{for $j = 1, \dots, n_T.$}  \\
+\end{align*}
+$$
+
+Note that the **demand query** corresponds to the $i$th `r colourize("random variable", "blue")` $D_i$, where the subindex $i$ ranges from $1$ to $n_D$. The term $n_D$ represents the **size of our sample** for this query and theoretically indicates the number of `r colourize("random variables", "blue")` we intend to observe from our `r colourize("population", "blue")` of interest during our sampling. On the other hand, for the **time query**, we have the $j$th `r colourize("random variable", "blue")` $T_j$, with the subindex $j$ ranging from $1$ to $n_T$. In the context of this query, $n_T$ denotes the **size of our respective sample** and indicates how many `r colourize("random variables", "blue")` we plan to observe from our `r colourize("population", "blue")` of interest as part of our sampling.
+
+Now, $D_i$ will require real numbers that correspond to potential outcomes derived from the specific **demand sample space** of ice cream flavour, which we can denote as $S_D$. It is crucial to note that a given child from our `r colourize("population", "blue")` may prefer a flavour other than chocolate or vanilla—for example, strawberry, salted caramel, or pistachio. However, we are limited by our available flavour menu as a company. Therefore, we will restrict our survey question regarding these potential $n_D$ surveyed children as follows:
+
+$$
+d_i = 
+\begin{cases}
+1 \qquad \text{The surveyed child prefers chocolate.}\\
+0 \qquad \text{Otherwise.}
+\end{cases}
+$${#eq-random-variable-demand}
+
+In the modelling associated with @eq-random-variable-demand, an **observed `r colourize("random variable", "blue")`** $d_i$ **(thus, the lowercase)** can only yield values of $1$ if the surveyed child prefers chocolate and $0$ *otherwise*. The term “*otherwise*” refers to any flavour other than chocolate, which, in our limited menu context, is vanilla!
+
+To define the real numbers from a given **waiting time sample space** $S_T$, associated with an **observed `r colourize("random variable", "blue")`** $t_j$ **(thus, the lowercase)** measured in minutes, we need to establish a possible range for these waiting times. It would not make sense to have observed negative waiting times in this ice cream scenario; therefore, our lower bound for this range of potential values should be $0$ minutes. However, we cannot set an upper limit on these waiting times since any ice cream vendor might need to wait for $1, 2, 3, \ldots, 10, \ldots, 20, \ldots, 60, \ldots$ minutes for the next customer to arrive. In fact, it is possible to wait for a very long time, especially on a low sales day! Thus, the range of this observed `r colourize("random variable", "blue")` can be expressed as:
+
+$$
+t_j \in [0, \infty),
+$$
+
+where the $\infty$ symbol indicates **no upper bound**.
+
+After defining the possible values for our two random variables $D_i$ and $T_j$, we will now classify them correctly using further probabilistic definitions as shown below.
 
 ::: {#Definition-discrete-random-variables .definition}
 ::::{.definition-header}
@@ -319,12 +456,62 @@ Note a `r colourize("continuous random variable", "blue")` could be
 ::::
 :::
 
+Therefore, we can classify our two `r colourize("random variables", "blue")` as follows:
+
+- For the **demand query**, the support of $D_i$ (denoted as $\mathcal{D}$) is a countable finite set with two possible values: $d_i \in \{0, 1\}$, as noted by @eq-random-variable-demand. Therefore, $D_i$ is categorized as a **binary `r colourize("discrete random variable", "blue")`**.
+- For the **time query**, the support of $T_j$ (denoted as $\mathcal{T}$) is positively unbounded. This results in an uncountably infinite set of values that $T_j$ can take, including (but not limited to!) $0, \dots, 0.01, \ldots, 0.02, \ldots, 0.00234, \ldots, 1, \ldots, 1.5576, \ldots$ minutes. Therefore, $T_j$ is classified as a **positively unbounded `r colourize("continuous random variable", "blue")`**.
+
+So far, we have successfully translated our two statistical queries into proper `r colourize("random variables", "blue")`, along with clear definitions and classifications derived from our problem statements, as well as the `r colourize("populations", "blue")` of interest, as noted in @tbl-queries-1. However, we still need to find a way to include our `r colourize("parameters", "blue")`. The upcoming section will allow us to do that.
+
+### The Wonders of Generative Modelling and Probability Distributions {#sec-wonders-random-variables}
+
+Before exploring the wonders of `r colourize("generative models", "blue")`, let us introduce @tbl-queries-2, an extension of @tbl-queries-1 that now includes the elements discussed in @sec-random-variables.
+
+|       | **Demand Query** | **Time Query** |
+|:-----:|:-----:|:-----:|
+| **Statement** | We would like to know **which** ice cream flavour is the favourite one (either **chocolate** or **vanilla**) and by **how much**. | We would like to know the **average** waiting time from one customer to the next one in any given ice cream cart. |
+| **Population of interest** | **Children between 4 and 11 years old** attending different parks in Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal during Summer weekends. | **All our general customer-to-customer waiting times** in the different parks of Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal during Summer weekends across the 900 ice cream carts. |
+| **Parameter** | **Proportion** of individuals from the population of interest **who prefer the chocolate flavour versus the vanilla flavour**. | **Average** waiting time from one customer to the next one. |
+| **Random variable** | $D_i$ for $i = 1, \dots, n_D$. | $T_j$ for $j = 1, \dots, n_T$. |
+| **Random variable definition** | A favourite ice cream flavour of a randomly surveyed $i$th child between 4 and 11 years old attending the parks of Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal during the Summer weekends. | A randomly recorded $j$th waiting time in minutes between two customers during a Summer weekend across the 900 ice cream carts found in Vancouver, Victoria, Edmonton, Calgary, Winnipeg, Ottawa, Toronto, and Montreal. |
+| **Random variable type** | Discrete and binary. | Continuous and positively unbounded. |
+| **Random variable support** | $d_i \in \{ 0, 1\}$ as in @eq-random-variable-demand. | $t_j \in [0, \infty).$ |
+
+: Table containing the general statements, populations, parameters of interest for our **demand** and **time** queries. {#tbl-queries-2 .striped .hover}
+
+Having summarized all our probabilistic elements in @tbl-queries-2, the `r colourize("parameters", "blue")` of interest must come into play for our data modelling game! Hence, the question is:
+
+> **Is there any feasible way to do so via the the foundations of random variables?**
+
+The answer lies in what we call a `r colourize("generative model", "blue")`, for which we have a whole toolbox corresponding to another important concept called `r colourize("probability distributions", "blue")`, as shown below.
+
+::: {#Definition-generative-model .definition}
+::::{.definition-header}
+Definition of generative model
+::::
+::::{.definition-container}
+Suppose you observe some data $y$ from a `r colourize("population", "blue")` or system of interest. Moreover, let us assume this `r colourize("population", "blue")` or system is governed by $k$ `r colourize("parameters", "blue")` contained in the following vector:
+
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T.
+$$
+
+If we state that the `r colourize("random variable", "blue")` $Y$ follows certain `r colourize("probability distribution", "blue")` $\mathcal{D}(\cdot)$, then we will have a `r colourize("generative model", "blue")` $m$ such that
+
+$$
+m: Y \sim \mathcal{D}(\boldsymbol{\theta}).
+$$
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/laptop-games-jigsaw-puzzle-puzzle-7426707/).](img/generative-model.png){width="300"}
+::::
+:::
+
 ::: {#Definition-probability-distribution .definition}
 ::::{.definition-header}
 Definition of probability distribution 
 ::::
 ::::{.definition-container}
-When we set a `r colourize("random variable", "blue")` $Y$, we also set a new set of $v$ possible outcomes $\mathcal{Y} = \{ y_1, \dots, y_v\}$ coming from the `r colourize("sample space", "blue")` $S$. This new set of possible outcomes $\mathcal{Y}$ corresponds to the range of the `r colourize("random variable", "blue")` $Y$ (i.e., all the possible values that could be taken on once we execute a given random experiment involving $Y$). 
+When we set a `r colourize("random variable", "blue")` $Y$, we also set a new set of $v$ possible outcomes $\mathcal{Y} = \{ y_1, \dots, y_v\}$ coming from the `r colourize("sample space", "blue")` $S$. This new set of possible outcomes $\mathcal{Y}$ corresponds to the support of the `r colourize("random variable", "blue")` $Y$ (i.e., all the possible values that could be taken on once we execute a given random experiment involving $Y$). 
 
 That said, let us suppose we have a `r colourize("sample space", "blue")` of $u$ elements defined as 
 
@@ -348,6 +535,68 @@ $$
 ::::
 :::
 
+Since we have two different queries, we will use two instances of `r colourize("generative models", "blue")`. It is worth noting that more complex modelling could refer to a single `r colourize("generative model", "blue")`. However, for the purposes of this review chapter, we will keep it simple with via two separate `r colourize("generative models", "blue")`. 
+
+Now, let us introduce a specific notation for our discussion: the **Greek alphabet**. Greek letters are frequently used to statistically represent `r colourize("population parameters", "blue")` in **modelling setups**, **estimation**, and **statistical inference**. These letters will be quite useful for our `r colourize("parameters", "blue")` in this ice cream case!
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Greek alphabet in statistics!
+::::
+::::{.Tip-container}
+In the early stages of learning statistical modelling, including concepts such as `r colourize("regression analysis", "blue")`, it is common to feel overwhelmed by unfamiliar letters and terminology. Whenever confusion arises in any of the main chapters of this book regarding these letters, we recommend referring to the Greek alphabet shared by @sec-greek-alphabet. It is important to note that `r colourize("frequentist", "blue")` statistical inference primarily uses lowercase letters. **With consistent practice over time, you will likely memorize most of this alphabet!**
+
+![Image by [*meineresterampe*](https://pixabay.com/users/meineresterampe-26089/) via [*Pixabay*](https://pixabay.com/photos/typewriter-old-retro-office-1899760/).](img/typewriter.jpg){width="500"} 
+::::
+:::
+
+Let us retake the row corresponding to `r colourize("parameters", "blue")` in @tbl-queries-2 and assign their corresponding Greek letters:
+
+- For the **demand query**, we are interested in the `r colourize("parameter", "blue")` $\pi$, which represents the proportion of individuals from the children `r colourize("population", "blue")` who prefer the chocolate flavour over the vanilla flavour. It is crucial to note that a proportion is always bounded between $0$ and $1$, similar to how `r colourize("probabilities", "blue")` function! For instance, a proportion of $0.2$ would mean that $20\%$ of the children in our `r colourize("population", "blue")` prefer chocolate flavour over vanilla. This definition establishes our demand query `r colourize("parameter", "blue")` as follows:
+
+$$
+\pi \in [0, 1].
+$$
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the use of $\pi$!
+::::
+::::{.Heads-up-container}
+In this textbook, unless stated otherwise, the letter $\pi$ will denote a `r colourize("population parameter", "blue")` and not the mathematical constant $3.141592...$
+::::
+:::
+
+- For the **time query**, we are interested in the `r colourize("parameter", "blue")` $\beta$, which represents the average waiting time in minutes from one customer to the next one in our `r colourize("population", "blue")` of interest. Unlike the above $\pi$ `r colourize("parameter", "blue")`, $\beta$ is only positively unbounded given the definition of our random variable $T_j$. Therefore, this definition establishes our time query `r colourize("parameter", "blue")` as follows:
+
+$$
+\beta \in (0, \infty).
+$$
+
+Having defined our `r colourize("parameters", "blue")` of interest with proper lowercase Greek letters, it is time to declare our corresponding `r colourize("generative models", "blue")` on a general basis. For the **demand query**, there will be a single `r colourize("parameter", "blue")` called $\pi$, where the randomly surveyed child $D_i$ will follow the model $m_D$ such that
+
+$$
+\begin{gather*}
+m_D : D_i \sim \mathcal{D}_D(\pi) \\
+\qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \quad \text{for $i = 1, \dots, n_D.$}
+\end{gather*}
+$${#eq-gen-model-demand}
+
+Now, for the **time query**, there will also be a single `r colourize("parameter", "blue")` called $\beta$. Thus, the randomly recorded waiting time $T_j$ will follow the model $m_T$ such that
+
+$$
+\begin{gather*}
+m_T : T_j \sim \mathcal{D}_T(\beta) \\
+\qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \quad \text{for $j = 1, \dots, n_T.$}
+\end{gather*}
+$${#eq-gen-model-time}
+
+Nonetheless, we might wonder the following:
+
+> **How can we determine the corresponding distributions $\mathcal{D}_D(\pi)$ and $\mathcal{D}_T(\beta)$?**
+
+Of course the above [definition ](#Definition-probability-distribution) of a `r colourize("probability distribution", "blue")` will come in handy to resolve this question. That said, given that we have two types of `r colourize("random variables", "blue")` (`r colourize("discrete", "blue")` and `r colourize("continuous", "blue")`), it is necessary to introduce two specific types of `r colourize("probability", "blue")` functions: `r colourize("probability mass function (PMF)", "blue")` and `r colourize("probability density function (PDF)", "blue")`.
+
 ::: {#Definition-probability-mass-function .definition}
 ::::{.definition-header}
 Definition of probability mass function 
@@ -369,10 +618,86 @@ and
 
 $$
 \sum_{y \in \mathcal{Y}} P_Y(Y = y) = 1.
-$$
-Then, $P_Y(Y = y)$ is considered a `r colourize("probability mass function (PMF)", "blue")`.
+$${#eq-sample-space-PMF}
+Then, $P_Y(Y = y)$ is considered a `r colourize("PMF", "blue")`.
 ::::
 :::
+
+As we have discussed throughout this ice cream case, let us begin with the **demand query**. We have already defined the $i$th `r colourize("random variable", "blue")` $D_i$ as `r colourize("discrete", "blue")` and binary. In statistical literature, certain random variables in common random processes can be modelled using what we call **parametric families**. We refer to these tools as parametric families because they are characterized by a specific set of **parameters** (in our case, each query has a single-element set, such as $\pi$ or $\beta$). 
+
+Moreover, we call them **families** since each member corresponds to a particular value of our `r colourize("parameter(s)", "blue")`. For instance, in our **demand query**, a chosen member could be where $\pi = 0.8$ within the respective chosen parametric family to model our surveyed children. Other possible members could correspond to $\pi = 0.2$, $\pi = 0.4$ or $\pi = 0.6$. In fact, the number of members in our chosen parametric family is infinite in this **demand query**!
+
+> **Therefore, what parametric family can we choose for our demand query?**
+
+The question above introduces a new, valuable resource that is further elaborated upon in @sec-distributional-mind-map. This resource outlines the various distributions that will be utilized in this textbook. In reality, the realm of parametric families—specifically, distributions—is quite extensive, and this material serves as only a brief overview of the many parametric families documented in statistical literature.
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on data modelling alternatives via different parametric families!
+::::
+::::{.Tip-container}
+Any data model is simply an abstraction of reality, and different parametric families can provide various alternatives for modelling. In practice, we often need to select a specific family based on our particular inquiries and the conditions of our data. This process requires time and experience to master. Furthermore, it is important to note that different families are often interconnected!
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/family.png){width="550"}
+
+If you wish to explore the world of **univariate distribution families**—which are used to model a single `r colourize("random variable", "blue")`—@leemis has created a comprehensive relational chart that covers 76 distinct `r colourize("probability distributions", "blue")`: 19 are `r colourize("discrete", "blue")`, and 57 are `r colourize("continuous", "blue")`. However, this chart does not encompass all the possible families that one might encounter in statistical literature (you can check another list [**at the end of this section**](https://www.math.wm.edu/~leemis/chart/UDR/about.html)).
+::::
+:::
+
+Referring back to our discussion about @sec-distributional-mind-map, it is time to choose the **most suitable** parametric family for a `r colourize("discrete", "blue")` and a binary `r colourize("random variable", "blue")`, such as the $i$th `r colourize("random variable", "blue")` $D_i$. A particular case we can examine is the **Bernoulli distribution** (also, commonly known as a **Bernoulli trial**). The Bernoulli distribution applies to a `r colourize("discrete random variable", "blue")` that can take one of two values: $0$, which we refer to as a *failure*, and $1$, identified as a *success*. This aligns with our previous definition from @eq-random-variable-demand:
+
+$$
+d_i = 
+\begin{cases}
+1 \qquad \text{The surveyed child prefers chocolate.}\\
+0 \qquad \text{Otherwise.}
+\end{cases}
+$$
+
+The equation above defines the chocolate preference of the $i$th surveyed child as a *success*, while another flavour—specifically vanilla in the context of our limited menu—is categorized as a *failure*. Thus, we can denote the support as $d_i \in \{0, 1\}$.
+
+We need to define our `r colourize("population parameter", "blue")` for this **demand query** in the context of a Bernoulli trial, which is denoted by $\pi \in [0, 1]$. This represents the **proportion of children who prefer the chocolate flavour over the vanilla flavour**. In a Bernoulli trial, this parameter refers to the `r colourize("probability", "blue")` of success. Lastly, we can specify our `r colourize("generative model", "blue")` accordingly:
+
+$$
+\begin{gather*}
+m_D : D_i \sim \text{Bern}(\pi) \\
+\qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \quad \text{for $i = 1, \dots, n_D.$}
+\end{gather*}
+$$
+
+**It is time to start with formal equations!** We need to define the `r colourize("PMF", "blue")` corresponding to the above `r colourize("generative model", "blue")`. The statistical literature assigns the following `r colourize("PMF", "blue")` for the a Bernoulli trial $D_i$:
+
+$$
+P_{D_i} \left( D_i = d_i \mid \pi \right) = \pi^{d_i } (1 - \pi)^{1 - d_i } \quad \text{for $d_i \in \{ 0, 1 \}$.}
+$${#eq-bernoulli-pmf-demand}
+
+A further question arises regarding whether @eq-bernoulli-pmf-demand satisfies the condition of **the total `r colourize("probability", "blue")` of the `r colourize("sample space", "blue")`** defined in the @eq-sample-space-PMF under the [definition](#Definition-probability-mass-function) of a `r colourize("PMF", "blue")`. This condition states that a valid `r colourize("PMF", "blue")` should result in a total `r colourize("probability", "blue")` equal to one when we sum all the `r colourize("probabilities", "blue")` produced by this function over every possible value that the `r colourize("random variable", "blue")` can take.
+
+Hence, we can state @eq-bernoulli-pmf-demand is a proper `r colourize("probability distribution", "blue")` (i.e., all the standalone `r colourize("probabilities", "blue")` over the support of $D_i$ add up to one) given that:
+
+::: {.proof}
+$$
+\begin{align*} 
+\sum_{d_i = 0}^1 P_{D_i} \left( D_i = d_i \mid \pi \right) &=  \sum_{d_i = 0}^1 \pi^{d_i} (1 - \pi)^{1 - d_i}  \\
+&= \underbrace{\pi^0}_{1} (1 - \pi) + \pi \underbrace{(1 - \pi)^{0}}_{1} \\
+&= (1 - \pi) + \pi \\
+&= 1. \qquad \qquad \qquad \qquad \quad \square
+\end{align*}
+$${#eq-bernoulli-pmf-demand-total}
+
+> **Indeed, this Bernoulli `r colourize("PMF", "blue")` is a proper `r colourize("probability distribution", "blue")`!**
+:::
+
+The `r colourize("probability distribution", "blue")`, obtained from @eq-bernoulli-pmf-demand-total, is summarized in @tbl-PMF-demand. Note that the chocolate preference has a `r colourize("probability", "blue")` equal to $\pi$, whereas the vanilla preference corresponds to the complement $1 - \pi$. This `r colourize("probability", "blue")` arrangement completely fulfils the corresponding `r colourize("probability", "blue")` condition of the `r colourize("sample space", "blue")` seen in @eq-sample-space-PMF.
+
+| $d_i$ | $P_{D_i} \left( D_i = d_i \mid \pi \right)$ |
+|:-----:|:-----:|
+| $0$ | $1 - \pi$ |
+| $1$ | $\pi$ |
+
+: Probability distribution for the $i$th Bernoulli trial $D_i$. {#tbl-PMF-demand .striped .hover}
+
+To proceed with the **time query**, we need to analyze the $j$th `r colourize("continuous random variable", "blue")` $T_j$ and subsequently work with a `r colourize("PDF", "blue")`.
 
 ::: {#Definition-probability-density-function .definition}
 ::::{.definition-header}
@@ -391,7 +716,7 @@ $$
 f_Y(y) \geq 0.
 $$
 
-Then, $f_Y(y)$ is considered a `r colourize("probability density function (PDF)", "blue")` if the `r colourize("probability", "blue")` of $Y$ taking on a value within the range represented by the subset $A \subset \mathcal{Y}$ is equal to
+Then, $f_Y(y)$ is considered a `r colourize("PDF", "blue")` if the `r colourize("probability", "blue")` of $Y$ taking on a value within the range represented by the subset $A \subset \mathcal{Y}$ is equal to
 
 $$
 P_Y(Y \in A) = \int_A f_Y(y) \mathrm{d}y
@@ -401,9 +726,532 @@ with
 
 $$
 \int_{\mathcal{Y}} f_Y(y) \mathrm{d}y = 1.
-$$
+$${#eq-sample-space-PDF}
 ::::
 :::
+
+To begin our second analysis, let us examine the nature of the variable $T_j$ represented as a `r colourize("continuous random variable", "blue")`. This variable is **nonnegative**, meaning it is positively unbounded, as it models a waiting time. We can interpret $T_j$ as the waiting time until a specific event of interest occurs, such as when the next customer arrives at the ice cream cart. In statistical literature, this is commonly referred to as a **survival time**. Hence, we might wonder:
+
+> **What is the most suitable parametric family to model a survival time?**
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/question.png){width="230"}
+
+Well, in this case within our textbook and in general in statistical literature, there is more than one alternative to model a `r colourize("continuous", "blue")` and nonnegative survival time. @sec-distributional-mind-map offers four possible ways:
+
+- [**Exponential.**](#sec-exponential-distribution) A `r colourize("random variable", "blue")` with a single `r colourize("parameter", "blue")` that can come in either of the following forms:
+  + As a **rate** $\lambda \in (0, \infty)$, which generally defines the `r colourize("mean", "blue")` number of events of interest per time interval or space unit.
+  + As a **scale** $\beta \in (0, \infty)$, which generally defines the `r colourize("mean", "blue")` time until the next event of interest occurs.
+- [**Weibull.**](#sec-weibull-distribution) A `r colourize("random variable", "blue")` that is a generalization of the **Exponential distribution**. Note its distributional `r colourize("parameters", "blue")` are the **scale** `r colourize("continuous parameter", "blue")` $\beta \in (0, \infty)$ and **shape** `r colourize("continuous parameter", "blue")` $\gamma \in (0, \infty)$.
+- [**Gamma**](#sec-gamma-distribution) A `r colourize("random variable", "blue")` whose distributional `r colourize("parameters", "blue")` are the **shape** `r colourize("continuous parameter", "blue")` $\eta \in (0, \infty)$ and **scale** `r colourize("continuous parameter", "blue")` $\theta \in (0, \infty)$.
+- [**Lognormal.**](#sec-lognormal-distribution) A `r colourize("random variable", "blue")` whose logarithmic transformation yields a Normal distribution. Its distributional `r colourize("parameters", "blue")` are the **Normal location** `r colourize("continuous parameter", "blue")` $\mu \in (-\infty, \infty)$ and **Normal scale** `r colourize("continuous parameter", "blue")` $\sigma^2 \in (0, \infty)$.
+
+In our context, as summarized in the [corresponding](#eq-gen-model-time) `r colourize("generative model", "blue")`, it is in our best interest to select a `r colourize("probability distribution", "blue")` characterized by a single parameter. Therefore, the Exponential distribution is the most suitable choice for our current **time query**, particularly under the scale parametrization, since we aim to estimate the waiting time between two customers.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on survival analysis!
+::::
+::::{.Heads-up-container}
+Although our ice cream case can be straightforwardly modelled using an Exponential distribution for our **time query**, by using a single `r colourize("population parameter", "blue")` which indicates a `r colourize("mean", "blue")` waiting time between two customers, it is important to stress that other distributions, such as the **Weibull**, **Gamma**, or **Lognormal**, are also entirely valid options. In fact, utilizing these distributions, that involve more than just a standalone `r colourize("parameter", "blue")`, can enhance the flexibility of our data modelling!
+
+![Image by [*toushirou_px*](https://pixabay.com/users/toushirou_px-27788994/) via [*Pixabay*](https://pixabay.com/vectors/calendar-deadline-icon-limit-time-7253494/).](img/calendar.png){width="320"}
+
+Additionally, there is a specialized statistical field focused on modelling waiting times—specifically, the time until an event of interest occurs. These types of times are formally referred to as **survival times**, and the associated field is known as **survival analysis**. It is worth noting that `r colourize("regression analysis", "blue")` can be extended to this area, and @sec-parametric-survival will provide a more in-depth exploration of various parametric models that involve the **Exponential**, **Weibull**, and **Lognormal** distributions.
+::::
+:::
+
+Since we are using an Exponential distribution, we need to establish our `r colourize("population parameter", "blue")` for this **time query**. As mentioned in @tbl-queries-2, this `r colourize("parameter", "blue")` refers to the **`r colourize("average", "blue")` (or `r colourize("mean", "blue")`) waiting time from one customer to the next**. This corresponds to a **scale parametrization**, where the `r colourize("parameter", "blue")` $\beta \in (0, \infty)$ defines the `r colourize("mean", "blue")` time until the next event of interest occurs (in this case, the next customer!). Therefore, we can specify our `r colourize("generative model", "blue")` as follows:
+
+$$
+\begin{gather*}
+m_T : T_j \sim \text{Exponential}(\beta) \\
+\qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \quad \text{for $j = 1, \dots, n_T.$}
+\end{gather*}
+$$
+
+Since $T_j$ is a `r colourize("continuous random variable", "blue")`, we must define the `r colourize("PMF", "blue")` corresponding to the above `r colourize("generative model", "blue")`. The statistical literature assigns the following `r colourize("PDF", "blue")` for $T_j$:
+
+$$
+f_{T_j} \left(t_j \mid \beta \right) = \frac{1}{\beta} \exp \left( -\frac{t_j}{\beta} \right) \quad \text{for $t_j \in [0, \infty )$.}
+$${#eq-exponential-pdf-time}
+
+Now, we might wonder whether @eq-exponential-pdf-time satisfies the condition of **the total `r colourize("probability", "blue")` of the `r colourize("sample space", "blue")`** defined in the @eq-sample-space-PDF under the [definition](#Definition-probability-density-function) of a `r colourize("PDF", "blue")`. This condition states that a valid `r colourize("PDF", "blue")` should result in a total `r colourize("probability", "blue")` equal to one when we integrate this function over all the support of $T_j$.
+
+Thus, we can state that @eq-exponential-pdf-time is a proper `r colourize("probability distribution", "blue")` (i.e., @eq-exponential-pdf-time integrates to one over the support of $T_j$) given that:
+
+::: {.proof}
+$$
+\begin{align*} 
+\int_{t_j = 0}^{t_j = \infty} f_{T_j} \left(t_j \mid \beta \right) \mathrm{d}y &= \int_{t_j = 0}^{t_j = \infty} \frac{1}{\beta} \exp \left( -\frac{t_j}{\beta} \right) \mathrm{d}t_j \\
+&= \frac{1}{\beta} \int_{t_j = 0}^{t_j = \infty} \exp \left( -\frac{t_j}{\beta} \right) \mathrm{d}t_j \\
+&= - \frac{\beta}{\beta} \exp \left( -\frac{t_j}{\beta} \right) \Bigg|_{t_j = 0}^{t_j = \infty} \\
+&= - \exp \left( -\frac{t_j}{\beta} \right) \Bigg|_{t_j = 0}^{t_j = \infty} \\
+&= - \left[ \exp \left( -\infty \right) - \exp \left( 0 \right) \right] \\
+&= - \left( 0 - 1 \right) \\
+&= 1. \qquad \qquad \qquad \qquad \quad \square
+\end{align*}
+$${#eq-exponential-scale-PDF-integrates-1}
+
+> **Indeed, the Exponential `r colourize("PDF", "blue")`, under a scale parametrization, is a proper `r colourize("probability distribution", "blue")`!**
+:::
+
+Unlike our **demand query**, which features a table illustrating the `r colourize("PMF", "blue")` for $D_i \in \{ 0, 1 \}$ (see @tbl-PMF-demand), it is not feasible to create a table for the `r colourize("PDF", "blue")` of $T_j \in [0, \infty)$ because it represents an uncountably infinite set of possible values. However, we can plot the corresponding `r colourize("PDF", "blue")` using three specific members of the **Exponential parametric family** as examples. @fig-exponential-family-scale-time presents these three example members, with scale `r colourize("parameters", "blue")` values of $\beta = 0.25, 0.5, 1$ minutes, representing waiting times through their corresponding `r colourize("PDFs", "blue")`. Based on our findings in @eq-exponential-scale-PDF-integrates-1, we know that the area under these three **density plots** equals one, indicating the total probability of the `r colourize("sample space", "blue")`. Additionally, it is important to note that as we increase the scale `r colourize("parameter", "blue")`, larger observed values $t_j$ become more probable.
+
+```{r}
+#| label: fig-exponential-family-scale-time
+#| fig-cap: "Some members of the Exponential family with scale parametrization."
+#| warning: false
+#| echo: false
+#| fig.height: 6.5
+#| fig.width: 14
+
+exponential_family_plot_scale <- tibble(lambda = c(1, 2, 4)) |>
+  mutate(f = map(
+    lambda,
+    ~ tibble(
+      x       = seq(0, 10, length.out = 1000),
+      density = dexp(x, rate = .x)
+    )
+  )) |>
+  unnest(f) |>
+  mutate(lambda = str_c('beta*" = ', 1 / lambda, '"')) |>
+  ggplot(aes(x, density)) +
+  facet_wrap(~lambda, labeller = label_parsed) +
+  geom_line() +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, angle = 0, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  labs(
+    x = expression(t[j]),
+    y = expression(paste(f[T[j]], "(", t[j] ," | ", beta, ") "))
+  ) +
+  geom_line(color = "tomato", linewidth = 1)
+
+exponential_family_plot_scale
+```
+
+### Characterizing Probability Distributions {#sec-characterizing-prob-dist}
+
+So far, we have been exploring the basics of `r colourize("random variables", "blue")`, as well as the importance of `r colourize("generative modelling", "blue")` and `r colourize("probability distributions", "blue")` in addressing different data inquiries. These concepts are fundamental to understanding the `r colourize("population parameter", "blue")` setup before we actually collect data and solve these inquiries to create effective storytelling. Therefore, before we delve into those stages, however, we need to identify and explain efficient ways to summarize `r colourize("probability distributions", "blue")`. This will help us make our storytelling compelling for a general audience, as we will discuss further.
+
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on coding tabs!
+::::
+::::{.Heads-up-container}
+You may be wondering:
+
+> **Where do we begin with some `R` or `Python` code?**
+
+It is time to introduce our very first lines of code and provide some explanations about the coding approach in this book. As implied in the [**Preface**](https://alexrod61.github.io/regression-cookbook/), our goal is to make this book "*bilingual*," meaning that all hands-on coding practices can be performed in either `R` or `Python`. Whenever we present a specific proof of concept or data modelling exercise, you will find two tabs: one for `R` and another for `Python`. We will first show the input code, followed by the output.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
+
+With this format, you can choose your coding journey based on your language preferences and interests as you progress through the book.
+::::
+:::
+
+Alright! Moving forward with the code, we need to work with some simulated `r colourize("populations", "blue")` to create the corresponding proofs of concept in this section and the subsequent ones. Let us start with our **demand query**. We will consider a population size of $N_D = 2,000,000$ children. The code (in either `R` or `Python`) below assigns this value as `N_D`, along with a simulation **seed** to ensure our results are reproducible. Additionally, **for the simulation purposes related to our `r colourize("generative modelling", "blue")`**, we will assume that 65% of these children prefer chocolate over vanilla (i.e., $\pi = 0.65$).
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on real and unknown parameters!
+::::
+::::{.Heads-up-container}
+Although we are assigning a value of $\pi = 0.65$ as our true `r colourize("population parameter", "blue")` in this query, we can never know the exact value in practice unless we conduct a full census. This is why we rely on probabilistic tools, via random sampling and statistical inference, to estimate this $\pi$.
+::::
+:::
+
+Let us recall that we are assuming each child is modelled as a Bernoulli trial, where a success (denoted as `1`) indicates that the child "*prefers chocolate*." This also reflects the flavour mapping in the code. Furthermore, instead of using a Bernoulli random number generator, we are utilizing a [**Binomial**](#sec-binomial-distribution) random number generator. This is because the Binomial case with `r colourize("parameters", "blue")` $n = 1$ and $\pi$ is equivalent to a Bernoulli trial with `r colourize("parameter", "blue")` $pi$. Hence, in general, consider the following general Binomial case:
+
+$$
+Y \sim \text{Bin}(n = 1, \pi),
+$$
+
+whose `r colourize("PMF", "blue")` is simplified as a Bernoulli given that
+
+$$
+\begin{align*}
+P_Y \left( Y = y \mid n = 1, \pi \right) &= {1 \choose y} \pi^y (1 - \pi)^{1 - y} \\
+&= \underbrace{\frac{1!}{y!(1 - y)!}}_{\text{$1$ for $y \in \{ 0, 1 \}$}} \pi^y (1 - \pi)^{1 - y} \\
+&= \pi^y (1 - \pi)^{1 - y} \\
+& \qquad \qquad \qquad \qquad \qquad \text{for $y \in \{ 0, 1 \}$.}
+\end{align*}
+$$
+
+The final output of this quick simulation, which models a population of children as Bernoulli trials with a `r colourize("probability", "blue")` of success $\pi = 0.65$, consists of a data frame containing $N_D = 2,000,000$ rows, with each row representing a child and their preferred ice cream flavor: either **chocolate** or **vanilla**. It is worth noting that the outputs from both `R` and `Python` differ due to the fact that each language employs **different pseudo-random number generators**.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+set.seed(123)  # Seed for reproducibility
+
+# Population size
+N_D <- 2000000
+
+# Simulate binary outcomes: 1 = chocolate, 0 = vanilla
+flavour_bin <- rbinom(N_D, size = 1, prob = 0.65)
+
+# Map binary to flavour names
+flavours <- ifelse(flavour_bin == 1, "chocolate", "vanilla")
+
+# Create data frame
+children_pop <- data.frame(
+  children_ID = 1:N_D,
+  fav_flavour = flavours
+)
+
+# Showing the first 100 children of the population
+head(children_pop, n = 100) 
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Importing libraries
+import numpy as np
+import pandas as pd
+
+np.random.seed(123)   # Seed for reproducibility
+
+# Population size
+N_D = 2000000
+
+# Simulate binary outcomes: 1 = chocolate, 0 = vanilla
+flavour_bin = np.random.binomial(n = 1, p = 0.65, size = N_D)
+
+# Map binary to flavour names
+flavours = np.where(flavour_bin == 1, "chocolate", "vanilla")
+
+# Create data frame
+children_pop = pd.DataFrame({
+    "children_ID": np.arange(1, N_D + 1),
+    "fav_flavour": flavours
+})
+
+# Showing the first 100 children of the population
+print(children_pop.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+set.seed(123)  # Seed for reproducibility
+
+# Population size
+N_D <- 2000000
+
+# Simulate binary outcomes: 1 = chocolate, 0 = vanilla
+flavour_bin <- rbinom(N_D, size = 1, prob = 0.65)
+
+# Map binary to flavour names
+flavours <- ifelse(flavour_bin == 1, "chocolate", "vanilla")
+
+# Create data frame
+children_pop <- data.frame(
+  children_ID = 1:N_D,
+  fav_flavour = flavours
+)
+
+# Showing the first 100 children of the population
+head(children_pop, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+# Importing libraries
+import numpy as np
+import pandas as pd
+
+np.random.seed(123)   # Seed for reproducibility
+
+# Population size
+N_D = 2000000
+
+# Simulate binary outcomes: 1 = chocolate, 0 = vanilla
+flavour_bin = np.random.binomial(n = 1, p = 0.65, size = N_D)
+
+# Map binary to flavour names
+flavours = np.where(flavour_bin == 1, "chocolate", "vanilla")
+
+# Create data frame
+children_pop = pd.DataFrame({
+    "children_ID": np.arange(1, N_D + 1),
+    "fav_flavour": flavours
+})
+```
+
+```{r}
+#| echo: false
+
+# Showing the first 100 children of the population
+print_as_dt(head(py$children_pop, 100))
+```
+
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+set.seed(123)  # Seed for reproducibility
+
+# Population size
+n <- 500000
+
+# In R, 'rate' is 1 / scale and rounding to two decimal places
+waiting_times <- round(rexp(n, rate = 1 / 10), 2)
+
+# Create data frame
+waiting_pop <- data.frame(
+  time_ID = 1:200,
+  waiting_time = waiting_times
+)
+
+# Showing the first 100 waiting times of the population
+head(waiting_pop, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+np.random.seed(123)  # Seed for reproducibility
+
+# Population size
+n = 500000
+
+# Simulate waiting times
+waiting_times = np.round(np.random.exponential(scale = 10, size = n), 2)
+
+# Create DataFrame
+waiting_pop = pd.DataFrame({
+    "time_ID": np.arange(1, n + 1),
+    "waiting_time": waiting_times
+})
+
+# Showing the first 100 waiting times of the population
+print(waiting_pop.head((100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+set.seed(123)  # Seed for reproducibility
+
+# Population size
+n <- 500000
+
+# In R, 'rate' is 1 / scale and rounding to two decimal places
+waiting_times <- round(rexp(n, rate = 1 / 10), 2)
+
+# Create data frame
+waiting_pop <- data.frame(
+  time_ID = 1:200,
+  waiting_time = waiting_times
+)
+
+# Showing the first 100 waiting times of the population
+head(waiting_pop, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+np.random.seed(123)  # Seed for reproducibility
+
+# Population size
+n = 500000
+
+# Simulate waiting times
+waiting_times = np.round(np.random.exponential(scale = 10, size = n), 2)
+
+# Create DataFrame
+waiting_pop = pd.DataFrame({
+    "time_ID": np.arange(1, n + 1),
+    "waiting_time": waiting_times
+})
+```
+
+```{r}
+#| echo: false
+
+# Showing the first 100 waiting of the population
+print_as_dt(head(py$waiting_pop, 100))
+```
+
+:::
+
+Now, imagine that the data collection and analysis for the ice cream case have progressed further into the future. You have a follow-up meeting with your eight general managers, one from each Canadian city, to discuss how to address the statements related to both the demand and time queries as depicted in @tbl-queries-2, in relation to our `r colourize("populations", "blue")` of interest. Additionally, suppose you have collected data from $n_D = 500$ randomly surveyed children across these eight Canadian cities.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+set.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 500 children
+children_sample <- children_pop[sample(1:nrow(children_pop), 500), ]
+
+# Showing the first 100 sampled children
+head(children_sample, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+np.random.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 500 rows
+children_sample = children_pop.sample(n = 500)
+
+# Showing the first 100 sampled children
+print(children_sample.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+set.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 500 children
+children_sample <- children_pop[sample(1:nrow(children_pop), 500), ]
+
+# Showing the first 100 sampled children
+head(children_sample, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+np.random.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 500 rows
+children_sample = children_pop.sample(n = 500)
+```
+
+```{r}
+#| echo: false
+
+# Showing the first 100 sampled children
+print_as_dt(head(py$children_sample, 100))
+```
+:::
+
+Also, you have sampled data on $n_T = 200$ randomly recorded waiting times between customers across our 900 ice cream carts in the same cities.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+set.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 200 waiting times
+waiting_sample <- waiting_pop[sample(1:nrow(waiting_pop), 200), ]
+
+# Showing the first 100 sampled waiting times
+head(waiting_pop, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+np.random.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 200 waiting times
+waiting_sample = waiting_pop.sample(n = 500)
+
+# Showing the first 100 sampled waiting times
+print(waiting_sample.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+set.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 200 waiting times
+waiting_sample <- waiting_pop[sample(1:nrow(waiting_pop), 200), ]
+
+# Showing the first 100 sampled waiting times
+head(waiting_pop, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+np.random.seed(123)  # Seed for reproducibility
+
+# Simple random sample of 200 waiting times
+waiting_sample = waiting_pop.sample(n = 500)
+```
+
+```{r}
+#| echo: false
+
+# Showing the first 100 sampled waiting times
+print_as_dt(head(py$waiting_sample, 100))
+```
+:::
+
+In terms of the executive meeting with the eight general managers, it would not be an efficient use of time to go individually over these $n_D = 500$ and $n_T = 1000$ data points along with abstract mathematical concepts such as `r colourize("PMFs", "blue")` or `r colourize("PDFs", "blue")`, as well as probabilistic definitions of `r colourize("random variables", "blue")` and `r colourize("parameters", "blue")` represented by Greek letters. Instead, there should be a more straightforward and simple way to explain how these `r colourize("random variables", "blue")` behaved during our data collection process. The key to addressing this complexity lies in understanding `r colourize("measures of central tendency", "blue")` and `r colourize("uncertainty", "blue")`.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-lecture-lecturer-3976299/.](img/meeting.png){width="450"}
 
 ::: {#Definition-measure-central-tendency .definition}
 ::::{.definition-header}
@@ -413,17 +1261,6 @@ Definition of measure of central tendency
 Probabilistically, a `r colourize("measure of central tendency", "blue")` is defined as a metric that identifies a **central or typical value** of a given `r colourize("probability distribution", "blue")`. In other words, a `r colourize("measure of central tendency", "blue")` refers to a **central or typical value** that a given `r colourize("random variable", "blue")` might take when we observe various realizations of this variable over a long period.
 
 ![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-download-data-transfer-3947910/).](img/pulling.png){width="600"}
-::::
-:::
-
-::: {#Definition-measure-uncertainty .definition}
-::::{.definition-header}
-Definition of measure of uncertainty
-::::
-::::{.definition-container}
-Probabilistically, a `r colourize("measure of uncertainty", "blue")` refers to the **spread** of a given `r colourize("random variable", "blue")` when we observe its different realizations in the long term. Note a **larger spread** indicates more variability in these realizations. On the other hand, a **smaller spread** denotes less variability in these realizations.
-
-![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464615/).](img/round.png){width="600"}
 ::::
 :::
 
@@ -445,21 +1282,36 @@ When $Y$ is a `r colourize("continuous random variable", "blue")` whose `r colou
 $$
 \mathbb{E}(Y) = \int_{\mathcal{Y}} y \cdot f_Y(y) \mathrm{d}y.
 $${#eq-expected-value-continuous}
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-to-learn-goal-3674110/).](img/mean.png){width="600"}
 ::::
 :::
 
-::: {#Headsup-LOTUS .Heads-up}
-::::{.Heads-up-header}
-Heads-up on the Law of the Unconscious Statistician!
+
+
+::: {#Definition-measure-uncertainty .definition}
+::::{.definition-header}
+Definition of measure of uncertainty
 ::::
 ::::{.definition-container}
+Probabilistically, a `r colourize("measure of uncertainty", "blue")` refers to the **spread** of a given `r colourize("random variable", "blue")` when we observe its different realizations in the long term. Note a **larger spread** indicates more variability in these realizations. On the other hand, a **smaller spread** denotes less variability in these realizations.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464615/).](img/round.png){width="600"}
+::::
+:::
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Law of the Unconscious Statistician!
+::::
+::::{.Tip-container}
 The **law of the unconscious statistician (LOTUS)** is a particular theorem in `r colourize("probability", "blue")` theory that allows us to compute a wide variety of `r colourize("expected  values", "blue")`. Let us properly define it for both `r colourize("discrete", "blue")` and `r colourize("continuous random variables", "blue")`.
 
 ::::: {#thm-LOTUS-theorem-discrete}
-Let $Y$ be a `r colourize("discrete random variable", "blue")` whose support is $\mathcal{Y}$. The **LOTUS** indicates that the `r colourize("expected  value", "blue")` of a general function $g(Y)$ of this `r colourize("random variable", "blue")` $Y$ can be obtained via $g(Y)$ along with the corresponding `r colourize("PMF", "blue")` $P_Y(y)$. Hence, the `r colourize("expected value", "blue")` of $g(Y)$ can be obtained as
+Let $Y$ be a `r colourize("discrete random variable", "blue")` whose support is $\mathcal{Y}$. The **LOTUS** indicates that the `r colourize("expected  value", "blue")` of a general function $g(Y)$ of this `r colourize("random variable", "blue")` $Y$ can be obtained via $g(Y)$ along with the corresponding `r colourize("PMF", "blue")` $P_Y(Y = y)$. Hence, the `r colourize("expected value", "blue")` of $g(Y)$ can be obtained as
 
 $$
-\mathbb{E}\left[ g(Y) \right] = \sum_{y \in \mathcal{Y}} g(Y) \cdot P_Y(y).
+\mathbb{E}\left[ g(Y) \right] = \sum_{y \in \mathcal{Y}} g(y) \cdot P_Y(Y = y).
 $${#eq-expected-value-discrete-function}
 
 :::::: {.proof}
@@ -507,13 +1359,12 @@ $$
 g(y_j) = z_i.
 $${#eq-LOTUS-discrete-subset} 
 
-
 Now, let us tweak a bit the above expression from @eq-expected-discrete-Z-LOTUS to include this setting:
 
 $$
 \begin{align*}
 \mathbb{E}(Z) &= \sum_{z \in \mathcal{Z}} z \cdot P_Z(Z = z) \\
-&= \sum_{i} z_i P_{g(Y)}(Z = z_i) \\
+&= \sum_{i} z_i \cdot P_{g(Y)}(Z = z_i) \\
 & \qquad \text{we subset the summation to all $z_i$ with $Z = g(Y)$}\\
 &= \sum_{i} z_i \sum_{j \in I_i} P_Y(Y = y_j). \\
 \end{align*}
@@ -526,8 +1377,8 @@ Moving along with @eq-LOTUS-discrete-subset-2 in conjunction with @eq-LOTUS-disc
 $$
 \begin{align*}
 \mathbb{E}(Z) &= \sum_{i} z_i \sum_{j \in I_i} P_Y(Y = y_j) \\
-&= \sum_{i} \sum_{j \in I_i} z_i P_Y(Y = y_j) \\
-&= \sum_{i} \sum_{j \in I_i} g(y_j) P_Y(Y = y_j).
+&= \sum_{i} \sum_{j \in I_i} z_i \cdot P_Y(Y = y_j) \\
+&= \sum_{i} \sum_{j \in I_i} g(y_j) \cdot P_Y(Y = y_j).
 \end{align*}
 $${#eq-LOTUS-discrete-subset-3}
 
@@ -535,8 +1386,8 @@ The double summation in @eq-LOTUS-discrete-subset-3 can be summarized into a sin
 
 $$
 \begin{align*}
-\mathbb{E}(Z) &= \sum_{i} \sum_{j \in I_i} g(y_j) P_Y(Y = y_j) \\
-&= \sum_{y \in \mathcal{Y}} g(y) P_Y(Y = y) \\
+\mathbb{E}(Z) &= \sum_{i} \sum_{j \in I_i} g(y_j) \cdot P_Y(Y = y_j) \\
+&= \sum_{y \in \mathcal{Y}} g(y) \cdot P_Y(Y = y) \\
 &= \mathbb{E}\left[ g(Y) \right].
 \end{align*}
 $$
@@ -544,7 +1395,7 @@ $$
 Therefore, we have:
 
 $$
-\mathbb{E}\left[ g(Y) \right] = \sum_{y \in \mathcal{Y}} g(y) P_Y(Y = y). \quad \square
+\mathbb{E}\left[ g(Y) \right] = \sum_{y \in \mathcal{Y}} g(y) \cdot P_Y(Y = y). \quad \square
 $$
 ::::::
 :::::
@@ -553,15 +1404,120 @@ $$
 Let $Y$ be a `r colourize("continuous random variable", "blue")` whose support is $\mathcal{Y}$. The **LOTUS** indicates that the `r colourize("expected  value", "blue")` of a general function $g(Y)$ of this `r colourize("random variable", "blue")` $Y$ can be obtained via $g(Y)$ along with the corresponding `r colourize("PDF", "blue")` $f_Y(y)$. Thus, the `r colourize("expected value", "blue")` of $g(Y)$ can be obtained as
 
 $$
-\mathbb{E}\left[ g(Y) \right] = \int_{\mathcal{Y}} g(Y) \cdot f_Y(y).
+\mathbb{E}\left[ g(Y) \right] = \int_{\mathcal{Y}} g(y) \cdot f_Y(y).
 $${#eq-expected-value-continuous-function}
 
 :::::: {.proof}
-Suppose...
+Let us explore the rationale provided by @soch2023. Hence, we will rename the general function $g(Y)$ as another `r colourize("random variable", "blue")` called $Z$ such that:
+
+$$
+Z = g(Y).
+$${#eq-rv-transformation-to-z-continuous-LOTUS}
+
+As in the `r colourize("discrete", "blue")` LOTUS proof, the above @eq-rv-transformation-to-z-continuous-LOTUS is formally called a **`r colourize("random variable", "blue")` transformation** from the general function of `r colourize("random variable", "blue")` $Y,$ $g(Y)$, to a new `r colourize("random variable", "blue")` $Z$. Therefore, when we set up a transformation of this class, there will be a **support mapping** from this general function $g(Y)$ to $Z$. This will also yield a proper `r colourize("PDF", "blue")`:
+
+$$
+f_Z(z) : \mathbb{R} \rightarrow [0, 1] \quad \forall z \in \mathcal{Z},
+$$ 
+
+given that $g(Y)$ is a `r colourize("random variable", "blue")`-based function.
+
+Now, we will use the concept of the `r colourize("cumulative distribution function (CDF)", "blue")` for a `r colourize("continuous random variable", "blue")` $Z$:
+
+$$
+\begin{align*}
+F_Z(z) &= P(Z \leq z) \\
+&= P\left[g(Y) \leq z \right] \\
+&= P\left[Y \leq g^{-1}(z) \right] \\
+&= F_Y\left[ g^{-1}(z) \right].
+\end{align*}
+$${#eq-cdf-z}
+
+A well-known Calculus result is the **inverse function theorem**. Assuming that 
+
+$$
+z = g(y)
+$$ 
+
+is an invertible and differentiable function, then the inverse 
+
+$$
+y = g^{-1}(z)
+$${#eq-inverse-z} 
+
+must be differentiable as in:
+
+$$
+\frac{\mathrm{d}}{\mathrm{d}z} \left[ g^{-1}(z) \right] = \frac{1}{g' \left[ g^{-1}(z) \right]}.
+$${#eq-inv-function-theorem}
+
+Note that we differentiate @eq-inverse-z as follows:
+
+$$
+\frac{\mathrm{d}}{\mathrm{d}z} y = \frac{\mathrm{d}}{\mathrm{d}z} \left[ g^{-1}(z) \right].
+$${#eq-derivative-inv-y}
+
+Then, plugging @eq-derivative-inv-y into @eq-inv-function-theorem, we obtain:
+
+$$
+\begin{gather*}
+\frac{\mathrm{d}}{\mathrm{d}z} y = \frac{1}{g' \left[ g^{-1}(z) \right]} \\
+\mathrm{d}y = \frac{1}{g' \left[ g^{-1}(z) \right]} \mathrm{d}z.
+\end{gather*}
+$${#eq-derivative-inv-y-2}
+
+Then, we use the property that relates the `r colourize("CDF", "blue")` $F_Z(z)$ to the `r colourize("PDF", "blue")` $f_Z(z)$:
+
+$$
+f_Z(z) = \frac{\mathrm{d}}{\mathrm{d}z} F_Z(z).
+$$
+
+Using @eq-cdf-z, we have:
+
+$$
+\begin{align*}
+f_Z(z) &= \frac{\mathrm{d}}{\mathrm{d}z} F_Z(z) \\
+&= \frac{\mathrm{d}}{\mathrm{d}z} F_Y\left[ g^{-1}(z) \right] \\
+&= f_Y\left[ g^{-1}(z) \right] \frac{\mathrm{d}}{\mathrm{d}z} \left[ g^{-1}(z) \right].
+\end{align*}
+$$
+
+Then, via @eq-inv-function-theorem, it follows that:
+
+$$
+f_Z(z) = f_Y\left[ g^{-1}(z) \right] \frac{1}{g' \left[ g^{-1}(z) \right]}.
+$${#eq-pdf-continuous-Z-LOTUS}
+
+Therefore, using the `r colourize("expected value", "blue")` definition for a `r colourize("continuous random variable", "blue")` as in @eq-expected-value-continuous, we have for $Z$ that
+
+$$
+\mathbb{E}(Z) = \int_{\mathcal{Z}} z \cdot f_Z(z) \mathrm{d}z,
+$$
+
+which yields via @eq-pdf-continuous-Z-LOTUS:
+
+$$
+\mathbb{E}(Z) = \int_{\mathcal{Z}} z \cdot f_Y \left[ g^{-1}(z) \right] \frac{1}{g' \left[ g^{-1}(z) \right]} \mathrm{d}z.
+$$
+
+Using @eq-inverse-z and @eq-derivative-inv-y-2, it follows that:
+
+$$
+\begin{align*}
+\mathbb{E}(Z) &= \int_{\mathcal{Z}} z \cdot f_Y(y) \frac{1}{g' \left[ g^{-1}(z) \right]} \mathrm{d}z \\
+&= \int_{\mathcal{Y}} g(y) \cdot f_Y(y) \mathrm{d}y.
+\end{align*}
+$$
+
+Note the last line in the above equation changes the integration limits to the support of $Y$, given all terms end up depending on $y$ on the right-hand side.
+
+Finally, given the `r colourize("random variable", "blue")` transformation from @eq-rv-transformation-to-z-continuous-LOTUS, we have:
+
+$$
+\mathbb{E}\left[ g(X) \right] = \int_{\mathcal{Y}} g(y) \cdot f_Y(y) \mathrm{d}y. \quad \square
+$$
 ::::::
 :::::
-
-
 ::::
 :::
 
@@ -570,81 +1526,476 @@ Suppose...
 Definition of variance 
 ::::
 ::::{.definition-container}
-The `r colourize("variance", "blue")` of a `r colourize("random  variable", "blue")` is...
-
-Either for a `r colourize("discrete", "blue")` or `r colourize("continuous", "blue")` case, the `r colourize("variance", "blue")` is defined as 
+Let $Y$ be a `r colourize("discrete", "blue")` or `r colourize("continuous random variable", "blue")` whose support is $\mathcal{Y}$ with a mean represented by $\mathbb{E}(Y)$. Then, the `r colourize("variance", "blue")` of $Y$ is the `r colourize("mean", "blue")` of the squared deviation from the corresponding `r colourize("mean", "blue")` as follows:
 
 $$
-\text{Var}(Y) = \mathbb{E}\{[Y - \mathbb{E}(Y)]^2\}.
+\text{Var}(Y) = \mathbb{E}\left\{[ Y - \mathbb{E}(Y)]^2 \right\}. \\
 $${#eq-first-variance}
 
 Note the expression above is equivalent to:
 
 $$
-\text{Var}(Y) = \mathbb{E}(Y^2) - [\mathbb{E}(Y)]^2.
+\text{Var}(Y) = \mathbb{E} \left( Y^2 \right) - \left[ \mathbb{E}(Y) \right]^2.
 $${#eq-second-variance}
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/tablet-games-tetris-building-blocks-7426706/).](img/tablet.png){width="300"}
 ::::
 :::
 
-::: {#Headsup-sample .Heads-up}
+::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up on the two mathematical expressions of the variance!
 ::::
 ::::{.Heads-up-container}
-After applying some algebraic rearrangements and `r colourize("expected value", "blue")` properties, @eq-first-variance and @eq-second-variance are equivalent as follows:
+Proving the equivalence of @eq-first-variance and @eq-second-variance, requires the introduction of some further properties of the `r colourize("expected value", "blue")` of a `r colourize("random variable", "blue")` while using the **LOTUS**. We will dig into the insights provided by @casella2024.
+
+::::: {#thm-theorem-mean-properties}
+Let $Y$ be a `r colourize("discrete", "blue")` or `r colourize("continuous random variable", "blue")`. Furthermore, let $a$, $b$, and $c$ be constants. Thus, **for any functions $g_1(y)$ and $g_2(x)$ whose `r colourize("means", "blue")` exist**, we have that:
+
+$$
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] = a \mathbb{E}\left[ g_1(Y) \right] + b \mathbb{E}\left[ g_2(Y) \right] + c.
+$${#eq-expected-value-properties}
+
+Firstly, let us prove @eq-expected-value-properties for the `r colourize("discrete", "blue")` case.
+
+:::::: {.proof}
+Let $Y$ be a `r colourize("discrete random variable", "blue")` whose support is $\mathcal{Y}$ and `r colourize("PMF", "blue")` is $P_Y(Y = y)$. Let us apply the **LOTUS** as in @eq-expected-value-discrete-function:
+
+$$
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] = \sum_{y \in \mathcal{Y}} \left[ a g_1(y) + b g_2(y) + c \right] \cdot P_Y(Y = y).
+$$
+We can distribute the summation across each addend as follows:
+
+$$
+\begin{align*}
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] &= \sum_{y \in \mathcal{Y}} \left[ a g_1(y) \right] \cdot P_Y(Y = y) + \\
+& \qquad \sum_{y \in \mathcal{Y}} \left[ b g_2(y) \right] \cdot P_Y(Y = y) + \\
+& \qquad \sum_{y \in \mathcal{Y}} c \cdot P_Y(Y = y).
+\end{align*}
+$$
+
+Let us take the constants out of the corresponding summations:
+
+$$
+\begin{align*}
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] &= a \sum_{y \in \mathcal{Y}} g_1(y) \cdot P_Y(Y = y) + \\
+& \qquad b \sum_{y \in \mathcal{Y}} g_2(y) \cdot P_Y(Y = y) + \\
+& \qquad c \underbrace{\sum_{y \in \mathcal{Y}} P_Y(Y = y)}_1 \\
+&= a \underbrace{\sum_{y \in \mathcal{Y}} g_1(y) \cdot P_Y(Y = y)}_{\mathbb{E} \left[ g_1(Y) \right]} + \\
+& \qquad b \underbrace{\sum_{y \in \mathcal{Y}} g_2(y) \cdot P_Y(Y = y)}_{\mathbb{E} \left[ g_2(Y) \right]} + c.
+\end{align*}
+$$
+
+For the first and second addends on the right-hand side in the above equation, let us apply the **LOTUS** again:
+
+$$
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] = a \mathbb{E} \left[ g_1(Y) \right] + b \mathbb{E} \left[ g_2(Y) \right] + c. \quad \square
+$$
+::::::
+
+Secondly, let us prove @eq-expected-value-properties for the `r colourize("continuous", "blue")` case.
+
+:::::: {.proof}
+Let $Y$ be a `r colourize("continuous random variable", "blue")` whose support is $\mathcal{Y}$ and `r colourize("PDF", "blue")` is $f_Y(y)$. Let us apply the **LOTUS** as in @eq-expected-value-continuous-function:
+
+$$
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] = \int_{\mathcal{Y}} \left[ a g_1 (y) + b g_2(y) + c \right] \cdot f_Y(y) \mathrm{d}y.
+$$
+
+We distribute the integral on the right-hand side of the above equation:
+
+$$
+\begin{align*}
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] &= \int_{\mathcal{Y}} \left[ a g_1 (y) \right] \cdot f_Y(y) \mathrm{d}y + \\
+& \qquad \int_{\mathcal{Y}} \left[ b g_2(y) \right] \cdot f_Y(y) \mathrm{d}y + \\
+& \qquad \int_{\mathcal{Y}} c \cdot f_Y(y) \mathrm{d}y.
+\end{align*}
+$$
+
+Let us take the constants out of the corresponding integrals:
+
+$$
+\begin{align*}
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] &= a \int_{\mathcal{Y}} g_1 (y) \cdot f_Y(y) \mathrm{d}y + \\
+& \qquad b \int_{\mathcal{Y}} g_2(y) \cdot f_Y(y) \mathrm{d}y + \\
+& \qquad c \underbrace{\int_{\mathcal{Y}} f_Y(y) \mathrm{d}y}_{1} \\
+&= a \underbrace{\int_{\mathcal{Y}} g_1 (y) \cdot f_Y(y) \mathrm{d}y}_{\mathbb{E} \left[ g_1(Y) \right]} + \\
+& \qquad b \underbrace{\int_{\mathcal{Y}} g_2(y) \cdot f_Y(y) \mathrm{d}y}_{\mathbb{E} \left[ g_2(Y) \right]} + c.
+\end{align*}
+$$
+
+For the first and second addends on the right-hand side in the above equation, let us apply the **LOTUS** again:
+
+$$
+\mathbb{E}\left[ a g_1(Y) + b g_2(Y) + c \right] = a \mathbb{E} \left[ g_1(Y) \right] + b \mathbb{E} \left[ g_2(Y) \right] + c. \quad \square
+$$
+::::::
+:::::
+
+Finally, after applying some algebraic rearrangements and the `r colourize("expected value", "blue")` properties shown in @eq-expected-value-properties, @eq-first-variance and @eq-second-variance are equivalent as follows:
 
 ::::: {.proof}
 $$
 \begin{align*}
-\text{Var}(Y) &= \mathbb{E} \left\{ \left[ Y - \mathbb{E}(Y) \right]^2 \right\} \\
+\text{Var}(Y) &= \mathbb{E}\left\{[ Y - \mathbb{E}(Y)]^2 \right\} \\
 &= \mathbb{E} \left\{ Y^2 - 2Y \mathbb{E}(Y) + \left[ \mathbb{E}(Y) \right]^2 \right\} \\
-&= \mathbb{E}(Y^2) - \mathbb{E} \left[ 2 Y \mathbb{E}(Y) \right] + \mathbb{E} \left[ \mathbb{E}(Y) \right]^2 \\
-& \qquad \text{distributing the expected value operator}\\
-&= \mathbb{E}(Y^2) - 2 \mathbb{E} \left[ Y \mathbb{E}(Y) \right] + \mathbb{E} \left[ \mathbb{E}(Y) \right]^2 \\
-& \qquad \text{since $2$ is a constant}\\
-&= \mathbb{E}(Y^2) - 2 \mathbb{E}(Y) \mathbb{E} \left( Y \right) + \left[ \mathbb{E}(Y) \right]^2 \\
-& \qquad \text{since $\mathbb{E}(Y)$ is a constant}\\
-&= \mathbb{E}(Y^2) - 2 \left[ \mathbb{E}(Y) \right]^2 + \left[ \mathbb{E}(Y) \right]^2 \\
-&= \mathbb{E}(Y^2) - [\mathbb{E}(Y)]^2.  \qquad \qquad \qquad \qquad \qquad \square
+&= \mathbb{E} \left( Y^2 \right) - \mathbb{E} \left[ 2Y \mathbb{E}(Y) \right] + \mathbb{E} \left[ \mathbb{E}(Y) \right]^2 \\
+& \qquad \text{distributing the expected value operator} \\
+&= \mathbb{E} \left( Y^2 \right) - 2 \mathbb{E} \left[ Y \mathbb{E}(Y) \right] + \mathbb{E} \left[ \mathbb{E}(Y) \right]^2 \\
+& \qquad \text{since $2$ is a constant} \\
+&= \mathbb{E} \left( Y^2 \right) - 2 \mathbb{E}(Y) \mathbb{E} \left( Y \right) + \left[ \mathbb{E}(Y) \right]^2 \\
+& \qquad \text{since $\mathbb{E}(Y)$ is a constant} \\
+&= \mathbb{E} \left( Y^2 \right) - 2 \left[ \mathbb{E}(Y) \right]^2 + \left[ \mathbb{E}(Y) \right]^2 \\
+&= \mathbb{E} \left( Y^2 \right) - \left[ \mathbb{E}(Y) \right]^2.  \qquad \qquad \qquad \qquad \qquad \square
 \end{align*}
 $$
 :::::
 ::::
 :::
 
-::: {#Definition-generative-model .definition}
+::: {#Definition-estimator .definition}
 ::::{.definition-header}
-Definition of generative model
+Definition of estimator 
 ::::
 ::::{.definition-container}
-A `r  colourize("generative model", "blue")` is
+An `r colourize("estimator", "blue")` is a mathematical rule involving the random variables $Y_1, \dots, Y_n$ from our `r colourize("random sample", "blue")` of size $n$. As its name says, this rule allows us to estimate our `r colourize("population parameter", "blue")` of interest.
 ::::
 :::
 
-::: {#Definition-random-sample .definition}
+::: {#Definition-estimate .definition}
 ::::{.definition-header}
-Definition of random sample
+Definition of estimate 
 ::::
 ::::{.definition-container}
-A `r  colourize("random sample", "blue")` is a collection of `r colourize("random  variables", "blue")`
+Suppose we have an **observed** `r colourize("random sample", "blue")` of size $n$ with values $y_1, \dots , y_n$. Then, we apply a given `r colourize("estimator", "blue")` mathematical rule to these $n$ observed values. Hence, this numerical computation is called an `r colourize("estimate", "blue")` of our `r colourize("population parameter", "blue")` of interest.
 ::::
 :::
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+pi_hat <- round(mean(children_sample$fav_flavour == "chocolate"), 2)
+pi_hat
+```
+
+## **`Python` Code**
+
+``` {.python}
+pi_hat = round((children_sample["fav_flavour"] == "chocolate").mean(), 2)
+print(pi_hat)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+pi_hat <- round(mean(children_sample$fav_flavour == "chocolate"), 2)
+pi_hat
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+pi_hat = round((children_sample["fav_flavour"] == "chocolate").mean(), 2)
+print(pi_hat)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+beta_hat <- round(mean(waiting_sample$waiting_time), 2)
+beta_hat
+```
+
+## **`Python` Code**
+
+``` {.python}
+beta_hat = round(waiting_sample["waiting_time"].mean(), 2)
+print(beta_hat)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+beta_hat <- round(mean(waiting_sample$waiting_time), 2)
+beta_hat
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+beta_hat = round(waiting_sample["waiting_time"].mean(), 2)
+print(beta_hat)
+```
+
+:::
+
+### The Rationale in Random Sampling {#sec-random-samples}
 
 ::: {#Definition-conditional-probability .definition}
 ::::{.definition-header}
 Definition of conditional probability
 ::::
 ::::{.definition-container}
-We define `r colourize("conditional probability", "blue")`
+Suppose you have two events of interest, $A$ and $B$, in a random phenomenon of a `r colourize("population", "blue")` or **system** of interest. These two events belong to the  `r colourize("sample space", "blue")` $S$. Moreover, assume that the  `r colourize("probability", "blue")` of event $B$ is such that
+
+$$
+P(B) > 0,
+$$
+
+which is considered the **conditioning event**.
+
+Hence, the `r colourize("conditional probability", "blue")` of event $A$ **given** event $B$ is defined as
+
+$$
+P(A | B) = \frac{P(A \cap B)}{P(B)},
+$${#eq-conditional-probability}
+
+where $P(A \cap B)$ is read as **the `r colourize("probability", "blue")` of the intersection of events $A$ and $B$**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-to-learn-3674106/).](img/pieces.png){width="250"}
 ::::
 :::
 
-::: {#Definition-probabilistic-independence .definition}
+::: {.Tip}
+::::{.Tip-header}
+Tip on the rationale behind conditional probability!
+::::
+::::{.Tip-container}
+We can delve into the rationale of @eq-conditional-probability by using a handy probabilistic concept called **cardinality**, which refers to the corresponding total number of possible outcomes in a random phenomenon belonging to any given event or `r colourize("sample space", "blue")`.
+
+:::::: {.proof}
+Let $|S|$ be the cardinality corresponding to the `r colourize("sample space", "blue")` in a random phenomenon. Hence, as in @eq-sample-space, we have that:
+
+$$
+P(S) = \frac{|S|}{|S|} = 1.
+$$
+
+Moreover, suppose that $A$ is the **primary event of interest** whose cardinality is represented by $|A|$. Alternatively to @eq-probability, the probability of $A$ can be represented as 
+
+$$
+P(A) = \frac{|A|}{|S|}.
+$$
+
+On the other hand, the cardinality of the **conditioning event** is
+
+$$
+P(B) = \frac{|B|}{|S|}.
+$${#eq-prob-card-B}
+
+Now, let $|A \cap B|$ be the cardinality of the intersection between events $A$ and $B$. Its probability can be represented as:
+
+$$
+P(A \cap B) = \frac{|A \cap B|}{|B|}.
+$${#eq-prob-card-A-int-B}
+
+Analogous to @eq-prob-card-B and @eq-prob-card-A-int-B, we can view the conditional probability $P(A | B)$ as an updated probability of the primary event $A$ restricted to the cardinality of the conditioning event $|B|$. This places $|A \cap B|$ in the numerator and $|B|$ in the denominator as follows:
+
+$$
+P(A | B) = \frac{|A \cap B|}{|B|}.
+$${#eq-prob-card-cond-A-B}
+
+Therefore, we can play around with @eq-prob-card-cond-A-B along with @eq-prob-card-B and @eq-prob-card-A-int-B as follows:
+
+$$
+\begin{align*}
+P(A \cap B) &= \frac{|A \cap B|}{|B|} \\
+&= \frac{\frac{|A \cap B}{|S|}}{\frac{|B|}{|S|}} \qquad \text{dividing numerator and denominator over $|S|$} \\
+&= \frac{P(A \cap B)}{P(B)}. \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \quad \square
+\end{align*}
+$$
+::::::
+::::
+:::
+
+::: {#Definition-Bayes-rule .definition}
+::::{.definition-header}
+Definition of the Bayes' rule
+::::
+::::{.definition-container}
+Suppose you have two events of interest, $A$ and $B$, in a random phenomenon of a `r colourize("population", "blue")` or **system** of interest. From @eq-conditional-probability, we can state the following expression for the `r colourize("conditional probability", "blue")` of $A$ **given** $B$:
+
+$$
+P(A | B) = \frac{P(A \cap B)}{P(B)} \quad \text{if $P(B) > 0$.}
+$${#eq-cond-prob-A-given-B}
+
+Note the `r colourize("conditional probability", "blue")` of $B$ **given** $A$ can be stated as:
+
+$$
+\begin{align*}
+P(B | A) &= \frac{P(B \cap A)}{P(A)} \quad \text{if $P(A) > 0$} \\
+&= \frac{P(A \cap B)}{P(A)} \quad \text{since $P(B \cap A) = P(A \cap B)$.}
+\end{align*}
+$${#eq-cond-prob-B-given-A}
+
+Then, we can manipulate @eq-cond-prob-B-given-A as follows:
+
+$$
+P(A \cap B) = P(B | A) \times P(A).
+$$
+
+The above result can be plugged into @eq-cond-prob-A-given-B:
+
+$$
+\begin{align*}
+P(A | B) &= \frac{P(A \cap B)}{P(B)} \\
+&= \frac{P(B | A) \times P(A)}{P(B)}.
+\end{align*}
+$${#eq-bayes-rule}
+
+@eq-bayes-rule is called the `r colourize("Bayes' rule", "blue")`. We are basically flipping around `r colourize("conditional probabilities", "blue")`.
+::::
+:::
+
+::: {#Definition-independence .definition}
 ::::{.definition-header}
 Definition of independence
 ::::
 ::::{.definition-container}
-We define `r colourize("probabilistic independence", "blue")`
+Suppose you have two events of interest, $A$ and $B$, in a random phenomenon of a `r colourize("population", "blue")` or **system** of interest. These two events are **statistically** `r colourize("independent", "blue")` if event $B$ does not affect event $A$ and vice versa. Therefore, the `r colourize("probability", "blue")` of their corresponding intersection is given by:
+
+$$
+P(A \cap B) = P(A) \times P(B).
+$${#eq-ind-A-B}
+
+Let us expand the above definition to a `r colourize("random variable", "blue")` framework:
+
+- Suppose you have a set of $n$ `r colourize("discrete random variables", "blue")` $Y_1, \dots, Y_n$ whose supports are $\mathcal{Y_1}, \dots, \mathcal{Y_n}$ with `r colourize("PMFs", "blue")` $P_{Y_1}(Y_1 = y_1), \dots, P_{Y_n}(Y_n = y_n)$ respectively. That said, the joint `r colourize("PMF", "blue")` of these $n$ `r colourize("random variables", "blue")` is the multiplication of their corresponding standalone `r colourize("PMFs", "blue")`:
+
+$$
+\begin{align*}
+P_{Y_1, \dots, Y_n}(Y_1 = y_1, \dots, Y_n = y_n) &= \prod_{i = 1}^n P_{Y_i}(Y_i = y_i) \\
+& \qquad \text{for all} \\
+& \qquad \quad y_i \in \mathcal{Y}_i, i = 1, \dots, n.
+\end{align*}
+$${#eq-joint-PMF-ind-random-variables}
+
+- Suppose you have a set of $n$ `r colourize("continuous random variables", "blue")` $Y_1, \dots, Y_n$ whose supports are $\mathcal{Y_1}, \dots, \mathcal{Y_n}$ with `r colourize("PDFs", "blue")` $f_{Y_1}(y_1), \dots, f_{Y_n}(y_n)$ respectively. That said, the joint `r colourize("PDF", "blue")` of these $n$ `r colourize("random variables", "blue")` is the multiplication of their corresponding standalone `r colourize("PDFs", "blue")`:
+
+$$
+\begin{align*}
+f_{Y_1, \dots, Y_n}(y_1, \dots, y_n) &= \prod_{i = 1}^n f_{Y_i}(y_i) \\
+& \qquad \text{for all} \\
+& \qquad \quad y_i \in \mathcal{Y}_i, i = 1, \dots, n.
+\end{align*}
+$${#eq-joint-PDF-ind-random-variables}
+::::
+:::
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on the rationale behind the rule of independent events!
+::::
+::::{.Tip-container}
+We can delve into the rationale of @eq-ind-A-B by using the `r colourize("Bayes' rule", "blue")` from @eq-bayes-rule along with the basic `r colourize("conditional probability", "blue")` formula from @eq-conditional-probability.
+
+:::::: {.proof}
+Firstly, let us assume that a given event $B$ does not affect event $A$ which can be probabilistically represented as
+
+$$
+P(A | B) = P(A).
+$${#eq-unconditional-prob-A-B}
+
+If the statement in @eq-unconditional-prob-A-B holds, by using the `r colourize("Bayes' rule", "blue")` from @eq-bayes-rule, we have the following manipulation for the below `r colourize("conditional probability", "blue")` formula:
+
+$$
+\begin{align*}
+P(B | A) &= \frac{P(B \cap A)}{P(A)} \\
+&= \frac{P(A \cap B)}{P(A)} \qquad \text{since $P(B \cap A) = P(A \cap B$)} \\
+&= \frac{P(A | B) \times P(B)}{P(A)} \qquad \text{by the Bayes' rule} \\
+&= \frac{P(A) \times P(B)}{P(A)} \qquad \text{since $P(A | B) = P(A)$} \\
+&= P(B).
+\end{align*}
+$$
+
+Then, again by using the `r colourize("Bayes' rule", "blue")`, we obtain $P(B \cap A)$ as follows:
+
+$$
+\begin{align*}
+P(B \cap A) &= P(B | A) \times P(A) \\
+&= P(B) \times P(A) \qquad \text{since $P(B | A) = P(B)$.}
+\end{align*}
+$$
+
+Finally, we have that:
+
+$$
+\begin{align*}
+P(A \cap B) &= P(B \cap A) \\
+&= P(B) \times P(A) \\
+&= P(A) \times P(B). \qquad \square
+\end{align*}
+$$
+
+::::::
+::::
+:::
+
+
+::: {#Definition-random-sample .definition}
+::::{.definition-header}
+Definition of random sample
+::::
+::::{.definition-container}
+A `r  colourize("random sample", "blue")` is a collection of `r colourize("random variables", "blue")` $Y_1, \dots, Y_n$ of size $n$ coming from a given `r colourize("population", "blue")` or system of interest. Note that **the most elementary definition** of a `r  colourize("random sample", "blue")` assumes that these $n$ `r colourize("random variables", "blue")` are mutually `r colourize("independent", "blue")` and **identically distributed** (which is abbreviated as *iid*). 
+
+The fact that these $n$ `r colourize("random variables", "blue")` are identically distributed indicates that they have the same mathematical form for their corresponding `r colourize("PMFs", "blue")` or `r colourize("PDFs", "blue")`, depending on whether they are `r colourize("discrete", "blue")` or `r colourize("continuous", "blue")` respectively. Hence, under a `r colourize("generative modelling", "blue")` approach in a `r colourize("population", "blue")` or system of interest governed by $k$ `r colourize("parameters", "blue")` contained in the vector
+
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T,
+$$
+
+we can apply the *iid* property in an elementary `r colourize("random sample", "blue")` to obtain the following joint `r colourize("probability distributions", "blue")`:
+
+- In the case of $n$ *iid* `r colourize("discrete random variables", "blue")` $Y_1, \dots, Y_n$ whose common standalone `r colourize("PMF", "blue")` is $P_Y(Y = y | \boldsymbol{\theta})$ with support $\mathcal{Y}$, the joint `r colourize("PMF", "blue")` is mathematically expressed as
+
+$$
+\begin{align*}
+P_{Y_1, \dots, Y_n}(Y_1 = y_1, \dots, Y_n = y_n | \boldsymbol{\theta}) &= \prod_{i = 1}^n P_Y(Y = y_i | \boldsymbol{\theta}) \\
+& \quad \text{for all} \\
+& \quad \quad y_i \in \mathcal{Y}, i = 1, \dots, n.
+\end{align*}
+$${#eq-joint-PMF-iid-random-variables}
+
+- In the case of $n$ *iid* `r colourize("continuous random variables", "blue")` $Y_1, \dots, Y_n$ whose common standalone `r colourize("PDF", "blue")` is $f_Y(y | \boldsymbol{\theta})$ with support $\mathcal{Y}$, the joint `r colourize("PDF", "blue")` is mathematically expressed as
+
+$$
+\begin{align*}
+f_{Y_1, \dots, Y_n}(y_1, \dots, y_n | \boldsymbol{\theta}) &= \prod_{i = 1}^n f_Y(y_i | \boldsymbol{\theta}) \\
+& \quad \text{for all} \\
+& \quad \quad y_i \in \mathcal{Y}, i = 1, \dots, n.
+\end{align*}
+$${#eq-joint-PDF-iid-random-variables}
+
+
+Unlike @eq-joint-PMF-ind-random-variables and @eq-joint-PDF-ind-random-variables, note that @eq-joint-PMF-iid-random-variables and @eq-joint-PDF-iid-random-variables **do not** indicate a subscript for $Y$ in the corresponding `r colourize("probability distributions", "blue")` since we have identically distributed `r colourize("random variables", "blue")`. Furthermore, the joint distributions are conditioned on the `r colourize("population parameter", "blue")` vector $\boldsymbol{\theta}$ which reflects our `r colourize("generative modelling", "blue")` approach.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-lecture-lecture-hall-3976296/).](img/sample.png){width="500"}
 ::::
 :::
 
@@ -652,12 +2003,50 @@ We define `r colourize("probabilistic independence", "blue")`
 
 ## Basics of Frequentist Statistical Inference {#sec-basics-inf}
 
-::: {#Definition-hypothesis-testing .definition}
+::: {#fig-ds-workflow-results-2}
+![](img/results.png){width="1000"}
+
+*Results* stage from the data science workflow in @fig-ds-workflow. This stage is directly followed by *storytelling* and preceded by *goodness of fit*.
+:::
+
+::: {#fig-classical-hypothesis-testing-workflow}
+![](img/classical-hypothesis-testing-workflow.png){width="1500"}
+
+A classical-based hypothesis testing workflow structured in four substages: *general settings*, *hypotheses definitions*, *test flavour and components*, and *inferential conclusions*.
+:::
+
+### General Settings {#sec-hypothesis-workflow-general-settings}
+
+::: {#fig-hypothesis-workflow-general-settings}
+![](img/general-settings.png){width="1000"}
+
+*General settings* substage from the classical-based hypothesis testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly followed by the *hypotheses definitions*.
+:::
+
+Based on the work by @soch2023, let us check some key definitions.
+
+::: {#Definition-hypothesis .definition}
 ::::{.definition-header}
-Definition of hypothesis testing 
+Definition of hypothesis
 ::::
 ::::{.definition-container}
-A `r colourize("frequentist hypothesis testing", "blue")` is
+Suppose you observe some data $y$ from some `r colourize("population(s)", "blue")` or system(s) of interest governed by $k$ `r colourize("parameters", "blue")` contained in the following vector:
+
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T.
+$$
+
+Moreover, we assume this observed data $y$ follows certain `r colourize("probability distribution", "blue")` $\mathcal{D}(\cdot)$ in a `r colourize("generative model", "blue")` $m$ as in
+
+$$
+m: y \sim \mathcal{D}(\boldsymbol{\theta}).
+$$
+
+Beginning from the fact that $\boldsymbol{\theta} \in \boldsymbol{\Theta}$ where $\boldsymbol{\Theta} \in \mathbb{R}^k$, a statistical `r colourize("hypothesis", "blue")` is a general statement about some `r colourize("parameter", "blue")` vector $\boldsymbol{\theta}$ in regards to specific values contained in vector $\boldsymbol{\Theta}^*$ such that
+
+$$
+H: \boldsymbol{\theta} \in \boldsymbol{\Theta}^* \quad \text{where} \quad \boldsymbol{\Theta}^* \subset \boldsymbol{\Theta}.
+$$
 ::::
 :::
 
@@ -666,7 +2055,25 @@ A `r colourize("frequentist hypothesis testing", "blue")` is
 Definition of null hypothesis 
 ::::
 ::::{.definition-container}
-A `r colourize("null hypothesis", "blue")` is
+In a `r colourize("hypothesis(s)", "blue")` testing, a `r colourize("null hypothesis", "blue")` is denoted by $H_0$. The whole inferential process is designed to assess the strength of the evidence in favour or against this `r colourize("null hypothesis", "blue")`. In plain words, $H_0$ is an **inferential statement** associated to the **status quo** in some `r colourize("population(s)", "blue")` or system(s) of interest, which might refer to **no signal** for the researcher in question.
+
+Again, suppose you observe some data $y$ from some `r colourize("population(s)", "blue")` or system(s) of interest governed by $k$ `r colourize("parameters", "blue")` contained in the following vector:
+
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T.
+$$
+
+Moreover, we assume this observed data $y$ follows certain `r colourize("probability distribution", "blue")` $\mathcal{D}(\cdot)$ in a `r colourize("generative model", "blue")` $m$ as in
+
+$$
+m: y \sim \mathcal{D}(\boldsymbol{\theta}).
+$$
+
+Let $\boldsymbol{\Theta}_0 \subset \boldsymbol{\theta}$ denote the status quo for the `r colourize("parameter(s)", "blue")` to be tested. Then, the `r colourize("null hypothesis", "blue")` is mathematically defined as
+
+$$
+H_0: \boldsymbol{\theta} \in \boldsymbol{\Theta}_0 \quad \text{where} \quad \boldsymbol{\Theta}_0 \subset \boldsymbol{\theta}.
+$${#eq-def-null-hypothesis}
 ::::
 :::
 
@@ -675,25 +2082,59 @@ A `r colourize("null hypothesis", "blue")` is
 Definition of alternative hypothesis 
 ::::
 ::::{.definition-container}
-An `r colourize("alternative hypothesis", "blue")` is
+In a `r colourize("hypothesis", "blue")` testing, an `r colourize("alternative hypothesis", "blue")` is denoted by $H_1$. This hypothesis corresponds to the **complement** (i.e., the **opposite**) of the `r colourize("null hypothesis", "blue")` $H_0$. Since the whole inferential process is designed to assess the strength of the evidence in favour or against of $H_0$, any inferential conclusion against $H_0$ can be worded as "*rejecting $H_0$ **in favour** of $H_1$*." In plain words, $H_1$ is an **inferential statement** associated to a **non-status quo** in some `r colourize("population(s)", "blue")` or system(s) of interest, which might refer to **actual signal** for the researcher in question.
+
+Let us assume you observe some data $y$ from some `r colourize("population(s)", "blue")` or system(s) of interest governed by $k$ `r colourize("parameters", "blue")` contained in the following vector:
+
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T.
+$$
+
+Moreover, suppose this observed data $y$ follows certain `r colourize("probability distribution", "blue")` $\mathcal{D}(\cdot)$ in a `r colourize("generative model", "blue")` $m$ as in
+
+$$
+m: y \sim \mathcal{D}(\boldsymbol{\theta}).
+$$
+
+Let $\boldsymbol{\Theta}_0^c \subset \boldsymbol{\theta}$ denote the non-status quo for the `r colourize("parameter(s)", "blue")` to be tested. Then, the `r colourize("alternative hypothesis", "blue")` is mathematically defined as
+
+$$
+H_1: \boldsymbol{\theta} \in \boldsymbol{\Theta}_0^c \quad \text{where} \quad \boldsymbol{\Theta}_0^c \subset \boldsymbol{\theta}.
+$${#eq-def-alternative-hypothesis}
+::::
+:::
+
+::: {#Definition-hypothesis-testing .definition}
+::::{.definition-header}
+Definition of hypothesis testing 
+::::
+::::{.definition-container}
+A `r colourize("hypothesis testing", "blue")` is the **decision rule** we have to apply between the `r colourize("null", "blue")` and `r colourize("alternative hypotheses", "blue")`, via our sample data, to **fail to reject** or **reject** the `r colourize("null hypothesis", "blue")`.
 ::::
 :::
 
 ::: {#Definition-type-I-error .definition}
 ::::{.definition-header}
-Definition of type I error 
+Definition of type I error (false positive)
 ::::
 ::::{.definition-container}
-`r colourize("Type I error", "blue")` is defined as
+`r colourize("Type I error", "blue")` is defined as **incorrectly** rejecting the `r colourize("null hypothesis", "blue")` $H_0$ in favour of the `r colourize("alternative hypothesis", "blue")` $H_1$ when, in fact, **$H_0$ is true**. Analogously, this type of error is also called `r colourize("false positive ", "blue")`.
 ::::
 :::
 
 ::: {#Definition-type-II-error .definition}
 ::::{.definition-header}
-Definition of type II error 
+Definition of type II error (false negative)
 ::::
 ::::{.definition-container}
-`r colourize("Type II error", "blue")` is defined as
+`r colourize("Type II error", "blue")` is defined as **incorrectly** failing to reject the `r colourize("null hypothesis", "blue")` $H_0$ in favour of the `r colourize("alternative hypothesis", "blue")` $H_1$ when, in fact, **$H_0$ is false**. Analogously, this type of error is also called `r colourize("false negative ", "blue")`. @tbl-errors summarizes the types of inferential conclusions in function on whether $H_0$ is true or not.
+
+|       | **$H_0$ is true** | **$H_0$ is false** |
+|:-----:|:-----:|:-----:|
+| **Reject $H_0$** | Type I error (*False positive*) | Correct |
+| **Fail to reject $H_0$** | Correct | Type II error (*False negative*) |
+
+: Types of inferential conclusions in a frequentist hypothesis testing. {#tbl-errors .hover}
 ::::
 :::
 
@@ -702,7 +2143,13 @@ Definition of type II error
 Definition of significance level
 ::::
 ::::{.definition-container}
-`r colourize("Significance level", "blue")` is defined as
+The `r colourize("significance level", "blue")` $\alpha$ is defined as the `r colourize("conditional probability", "blue")` of rejecting the `r colourize("null hypothesis", "blue")` $H_0$ given that $H_0$ is true. This can be mathematically represented as
+
+$$
+P \left( \text{Reject $H_0$} | \text{$H_0$ is true} \right) = \alpha.
+$$
+
+In plain words, $\alpha \in [0, 1]$ allows us to probabilistically control for `r colourize("type I error", "blue")` since we are dealing with `r colourize("random variables", "blue")` in our inferential process. The `r colourize("significance level", "blue")` can be thought as one of the main `r colourize("hypothesis testing", "blue")` and `r colourize("power analysis", "blue")` settings. **The larger the `r colourize("significance level", "blue")` in our `r colourize("power analysis", "blue")` and `r colourize("hypothesis testing", "blue")`, the less prone we are to commit a `r colourize("type I error", "blue")`.**
 ::::
 :::
 
@@ -711,8 +2158,47 @@ Definition of significance level
 Definition of power
 ::::
 ::::{.definition-container}
-The statistical `r colourize("power", "blue")` of a test is defined as
+The statistical `r colourize("power", "blue")` of a test $1 -\beta$ is the complement of the `r colourize("conditional probability", "blue")` $\beta$ of failing to reject the `r colourize("null hypothesis", "blue")` $H_0$ given that $H_0$ is false, which is mathematically represented as
+
+$$
+P \left( \text{Failing to reject $H_0$} | \text{$H_0$ is false} \right) = \beta;
+$$
+
+yielding
+
+$$
+\text{Power} = 1 - \beta. 
+$$
+
+In plain words, $1 - \beta \in [0, 1]$ is the **probabilistic ability** of our `r colourize("hypothesis testing", "blue")` to detect any signal in our inferential process, **if there is any**. **The larger the `r colourize("power", "blue")` in our `r colourize("power analysis", "blue")`, the less prone we are to commit a `r colourize("type II error", "blue")`.**
 ::::
+:::
+
+::: {#Definition-power-analysis .definition}
+::::{.definition-header}
+Definition of power analysis
+::::
+::::{.definition-container}
+`r colourize("Power analysis", "blue")` is a set of statistical tools used to compute the **minimum required sample size $n$** for any given inferential study. These tools require the `r colourize("significance level", "blue")`, `r colourize("power", "blue")`, and **effect size** (i.e., the **magnitude of the signal**) the researcher aims to detect via their inferential study. This analysis seeks to determine whether observed results are likely **due to chance** or represent a **true and meaningful effect**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-blended-learning-6230153/).](img/blender.png){width="400"}
+::::
+:::
+
+### Hypotheses Definitions {#sec-hypothesis-workflow-hypotheses-definitions}
+
+::: {#fig-hypothesis-workflow-hypotheses-definitions}
+![](img/hypotheses-definitions.png){width="1000"}
+
+*Hypotheses definitions* substage from the classical-based hypothesis testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *general settings* and followed by *test flavour and components*.
+:::
+
+### Test Flavour and Components {#sec-hypothesis-workflow-test-flavour-components}
+
+::: {#fig-hypothesis-workflow-test-flavour-components}
+![](img/test-flavour-components.png){width="1000"}
+
+*Test flavour and components* substage from the classical-based hypothesis testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *hypotheses definitions* and followed by *inferential conclusions*.
 :::
 
 ::: {#Definition-observed-effect .definition}
@@ -720,7 +2206,7 @@ The statistical `r colourize("power", "blue")` of a test is defined as
 Definition of observed effect 
 ::::
 ::::{.definition-container}
-An `r colourize("observed effect", "blue")` is
+An `r colourize("observed effect", "blue")` is the difference between the `r colourize("estimate", "blue")` provided the **observed** `r colourize("random sample", "blue")` (of size $n$, as in $y_1, \dots, y_n$) to the hypothesized value(s) of the `r colourize("population parameter(s)", "blue")` depicted in the `r colourize("statistical hypotheses", "blue")`.
 ::::
 :::
 
@@ -729,7 +2215,11 @@ An `r colourize("observed effect", "blue")` is
 Definition of standard error 
 ::::
 ::::{.definition-container}
-An `r colourize("standard error", "blue")` is
+The `r colourize("standard error", "blue")` allows us to quantify the extent to which an `r colourize("estimate", "blue")` coming from an **observed** `r colourize("random sample", "blue")` (of size $n$, as in $y_1, \dots, y_n$) may deviate from the `r colourize("expected value", "blue")` under the assumption that the `r colourize("null hypothesis", "blue")` is true. 
+
+It plays a critical role in determining whether an `r colourize("observed effect", "blue")` is likely attributable to **random variation** or represents a **statistically significant finding**. In the absence of the `r colourize("standard error", "blue")`, it would not be possible to rigorously assess the **reliability** or **precision** of an `r colourize("estimate", "blue")`.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-easter-eggs-rabbit-8574765/).](img/magnifying-glass.png){width="420"}
 ::::
 :::
 
@@ -738,8 +2228,20 @@ An `r colourize("standard error", "blue")` is
 Definition of test statistic 
 ::::
 ::::{.definition-container}
-A `r colourize("test statistic", "blue")` is
+The `r colourize("test statistic", "blue")` is a function of the `r colourize("random sample", "blue")` of size $n$, i.e., it is in the function of the `r colourize("random variables", "blue")` $Y_1, \dots, Y_n$. Therefore, the `r colourize("test statistic", "blue")` will also be a random variable, whose **observed value** will describe how closely the `r colourize("probability distribution", "blue")` from which the `r colourize("random sample", "blue")` comes from matches the `r colourize("probability distribution", "blue")` of the `r colourize("null hypothesis", "blue")` $H_0$.
+
+More specifically, once we have obtained the `r colourize("observed effect", "blue")` and `r colourize("standard error", "blue")` from our **observed** `r colourize("random sample", "blue")`, we can compute the corresponding **observed** `r colourize("test statistic", "blue")`. This `r colourize("test statistic", "blue")` computation will be placed on the corresponding $x$-axis of the `r colourize("probability distribution", "blue")` of $H_0$ so we can reject or fail to reject it accordingly.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-protocol-exchange-3947913/).](img/test.png){width="420"}
 ::::
+:::
+
+### Inferential Conclusions {#sec-hypothesis-workflow-inferential-conclusions}
+
+::: {#fig-hypothesis-workflow-inferential-conclusions}
+![](img/inferential-conclusions.png){width="1000"}
+
+*Inferential conclusions* substage from the classical-based hypothesis testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *rest flavour and components* and followed by the corresponding *delivery significance conclusion* within the *results* stage of the *data science workflow* as shown in @fig-ds-workflow-results-2.
 :::
 
 ::: {#Definition-critical-value .definition}
@@ -747,7 +2249,10 @@ A `r colourize("test statistic", "blue")` is
 Definition of critical value 
 ::::
 ::::{.definition-container}
-A `r colourize("critical value", "blue")` is
+The `r colourize("critical value", "blue")` of a `r colourize("hypothesis testing", "blue")` defines the region for which we might reject $H_0$ in favour of $H_1$. This `r colourize("critical value", "blue")` is in the function of the `r colourize("significance level", "blue")` $\alpha$ and **test flavour**. It is located on the corresponding $x$-axis of the `r colourize("probability distribution", "blue")` of $H_0$. Hence, this value acts as a threshold to decide either of the following:
+
+- If the **observed** `r colourize("test statistic", "blue")` exceeds a given `r colourize("critical value", "blue")`, then we have enough statistical evidence to reject $H_0$ in favour of $H_1$. 
+- If the **observed** `r colourize("test statistic", "blue")` does not exceed a given `r colourize("critical value", "blue")`, then we have enough statistical evidence to fail to reject $H_0$.
 ::::
 :::
 
@@ -756,16 +2261,23 @@ A `r colourize("critical value", "blue")` is
 Definition of $p$-value 
 ::::
 ::::{.definition-container}
-A `r colourize("$p$-value", "blue")` is
+A `r colourize("$p$-value", "blue")` refers to the `r colourize("probability", "blue")` of obtaining a `r colourize("test statistic", "blue")` just as **extreme** or **more extreme** than the **observed** `r colourize("test statistic", "blue")` coming from our **observed** `r colourize("random sample", "blue")` of size $n$. This `r colourize("$p$-value", "blue")` is obtained via the `r colourize("probability distribution", "blue")` of $H_0$ and the **observed** `r colourize("test statistic", "blue")`.
+
+Alternatively to a `r colourize("critical value", "blue")`, we can reject or fail to reject the `r colourize("null hypothesis", "blue")` $H_0$ using this `r colourize("$p$-value", "blue")` as follows:
+
+- If the `r colourize("$p$-value", "blue")` associated to the **observed** `r colourize("test statistic", "blue")` exceeds a given significance level $\alpha$, then we have enough statistical evidence to reject $H_0$ in favour of $H_1$. 
+- If the `r colourize("$p$-value", "blue")` associated to the **observed** `r colourize("test statistic", "blue")` does not exceed a given significance level $\alpha$, then we have enough statistical evidence to fail to reject $H_0$.
 ::::
 :::
 
 ::: {#Definition-confidence-interval .definition}
 ::::{.definition-header}
-Definition of confidence interval 
+Definition of confidence interval
 ::::
 ::::{.definition-container}
-A `r colourize("confidence interval", "blue")` is
+A `r colourize("confidence interval", "blue")` provides an estimated range of values within which the true `r colourize("population parameter", "blue")` is likely to fall, based on the sample data. It reflects the degree of uncertainty associated with the obtained `r colourize("estimate", "blue")`. For instance, a 95% `r colourize("confidence interval", "blue")` means that if the study were repeated many times using different `r colourize("random samples", "blue")` from the same `r colourize("population", "blue")` or **system** of interest, approximately 95% of the resulting intervals would contain the true `r colourize("parameter", "blue")`.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-etherpad-group-work-3683373/).](img/interval.png){width="500"}
 ::::
 :::
 

@@ -23,6 +23,28 @@ colourize <- function(x, color) {
 }
 ```
 
+::: {.Warning}
+::::{.Warning-header}
+Fun fact!
+::::
+::::{.Warning-container}
+**Zestylicious!** That mouth-puckering, lemon-squirted, totally tangy kick!
+::::
+:::
+
+::: {#fig-ols-regression}
+```{mermaid}
+mindmap
+  root((Regression 
+  Analysis)
+    Continuous <br/>Outcome Y
+      {{Unbounded <br/>Outcome Y}}
+        )Chapter 3: <br/>Ordinary <br/>Least Squares <br/>Regression(
+          (Normal <br/>Outcome Y)
+    Discrete <br/>Outcome Y
+```
+:::
+
 ```{r setup, include=FALSE}
 # Load required libraries
 library(devtools)
@@ -34,22 +56,40 @@ library(tidyverse)
 library(car)
 library(lmtest)
 
+# Setting up Python dependencies
+library(reticulate)
+py_require("pandas")
+py_require("numpy")
+pandas <- import("pandas")
+numpy <- import("numpy")
+
 data_path <- system.file("data", "ols_data.rda", package = "cookbook")
 
 loaded_objects <- ls()
 data <- OLS
 ```
 
-## Learning Objectives
+```{python setup-py, include=FALSE}
+# Load required libraries
+import pandas
+import numpy
+```
 
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
 By the end of this chapter, you will be able to:
 
-- Explain how Ordinary Least Squares (OLS) estimates relationships by minimizing the sum of squared residuals.
-- Determine when OLS is an appropriate modeling choice.
-- Fit an OLS model using Python or R.
-- Interpret regression coefficients to assess the impact of predictors on the response variable.
-- Check key OLS assumptions, including linearity, independence, homoscedasticity, and normality of residuals.
-- Evaluate model performance using R-squared and error metrics such as MAE, MSE, and RMSE.
+- Explain how Ordinary Least-squares (OLS) estimates relationships by **minimizing the sum of squared residuals**.
+- Determine when OLS is an **appropriate modeling choice**.
+- Fit an OLS model using `Python` or `R`.
+- Interpret regression coefficients to assess **the impact of predictors on the response variable**.
+- Check **key OLS assumptions**, including: **linearity**, **independence**, **homoscedasticity**, and **normality of residuals**.
+- Evaluate **model performance** using **$R$-squared** and **error metrics** such as **mean absolute error** (MAE), **mean squared error** (MSE), and **root mean squared error** (RMSE).
+::::
+:::
 
 ## Introduction
 
@@ -80,6 +120,54 @@ Imagine you have a scatter plot of data points. Now, consider drawing two differ
 
 - **Line A (Blue)**: A line that follows the general trend of the data very well.
 - **Line B (Red)**: A line that doesn’t capture the trend as accurately.
+
+::: {.Warning}
+::::{.Warning-header}
+R Code
+::::
+::::{.Warning-container}
+```{r two_lines, echo=FALSE}
+# Sample data
+set.seed(42)
+X <- c(1000, 1200, 1500, 1800, 2000)
+Y <- c(200, 230, 250, 290, 310)
+
+# Create a data frame
+df <- data.frame(Size = X, Price = Y)
+
+# Fit the correct OLS model
+correct_model <- lm(Price ~ Size, data = df)
+
+# Create predictions for the two lines
+df$Predicted_Correct <- predict(correct_model, newdata = df)
+df$Predicted_Wrong <- 110 + 0.08 * df$Size  # Adjusted manually
+
+# Reshape data for ggplot (to add legend)
+df_long <- data.frame(
+  Size = rep(df$Size, 2),
+  Price = c(df$Predicted_Correct, df$Predicted_Wrong),
+  Line = rep(c("Line A (Best Fit)", "Line B (Worse Fit)"), each = nrow(df))
+)
+
+# Store the plot with a legend
+plot <- ggplot() +
+  geom_point(data = df, aes(x = Size, y = Price), size = 3, color = "black") +  # Scatter plot
+  geom_line(data = df_long, aes(x = Size, y = Price, color = Line), linewidth = 1.2) +
+  scale_color_manual(values = c("Line A (Best Fit)" = "blue", "Line B (Worse Fit)" = "red")) +
+  labs(title = "Comparing Regression Line Fits",
+       x = "House Size (sq ft)",
+       y = "House Price (in $1000s)",
+       color = "Regression Line") +  # Legend title
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5, color = "gray40"),
+        legend.position = "bottom")  # Move legend to bottom
+
+plot
+```
+::::
+:::
+
 
 ```{r two_lines, echo=FALSE}
 # Sample data
@@ -119,6 +207,10 @@ plot <- ggplot() +
         legend.position = "bottom")  # Move legend to bottom
 
 plot
+```
+
+```{python}
+print("HelloWorld")
 ```
 
 ### Understanding Residuals
