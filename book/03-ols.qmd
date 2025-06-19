@@ -606,25 +606,24 @@ To ensure that our OLS model generalizes well to unseen data, we split the datas
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-# Splitting the dataset into training and testing sets
-set.seed(123)  # For reproducibility
-train_indices <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
-train_data <- data[train_indices, ]
-test_data <- data[-train_indices, ]
+# Splitting the dataset by row order: first 80% for training, last 20% for testing
+n <- nrow(data)
+split_index <- floor(0.8 * n)
+train_data <- data[1:split_index, ]
+test_data <- data[(split_index + 1):n, ]
 ```
 
 ## Python Code
 ```{python}
-import numpy as np
-from sklearn.model_selection import train_test_split
-
-# Set seed for reproducibility
-np.random.seed(123)
-
-# Split the dataset into training and testing sets (80% / 20%)
-train_data, test_data = train_test_split(data, test_size=0.2, random_state=123)
+# Splitting the dataset by row order: first 80% for training, last 20% for testing
+n = len(data)
+split_index = int(0.8 * n)
+train_data = data.iloc[:split_index]
+test_data = data.iloc[split_index:]
 ```
 :::
+
+Although random sampling is generally preferred, since it helps ensure the training and testing sets are representative of the overall dataset, we deliberately split the data by row index here to produce consistent results across R and Python. This allows for reproducible comparisons between implementations in both languages.
 
 By following these steps, checking for missing values, encoding categorical variables, handling outliers, and splitting the data, we ensure that our dataset is clean, well-organized, and ready for regression analysis using OLS.
 
@@ -642,10 +641,10 @@ The first step in EDA is to classify variables according to their types. This cl
 
 The regressors include a mix of binary, categorical, ordinal, and continuous variables.
 
-- Binary variables, such as Has_Job and Drinks_Alcohol, take on only two values and need to be encoded for modeling.
-- Categorical variables, like Living_Situation and Housing_Type, represent qualitative distinctions between different student groups.
-- Some predictors, like Year_of_Study and Goes_Out_Spends_Money, follow an ordinal structure, meaning they have a meaningful ranking but no consistent numerical spacing.
-- Finally, Monthly_Allowance and Monthly_Earnings are continuous variables, requiring attention to their distributions and potential outliers.
+- Binary variables, such as `Has_Job` and `Drinks_Alcohol`, take on only two values and need to be encoded for modeling.
+- Categorical variables, like `Living_Situation` and `Housing_Type`, represent qualitative distinctions between different student groups.
+- Some predictors, like `Year_of_Study` and `Goes_Out_Spends_Money`, follow an ordinal structure, meaning they have a meaningful ranking but no consistent numerical spacing.
+- Finally, `Monthly_Allowance` and `Monthly_Earnings` are continuous variables, requiring attention to their distributions and potential outliers.
 
 By classifying variables correctly at the outset, we ensure that they are analyzed and interpreted appropriately throughout the modeling process.
 
@@ -702,15 +701,13 @@ boxplot(train_data$Net_Money,
 
 ## Python Code
 ```{python}
-import matplotlib.pyplot as plt
-
-# Boxplot of Net Money
-plt.figure(figsize=(4, 6))
-plt.boxplot(train_data["Net_Money"].dropna(), patch_artist=True,
-            boxprops=dict(facecolor="lightblue"))
-plt.title("Boxplot of Net Money")
-plt.ylabel("Net Money")
-plt.xticks([1], [""])  # Remove x-axis label/number
+fig, ax = plt.subplots(figsize=(4, 6))
+ax.boxplot(train_data["Net_Money"].dropna(), patch_artist=True,
+           boxprops=dict(facecolor="lightblue"));
+ax.set_title("Boxplot of Net Money")
+ax.set_ylabel("Net Money")
+ax.set_xticks([1])
+ax.set_xticklabels([""])
 plt.tight_layout()
 plt.show()
 ```
@@ -1017,17 +1014,17 @@ After fitting the model, we examine the estimated coefficients to understand the
 
 $$
 \begin{align*}
-\text{Net\_Money} &= -595.37 \\
-&\quad + 73.93 \times \text{Has\_Job} \\
-&\quad - 499.36 \times \text{Financially\_Dependent} \\
-&\quad - 96.52 \times \text{Year\_of\_Study} \\
-&\quad - 54.60 \times \text{Goes\_Out\_Spends\_Money} \\
-&\quad - 145.11 \times \text{Drinks\_Alcohol} \\
-&\quad + 1.47 \times \text{Monthly\_Allowance} \\
-&\quad + 0.95 \times \text{Monthly\_Earnings} \\
-&\quad + 102.95 \times \text{Living\_Situation} \\
-&\quad + 56.65 \times \text{Housing\_Type} \\
-&\quad - 96.31 \times \text{Cooks\_at\_Home} \\
+\text{Net\_Money} &= -647.24 \\
+&\quad + 91.24 \times \text{Has\_Job} \\
+&\quad - 488.10 \times \text{Financially\_Dependent} \\
+&\quad - 100.14 \times \text{Year\_of\_Study} \\
+&\quad - 47.85 \times \text{Goes\_Out\_Spends\_Money} \\
+&\quad - 139.96 \times \text{Drinks\_Alcohol} \\
+&\quad + 1.52 \times \text{Monthly\_Allowance} \\
+&\quad + 0.92 \times \text{Monthly\_Earnings} \\
+&\quad + 107.92 \times \text{Living\_Situation} \\
+&\quad + 57.78 \times \text{Housing\_Type} \\
+&\quad - 86.39 \times \text{Cooks\_at\_Home} \\
 &\quad + \epsilon
 \end{align*}
 $$
@@ -1037,8 +1034,8 @@ $$
 
 For example:
 
-- The intercept ($\beta_0=-595.37$) represents the expected financial balance for a student who has zero income, allowance, and falls at the baseline category for all categorical variables.
-- A $1 increase in Monthly Allowance ($\beta_6=1.47$) is associated with a $1.47 increase in Net Money, meaning students with higher allowances tend to have a higher financial balance.
+- The intercept ($\beta_0 = -647.24$) represents the expected financial balance for a student in the reference group—i.e., a student who has no job, is not financially dependent, does not go out to spend money or drink alcohol, receives no allowance or earnings, and is in the baseline category for all categorical variables.
+- A 1 dollar increase in `Monthly_Allowance` ($\beta$ = 1.52$) is associated with a $1.52 increase in `Net_Money`, suggesting that students with larger allowances tend to have a higher financial balance, all else being equal.
 
 These estimates provide an initial understanding of the direction and magnitude of relationships between predictors and financial balance. However, before drawing conclusions, we need to validate model assumptions and evaluate the statistical significance of each coefficient.
 
@@ -1092,7 +1089,7 @@ plt.show()
 ```
 :::
 
-If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure.
+If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure. However, in this case, the residuals appear to be randomly scattered around the horizontal axis, with no obvious patterns such as curves or systematic structure. This suggests that the linearity assumption of the OLS model holds reasonably well in this case. Therefore, no immediate transformation or addition of nonlinear terms is necessary to capture the relationship between predictors and the response variable.
 
 #### Independence of Errors
 
@@ -1117,6 +1114,8 @@ print(f"Durbin-Watson statistic: {dw_stat:.3f}")
 ```
 :::
 
+Based on the Durbin-Watson test, the test statistic is 1.9437 with a p-value of 0.2133. Since the statistic is close to 2 and the p-value is not statistically significant, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.
+
 If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.
 
 #### Homoscedasticity (Constant Variance of Errors)
@@ -1128,7 +1127,7 @@ To check for heteroscedasticity, we plot residuals against the fitted values and
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-ncvTest(ols_model)  # Test for homoscedasticity
+bptest(ols_model)  # Uses all regressors, like Python
 ```
 
 ## Python Code
@@ -1149,6 +1148,8 @@ print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
 print(f"P-value: {bp_pvalue:.4f}")
 ```
 :::
+
+Since the p-value (0.1563) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
 
 If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
 
@@ -1175,12 +1176,14 @@ residuals = ols_model.resid
 
 # Q-Q plot of residuals
 plt.figure(figsize=(6, 4))
-stats.probplot(residuals, dist="norm", plot=plt)
+_ = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
 plt.title("Q-Q Plot of Residuals")
 plt.tight_layout()
 plt.show()
 ```
 :::
+
+The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.
 
 If the plot reveals heavy tails or skewness, potential solutions include applying log or Box-Cox transformations to normalize the distribution. In cases where normality is severely violated, using a non-parametric model or bootstrapping confidence intervals may be appropriate.
 
@@ -1215,9 +1218,11 @@ print(f"Adjusted R-squared: {adj_r_squared:.4f}")
 ```
 :::
 
-While $R^2$ provides insight into model fit, it has limitations. Adding more predictors will always increase $R^2$, even if those predictors have little explanatory power. Adjusted R-squared accounts for this by penalizing unnecessary variables, making it a better indicator of true model performance.
+In this model, the R-squared is 0.894 and the adjusted R-squared is 0.892, indicating that around 89% of the variance in `Net_Money` is explained by the model.
 
-A high $R^2$ does not imply causation, nor does it confirm that the model is free from omitted variable bias or multicollinearity. Therefore, a strong goodness-of-fit measure should be complemented by careful assessment of residual behavior and coefficient significance.
+However, while $R^2$ provides insight into model fit, it has limitations. Adding more predictors will always increase $R^2$, even if those predictors have little explanatory power. That’s why Adjusted R-squared is often preferred, as it adjusts for the number of predictors and only increases when a new variable meaningfully improves the model.
+
+Finally, a high $R^2$ should not be interpreted as evidence of causation, nor does it guarantee the model is free from issues like omitted variable bias or multicollinearity. Always complement goodness-of-fit metrics with residual diagnostics and statistical inference to ensure model reliability.
 
 #### Identifying Outliers and Influential Points
 
