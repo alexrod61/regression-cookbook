@@ -587,33 +587,117 @@ Figure&nbsp;3.1
 <li>
 <strong>Line B (Red)</strong>: A line that doesn’t capture the trend as accurately.</li>
 </ul>
-<div class="Warning">
-<div class="Warning-header">
-<p>R Code</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true" aria-current="page">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Sample data</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
+<span><span class="va">X</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1000</span>, <span class="fl">1200</span>, <span class="fl">1500</span>, <span class="fl">1800</span>, <span class="fl">2000</span><span class="op">)</span></span>
+<span><span class="va">Y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">200</span>, <span class="fl">230</span>, <span class="fl">250</span>, <span class="fl">290</span>, <span class="fl">310</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Create a data frame</span></span>
+<span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html">data.frame</a></span><span class="op">(</span>Size <span class="op">=</span> <span class="va">X</span>, Price <span class="op">=</span> <span class="va">Y</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Fit the correct OLS model</span></span>
+<span><span class="va">correct_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">Price</span> <span class="op">~</span> <span class="va">Size</span>, data <span class="op">=</span> <span class="va">df</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Create predictions for the two lines</span></span>
+<span><span class="va">df</span><span class="op">$</span><span class="va">Predicted_Correct</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html">predict</a></span><span class="op">(</span><span class="va">correct_model</span>, newdata <span class="op">=</span> <span class="va">df</span><span class="op">)</span></span>
+<span><span class="va">df</span><span class="op">$</span><span class="va">Predicted_Wrong</span> <span class="op">&lt;-</span> <span class="fl">110</span> <span class="op">+</span> <span class="fl">0.08</span> <span class="op">*</span> <span class="va">df</span><span class="op">$</span><span class="va">Size</span>  <span class="co"># Adjusted manually</span></span>
+<span></span>
+<span><span class="co"># Reshape data for ggplot (to add legend)</span></span>
+<span><span class="va">df_long</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html">data.frame</a></span><span class="op">(</span></span>
+<span>  Size <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">Size</span>, <span class="fl">2</span><span class="op">)</span>,</span>
+<span>  Price <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">Predicted_Correct</span>, <span class="va">df</span><span class="op">$</span><span class="va">Predicted_Wrong</span><span class="op">)</span>,</span>
+<span>  Line <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"Line A (Best Fit)"</span>, <span class="st">"Line B (Worse Fit)"</span><span class="op">)</span>, each <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">df</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Store the plot with a legend</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org">ggplot2</a></span><span class="op">)</span></span>
+<span><span class="va">plot</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html">geom_point</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">df</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">Size</span>, y <span class="op">=</span> <span class="va">Price</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">3</span>, color <span class="op">=</span> <span class="st">"black"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html">geom_line</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">df_long</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">Size</span>, y <span class="op">=</span> <span class="va">Price</span>, color <span class="op">=</span> <span class="va">Line</span><span class="op">)</span>, linewidth <span class="op">=</span> <span class="fl">1.2</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_manual.html">scale_color_manual</a></span><span class="op">(</span>values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"Line A (Best Fit)"</span> <span class="op">=</span> <span class="st">"blue"</span>, <span class="st">"Line B (Worse Fit)"</span> <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html">labs</a></span><span class="op">(</span>title <span class="op">=</span> <span class="st">"Comparing Regression Line Fits"</span>,</span>
+<span>       x <span class="op">=</span> <span class="st">"House Size (sq ft)"</span>,</span>
+<span>       y <span class="op">=</span> <span class="st">"House Price (in $1000s)"</span>,</span>
+<span>       color <span class="op">=</span> <span class="st">"Regression Line"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html">theme_minimal</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>plot.title <span class="op">=</span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/element.html">element_text</a></span><span class="op">(</span>hjust <span class="op">=</span> <span class="fl">0.5</span>, face <span class="op">=</span> <span class="st">"bold"</span><span class="op">)</span>,</span>
+<span>        legend.position <span class="op">=</span> <span class="st">"bottom"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">plot</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div class="Warning-container">
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Sample data</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>np.random.seed(<span class="dv">42</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> np.array([<span class="dv">1000</span>, <span class="dv">1200</span>, <span class="dv">1500</span>, <span class="dv">1800</span>, <span class="dv">2000</span>])</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>Y <span class="op">=</span> np.array([<span class="dv">200</span>, <span class="dv">230</span>, <span class="dv">250</span>, <span class="dv">290</span>, <span class="dv">310</span>])</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> pd.DataFrame({<span class="st">'Size'</span>: X, <span class="st">'Price'</span>: Y})</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit the correct OLS model</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>X_sm <span class="op">=</span> sm.add_constant(df[<span class="st">'Size'</span>])</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> sm.OLS(df[<span class="st">'Price'</span>], X_sm).fit()</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'Predicted_Correct'</span>] <span class="op">=</span> model.predict(X_sm)</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Manually add the incorrect line</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>df[<span class="st">'Predicted_Wrong'</span>] <span class="op">=</span> <span class="dv">110</span> <span class="op">+</span> <span class="fl">0.08</span> <span class="op">*</span> df[<span class="st">'Size'</span>]</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Reshape for plotting</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>df_long <span class="op">=</span> pd.concat([</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    df[[<span class="st">'Size'</span>, <span class="st">'Predicted_Correct'</span>]].rename(columns<span class="op">=</span>{<span class="st">'Predicted_Correct'</span>: <span class="st">'Price'</span>}).assign(Line<span class="op">=</span><span class="st">'Line A (Best Fit)'</span>),</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    df[[<span class="st">'Size'</span>, <span class="st">'Predicted_Wrong'</span>]].rename(columns<span class="op">=</span>{<span class="st">'Predicted_Wrong'</span>: <span class="st">'Price'</span>}).assign(Line<span class="op">=</span><span class="st">'Line B (Worse Fit)'</span>)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>])</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>ax.scatter(df[<span class="st">'Size'</span>], df[<span class="st">'Price'</span>], color<span class="op">=</span><span class="st">'black'</span>, label<span class="op">=</span><span class="st">'Actual Data'</span>)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> label, group <span class="kw">in</span> df_long.groupby(<span class="st">'Line'</span>):</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    ax.plot(group[<span class="st">'Size'</span>], group[<span class="st">'Price'</span>], label<span class="op">=</span>label)</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Comparing Regression Line Fits"</span>, fontsize<span class="op">=</span><span class="dv">14</span>, fontweight<span class="op">=</span><span class="st">'bold'</span>)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"House Size (sq ft)"</span>)</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"House Price (in $1000s)"</span>)</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>ax.legend(title<span class="op">=</span><span class="st">"Regression Line"</span>, loc<span class="op">=</span><span class="st">'lower right'</span>)</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>plt.grid(<span class="va">True</span>)</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true">R Output</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false">Python Output</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
 <div class="cell">
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/two_lines-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
 </div>
-</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
 <div class="cell">
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/two_lines-2-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="576"></p>
 </figure>
 </div>
 </div>
 </div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"HelloWorld"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>HelloWorld</code></pre>
+</div>
 </div>
 </div>
 <section id="understanding-residuals" class="level3" data-number="3.3.1"><h3 data-number="3.3.1" class="anchored" data-anchor-id="understanding-residuals">
@@ -632,7 +716,13 @@ SSE=\sum_{i=1}^{n} (Y_i - \hat{Y}_i)^2
 </section><section id="quantifying-the-fit-with-sse" class="level3" data-number="3.3.2"><h3 data-number="3.3.2" class="anchored" data-anchor-id="quantifying-the-fit-with-sse">
 <span class="header-section-number">3.3.2</span> Quantifying the Fit with SSE</h3>
 <p>We can compare the two lines by computing their SSE. The code below calculates and prints the SSE for each line:</p>
-<div class="cell">
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Calculate the Sum of Squared Errors for the correct model (Blue)</span></span>
 <span><span class="va">sse_correct</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">Price</span> <span class="op">-</span> <span class="va">df</span><span class="op">$</span><span class="va">Predicted_Correct</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
@@ -640,13 +730,48 @@ SSE=\sum_{i=1}^{n} (Y_i - \hat{Y}_i)^2
 <span><span class="va">sse_wrong</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="op">(</span><span class="va">df</span><span class="op">$</span><span class="va">Price</span> <span class="op">-</span> <span class="va">df</span><span class="op">$</span><span class="va">Predicted_Wrong</span><span class="op">)</span><span class="op">^</span><span class="fl">2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Print the SSEs for each line</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html">cat</a></span><span class="op">(</span><span class="st">"SSE for Best-Fit Line (Blue line):"</span>, <span class="va">sse_correct</span>, <span class="st">"\n"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html">cat</a></span><span class="op">(</span><span class="st">"SSE for Best-Fit Line (Blue line):"</span>, <span class="va">sse_correct</span>, <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html">cat</a></span><span class="op">(</span><span class="st">"SSE for Worse-Fit Line (Red line):"</span>, <span class="va">sse_wrong</span>, <span class="st">"\n"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate the Sum of Squared Errors for the correct model (Blue)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>sse_correct <span class="op">=</span> np.<span class="bu">sum</span>((df[<span class="st">'Price'</span>] <span class="op">-</span> df[<span class="st">'Predicted_Correct'</span>]) <span class="op">**</span> <span class="dv">2</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate the Sum of Squared Errors for the manually adjusted model (Red)</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>sse_wrong <span class="op">=</span> np.<span class="bu">sum</span>((df[<span class="st">'Price'</span>] <span class="op">-</span> df[<span class="st">'Predicted_Wrong'</span>]) <span class="op">**</span> <span class="dv">2</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the SSEs for each line</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"SSE for Best-Fit Line (Blue line): </span><span class="sc">{</span>sse_correct<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"SSE for Worse-Fit Line (Red line): </span><span class="sc">{</span>sse_wrong<span class="sc">}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true">R Output</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false">Python Output</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
+<div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>SSE for Best-Fit Line (Blue line): 83.23529 </code></pre>
 </div>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/cat.html">cat</a></span><span class="op">(</span><span class="st">"SSE for Worse-Fit Line (Red line):"</span>, <span class="va">sse_wrong</span>, <span class="st">"\n"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>SSE for Worse-Fit Line (Red line): 3972 </code></pre>
+</div>
+</div>
+</div>
+<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>SSE for Best-Fit Line (Blue line): 83.23529411764711</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>SSE for Worse-Fit Line (Red line): 3972.0</code></pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <p>When you run this code, you’ll observe that the blue line (Line A) has a much lower SSE compared to the red line (Line B). This tells us that the blue line is a better fit for the data because its predictions are, on average, closer to the actual values.</p>
@@ -837,12 +962,12 @@ Y=\beta_0+\beta_1X+\epsilon
 <section id="inferential-vs.-predictive-analysis" class="level4"><h4 class="anchored" data-anchor-id="inferential-vs.-predictive-analysis">Inferential vs.&nbsp;Predictive Analysis</h4>
 <ul>
 <li>
-<strong>Inferential Analysis</strong> explores and quantifies the relationships between explanatory variables (e.g., student characteristics) and the response variable (Net Money). For example, we might ask: Does having a part-time job significantly affect a student’s net money, and by how much? The goal here is to understand these effects and assess their statistical significance.</li>
+<strong>Inferential Analysis</strong> explores and quantifies the relationships between explanatory variables (e.g., student characteristics) and the response variable (<code>Net_Money</code>). For example, we might ask: Does having a part-time job significantly affect a student’s net money, and by how much? The goal here is to understand these effects and assess their statistical significance.</li>
 <li>
 <strong>Predictive Analysis</strong> focuses on accurately forecasting the response variable using new data. In this case, the question could be: Can we predict a student’s net money based on factors like monthly earnings, living situation, and spending habits? The emphasis is on building a model that produces reliable predictions, even if it doesn’t fully explain the underlying relationships.</li>
 </ul></section></section><section id="applying-study-design-to-our-case-study" class="level3" data-number="3.4.4"><h3 data-number="3.4.4" class="anchored" data-anchor-id="applying-study-design-to-our-case-study">
 <span class="header-section-number">3.4.4</span> Applying Study Design to Our Case Study</h3>
-<p>For our case study, we are interested in understanding how factors such as Has_Job, Monthly_Earnings, and Spending_Habits affect a student’s Net Money. This leads us to adopt an inferential approach. We aim to answer questions like:</p>
+<p>For our case study, we are interested in understanding how factors such as <code>Has_Job</code>, <code>Monthly_Earnings</code>, and <code>Spending_Habits</code> affect a student’s <code>Net_Money</code>. This leads us to adopt an inferential approach. We aim to answer questions like:</p>
 <ul>
 <li>Does having a part-time job lead to significantly higher net money?</li>
 <li>How much do a student’s monthly earnings influence their financial situation?</li>
@@ -877,8 +1002,15 @@ Y=\beta_0+\beta_1X+\epsilon
 <strong>Imputing missing values</strong>: Using logical estimates or averages if missingness follows a systematic pattern.</li>
 </ul>
 <p>In our toy dataset, there are no missing values, as confirmed by:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html">colSums</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html">colSums</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>              Has_Job         Year_of_Study Financially_Dependent 
                     0                     0                     0 
@@ -890,20 +1022,67 @@ Y=\beta_0+\beta_1X+\epsilon
                     0                     0 </code></pre>
 </div>
 </div>
-</section><section id="encoding-categorical-variables" class="level4"><h4 class="anchored" data-anchor-id="encoding-categorical-variables">Encoding Categorical Variables</h4>
-<p>For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like Has_Job and Drinks_Alcohol should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:</p>
+</div>
+<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Convert binary categorical variables to factors</span></span>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Count missing values in each column</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>data.isna().<span class="bu">sum</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Has_Job                  0
+Year_of_Study            0
+Financially_Dependent    0
+Monthly_Allowance        0
+Cooks_at_Home            0
+Living_Situation         0
+Housing_Type             0
+Goes_Out_Spends_Money    0
+Drinks_Alcohol           0
+Net_Money                0
+Monthly_Earnings         0
+dtype: int64</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section><section id="encoding-categorical-variables" class="level4"><h4 class="anchored" data-anchor-id="encoding-categorical-variables">Encoding Categorical Variables</h4>
+<p>For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like <code>Has_Job</code> and <code>Drinks_Alcohol</code> should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" role="tab" aria-controls="tabset-6-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-6-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-6-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Convert binary categorical variables to factors</span></span>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu">mutate</span><span class="op">(</span>Has_Job <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">Has_Job</span><span class="op">)</span>,</span>
 <span>         Drinks_Alcohol <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">Drinks_Alcohol</span><span class="op">)</span>,</span>
 <span>         Financially_Dependent <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">Financially_Dependent</span><span class="op">)</span>,</span>
 <span>         Cooks_at_Home <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">Cooks_at_Home</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-</section><section id="detecting-and-handling-outliers" class="level4"><h4 class="anchored" data-anchor-id="detecting-and-handling-outliers">Detecting and Handling Outliers</h4>
-<p>Outliers in continuous variables like Monthly_Earnings and Net_Money can distort the regression analysis by skewing results. We use the <strong>Interquartile Range (IQR)</strong> method to identify these extreme values. Specifically, any observation falling below 1.5 times the IQR below the first quartile (Q1) or above 1.5 times the IQR above the third quartile (Q3) is flagged as an outlier. These outliers are then treated as missing values and removed:</p>
+</div>
+<div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Using IQR method to filter out extreme values in continuous variables</span></span>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert binary columns to categorical dtype</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>cols_to_convert <span class="op">=</span> [<span class="st">"Has_Job"</span>, <span class="st">"Drinks_Alcohol"</span>, <span class="st">"Financially_Dependent"</span>, <span class="st">"Cooks_at_Home"</span>]</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>data[cols_to_convert] <span class="op">=</span> data[cols_to_convert].astype(<span class="st">"category"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+</section><section id="detecting-and-handling-outliers" class="level4"><h4 class="anchored" data-anchor-id="detecting-and-handling-outliers">Detecting and Handling Outliers</h4>
+<p>Outliers in continuous variables like <code>Monthly_Earnings</code> and <code>Net_Money</code> can distort the regression analysis by skewing results. We use the <strong>Interquartile Range (IQR)</strong> method to identify these extreme values. Specifically, any observation falling below 1.5 times the IQR below the first quartile (Q1) or above 1.5 times the IQR above the third quartile (Q3) is flagged as an outlier. These outliers are then treated as missing values and removed:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" role="tab" aria-controls="tabset-7-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Using IQR method to filter out extreme values in continuous variables</span></span>
 <span><span class="va">remove_outliers</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">Q1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">0.25</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span>  <span class="va">Q3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">0.75</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
@@ -918,15 +1097,55 @@ Y=\beta_0+\beta_1X+\epsilon
 <span><span class="co"># Remove rows with newly introduced NAs due to outlier handling</span></span>
 <span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/na.fail.html">na.omit</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</div>
+<div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Define the IQR outlier-removal function</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> remove_outliers(series):</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    Q1 <span class="op">=</span> series.quantile(<span class="fl">0.25</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    Q3 <span class="op">=</span> series.quantile(<span class="fl">0.75</span>)</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    IQR <span class="op">=</span> Q3 <span class="op">-</span> Q1</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> series.where((series <span class="op">&gt;=</span> Q1 <span class="op">-</span> <span class="fl">1.5</span> <span class="op">*</span> IQR) <span class="op">&amp;</span> (series <span class="op">&lt;=</span> Q3 <span class="op">+</span> <span class="fl">1.5</span> <span class="op">*</span> IQR))</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Apply to specific continuous columns</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"Monthly_Earnings"</span>] <span class="op">=</span> remove_outliers(data[<span class="st">"Monthly_Earnings"</span>])</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"Net_Money"</span>] <span class="op">=</span> remove_outliers(data[<span class="st">"Net_Money"</span>])</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop rows with any newly introduced NAs (from outliers)</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.dropna()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
 </section><section id="splitting-the-data-for-model-training" class="level4"><h4 class="anchored" data-anchor-id="splitting-the-data-for-model-training">Splitting the Data for Model Training</h4>
 <p>To ensure that our OLS model generalizes well to unseen data, we split the dataset into training and testing subsets. The training set is used to estimate the model parameters, and the testing set is used to evaluate the model’s performance. This split is typically done in an 80/20 ratio, as shown below:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Splitting the dataset into training and testing sets</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span>  <span class="co"># For reproducibility</span></span>
-<span><span class="va">train_indices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">0.8</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">train_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="va">train_indices</span>, <span class="op">]</span></span>
-<span><span class="va">test_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="op">-</span><span class="va">train_indices</span>, <span class="op">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Splitting the dataset by row order: first 80% for training, last 20% for testing</span></span>
+<span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span></span>
+<span><span class="va">split_index</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">floor</a></span><span class="op">(</span><span class="fl">0.8</span> <span class="op">*</span> <span class="va">n</span><span class="op">)</span></span>
+<span><span class="va">train_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="va">split_index</span>, <span class="op">]</span></span>
+<span><span class="va">test_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="op">(</span><span class="va">split_index</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">:</span><span class="va">n</span>, <span class="op">]</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</div>
+<div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Splitting the dataset by row order: first 80% for training, last 20% for testing</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>n <span class="op">=</span> <span class="bu">len</span>(data)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>split_index <span class="op">=</span> <span class="bu">int</span>(<span class="fl">0.8</span> <span class="op">*</span> n)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>train_data <span class="op">=</span> data.iloc[:split_index]</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>test_data <span class="op">=</span> data.iloc[split_index:]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+<p>Although random sampling is generally preferred, since it helps ensure the training and testing sets are representative of the overall dataset, we deliberately split the data by row index here to produce consistent results across R and Python. This allows for reproducible comparisons between implementations in both languages.</p>
 <p>By following these steps, checking for missing values, encoding categorical variables, handling outliers, and splitting the data, we ensure that our dataset is clean, well-organized, and ready for regression analysis using OLS.</p>
 <p>It’s important to note, however, that these are just a few of the many techniques available during the data wrangling stage. Depending on the dataset and the specific goals of your analysis, you might also consider additional strategies such as feature scaling, normalization, advanced feature engineering, handling duplicate records, or addressing imbalanced data. Each of these techniques comes with its own set of solutions, and the optimal approach will depend on the unique challenges and objectives of your case.</p>
 </section></section></section><section id="exploratory-data-analysis-eda" class="level2" data-number="3.6"><h2 data-number="3.6" class="anchored" data-anchor-id="exploratory-data-analysis-eda">
@@ -941,10 +1160,10 @@ Y=\beta_0+\beta_1X+\epsilon
 </ul>
 <p>The regressors include a mix of binary, categorical, ordinal, and continuous variables.</p>
 <ul>
-<li>Binary variables, such as Has_Job and Drinks_Alcohol, take on only two values and need to be encoded for modeling.</li>
-<li>Categorical variables, like Living_Situation and Housing_Type, represent qualitative distinctions between different student groups.</li>
-<li>Some predictors, like Year_of_Study and Goes_Out_Spends_Money, follow an ordinal structure, meaning they have a meaningful ranking but no consistent numerical spacing.</li>
-<li>Finally, Monthly_Allowance and Monthly_Earnings are continuous variables, requiring attention to their distributions and potential outliers.</li>
+<li>Binary variables, such as <code>Has_Job</code> and <code>Drinks_Alcohol</code>, take on only two values and need to be encoded for modeling.</li>
+<li>Categorical variables, like <code>Living_Situation</code> and <code>Housing_Type</code>, represent qualitative distinctions between different student groups.</li>
+<li>Some predictors, like <code>Year_of_Study</code> and <code>Goes_Out_Spends_Money</code>, follow an ordinal structure, meaning they have a meaningful ranking but no consistent numerical spacing.</li>
+<li>Finally, <code>Monthly_Allowance</code> and <code>Monthly_Earnings</code> are continuous variables, requiring attention to their distributions and potential outliers.</li>
 </ul>
 <p>By classifying variables correctly at the outset, we ensure that they are analyzed and interpreted appropriately throughout the modeling process.</p>
 </section><section id="visualizing-variable-distributions" class="level3" data-number="3.6.2"><h3 data-number="3.6.2" class="anchored" data-anchor-id="visualizing-variable-distributions">
@@ -953,9 +1172,16 @@ Y=\beta_0+\beta_1X+\epsilon
 <section id="continuous-variables" class="level4"><h4 class="anchored" data-anchor-id="continuous-variables">Continuous Variables</h4>
 <p>We begin by examining continuous variables, which are best visualized using histograms and boxplots.</p>
 <section id="histograms" class="level5"><h5 class="anchored" data-anchor-id="histograms">Histograms</h5>
-<p>Histograms display the frequency distribution of a continuous variable. They allow us to assess the overall shape, central tendency, and spread of the data. For example, the histogram of Net_Money helps us determine if the variable follows a roughly normal distribution or if it is skewed. A normal distribution often appears bell-shaped, while skewness can indicate that the data might benefit from transformations (like logarithmic transformations) to meet the assumptions of regression analysis. In our case, the histogram below shows that Net_Money appears roughly normal.</p>
+<p>Histograms display the frequency distribution of a continuous variable. They allow us to assess the overall shape, central tendency, and spread of the data. For example, the histogram of <code>Net_Money</code> helps us determine if the variable follows a roughly normal distribution or if it is skewed. A normal distribution often appears bell-shaped, while skewness can indicate that the data might benefit from transformations (like logarithmic transformations) to meet the assumptions of regression analysis. In our case, the histogram below shows that <code>Net_Money</code> appears roughly normal.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" role="tab" aria-controls="tabset-9-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-9-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-9-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Histogram of Net_Money</span></span>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Histogram of Net_Money</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html">hist</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">$</span><span class="va">Net_Money</span>, </span>
 <span>     main <span class="op">=</span> <span class="st">"Distribution of Net Money"</span>, </span>
 <span>     xlab <span class="op">=</span> <span class="st">"Net Money"</span>, </span>
@@ -963,32 +1189,89 @@ Y=\beta_0+\beta_1X+\epsilon
 <span>     border <span class="op">=</span> <span class="st">"white"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/eda-histogram-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-</section><section id="boxplots" class="level5"><h5 class="anchored" data-anchor-id="boxplots">Boxplots</h5>
-<p>Boxplots provide a concise summary of a variable’s distribution by displaying its quartiles and highlighting potential outliers. Outliers are typically defined as data points that fall below Q1 - 1.5 * IQR or above Q3 + 1.5 * IQR. The boxplot below visualizes Net_Money and helps us quickly assess if there are any extreme values that might skew the analysis. In this case, the boxplot suggests that there are no significant outliers according to the IQR method (the method commonly used by ggplot to identify outliers).</p>
+</div>
+<div id="tabset-9-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-9-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Boxplot of Net Money</span></span>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Histogram of Net_Money</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>plt.hist(train_data[<span class="st">"Net_Money"</span>].dropna(), bins<span class="op">=</span><span class="dv">8</span>, color<span class="op">=</span><span class="st">"blue"</span>, edgecolor<span class="op">=</span><span class="st">"white"</span>)</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Distribution of Net Money"</span>)</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Net Money"</span>)</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Frequency"</span>)</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-16-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section><section id="boxplots" class="level5"><h5 class="anchored" data-anchor-id="boxplots">Boxplots</h5>
+<p>Boxplots provide a concise summary of a variable’s distribution by displaying its quartiles and highlighting potential outliers. Outliers are typically defined as data points that fall below <span class="math inline">\(Q1 - 1.5 * IQR\)</span> or above <span class="math inline">\(Q3 + 1.5 * IQR\)</span>. The boxplot below visualizes<code>Net_Money</code> and helps us quickly assess if there are any extreme values that might skew the analysis. In this case, the boxplot suggests that there are no significant outliers according to the IQR method (the method commonly used by ggplot to identify outliers).</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-10-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-1" role="tab" aria-controls="tabset-10-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-10-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-10-2" role="tab" aria-controls="tabset-10-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-10-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-10-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Boxplot of Net Money</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/boxplot.html">boxplot</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">$</span><span class="va">Net_Money</span>, </span>
 <span>        main <span class="op">=</span> <span class="st">"Boxplot of Net Money"</span>, </span>
 <span>        ylab <span class="op">=</span> <span class="st">"Net Money"</span>, </span>
 <span>        col <span class="op">=</span> <span class="st">"lightblue"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/eda-boxplot-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-17-3.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>By visualizing the distribution of Net_Money with these plots, we gain valuable insights into its behavior. This understanding not only informs whether transformations are needed but also prepares us for deeper analysis as we move forward with regression modeling.</p>
+</div>
+<div id="tabset-10-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-10-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">4</span>, <span class="dv">6</span>))</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>ax.boxplot(train_data[<span class="st">"Net_Money"</span>].dropna(), patch_artist<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>           boxprops<span class="op">=</span><span class="bu">dict</span>(facecolor<span class="op">=</span><span class="st">"lightblue"</span>))<span class="op">;</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Boxplot of Net Money"</span>)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Net Money"</span>)</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>ax.set_xticks([<span class="dv">1</span>])</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>ax.set_xticklabels([<span class="st">""</span>])</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid figure-img" width="384"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>By visualizing the distribution of <code>Net_Money</code> with these plots, we gain valuable insights into its behavior. This understanding not only informs whether transformations are needed but also prepares us for deeper analysis as we move forward with regression modeling.</p>
 </section></section><section id="categorical-and-ordinal-variables" class="level4"><h4 class="anchored" data-anchor-id="categorical-and-ordinal-variables">Categorical and Ordinal Variables</h4>
 <p>Categorical variables require a different approach from continuous ones because they represent distinct groups rather than numerical values. For these variables, bar charts are very effective. They display the frequency of each category, helping us understand the distribution of qualitative attributes.</p>
-<p>For example, consider the variable Living_Situation. The bar chart below shows how many students fall into each category. From the chart, we can see that category 1 is more heavily represented, while categories 2 and 3 have roughly similar counts. This insight can be critical—if a category is underrepresented, you might need to consider grouping it with similar categories or applying techniques such as one-hot encoding to ensure that each category contributes appropriately to the model.</p>
+<p>For example, consider the variable <code>Living_Situation</code>. The bar chart below shows how many students fall into each category. From the chart, we can see that category 1 is more heavily represented, while categories 2 and 3 have roughly similar counts. This insight can be critical—if a category is underrepresented, you might need to consider grouping it with similar categories or applying techniques such as one-hot encoding to ensure that each category contributes appropriately to the model.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-11-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-1" role="tab" aria-controls="tabset-11-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-11-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-11-2" role="tab" aria-controls="tabset-11-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-11-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-11-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Bar plot of Living Situation</span></span>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Bar plot of Living Situation</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/barplot.html">barplot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/table.html">table</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">$</span><span class="va">Living_Situation</span><span class="op">)</span>, </span>
 <span>        main <span class="op">=</span> <span class="st">"Living Situation Distribution"</span>, </span>
 <span>        xlab <span class="op">=</span> <span class="st">"Living Situation"</span>, </span>
@@ -996,32 +1279,89 @@ Y=\beta_0+\beta_1X+\epsilon
 <span>        col <span class="op">=</span> <span class="st">"purple"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/eda-barcharts-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-19-3.png" class="img-fluid figure-img" width="672"></p>
 </figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-11-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-11-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Count occurrences of each category</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>living_counts <span class="op">=</span> train_data[<span class="st">"Living_Situation"</span>].value_counts()</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Bar plot of Living Situation</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>plt.bar(living_counts.index, living_counts.values, color<span class="op">=</span><span class="st">"purple"</span>)</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Living Situation Distribution"</span>)</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Living Situation"</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Frequency"</span>)</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>plt.xticks(rotation<span class="op">=</span><span class="dv">45</span>)  <span class="co"># Optional: rotate labels if they overlap</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>(array([0. , 0.5, 1. , 1.5, 2. , 2.5, 3. , 3.5, 4. ]), [Text(0.0, 0, '0.0'), Text(0.5, 0, '0.5'), Text(1.0, 0, '1.0'), Text(1.5, 0, '1.5'), Text(2.0, 0, '2.0'), Text(2.5, 0, '2.5'), Text(3.0, 0, '3.0'), Text(3.5, 0, '3.5'), Text(4.0, 0, '4.0')])</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
 <p>For ordinal variables (which have a natural order but not a fixed numerical interval), you might still use bar charts to show the ranking or frequency of each level. Additionally, understanding these distributions can help you decide whether to treat them as categorical variables or convert them into numeric scores for analysis.</p>
 </section><section id="exploring-relationships-between-variables" class="level4"><h4 class="anchored" data-anchor-id="exploring-relationships-between-variables">Exploring Relationships Between Variables</h4>
-<p>Beyond examining individual variables, it is crucial to explore how they interact with one another—especially the predictors and the response variable. Understanding these relationships helps identify which predictors might be influential in the model and whether any issues, like multicollinearity, could affect regression estimates.</p>
+<p>Beyond examining individual variables, it is crucial to explore how they interact with one another, especially the predictors and the response variable. Understanding these relationships helps identify which predictors might be influential in the model and whether any issues, like multicollinearity, could affect regression estimates.</p>
 <section id="correlation-matrices" class="level5"><h5 class="anchored" data-anchor-id="correlation-matrices">Correlation Matrices</h5>
-<p>For continuous variables, correlation matrices provide a numerical summary of how strongly pairs of variables are related. High correlations between predictors might signal multicollinearity, which can distort model estimates. For demonstration, consider the correlation matrix computed for Net_Money, Monthly_Allowance, and Monthly_Earnings:</p>
+<p>For continuous variables, correlation matrices provide a numerical summary of how strongly pairs of variables are related. High correlations between predictors might signal multicollinearity, which can distort model estimates. For demonstration, consider the correlation matrix computed for <code>Net_Money</code>, <code>Monthly_Allowance</code>, and <code>Monthly_Earnings</code>:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-12-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-1" role="tab" aria-controls="tabset-12-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-12-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-2" role="tab" aria-controls="tabset-12-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-12-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-12-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Correlation matrix</span></span>
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Correlation matrix</span></span>
 <span><span class="va">cor_matrix</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/cor.html">cor</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"Net_Money"</span>, <span class="st">"Monthly_Allowance"</span>, <span class="st">"Monthly_Earnings"</span><span class="op">)</span><span class="op">]</span>, use <span class="op">=</span> <span class="st">"complete.obs"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html">print</a></span><span class="op">(</span><span class="va">cor_matrix</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                  Net_Money Monthly_Allowance Monthly_Earnings
-Net_Money         1.0000000        0.28835746       0.75743542
-Monthly_Allowance 0.2883575        1.00000000      -0.03669097
-Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
+Net_Money         1.0000000         0.2975895        0.7525736
+Monthly_Allowance 0.2975895         1.0000000       -0.0319396
+Monthly_Earnings  0.7525736        -0.0319396        1.0000000</code></pre>
 </div>
 </div>
-<p>In the output, we observe a strong positive correlation (corr = 0.757) between Monthly_Earnings and Net_Money. This result is intuitive. Higher earnings typically lead to more money left at the end of the month, resulting in a higher Net_Money.</p>
-</section></section><section id="scatterplots" class="level4"><h4 class="anchored" data-anchor-id="scatterplots">Scatterplots</h4>
-<p>Scatter plots visually depict the relationship between two continuous variables. For example, plotting Monthly_Allowance against Net_Money helps us assess whether students with higher allowances tend to have higher or lower net savings. In the scatter plot below, a slightly positive trend is visible. However, the points are quite scattered, indicating that while there may be a relationship, it is not overwhelmingly strong. Such visual insights might prompt further investigation, perhaps considering polynomial transformations or interaction terms if nonlinearity is suspected.</p>
+</div>
+<div id="tabset-12-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-12-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Scatter plot of Monthly Allowance vs. Net Money</span></span>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Select relevant columns and drop rows with missing values</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>cor_matrix <span class="op">=</span> train_data[[<span class="st">"Net_Money"</span>, <span class="st">"Monthly_Allowance"</span>, <span class="st">"Monthly_Earnings"</span>]].corr(method<span class="op">=</span><span class="st">"pearson"</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(cor_matrix)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                   Net_Money  Monthly_Allowance  Monthly_Earnings
+Net_Money           1.000000            0.29759          0.752574
+Monthly_Allowance   0.297590            1.00000         -0.031940
+Monthly_Earnings    0.752574           -0.03194          1.000000</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>In the output, we observe a strong positive correlation (corr = 0.757) between <code>Monthly_Earnings</code> and <code>Net_Money</code>. This result is intuitive. Higher earnings typically lead to more money left at the end of the month, resulting in a higher <code>Net_Money</code>.</p>
+</section></section><section id="scatterplots" class="level4"><h4 class="anchored" data-anchor-id="scatterplots">Scatterplots</h4>
+<p>Scatter plots visually depict the relationship between two continuous variables. For example, plotting <code>Monthly_Allowance</code> against <code>Net_Money</code> helps us assess whether students with higher allowances tend to have higher or lower net savings. In the scatter plot below, a slightly positive trend is visible. However, the points are quite scattered, indicating that while there may be a relationship, it is not overwhelmingly strong. Such visual insights might prompt further investigation, perhaps considering polynomial transformations or interaction terms if nonlinearity is suspected.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-13-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-13-1" role="tab" aria-controls="tabset-13-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-13-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-13-2" role="tab" aria-controls="tabset-13-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-13-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-13-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Scatter plot of Monthly Allowance vs. Net Money</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">$</span><span class="va">Monthly_Allowance</span>, <span class="va">train_data</span><span class="op">$</span><span class="va">Net_Money</span>, </span>
 <span>     main <span class="op">=</span> <span class="st">"Net Money vs. Monthly Allowance"</span>, </span>
 <span>     xlab <span class="op">=</span> <span class="st">"Monthly Allowance"</span>, </span>
@@ -1031,15 +1371,52 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html">abline</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">Net_Money</span> <span class="op">~</span> <span class="va">Monthly_Allowance</span>, data <span class="op">=</span> <span class="va">train_data</span><span class="op">)</span>, col <span class="op">=</span> <span class="st">"red"</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/eda-scatterplot-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-23-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<section id="boxplots-for-categorical-variables" class="level5"><h5 class="anchored" data-anchor-id="boxplots-for-categorical-variables">Boxplots for Categorical Variables</h5>
-<p>For categorical predictors, boxplots are an excellent tool to compare the distribution of the response variable across different groups. For instance, examining how Net_Money varies by Living_Situation can reveal whether students in different living arrangements experience different financial outcomes. In the boxplot below, the distributions of Net_Money across categories of Living_Situation appear quite similar. This similarity may suggest that Living_Situation has little impact on Net_Money in our dataset.</p>
+</div>
+<div id="tabset-13-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-13-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Boxplot of Net Money by Living Situation</span></span>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Scatter plot with regression line</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>sns.regplot(</span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>train_data,</span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">"Monthly_Allowance"</span>,</span>
+<span id="cb32-9"><a href="#cb32-9" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"Net_Money"</span>,</span>
+<span id="cb32-10"><a href="#cb32-10" aria-hidden="true" tabindex="-1"></a>    scatter_kws<span class="op">=</span>{<span class="st">"color"</span>: <span class="st">"blue"</span>, <span class="st">"s"</span>: <span class="dv">40</span>},  <span class="co"># s = point size</span></span>
+<span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>    line_kws<span class="op">=</span>{<span class="st">"color"</span>: <span class="st">"red"</span>, <span class="st">"linewidth"</span>: <span class="dv">2</span>}</span>
+<span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Net Money vs. Monthly Allowance"</span>)</span>
+<span id="cb32-14"><a href="#cb32-14" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Monthly Allowance"</span>)</span>
+<span id="cb32-15"><a href="#cb32-15" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Net Money"</span>)</span>
+<span id="cb32-16"><a href="#cb32-16" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb32-17"><a href="#cb32-17" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<section id="boxplots-for-categorical-variables" class="level5"><h5 class="anchored" data-anchor-id="boxplots-for-categorical-variables">Boxplots for Categorical Variables</h5>
+<p>For categorical predictors, boxplots are an excellent tool to compare the distribution of the response variable across different groups. For instance, examining how Net_Money varies by <code>Living_Situation</code> can reveal whether students in different living arrangements experience different financial outcomes. In the boxplot below, the distributions of <code>Net_Money</code> across categories of <code>Living_Situation</code> appear quite similar. This similarity may suggest that <code>Living_Situation</code> has little impact on Net_Money in our dataset.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-14-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-1" role="tab" aria-controls="tabset-14-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-14-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-14-2" role="tab" aria-controls="tabset-14-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-14-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-14-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Boxplot of Net Money by Living Situation</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/boxplot.html">boxplot</a></span><span class="op">(</span><span class="va">Net_Money</span> <span class="op">~</span> <span class="va">Living_Situation</span>, </span>
 <span>        data <span class="op">=</span> <span class="va">train_data</span>, </span>
 <span>        main <span class="op">=</span> <span class="st">"Net Money by Living Situation"</span>, </span>
@@ -1048,30 +1425,90 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 <span>        col <span class="op">=</span> <span class="st">"lightgreen"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/eda-multiple-boxplots-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-25-3.png" class="img-fluid figure-img" width="672"></p>
 </figure>
+</div>
+</div>
+</div>
+</div>
+<div id="tabset-14-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-14-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> seaborn <span class="im">as</span> sns</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Boxplot of Net Money by Living Situation</span></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>sns.boxplot(</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>train_data,</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>    x<span class="op">=</span><span class="st">"Living_Situation"</span>,</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>    y<span class="op">=</span><span class="st">"Net_Money"</span>,</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>    color<span class="op">=</span><span class="st">"lightgreen"</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Net Money by Living Situation"</span>)</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Living Situation"</span>)</span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Net Money"</span>)</span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>plt.xticks(rotation<span class="op">=</span><span class="dv">45</span>)  <span class="co"># Optional: rotate if labels overlap</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>([0, 1, 2], [Text(0, 0, '1.0'), Text(1, 0, '2.0'), Text(2, 0, '3.0')])</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
 </section></section><section id="summary-statistics" class="level4"><h4 class="anchored" data-anchor-id="summary-statistics">Summary Statistics</h4>
 <p>In addition to visual exploration, descriptive statistics provide a numerical summary of the dataset that is especially useful for beginners. Summary statistics give you a snapshot of the central tendency and spread of your data, helping you quickly grasp its overall characteristics.</p>
-<p>For instance, if you notice that the mean of Monthly_Earning is significantly higher than its median, it might suggest that a few high values (or outliers) are skewing the data.</p>
+<p>For instance, if you notice that the mean of <code>Monthly_Earning</code> is significantly higher than its median, it might suggest that a few high values (or outliers) are skewing the data.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-15-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-1" role="tab" aria-controls="tabset-15-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-15-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-15-2" role="tab" aria-controls="tabset-15-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-15-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-15-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Summary statistics for numerical variables</span></span>
+<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Summary statistics for numerical variables</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"Net_Money"</span>, <span class="st">"Monthly_Allowance"</span>, <span class="st">"Monthly_Earnings"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   Net_Money        Monthly_Allowance Monthly_Earnings
- Min.   :-1587.52   Min.   :  51.33   Min.   :   0    
- 1st Qu.: -399.87   1st Qu.: 402.50   1st Qu.:   0    
- Median :   78.36   Median : 500.55   Median : 291    
- Mean   :  120.74   Mean   : 501.85   Mean   : 502    
- 3rd Qu.:  618.59   3rd Qu.: 603.46   3rd Qu.:1014    
- Max.   : 1932.42   Max.   :1088.94   Max.   :1763    </code></pre>
+ Min.   :-1719.38   Min.   :  51.33   Min.   :   0.0  
+ 1st Qu.: -387.69   1st Qu.: 399.83   1st Qu.:   0.0  
+ Median :   66.15   Median : 494.10   Median : 348.0  
+ Mean   :  117.76   Mean   : 497.44   Mean   : 500.5  
+ 3rd Qu.:  589.36   3rd Qu.: 592.96   3rd Qu.: 998.4  
+ Max.   : 1932.42   Max.   :1088.94   Max.   :1839.9  </code></pre>
+</div>
+</div>
+</div>
+<div id="tabset-15-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-15-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Summary statistics for numerical variables</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>train_data[[<span class="st">"Net_Money"</span>, <span class="st">"Monthly_Allowance"</span>, <span class="st">"Monthly_Earnings"</span>]].describe()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>         Net_Money  Monthly_Allowance  Monthly_Earnings
+count   797.000000         797.000000        797.000000
+mean    117.758595         497.442424        500.451432
+std     675.877166         147.209448        536.948133
+min   -1719.378062          51.329604          0.000000
+25%    -387.687620         399.833067          0.000000
+50%      66.145622         494.103907        347.994676
+75%     589.360845         592.956717        998.419667
+max    1932.416524        1088.935656       1839.947244</code></pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 </section></section><section id="key-takeaways-from-eda" class="level3" data-number="3.6.3"><h3 data-number="3.6.3" class="anchored" data-anchor-id="key-takeaways-from-eda">
 <span class="header-section-number">3.6.3</span> Key Takeaways from EDA</h3>
-<p>Conducting Exploratory Data Analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For instance, a strong correlation between two variables, like Monthly_Earnings and Net_Money, signals that earnings are likely a key driver of net savings. At the same time, observing differences in distributions or spotting similar patterns across groups in boxplots can inform us about the impact of categorical factors like Living_Situation.</p>
+<p>Conducting Exploratory Data Analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For instance, a strong correlation between two variables, like <code>Monthly_Earnings</code> and <code>Net_Money</code>, signals that earnings are likely a key driver of net savings. At the same time, observing differences in distributions or spotting similar patterns across groups in boxplots can inform us about the impact of categorical factors like <code>Living_Situation</code>.</p>
 <p>It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modeling strategy. With this foundation, we are better prepared to build a robust Ordinary Least Squares (OLS) regression model on data that has been carefully examined and understood.</p>
 </section></section><section id="data-modelling" class="level2" data-number="3.7"><h2 data-number="3.7" class="anchored" data-anchor-id="data-modelling">
 <span class="header-section-number">3.7</span> Data Modelling</h2>
@@ -1092,7 +1529,7 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 <li>
 <strong>Regularized Regression (Ridge and Lasso)</strong> applies penalties to regression coefficients to handle multicollinearity and enhance model generalization by reducing overfitting.</li>
 </ul>
-<p>Given that our goal is to examine how multiple factors—such as income, expenses, and living arrangements—affect students’ financial balance, we select Multiple Linear Regression via OLS. This method allows us to quantify the influence of each predictor while controlling for confounding effects.</p>
+<p>Given that our goal is to examine how multiple factors-such as income, expenses, and living arrangements—affect students’ financial balance, we select Multiple Linear Regression via OLS. This method allows us to quantify the influence of each predictor while controlling for confounding effects.</p>
 </section><section id="defining-modeling-parameters" class="level3" data-number="3.7.2"><h3 data-number="3.7.2" class="anchored" data-anchor-id="defining-modeling-parameters">
 <span class="header-section-number">3.7.2</span> Defining Modeling Parameters</h3>
 <p>Once we select OLS regression, we define the key modeling components: the response variable (dependent variable) and the predictor variables (independent variables).</p>
@@ -1129,26 +1566,28 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 </section></section><section id="setting-up-the-modeling-equation" class="level3" data-number="3.7.3"><h3 data-number="3.7.3" class="anchored" data-anchor-id="setting-up-the-modeling-equation">
 <span class="header-section-number">3.7.3</span> Setting Up the Modeling Equation</h3>
 <p>With all predictors defined, the OLS regression equation models the relationship between Net_Money and the predictor variables:</p>
+<div style="overflow-x: auto; white-space: nowrap;">
 <p><span class="math display">\[
-\begin{align}
-\text{Net_Money} = \beta_0 \\
-               &amp; + \beta_1 \times \text{Has_Job} \\
-               &amp; + \beta_2 \times \text{Financially_Dependent} \\
-               &amp; + \beta_3 \times \text{Year_of_Study} \\
-               &amp; + \beta_4 \times \text{Goes_Out_Spends_Money} \\
-               &amp; + \beta_5 \times \text{Drinks_Alcohol} \\
-               &amp; + \beta_6 \times \text{Monthly_Allowance} \\
-               &amp; + \beta_7 \times \text{Monthly_Earnings} \\
-               &amp; + \beta_8 \times \text{Living_Situation} \\
-               &amp; + \beta_9 \times \text{Housing_Type} \\
-               &amp; + \beta_{10} \times \text{Cooks_at_Home} \\
-               &amp; + \epsilon
-\end{align}
+\begin{align*}
+\text{Net\_Money} &amp;= \beta_0 \\
+&amp;\quad + \beta_1 \times \text{Has\_Job} \\
+&amp;\quad + \beta_2 \times \text{Financially\_Dependent} \\
+&amp;\quad + \beta_3 \times \text{Year\_of\_Study} \\
+&amp;\quad + \beta_4 \times \text{Goes\_Out\_Spends\_Money} \\
+&amp;\quad + \beta_5 \times \text{Drinks\_Alcohol} \\
+&amp;\quad + \beta_6 \times \text{Monthly\_Allowance} \\
+&amp;\quad + \beta_7 \times \text{Monthly\_Earnings} \\
+&amp;\quad + \beta_8 \times \text{Living\_Situation} \\
+&amp;\quad + \beta_9 \times \text{Housing\_Type} \\
+&amp;\quad + \beta_{10} \times \text{Cooks\_at\_Home} \\
+&amp;\quad + \epsilon
+\end{align*}
 \]</span></p>
+</div>
 <p>where:</p>
 <ul>
 <li>
-<span class="math inline">\(\beta_0\)</span> represents the intercept, or the baseline Net Money when all predictors are set to zero.</li>
+<span class="math inline">\(\beta_0\)</span> represents the intercept, or the baseline <code>Net_Money</code> when all predictors are set to zero.</li>
 <li>
 <span class="math inline">\(\beta_1, \beta_2, ..., \beta_{10}\)</span> are the regression coefficients, quantifying the impact of each predictor on financial balance.</li>
 <li>
@@ -1157,11 +1596,11 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 <p>Each coefficient provides insight into how <code>Net_Money</code> changes when a specific predictor increases by one unit, holding all other factors constant. For example:</p>
 <ul>
 <li>
-<span class="math inline">\(\beta_5\)</span> (Drinks Alcohol) measures the financial impact of alcohol consumption, which may reflect higher discretionary spending.</li>
+<span class="math inline">\(\beta_5\)</span> (<code>Drinks_Alcohol</code>) measures the financial impact of alcohol consumption, which may reflect higher discretionary spending.</li>
 <li>
-<span class="math inline">\(\beta_6\)</span> (Monthly Allowance) quantifies the increase in Net_Money per additional dollar of allowance.</li>
+<span class="math inline">\(\beta_6\)</span> (<code>Monthly_Allowance</code>) quantifies the increase in Net_Money per additional dollar of allowance.</li>
 <li>
-<span class="math inline">\(\beta_10\)</span> (Cooks at Home) indicates how much more (or less) financially stable students are when they cook at home instead of eating out.</li>
+<span class="math inline">\(\beta_10\)</span> (<code>Cooks_at_Home</code>) indicates how much more (or less) financially stable students are when they cook at home instead of eating out.</li>
 </ul>
 <p>If significant interaction effects exist—such as students who live independently having a different financial impact from increased earnings compared to those living with family—we can extend the model by adding interaction terms.</p>
 </section></section><section id="estimation" class="level2" data-number="3.8"><h2 data-number="3.8" class="anchored" data-anchor-id="estimation">
@@ -1172,8 +1611,15 @@ Monthly_Earnings  0.7574354       -0.03669097       1.00000000</code></pre>
 <span class="header-section-number">3.8.1</span> Fitting the Model</h3>
 <p>To estimate the regression coefficients, we fit the OLS model to the training data using Python (<code>statsmodels</code>) or R (<code>lm</code>). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions.</p>
 <p>In R, we can fit the regression model using the <code><a href="https://rdrr.io/r/stats/lm.html">lm()</a></code> function:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-16-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-16-1" role="tab" aria-controls="tabset-16-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-16-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-16-2" role="tab" aria-controls="tabset-16-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-16-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-16-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Load necessary library</span></span>
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Load necessary library</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va">stats</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Fit the OLS model</span></span>
@@ -1190,53 +1636,110 @@ lm(formula = Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study +
     data = train_data)
 
 Residuals:
-   Min     1Q Median     3Q    Max 
--742.4 -144.9   14.7  157.9  675.1 
+    Min      1Q  Median      3Q     Max 
+-752.76 -142.00    9.64  154.20  679.52 
 
 Coefficients:
                          Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept)            -595.37433   46.68928 -12.752  &lt; 2e-16 ***
-Has_Job1                 73.93112   39.75871   1.859   0.0633 .  
-Financially_Dependent1 -499.36309   15.42689 -32.370  &lt; 2e-16 ***
-Year_of_Study           -96.51877    6.85478 -14.081  &lt; 2e-16 ***
-Goes_Out_Spends_Money   -54.60494    3.93783 -13.867  &lt; 2e-16 ***
-Drinks_Alcohol1        -145.10637   15.74322  -9.217  &lt; 2e-16 ***
-Monthly_Allowance         1.47138    0.05200  28.295  &lt; 2e-16 ***
-Monthly_Earnings          0.94906    0.03704  25.625  &lt; 2e-16 ***
-Living_Situation        102.95241    9.32478  11.041  &lt; 2e-16 ***
-Housing_Type             56.65388    9.72781   5.824 8.38e-09 ***
-Cooks_at_Home1          -96.31098   15.83074  -6.084 1.83e-09 ***
+(Intercept)            -647.24459   48.05092 -13.470  &lt; 2e-16 ***
+Has_Job1                 91.24439   39.55815   2.307   0.0213 *  
+Financially_Dependent1 -488.10094   15.87713 -30.742  &lt; 2e-16 ***
+Year_of_Study          -100.14255    6.94097 -14.428  &lt; 2e-16 ***
+Goes_Out_Spends_Money   -47.85370    4.10987 -11.644  &lt; 2e-16 ***
+Drinks_Alcohol1        -139.96472   16.10396  -8.691  &lt; 2e-16 ***
+Monthly_Allowance         1.51624    0.05361  28.283  &lt; 2e-16 ***
+Monthly_Earnings          0.92083    0.03686  24.981  &lt; 2e-16 ***
+Living_Situation        107.91555    9.57487  11.271  &lt; 2e-16 ***
+Housing_Type             57.77879    9.89696   5.838 7.72e-09 ***
+Cooks_at_Home1          -86.39027   16.22054  -5.326 1.31e-07 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-Residual standard error: 216.4 on 786 degrees of freedom
-Multiple R-squared:  0.9018,    Adjusted R-squared:  0.9006 
-F-statistic: 722.1 on 10 and 786 DF,  p-value: &lt; 2.2e-16</code></pre>
+Residual standard error: 221.7 on 786 degrees of freedom
+Multiple R-squared:  0.8937,    Adjusted R-squared:  0.8924 
+F-statistic:   661 on 10 and 786 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+</div>
+<div id="tabset-16-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-16-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit the OLS model using a formula</span></span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>ols_model <span class="op">=</span> smf.ols(</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home"</span>,</span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>train_data</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>).fit()</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Display summary of model results</span></span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(ols_model.summary())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:              Net_Money   R-squared:                       0.894
+Model:                            OLS   Adj. R-squared:                  0.892
+Method:                 Least Squares   F-statistic:                     661.0
+Date:                Fri, 20 Jun 2025   Prob (F-statistic):               0.00
+Time:                        20:35:15   Log-Likelihood:                -5430.3
+No. Observations:                 797   AIC:                         1.088e+04
+Df Residuals:                     786   BIC:                         1.093e+04
+Df Model:                          10                                         
+Covariance Type:            nonrobust                                         
+================================================================================================
+                                   coef    std err          t      P&gt;|t|      [0.025      0.975]
+------------------------------------------------------------------------------------------------
+Intercept                     -647.2446     48.051    -13.470      0.000    -741.568    -552.921
+Has_Job[T.1.0]                  91.2444     39.558      2.307      0.021      13.592     168.897
+Financially_Dependent[T.1.0]  -488.1009     15.877    -30.742      0.000    -519.268    -456.934
+Drinks_Alcohol[T.1.0]         -139.9647     16.104     -8.691      0.000    -171.577    -108.353
+Cooks_at_Home[T.1.0]           -86.3903     16.221     -5.326      0.000    -118.231     -54.550
+Year_of_Study                 -100.1425      6.941    -14.428      0.000    -113.768     -86.518
+Goes_Out_Spends_Money          -47.8537      4.110    -11.644      0.000     -55.921     -39.786
+Monthly_Allowance                1.5162      0.054     28.283      0.000       1.411       1.621
+Monthly_Earnings                 0.9208      0.037     24.981      0.000       0.848       0.993
+Living_Situation               107.9155      9.575     11.271      0.000      89.120     126.711
+Housing_Type                    57.7788      9.897      5.838      0.000      38.351      77.206
+==============================================================================
+Omnibus:                        4.197   Durbin-Watson:                   1.944
+Prob(Omnibus):                  0.123   Jarque-Bera (JB):                4.115
+Skew:                          -0.138   Prob(JB):                        0.128
+Kurtosis:                       3.218   Cond. No.                     5.14e+03
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 5.14e+03. This might indicate that there are
+strong multicollinearity or other numerical problems.</code></pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 </section><section id="interpreting-the-coefficients" class="level3" data-number="3.8.2"><h3 data-number="3.8.2" class="anchored" data-anchor-id="interpreting-the-coefficients">
 <span class="header-section-number">3.8.2</span> Interpreting the Coefficients</h3>
 <p>After fitting the model, we examine the estimated coefficients to understand their impact. Each coefficient obtained from the OLS regression represents the expected change in Net_Money for a one-unit increase in the corresponding predictor, holding all other variables constant. The estimated regression equation can be expressed as:</p>
+<div style="overflow-x: auto; white-space: nowrap;">
 <p><span class="math display">\[
-\begin{align}
-\text{Net_Money} = -595.37 \\
-               &amp; + 73.93 \times \text{Has_Job} \\
-               &amp; - 499.36 \times \text{Financially_Dependent} \\
-               &amp; - 96.52 \times \text{Year_of_Study} \\
-               &amp; - 54.60 \times \text{Goes_Out_Spends_Money} \\
-               &amp; - 145.11 \times \text{Drinks_Alcohol} \\
-               &amp; + 1.47 \times \text{Monthly_Allowance} \\
-               &amp; + 0.95 \times \text{Monthly_Earnings} \\
-               &amp; + 102.95 \times \text{Living_Situation} \\
-               &amp; + 56.65 \times \text{Housing_Type} \\
-               &amp; - 96.31 \times \text{Cooks_at_Home} \\
-               &amp; + \epsilon
-\end{align}
+\begin{align*}
+\text{Net\_Money} &amp;= -647.24 \\
+&amp;\quad + 91.24 \times \text{Has\_Job} \\
+&amp;\quad - 488.10 \times \text{Financially\_Dependent} \\
+&amp;\quad - 100.14 \times \text{Year\_of\_Study} \\
+&amp;\quad - 47.85 \times \text{Goes\_Out\_Spends\_Money} \\
+&amp;\quad - 139.96 \times \text{Drinks\_Alcohol} \\
+&amp;\quad + 1.52 \times \text{Monthly\_Allowance} \\
+&amp;\quad + 0.92 \times \text{Monthly\_Earnings} \\
+&amp;\quad + 107.92 \times \text{Living\_Situation} \\
+&amp;\quad + 57.78 \times \text{Housing\_Type} \\
+&amp;\quad - 86.39 \times \text{Cooks\_at\_Home} \\
+&amp;\quad + \epsilon
+\end{align*}
 \]</span></p>
+</div>
 <p>For example:</p>
 <ul>
-<li>The intercept (<span class="math inline">\(\beta_0=-595.37\)</span>) represents the expected financial balance for a student who has zero income, allowance, and falls at the baseline category for all categorical variables.</li>
-<li>A <span class="math inline">\(1 increase in Monthly Allowance (\)</span>_6=1.47$) is associated with a $1.47 increase in Net Money, meaning students with higher allowances tend to have a higher financial balance.</li>
+<li>The intercept (<span class="math inline">\(\beta_0 = -647.24\)</span>) represents the expected financial balance for a student in the reference group—i.e., a student who has no job, is not financially dependent, does not go out to spend money or drink alcohol, receives no allowance or earnings, and is in the baseline category for all categorical variables.</li>
+<li>A 1 dollar increase in <code>Monthly_Allowance</code> (<span class="math inline">\(\beta\)</span> = 1.52$) is associated with a $1.52 increase in <code>Net_Money</code>, suggesting that students with larger allowances tend to have a higher financial balance, all else being equal.</li>
 </ul>
 <p>These estimates provide an initial understanding of the direction and magnitude of relationships between predictors and financial balance. However, before drawing conclusions, we need to validate model assumptions and evaluate the statistical significance of each coefficient.</p>
 </section></section><section id="goodness-of-fit" class="level2" data-number="3.9"><h2 data-number="3.9" class="anchored" data-anchor-id="goodness-of-fit">
@@ -1255,59 +1758,194 @@ F-statistic: 722.1 on 10 and 786 DF,  p-value: &lt; 2.2e-16</code></pre>
 <section id="linearity" class="level4"><h4 class="anchored" data-anchor-id="linearity">Linearity</h4>
 <p>A core assumption of OLS is that the relationship between each predictor and the response variable is linear. If this assumption is violated, the model may systematically under- or overestimate Net_Money, leading to biased predictions. The Residuals vs.&nbsp;Fitted values plot is a common diagnostic tool for checking linearity. In a well-specified linear model, residuals should be randomly scattered around zero, without any discernible patterns. If the residuals exhibit a U-shaped or curved pattern, this suggests a non-linear relationship, indicating that transformations such as logarithmic, square root, or polynomial terms may be necessary.</p>
 <p>To visualize linearity, we plot the residuals against the fitted values:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-17-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-17-1" role="tab" aria-controls="tabset-17-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-17-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-17-2" role="tab" aria-controls="tabset-17-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-17-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-17-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Residuals vs Fitted plot (R)</span></span>
+<div class="sourceCode" id="cb45"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Residuals vs Fitted plot (R)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">$</span><span class="va">fitted.values</span>, <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>, </span>
 <span>     main <span class="op">=</span> <span class="st">"Residuals vs Fitted"</span>, xlab <span class="op">=</span> <span class="st">"Fitted Values"</span>, ylab <span class="op">=</span> <span class="st">"Residuals"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, col <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/model-assumption-linearity-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-31-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure.</p>
+</div>
+<div id="tabset-17-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-17-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract fitted values and residuals</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>fitted_vals <span class="op">=</span> ols_model.fittedvalues</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>residuals <span class="op">=</span> ols_model.resid</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot Residuals vs Fitted</span></span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a>plt.scatter(fitted_vals, residuals, alpha<span class="op">=</span><span class="fl">0.7</span>)</span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a>plt.axhline(y<span class="op">=</span><span class="dv">0</span>, color<span class="op">=</span><span class="st">'red'</span>, linestyle<span class="op">=</span><span class="st">'--'</span>)</span>
+<span id="cb46-11"><a href="#cb46-11" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Residuals vs Fitted"</span>)</span>
+<span id="cb46-12"><a href="#cb46-12" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Fitted Values"</span>)</span>
+<span id="cb46-13"><a href="#cb46-13" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Residuals"</span>)</span>
+<span id="cb46-14"><a href="#cb46-14" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb46-15"><a href="#cb46-15" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-32-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure. However, in this case, the residuals appear to be randomly scattered around the horizontal axis, with no obvious patterns such as curves or systematic structure. This suggests that the linearity assumption of the OLS model holds reasonably well in this case. Therefore, no immediate transformation or addition of nonlinear terms is necessary to capture the relationship between predictors and the response variable.</p>
 </section><section id="independence-of-errors" class="level4"><h4 class="anchored" data-anchor-id="independence-of-errors">Independence of Errors</h4>
 <p>The residuals, or errors, in an OLS model should be independent of one another. This assumption is particularly relevant in time-series or sequential data, where errors from one observation might influence subsequent observations, leading to autocorrelation. If the errors are correlated, the estimated standard errors will be biased, making hypothesis testing unreliable.</p>
 <p>The Durbin-Watson test is commonly used to detect autocorrelation. This test produces a statistic that ranges between 0 and 4, where values close to 2 indicate no significant autocorrelation, while values near 0 or 4 suggest positive or negative correlation in the residuals.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-18-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-18-1" role="tab" aria-controls="tabset-18-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-18-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-18-2" role="tab" aria-controls="tabset-18-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-18-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-18-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu">dwtest</span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb47"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu">dwtest</span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
     Durbin-Watson test
 
 data:  ols_model
-DW = 1.9581, p-value = 0.2777
+DW = 1.9437, p-value = 0.2133
 alternative hypothesis: true autocorrelation is greater than 0</code></pre>
 </div>
 </div>
+</div>
+<div id="tabset-18-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-18-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.stats.stattools <span class="im">import</span> durbin_watson</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Durbin-Watson test for autocorrelation of residuals</span></span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>dw_stat <span class="op">=</span> durbin_watson(ols_model.resid)</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Durbin-Watson statistic: </span><span class="sc">{</span>dw_stat<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Durbin-Watson statistic: 1.944</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>Based on the Durbin-Watson test, the test statistic is 1.9437 with a p-value of 0.2133. Since the statistic is close to 2 and the p-value is not statistically significant, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.</p>
 <p>If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.</p>
 </section><section id="homoscedasticity-constant-variance-of-errors" class="level4"><h4 class="anchored" data-anchor-id="homoscedasticity-constant-variance-of-errors">Homoscedasticity (Constant Variance of Errors)</h4>
 <p>OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.</p>
 <p>To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-19-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-1" role="tab" aria-controls="tabset-19-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-19-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-19-2" role="tab" aria-controls="tabset-19-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-19-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-19-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu">ncvTest</span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>  <span class="co"># Test for homoscedasticity</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb51"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu">bptest</span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>  <span class="co"># Uses all regressors, like Python</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>Non-constant Variance Score Test 
-Variance formula: ~ fitted.values 
-Chisquare = 0.4018794, Df = 1, p = 0.52612</code></pre>
+<pre><code>
+    studentized Breusch-Pagan test
+
+data:  ols_model
+BP = 14.381, df = 10, p-value = 0.1563</code></pre>
 </div>
 </div>
+</div>
+<div id="tabset-19-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-19-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.stats.diagnostic <span class="im">import</span> het_breuschpagan</span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract residuals and design matrix from the fitted model</span></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a>residuals <span class="op">=</span> ols_model.resid</span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>exog <span class="op">=</span> ols_model.model.exog  <span class="co"># independent variables (with intercept)</span></span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Perform Breusch-Pagan test</span></span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a>bp_test <span class="op">=</span> het_breuschpagan(residuals, exog)</span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Unpack results</span></span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a>bp_stat, bp_pvalue, _, _ <span class="op">=</span> bp_test</span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-13"><a href="#cb53-13" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Breusch-Pagan test statistic: </span><span class="sc">{</span>bp_stat<span class="sc">:.3f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Breusch-Pagan test statistic: 14.381</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"P-value: </span><span class="sc">{</span>bp_pvalue<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>P-value: 0.1563</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>Since the p-value (0.1563) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.</p>
 <p>If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.</p>
 </section><section id="normality-of-residuals" class="level4"><h4 class="anchored" data-anchor-id="normality-of-residuals">Normality of Residuals</h4>
 <p>For valid hypothesis testing and confidence interval estimation, OLS assumes that residuals follow a normal distribution. If residuals deviate significantly from normality, statistical inference may be unreliable, particularly for small sample sizes.</p>
 <p>A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-20-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-20-1" role="tab" aria-controls="tabset-20-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-20-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-20-2" role="tab" aria-controls="tabset-20-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-20-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-20-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/qqnorm.html">qqnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb57"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/qqnorm.html">qqnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/qqnorm.html">qqline</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>, col <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/model-assumption-normality-residuals-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-37-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
+</div>
+<div id="tabset-20-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-20-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scipy.stats <span class="im">as</span> stats</span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract residuals from the model</span></span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a>residuals <span class="op">=</span> ols_model.resid</span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Q-Q plot of residuals</span></span>
+<span id="cb58-8"><a href="#cb58-8" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;Figure size 600x400 with 0 Axes&gt;</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> stats.probplot(residuals, dist<span class="op">=</span><span class="st">"norm"</span>, plot<span class="op">=</span>plt)  <span class="co"># Suppress output by assigning to _</span></span>
+<span id="cb60-2"><a href="#cb60-2" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Q-Q Plot of Residuals"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0.5, 1.0, 'Q-Q Plot of Residuals')</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-38-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.</p>
 <p>If the plot reveals heavy tails or skewness, potential solutions include applying log or Box-Cox transformations to normalize the distribution. In cases where normality is severely violated, using a non-parametric model or bootstrapping confidence intervals may be appropriate.</p>
 </section></section><section id="evaluating-model-fit" class="level3" data-number="3.9.2"><h3 data-number="3.9.2" class="anchored" data-anchor-id="evaluating-model-fit">
 <span class="header-section-number">3.9.2</span> Evaluating Model Fit</h3>
@@ -1315,41 +1953,169 @@ Chisquare = 0.4018794, Df = 1, p = 0.52612</code></pre>
 <section id="r-squared" class="level4"><h4 class="anchored" data-anchor-id="r-squared">R-Squared</h4>
 <p>Beyond checking assumptions, it is essential to assess how well the model explains variability in the response variable. One of the most commonly used metrics is R-Squared (<span class="math inline">\(R^2\)</span>), which measures the proportion of variance in Net_Money that is explained by the predictors. An <span class="math inline">\(R^2\)</span> value close to 1 indicates a strong model fit, whereas a low value suggests that important predictors may be missing or that the model is poorly specified.</p>
 <p>We can retrieve the R-squared and Adjusted R-squared values from the model summary:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-21-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-21-1" role="tab" aria-controls="tabset-21-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-21-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-21-2" role="tab" aria-controls="tabset-21-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-21-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-21-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">$</span><span class="va">r.squared</span>  <span class="co"># R-squared value</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb63"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">$</span><span class="va">r.squared</span>  <span class="co"># R-squared value</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] 0.9018396</code></pre>
+<pre><code>[1] 0.8937252</code></pre>
 </div>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">$</span><span class="va">adj.r.squared</span>  <span class="co"># Adjusted R-squared</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb65"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span><span class="op">$</span><span class="va">adj.r.squared</span>  <span class="co"># Adjusted R-squared</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>[1] 0.9005907</code></pre>
+<pre><code>[1] 0.8923731</code></pre>
 </div>
 </div>
-<p>While <span class="math inline">\(R^2\)</span> provides insight into model fit, it has limitations. Adding more predictors will always increase <span class="math inline">\(R^2\)</span>, even if those predictors have little explanatory power. Adjusted R-squared accounts for this by penalizing unnecessary variables, making it a better indicator of true model performance.</p>
-<p>A high <span class="math inline">\(R^2\)</span> does not imply causation, nor does it confirm that the model is free from omitted variable bias or multicollinearity. Therefore, a strong goodness-of-fit measure should be complemented by careful assessment of residual behavior and coefficient significance.</p>
+</div>
+<div id="tabset-21-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-21-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb67"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb67-1"><a href="#cb67-1" aria-hidden="true" tabindex="-1"></a><span class="co"># R-squared</span></span>
+<span id="cb67-2"><a href="#cb67-2" aria-hidden="true" tabindex="-1"></a>r_squared <span class="op">=</span> ols_model.rsquared</span>
+<span id="cb67-3"><a href="#cb67-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-4"><a href="#cb67-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Adjusted R-squared</span></span>
+<span id="cb67-5"><a href="#cb67-5" aria-hidden="true" tabindex="-1"></a>adj_r_squared <span class="op">=</span> ols_model.rsquared_adj</span>
+<span id="cb67-6"><a href="#cb67-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb67-7"><a href="#cb67-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Print values</span></span>
+<span id="cb67-8"><a href="#cb67-8" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"R-squared: </span><span class="sc">{</span>r_squared<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>R-squared: 0.8937</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb69"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb69-1"><a href="#cb69-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Adjusted R-squared: </span><span class="sc">{</span>adj_r_squared<span class="sc">:.4f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Adjusted R-squared: 0.8924</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>In this model, the R-squared is 0.894 and the adjusted R-squared is 0.892, indicating that around 89% of the variance in <code>Net_Money</code> is explained by the model.</p>
+<p>However, while <span class="math inline">\(R^2\)</span> provides insight into model fit, it has limitations. Adding more predictors will always increase <span class="math inline">\(R^2\)</span>, even if those predictors have little explanatory power. That’s why Adjusted R-squared is often preferred, as it adjusts for the number of predictors and only increases when a new variable meaningfully improves the model.</p>
+<p>Finally, a high <span class="math inline">\(R^2\)</span> should not be interpreted as evidence of causation, nor does it guarantee the model is free from issues like omitted variable bias or multicollinearity. Always complement goodness-of-fit metrics with residual diagnostics and statistical inference to ensure model reliability.</p>
 </section><section id="identifying-outliers-and-influential-points" class="level4"><h4 class="anchored" data-anchor-id="identifying-outliers-and-influential-points">Identifying Outliers and Influential Points</h4>
 <p>Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-22-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-22-1" role="tab" aria-controls="tabset-22-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-22-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-22-2" role="tab" aria-controls="tabset-22-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-22-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-22-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>, main <span class="op">=</span> <span class="st">"Residual Plot"</span>, ylab <span class="op">=</span> <span class="st">"Residuals"</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb71"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/residuals.html">residuals</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span>, main <span class="op">=</span> <span class="st">"Residual Plot"</span>, ylab <span class="op">=</span> <span class="st">"Residuals"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, col <span class="op">=</span> <span class="st">"red"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/residual-plots-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-41-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.</p>
+</div>
+<div id="tabset-22-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-22-2-tab">
 <div class="cell">
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">cook_values</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/influence.measures.html">cooks.distance</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span></span>
+<div class="sourceCode cell-code" id="cb72"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb72-1"><a href="#cb72-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb72-2"><a href="#cb72-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-3"><a href="#cb72-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract residuals</span></span>
+<span id="cb72-4"><a href="#cb72-4" aria-hidden="true" tabindex="-1"></a>residuals <span class="op">=</span> ols_model.resid</span>
+<span id="cb72-5"><a href="#cb72-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb72-6"><a href="#cb72-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Residual plot (residuals vs observation index)</span></span>
+<span id="cb72-7"><a href="#cb72-7" aria-hidden="true" tabindex="-1"></a>plt.figure(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;Figure size 600x400 with 0 Axes&gt;</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb74"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb74-1"><a href="#cb74-1" aria-hidden="true" tabindex="-1"></a>plt.plot(residuals, marker<span class="op">=</span><span class="st">'o'</span>, linestyle<span class="op">=</span><span class="st">'none'</span>, alpha<span class="op">=</span><span class="fl">0.7</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[&lt;matplotlib.lines.Line2D object at 0x14e23f110&gt;]</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb76"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb76-1"><a href="#cb76-1" aria-hidden="true" tabindex="-1"></a>plt.axhline(y<span class="op">=</span><span class="dv">0</span>, color<span class="op">=</span><span class="st">'red'</span>, linestyle<span class="op">=</span><span class="st">'--'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>&lt;matplotlib.lines.Line2D object at 0x14e239c10&gt;</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb78"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb78-1"><a href="#cb78-1" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Residual Plot"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0.5, 1.0, 'Residual Plot')</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb80"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb80-1"><a href="#cb80-1" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Observation Index"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0.5, 0, 'Observation Index')</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb82"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb82-1"><a href="#cb82-1" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Residuals"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0, 0.5, 'Residuals')</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb84"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb84-1"><a href="#cb84-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb84-2"><a href="#cb84-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-42-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers or highly influential observations in the dataset. The model residuals behave as expected, reinforcing the assumption that the data points do not exert undue influence on the regression fit.</p>
+<p>Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-23-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-23-1" role="tab" aria-controls="tabset-23-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-23-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-23-2" role="tab" aria-controls="tabset-23-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-23-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-23-1-tab">
+<div class="cell">
+<div class="sourceCode" id="cb85"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">cook_values</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/influence.measures.html">cooks.distance</a></span><span class="op">(</span><span class="va">ols_model</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span><span class="va">cook_values</span>, type <span class="op">=</span> <span class="st">"h"</span>, main <span class="op">=</span> <span class="st">"Cook's Distance"</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
-<figure class="figure"><p><img src="03-ols_files/figure-html/cooks-distance-1.png" class="img-fluid figure-img" width="672"></p>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-43-3.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
+</div>
+<div id="tabset-23-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-23-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb86"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb86-1"><a href="#cb86-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb86-2"><a href="#cb86-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb86-3"><a href="#cb86-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb86-4"><a href="#cb86-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Get Cook's distance values</span></span>
+<span id="cb86-5"><a href="#cb86-5" aria-hidden="true" tabindex="-1"></a>influence <span class="op">=</span> ols_model.get_influence()</span>
+<span id="cb86-6"><a href="#cb86-6" aria-hidden="true" tabindex="-1"></a>cooks_d <span class="op">=</span> influence.cooks_distance[<span class="dv">0</span>]  <span class="co"># Values</span></span>
+<span id="cb86-7"><a href="#cb86-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb86-8"><a href="#cb86-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot Cook's distance</span></span>
+<span id="cb86-9"><a href="#cb86-9" aria-hidden="true" tabindex="-1"></a>fig, ax <span class="op">=</span> plt.subplots(figsize<span class="op">=</span>(<span class="dv">6</span>, <span class="dv">4</span>))</span>
+<span id="cb86-10"><a href="#cb86-10" aria-hidden="true" tabindex="-1"></a>markerline, stemlines, baseline <span class="op">=</span> ax.stem(cooks_d, markerfmt<span class="op">=</span><span class="st">","</span>)</span>
+<span id="cb86-11"><a href="#cb86-11" aria-hidden="true" tabindex="-1"></a>ax.set_title(<span class="st">"Cook's Distance"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0.5, 1.0, "Cook's Distance")</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb88"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb88-1"><a href="#cb88-1" aria-hidden="true" tabindex="-1"></a>ax.set_xlabel(<span class="st">"Observation Index"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0.5, 0, 'Observation Index')</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb90"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a>ax.set_ylabel(<span class="st">"Cook's Distance"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Text(0, 0.5, "Cook's Distance")</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb92"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb92-1"><a href="#cb92-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb92-2"><a href="#cb92-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure"><p><img src="03-ols_files/figure-html/unnamed-chunk-44-1.png" class="img-fluid figure-img" width="576"></p>
+</figure>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>In the plot above, all observations have Cook’s Distance values well below the 0.5 threshold. This indicates that no individual data point has an undue influence on the model’s estimates.</p>
 <p>If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.</p>
 </section></section></section><section id="results" class="level2" data-number="3.10"><h2 data-number="3.10" class="anchored" data-anchor-id="results">
 <span class="header-section-number">3.10</span> Results</h2>
@@ -1357,10 +2123,36 @@ Chisquare = 0.4018794, Df = 1, p = 0.52612</code></pre>
 <section id="predictive-analysis" class="level3" data-number="3.10.1"><h3 data-number="3.10.1" class="anchored" data-anchor-id="predictive-analysis">
 <span class="header-section-number">3.10.1</span> Predictive Analysis</h3>
 <p>A key objective of regression modeling is to generate reliable predictions. To assess how well our model generalizes, we apply it to the test dataset—a portion of the original data that was not used for model training. If the model’s predictions align closely with actual outcomes, we can conclude that it has strong predictive power.</p>
-<p>In R, we use the predict() function to apply the trained OLS model to the test dataset:</p>
+<p>In R, we use the <code><a href="https://rdrr.io/r/stats/predict.html">predict()</a></code> function to apply the trained OLS model to the test set. In Python, we use the predict() method from the statsmodels library after ensuring the test data is properly formatted.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-24-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-24-1" role="tab" aria-controls="tabset-24-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-24-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-24-2" role="tab" aria-controls="tabset-24-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-24-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-24-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Generate predictions on the test set</span></span>
+<div class="sourceCode" id="cb93"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Generate predictions on the test set</span></span>
 <span><span class="va">y_pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html">predict</a></span><span class="op">(</span><span class="va">ols_model</span>, newdata<span class="op">=</span><span class="va">test_data</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+<div id="tabset-24-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-24-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb94"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb94-2"><a href="#cb94-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb94-3"><a href="#cb94-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Prepare the test data: add constant term to match training</span></span>
+<span id="cb94-4"><a href="#cb94-4" aria-hidden="true" tabindex="-1"></a>X_test <span class="op">=</span> test_data[[</span>
+<span id="cb94-5"><a href="#cb94-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Has_Job"</span>, <span class="st">"Financially_Dependent"</span>, <span class="st">"Year_of_Study"</span>,</span>
+<span id="cb94-6"><a href="#cb94-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Goes_Out_Spends_Money"</span>, <span class="st">"Drinks_Alcohol"</span>, <span class="st">"Monthly_Allowance"</span>,</span>
+<span id="cb94-7"><a href="#cb94-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"Monthly_Earnings"</span>, <span class="st">"Living_Situation"</span>, <span class="st">"Housing_Type"</span>, <span class="st">"Cooks_at_Home"</span></span>
+<span id="cb94-8"><a href="#cb94-8" aria-hidden="true" tabindex="-1"></a>]]</span>
+<span id="cb94-9"><a href="#cb94-9" aria-hidden="true" tabindex="-1"></a>X_test <span class="op">=</span> sm.add_constant(X_test)  <span class="co"># Add intercept term</span></span>
+<span id="cb94-10"><a href="#cb94-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb94-11"><a href="#cb94-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Generate predictions</span></span>
+<span id="cb94-12"><a href="#cb94-12" aria-hidden="true" tabindex="-1"></a>y_pred <span class="op">=</span> ols_model.predict(X_test)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
 </div>
 <p>Once predictions are generated, we evaluate their accuracy using common regression error metrics.</p>
 <section id="performance-metrics" class="level4"><h4 class="anchored" data-anchor-id="performance-metrics">Performance Metrics</h4>
@@ -1376,8 +2168,15 @@ Chisquare = 0.4018794, Df = 1, p = 0.52612</code></pre>
 <strong>R-squared (<span class="math inline">\(R^2\)</span>)</strong> quantifies the proportion of variance in Net_Money explained by the model. A higher <span class="math inline">\(R^2\)</span> value indicates better model performance.</li>
 </ol>
 <p>These metrics can be computed as follows:</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist">
+<li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-25-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-25-1" role="tab" aria-controls="tabset-25-1" aria-selected="true">R Code</a></li>
+<li class="nav-item" role="presentation"><a class="nav-link" id="tabset-25-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-25-2" role="tab" aria-controls="tabset-25-2" aria-selected="false">Python Code</a></li>
+</ul>
+<div class="tab-content">
+<div id="tabset-25-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-25-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Extract response variable from test data</span></span>
+<div class="sourceCode" id="cb95"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Extract response variable from test data</span></span>
 <span><span class="va">y_test</span> <span class="op">&lt;-</span> <span class="va">test_data</span><span class="op">$</span><span class="va">Net_Money</span></span>
 <span></span>
 <span><span class="co"># Calculate metrics in R</span></span>
@@ -1388,23 +2187,47 @@ Chisquare = 0.4018794, Df = 1, p = 0.52612</code></pre>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html">sprintf</a></span><span class="op">(</span><span class="st">"MAE: %.2f, MSE: %.2f, RMSE: %.2f, R-squared: %.2f"</span>, <span class="va">mae</span>, <span class="va">mse</span>, <span class="va">rmse</span>, <span class="va">r2</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>MAE: 183.76, MSE: 54660.22, RMSE: 233.80, R-squared: 0.90</code></pre>
+<pre><code>MAE: 175.48, MSE: 45299.10, RMSE: 212.84, R-squared: 0.89</code></pre>
 </div>
 </div>
-<p>If the RMSE is significantly larger than MAE, it suggests that the model is highly sensitive to large prediction errors, meaning that certain extreme values are having a disproportionate impact on the model’s performance. If the R-squared value is low, it may indicate that important predictors are missing from the model or that the relationship between predictors and Net_Money is more complex than a linear relationship can capture.</p>
+</div>
+<div id="tabset-25-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-25-2-tab">
+<div class="cell">
+<div class="sourceCode cell-code" id="cb97"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb97-1"><a href="#cb97-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.metrics <span class="im">import</span> mean_absolute_error, mean_squared_error, r2_score</span>
+<span id="cb97-2"><a href="#cb97-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb97-3"><a href="#cb97-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-4"><a href="#cb97-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Extract the true values</span></span>
+<span id="cb97-5"><a href="#cb97-5" aria-hidden="true" tabindex="-1"></a>y_test <span class="op">=</span> test_data[<span class="st">"Net_Money"</span>]</span>
+<span id="cb97-6"><a href="#cb97-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-7"><a href="#cb97-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate metrics</span></span>
+<span id="cb97-8"><a href="#cb97-8" aria-hidden="true" tabindex="-1"></a>mae <span class="op">=</span> mean_absolute_error(y_test, y_pred)</span>
+<span id="cb97-9"><a href="#cb97-9" aria-hidden="true" tabindex="-1"></a>mse <span class="op">=</span> mean_squared_error(y_test, y_pred)</span>
+<span id="cb97-10"><a href="#cb97-10" aria-hidden="true" tabindex="-1"></a>rmse <span class="op">=</span> np.sqrt(mse)</span>
+<span id="cb97-11"><a href="#cb97-11" aria-hidden="true" tabindex="-1"></a>r2 <span class="op">=</span> r2_score(y_test, y_pred)</span>
+<span id="cb97-12"><a href="#cb97-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb97-13"><a href="#cb97-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Print results</span></span>
+<span id="cb97-14"><a href="#cb97-14" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"MAE: </span><span class="sc">{</span>mae<span class="sc">:.2f}</span><span class="ss">, MSE: </span><span class="sc">{</span>mse<span class="sc">:.2f}</span><span class="ss">, RMSE: </span><span class="sc">{</span>rmse<span class="sc">:.2f}</span><span class="ss">, R-squared: </span><span class="sc">{</span>r2<span class="sc">:.2f}</span><span class="ss">"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>MAE: 175.48, MSE: 45299.10, RMSE: 212.84, R-squared: 0.91</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p>If the RMSE is significantly larger than the MAE, it suggests that the model is highly sensitive to large prediction errors, meaning that certain extreme values are having a disproportionate impact on the model’s performance. Similarly, a low R-squared value may indicate that important predictors are missing from the model or that the relationship is more complex than a simple linear pattern can capture.</p>
+<p>In this case, the model’s performance metrics are encouraging. With a MAE of 175.48, the model’s predictions deviate from actual values by about $175 on average. The RMSE of 212.84, which is not drastically higher than the MAE, suggests that large errors are present but not excessively dominant. An R-squared value of 0.89 confirms that the model explains a substantial portion of the variance in <code>Net_Money</code>, indicating strong predictive performance and a solid overall model fit.</p>
 </section></section><section id="inferential-analysis" class="level3" data-number="3.10.2"><h3 data-number="3.10.2" class="anchored" data-anchor-id="inferential-analysis">
 <span class="header-section-number">3.10.2</span> Inferential Analysis</h3>
-<p>Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in Net_Money for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.</p>
+<p>Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in <code>Net_Money</code> for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.</p>
 <section id="insights-from-regression-coefficients" class="level4"><h4 class="anchored" data-anchor-id="insights-from-regression-coefficients">Insights from Regression Coefficients</h4>
 <p>Here are a few insights that we can extract from the regression model result:</p>
 <ul>
-<li>The intercept (-595.37) represents the estimated financial balance for a baseline student (someone with Has_Job = 0, Financially_Dependent = 0, Year_of_Study = 0, etc.). Since a zero value for Year_of_Study is not meaningful in our context, the intercept itself has limited interpretability but serves as the starting point for estimating Net_Money based on predictor values.</li>
-<li>Financial Dependency (Financially_Dependent) has a strong negative effect (-499.36, p &lt; 2e-16), meaning that students who rely financially on others (e.g., parents, guardians) tend to have significantly lower Net_Money. This could be due to a lack of independent income sources or higher expenses associated with dependence on external financial support.</li>
-<li>Social Spending Habits (Goes_Out_Spends_Money) also have a negative impact (-54.60, p &lt; 2e-16), meaning that students who frequently go out and spend money experience a decline in Net_Money. This result aligns with expectations, as higher discretionary spending directly reduces available financial balance.</li>
-<li>Cooking at Home (Cooks_at_Home) has a negative effect (-96.31, p = 1.83e-09), which might seem counterintuitive at first. One possible explanation is that students who cook at home may already have lower budgets, leading them to adopt cost-saving habits, rather than the habit itself directly causing financial decline.</li>
-<li>Overall, the model explains 90.18% of the variance in Net_Money (<span class="math inline">\(R^2\)</span> = 0.9018, Adjusted <span class="math inline">\(R^2\)</span> = 0.9006), suggesting a strong predictive capability. The F-statistic (722.1, p &lt; 2.2e-16) confirms that the model as a whole is statistically significant.</li>
+<li>Financial dependency is one of the strongest negative predictors of financial balance. Students who rely on others—such as parents or guardians—for financial support tend to have $488.10 less in <code>Net_Money</code>. This may be due to having limited personal income, reduced autonomy in managing expenses, or tighter financial constraints imposed by dependency on external sources.</li>
+<li>Spending habits, particularly related to social activities, also play a crucial role. Students who report going out and spending money more frequently experience a $47.85 decrease in <code>Net_Money</code> for each unit increase in this behavior. This result aligns with expectations: frequent socializing often involves discretionary expenses such as dining out or entertainment, which can erode savings or disposable income over time.</li>
+<li>Another lifestyle factor, alcohol consumption, is associated with a $139.96 drop in <code>Net_Money</code>. This relatively large effect suggests that students who drink alcohol regularly may also engage in broader spending behaviors linked to nightlife or entertainment, significantly impacting their overall financial standing. It also highlights alcohol as a strong proxy for costly social habits.</li>
+<li>Finally, the student’s living situation is associated with financial advantage. Certain types of living arrangements correspond to an increase of $107.92 in <code>Net_Money</code>. This may reflect the financial benefits of shared housing, university-subsidized residences, or lower-cost arrangements. Choosing a cost-effective living setup appears to have a notable influence on students’ financial outcomes.</li>
 </ul>
-<p>These findings provide a comprehensive view of student financial behaviors, reinforcing expected relationships (such as the role of allowances and earnings) while also highlighting unexpected trends (such as the negative effect of cooking at home). The next step is to integrate these results into a cohesive narrative, translating statistical insights into actionable recommendations.</p>
+<p>These findings suggest that students can improve their financial position through a combination of employment, controlled social spending, and strategic housing choices. Conversely, financial dependency and certain lifestyle habits like frequent alcohol use and going out may contribute to lower net balances. These insights can inform both personal budgeting decisions and institutional support strategies for student financial wellness.</p>
 </section></section></section><section id="storytelling" class="level2" data-number="3.11"><h2 data-number="3.11" class="anchored" data-anchor-id="storytelling">
 <span class="header-section-number">3.11</span> Storytelling</h2>
 <p>The final step in our data science workflow is storytelling, where we translate our analytical findings into actionable insights. This stage ensures that our results are clearly understood by both technical and non-technical audiences. Effective storytelling involves summarizing insights, using visuals for clarity, and making data-driven recommendations.</p>
