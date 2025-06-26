@@ -70,6 +70,19 @@ mindmap
 ```
 :::
 
+```{r setup, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(asbio) # provides `crabs` dataset
+library(gridExtra) # combine ggplot2 figures
+```
+
 ::: {.LO}
 ::::{.LO-header}
 Learning Objectives
@@ -88,7 +101,14 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-This chapter introduces a generalized linear regression model that can be applied on count data, which is Poisson distributed. Compared to ordinary regression models, which assumes normality and constant variance--homoskedasticity, Poisson regression which models count data which is skewed and heteroskedastic. 
+This chapter introduces a generalized linear regression model that can be applied on count data that is Poisson distributed. Compared to ordinary regression models, which assumes normality and constant variance--homoskedasticity, Poisson regression models count data which is skewed and heteroskedastic. 
+
+Some typical questions you might ask are:
+
+- How is the number of insurance claims filed by policyholders in a year associated with ages, vehicle types, and regions?
+- How can the number of complaints received by a telecom company from customers be explained by service type and contract length?
+- How does the distribution of counts of satellite male crabs residing around a female crab nest vary by the biological characteristics of the nests?
+
 
 ### Poisson Regression Assumptions
 
@@ -100,15 +120,254 @@ This chapter introduces a generalized linear regression model that can be applie
 
 ### A Graphical Look
 
+Below is a graphical demonstration for the comparison of linear regression model with Gaussian (normal) distributed responses with Poisson regression model with Poisson distributed response. The linear regression has a linear fitted blue line (in the left panel), while the Poisson regression, due to the use of log link function, has a fitted blue curve (in the right panel). Segment the explanatory variable (in the x axis) in each scenario into five sections using the gray dashed vertical lines. The red horizontal segments represent the frequencies of binned response in each section, which represents the rotated histogram of the response. In linear regression, the response in each section is symmetrically distributed with similar variation across sections (i.e., homoskedasticity); while in Poisson regression, the response is skewed with heteroskedasticity (specifically, increasing variances as the responses increase) across sections. 
 
+::: {.panel-tabset}
+
+## R Plot
+
+```{r, fig.width=14, fig.height=10}
+#| echo: false
+#| message: false
+#| warning: false
+
+########### Simulated Poisson Data ###########
+set.seed(1)
+x <- runif(1000, 0, 20)
+lambda <- exp(0.15 * x)
+y_pois <- rpois(1000, lambda)
+df_pois <- tibble(x = x, y = y_pois)
+
+# Bin setup
+n_bins <- 5
+bin_edges <- seq(min(x), max(x), length.out = n_bins + 1)
+bin_width <- diff(bin_edges)[1]
+
+df_pois <- df_pois %>%
+  mutate(
+    x_bin = cut(x, breaks = bin_edges, include.lowest = TRUE),
+    x_bin_mid = (as.numeric(x_bin) - 0.5) * bin_width + min(x)
+  )
+
+y_breaks_pois <- seq(floor(min(y_pois)), ceiling(max(y_pois)), by = 1)
+
+hist_df_pois <- df_pois %>%
+  mutate(y_bin = cut(y, breaks = y_breaks_pois, include.lowest = TRUE)) %>%
+  group_by(x_bin, x_bin_mid, y_bin) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(
+    y_bin_mid = as.numeric(gsub("\\((.+),(.+)\\]", "\\1", y_bin)) + 0.5,
+    n_scaled = n / max(n) * (bin_width * 0.9)
+  )
+
+fit_pois <- glm(y ~ x, data = df_pois, family = poisson())
+x_seq <- seq(min(x), max(x), length.out = 200)
+fit_df_pois <- tibble(
+  x = x_seq,
+  y_hat = predict(fit_pois, newdata = tibble(x = x_seq), type = "response")
+)
+
+plot_pois <- ggplot(df_pois, aes(x, y)) +
+  geom_point(alpha = 0.2, size = 0.5) +
+  geom_line(data = fit_df_pois, aes(x, y_hat), color = "blue", size = 1) +
+  geom_segment(data = hist_df_pois,
+               aes(x = x_bin_mid, 
+                   xend = x_bin_mid - n_scaled-bin_width * 0.2,
+                   y = y_bin_mid, yend = y_bin_mid),
+               color = "red", size = .8) +
+  geom_vline(xintercept = bin_edges, linetype = "dashed", color = "black", size = .3) +
+  labs(title = "", x = "Width", y = "Counts") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
+
+########### Simulated Normal Data ###########
+set.seed(2)
+x2 <- runif(1000, 0, 20)
+mu <- 2 + 0.5 * x2
+y_norm <- rnorm(1000, mean = mu, sd = 3)
+df_norm <- tibble(x = x2, y = y_norm)
+
+df_norm <- df_norm %>%
+  mutate(
+    x_bin = cut(x, breaks = bin_edges, include.lowest = TRUE),
+    x_bin_mid = (as.numeric(x_bin) - 0.5) * bin_width + min(x)
+  )
+
+y_breaks_norm <- seq(floor(min(y_norm)), ceiling(max(y_norm)), by = 1)
+
+hist_df_norm <- df_norm %>%
+  mutate(y_bin = cut(y, breaks = y_breaks_norm, include.lowest = TRUE)) %>%
+  group_by(x_bin, x_bin_mid, y_bin) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  mutate(
+    y_bin_mid = as.numeric(gsub("\\((.+),(.+)\\]", "\\1", y_bin)) + 0.5,
+    n_scaled = n / max(n) * (bin_width * 0.9)
+  )
+
+fit_norm <- lm(y ~ x, data = df_norm)
+fit_df_norm <- tibble(
+  x = x_seq,
+  y_hat = predict(fit_norm, newdata = tibble(x = x_seq))
+)
+
+plot_norm <- ggplot(df_norm, aes(x, y)) +
+  geom_point(alpha = 0.2, size = 0.5) +
+  geom_line(data = fit_df_norm, aes(x, y_hat), color = "blue", size = 1) +
+  geom_segment(data = hist_df_norm,
+               aes(x = x_bin_mid, xend = x_bin_mid - n_scaled,
+                   y = y_bin_mid, yend = y_bin_mid),
+               color = "red", size = .8) +
+  geom_vline(xintercept = bin_edges, linetype = "dashed", color = "black", size = .3) +
+  labs(title = "", x = "Days", y = "Price") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
+
+########### Combine and Show Both ###########
+grid.arrange(plot_norm, plot_pois, ncol = 2)
+```
+
+## Python Plot
+
+```{python, fig.width=14, fig.height=10}
+#| echo: false
+#| message: false
+
+
+```
+
+:::
 
 ## Case Study: 
 
+Let's take a closer look at the example in the third question mentioned above---exploring the differential distribution of the number of satellite male horseshoe crabs residing around a female horseshoe crab nest across various phenotypic characteristics. Using the dataset `crabs` provided by [Brockmann, 1996](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1439-0310.1996.tb01099.x), let's load the dataset and do some data wrangling.
+
 ## Data Collection and Wrangling
+
+There are 173 records of female horseshoe crabs and their satellites with 5 features: `satell`: satellite size of each nest (i.e., the number of male horseshoe crabs around each female horseshoe crab nest), `width`: shell width in cm, `color`: 1 = medium light, 2 = medium, 3 = medium dark, 4 = dark, `spine`: spine condition: 1 = both good, 2 = one broken, 3 = both broken, and `weight`: weight in kg (referring to Section 3.3.3 in [Agresti, 2018](https://www.wiley.com/en-us/An+Introduction+to+Categorical+Data+Analysis%2C+3rd+Edition-p-9781119405283)). 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(asbio)
+data(crabs)
+crabs <- as_tibble(crabs)
+# reorder the columns
+crabs <- crabs %>%
+  select(satell, width, everything())
+# display the dataset with dimension and column types
+crabs
+```
+
+## Python Code
+
+```{.python}
+
+
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+library(asbio)
+data(crabs)
+crabs <- crabs %>%
+  select(satell, width, everything())
+
+# scatter plot of satellite size vs width
+crabs %>%
+  ggplot(aes(y = satell, x = width)) + 
+  geom_point(alpha = 0.8) + 
+  labs(x = "Width (cm)", y = "Satellite Size") +
+  scale_x_continuous(breaks = seq(floor(min(crabs$width)), ceiling(max(crabs$width)), by = 2)) + 
+  theme_bw() +
+  theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
+```
+
+## Python Output
+
+```{python, fig.width=14, fig.height=10}
+#| echo: false
+#| message: false
+#| warning: false
+
+```
+
+:::
 
 ## Exploratory Data Analysis
 
+Let's explore the relationship between the satellite size per nest (`satell`) and width of the female horseshoe crab (`width` in cm) in the following scatterplot.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+crabs
+```
+
+## Python Code
+
+```{.python}
+
+
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+crabs %>%
+  ggplot(aes(y = satell, x = width)) + 
+  geom_point(alpha = 0.8) + 
+  labs(x = "Width (cm)", y = "Satellite Size") +
+  scale_x_continuous(breaks = seq(floor(min(crabs$width)), ceiling(max(crabs$width)), by = 2)) + 
+  theme_bw()
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+
+
+```
+
+:::
+
 ## Data Modelling
+
+The Poisson regression model assumes a random sample of $n$ count observations $Y_i$s, hence independent (but not identically distributed!), which have the following distribution:
+$$Y_i \sim Poisson(\lambda_i)$$.
+Each $i$th observation has its own $\mathbb{E}(Y_i)=\lambda_i>0$, which also implicates $Var(Y_i)=\lambda_i>0$.
+
+
+The Poisson regression model with regressors is written as:
+$$h(\lambda_i) = \log(\lambda_i)=\beta_0+\beta_1 X_{i,1}+\dots+\beta_k X_{i,k}.$$
+
+The general idea to solve this function is that solving the coefficients by maximizing the likelihood is equivalent to minimizing the log-likelihood. We solve the second-order Taylor expansion of the log-likelihood, which is in turn a squared norm, that is much easier to solve than the original objective with a closed-form solution. Then, the approximated problem is solved iteratively until the convergence criteria is satisfied. 
+
+The iteration procedure is as follows.
+
+- 1. Choose a set of initial value of the coefficients $\beta^0 = (\beta_0^0, \dots,\beta_k^0)$, which can be a vector of zeros.
+- 2. Compute the fitted value 
+
 
 ## Estimation
 
