@@ -81,6 +81,7 @@ library(magrittr)
 library(ggplot2)
 library(asbio) # provides `crabs` dataset
 library(gridExtra) # combine ggplot2 figures
+library(ggExtra) # draw marginal histograms
 ```
 
 ::: {.LO}
@@ -101,26 +102,26 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-This chapter introduces a generalized linear regression model that can be applied on count data that is Poisson distributed. Compared to ordinary regression models, which assumes normality and constant variance--homoskedasticity, Poisson regression models count data which is skewed and heteroskedastic. 
+This chapter introduces a generalized linear regression model that can be applied on Poisson-distributed count data. Compared to ordinary regression, which assume normality and constant variance---homoskedasticity, Poisson regression models count data that is skewed and heteroskedastic. 
 
-Some typical questions you might ask are:
+Some research questions you might explore using Poisson regression:
 
 - How is the number of insurance claims filed by policyholders in a year associated with ages, vehicle types, and regions?
-- How can the number of complaints received by a telecom company from customers be explained by service type and contract length?
-- How does the distribution of counts of satellite male crabs residing around a female crab nest vary by the biological characteristics of the nests?
+- How can the number of complaints received by a telecom company from customers be explained by service types and contract lengths?
+- How does the distribution of counts of satellite male horseshoe crabs residing around a female horseshoe crab nest vary by the phenotypic characteristics of the female horseshoe crabs?
 
 
 ### Poisson Regression Assumptions
 
-- **Independence**: Poisson regression assumes the responses to be counts--(nonnegative integers: 0, 1, 2,...). Each response is mutually independent to each other with mean parameter $\lambda_i,i=1,...,n$. 
+- **Independence**: Poisson regression assumes the responses to be counts--(nonnegative integers: 0, 1, 2,...). Each response is mutually independent to each other with mean parameter $\lambda_i,i=1,\dots,n$. 
 
-- **Log-linearity**: Poisson regression models the link function of the response as a linear function of the explanatory variables, i.e., $\log(\lambda_i) = \beta_0 + \beta_1 X_{i1}+\dots+\beta_p X_{ip}$ with $\lambda_i> 0$. 
+- **Log-linearity**: Poisson regression models the log-link function of the response as a linear combination of the explanatory variables, i.e., $\log(\lambda_i) = \beta_0 + \beta_1 X_{i1}+\dots+\beta_p X_{ip}$ with $\lambda_i> 0$ for all $i=1,\dots,n$. 
 
-- **Heteroskedasticity**: Poisson regression assumes heteoroskedastic response, i.e., the variance of the response increases along with the mean increasing; in contrast to, in ordinary regression with Gaussian noises, the variances are constant and independent to the mean of the noises. Poisson regression assumes equidispersion, i.e., the variance is the same as the expectation of the response; compared to overdispersion in negative binomial distribution where variance is greater than mean.
+- **Heteroskedasticity**: Poisson regression assumes heteoroskedastic response, i.e., the variance of the response increases along with the mean increasing; in contrast to the ordinary regression with Gaussian noise, whose the variance is constant and independent to the mean. Poisson regression assumes **equidispersion**, i.e., the variance is the same as the expectation of the response; compared to overdispersion in negative binomial distribution where the variance is greater than the mean. 
 
 ### A Graphical Look
 
-Below is a graphical demonstration for the comparison of linear regression model with Gaussian (normal) distributed responses with Poisson regression model with Poisson distributed response. The linear regression has a linear fitted blue line (in the left panel), while the Poisson regression, due to the use of log link function, has a fitted blue curve (in the right panel). Segment the explanatory variable (in the x axis) in each scenario into five sections using the gray dashed vertical lines. The red horizontal segments represent the frequencies of binned response in each section, which represents the rotated histogram of the response. In linear regression, the response in each section is symmetrically distributed with similar variation across sections (i.e., homoskedasticity); while in Poisson regression, the response is skewed with heteroskedasticity (specifically, increasing variances as the responses increase) across sections. 
+Below is a graphical demonstration of the comparison between the ordinary linear regression with Gaussian distributed response and Poisson regression with Poisson distributed response. The ordinary linear regression has a linear fitted blue line (in the left panel), while the Poisson regression, due to the use of log-link function, has a fitted blue curve (in the right panel). Segment the explanatory variable (in the x axis) in each scenario into five sections using the gray dashed vertical lines. The red horizontal segments represent the frequencies of binned response in each section, which represents the rotated histogram of the response. In ordinary linear regression, the response in each section is symmetrically distributed with similar variation across five sections (i.e., homoskedasticity); while in Poisson regression, the response is skewed with heteroskedasticity (specifically, increasing variances as the responses increase) across sections. 
 
 ::: {.panel-tabset}
 
@@ -237,13 +238,13 @@ grid.arrange(plot_norm, plot_pois, ncol = 2)
 
 :::
 
-## Case Study: 
+## Case Study: Horseshoe Crab Satellites
 
-Let's take a closer look at the example in the third question mentioned above---exploring the differential distribution of the number of satellite male horseshoe crabs residing around a female horseshoe crab nest across various phenotypic characteristics. Using the dataset `crabs` provided by [Brockmann, 1996](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1439-0310.1996.tb01099.x), let's load the dataset and do some data wrangling.
+Let's take a closer look at the example in the third question mentioned in the Introduction---exploring the differential distribution of the number of satellite male horseshoe crabs residing around a female horseshoe crab nest across various phenotypic characteristics. Using the dataset `crabs` provided by [Brockmann, 1996](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1439-0310.1996.tb01099.x), let's load the dataset and do some data wrangling.
 
 ## Data Collection and Wrangling
 
-There are 173 records of female horseshoe crabs and their satellites with 5 features: `satell`: satellite size of each nest (i.e., the number of male horseshoe crabs around each female horseshoe crab nest), `width`: shell width in cm, `color`: 1 = medium light, 2 = medium, 3 = medium dark, 4 = dark, `spine`: spine condition: 1 = both good, 2 = one broken, 3 = both broken, and `weight`: weight in kg (referring to Section 3.3.3 in [Agresti, 2018](https://www.wiley.com/en-us/An+Introduction+to+Categorical+Data+Analysis%2C+3rd+Edition-p-9781119405283)). 
+There are 173 records of the female horseshoe crab nests and their male satellites with 5 features: `satell`: satellite size of each nest (i.e., the number of male horseshoe crabs around each female horseshoe crab nest), `width`: shell width in cm, `color`: 1 = medium light, 2 = medium, 3 = medium dark, 4 = dark, `spine`: spine condition: 1 = both good, 2 = one broken, 3 = both broken, and `weight`: weight in kg (referring to Section 3.3.3 in [Agresti, 2018](https://www.wiley.com/en-us/An+Introduction+to+Categorical+Data+Analysis%2C+3rd+Edition-p-9781119405283)). 
 
 ::: {.panel-tabset}
 
@@ -279,17 +280,10 @@ crabs
 #| warning: false
 library(asbio)
 data(crabs)
+crabs <- as_tibble(crabs)
 crabs <- crabs %>%
   select(satell, width, everything())
-
-# scatter plot of satellite size vs width
-crabs %>%
-  ggplot(aes(y = satell, x = width)) + 
-  geom_point(alpha = 0.8) + 
-  labs(x = "Width (cm)", y = "Satellite Size") +
-  scale_x_continuous(breaks = seq(floor(min(crabs$width)), ceiling(max(crabs$width)), by = 2)) + 
-  theme_bw() +
-  theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
+crabs
 ```
 
 ## Python Output
@@ -305,14 +299,24 @@ crabs %>%
 
 ## Exploratory Data Analysis
 
-Let's explore the relationship between the satellite size per nest (`satell`) and width of the female horseshoe crab (`width` in cm) in the following scatterplot.
+Suppose that the relationship between the satellite size per nest (`satell`) and width of the female horseshoe crab (`width` in cm) is our main research interest. 
+Let's explore their relationship in the following scatterplot with the distribution of `satell` on the margin. 
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-crabs
+# draw the scatterplot of satellite size versus width 
+p <- crabs %>%
+  ggplot(aes(y = satell, x = width)) + 
+  geom_point(alpha = 0.8) + 
+  labs(x = "Width (cm)", y = "Satellite Size") +
+  scale_x_continuous(breaks = seq(floor(min(crabs$width)), ceiling(max(crabs$width)), by = 2)) + 
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme_bw()
+# add a marginal histogram with binwidth of 1, i.e., bins for integers; equivalent to the barplot
+ggMarginal(p, type = "histogram", margins = "y", binwidth = 1, boundary = -0.5) # start with `satell=-0.5` to avoid the first bins (0s and 1s) being combined in one bin
 ```
 
 ## Python Code
@@ -332,12 +336,14 @@ crabs
 #| echo: false
 #| message: false
 #| warning: false
-crabs %>%
+p <- crabs %>%
   ggplot(aes(y = satell, x = width)) + 
   geom_point(alpha = 0.8) + 
   labs(x = "Width (cm)", y = "Satellite Size") +
   scale_x_continuous(breaks = seq(floor(min(crabs$width)), ceiling(max(crabs$width)), by = 2)) + 
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +
   theme_bw()
+ggMarginal(p, type = "histogram", margins = "y", binwidth = 1, boundary = -0.5)
 ```
 
 ## Python Output
@@ -350,6 +356,122 @@ crabs %>%
 ```
 
 :::
+
+The distribution of satellite sizes is highly right skewed, which violates the normality assumption of the ordinary linear regression. 
+
+In the scatter plot above, we can tell that the satellite size gets more spread out as the width increases. The averaged satellite sizes turn to increase along the width increasing. Let's now split the width into a few intervals and compute the representative point for each interval to have a clear look at the trend. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# set up the number of intervals
+n_intervals <- 10
+
+# compute the average points for each interval of `width`
+crabs_binned <- crabs %>%
+  mutate(width_inl = cut(width, breaks = n_intervals)) %>%
+  group_by(width_inl) %>%
+  summarize(
+    mean_width = mean(width),
+    mean_satell = mean(satell),
+    .groups = "drop"
+  )
+crabs_binned
+```
+
+## Python Code
+
+```{.python}
+
+
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+n_intervals <- 10
+crabs_binned <- crabs %>%
+  mutate(width_inl = cut(width, breaks = n_intervals)) %>%
+  group_by(width_inl) %>%
+  summarize(
+    mean_width = mean(width),
+    mean_satell = mean(satell),
+    .groups = "drop"
+  )
+crabs_binned
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+
+
+```
+
+:::
+
+We've prepared the summarized dataset for the average points---each entry includes an interval of `width`, an averaged width, and an averaged satellite size per interval. Now, let's visualize the representative points on the scatter plot to take a closer look at the trend. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# add the average points onto the scatterplot, connect them, and mark intervals
+breaks <- seq(min(crabs$width), max(crabs$width), length.out = n_intervals + 1)
+p + 
+  geom_vline(xintercept = breaks, linetype = "dashed", color = "gray50") +
+  geom_point(data = crabs_binned, aes(x = mean_width, y = mean_satell), color = "red", size = 2) +
+  geom_line(data = crabs_binned, aes(x = mean_width, y = mean_satell), color = "red", linewidth = 1)
+```
+
+## Python Code
+
+```{.python}
+
+
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+breaks <- seq(min(crabs$width), max(crabs$width), length.out = n_intervals + 1)
+p + 
+  geom_vline(xintercept = breaks, linetype = "dashed", color = "gray50") +
+  geom_point(data = crabs_binned, aes(x = mean_width, y = mean_satell), color = "red", size = 2) +
+  geom_line(data = crabs_binned, aes(x = mean_width, y = mean_satell), color = "red", linewidth = 1)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+
+
+```
+
+:::
+
+We can see a general increasing trend of the satellite size as the nest width grows. 
 
 ## Data Modelling
 
