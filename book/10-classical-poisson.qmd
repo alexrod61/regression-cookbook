@@ -8,6 +8,16 @@
   gtag('config', 'G-7PRVEBE1EF');
 </script>
 
+<!-- MathJax configuration -->
+<script>
+  MathJax = {
+    tex: {
+      tags: 'ams',  // enable numbering
+      useLabelIds: true
+    }
+  };
+</script>
+
 # Bubblarious Classical Poisson Regression {#sec-classical-poisson}
 
 ```{r}
@@ -596,22 +606,78 @@ We can see a general increasing trend of the satellite size as the nest width gr
 ## Data Modelling
 
 The Poisson regression model assumes a random sample of $n$ count observations $Y_i$s, hence independent (but not identically distributed!), which have the following distribution:
-$$Y_i \sim Poisson(\lambda_i)$$.
+$$Y_i \sim \mathrm{Poisson}(\lambda_i).$$ 
 Each $i$th observation has its own $\mathbb{E}(Y_i)=\lambda_i>0$, which also implicates $Var(Y_i)=\lambda_i>0$.
 
+Parameter $\lambda_i$ is the risk of an event occurrence, coming from the definition of the Poisson random variable, in a given timeframe or even a space. It is a **continuous** distributional parameter! For the `crabs` dataset, the events are the number of satellite male horseshoe crabs around a space: the female breeding nest. 
 
-The Poisson regression model with regressors is written as:
-$$h(\lambda_i) = \log(\lambda_i)=\beta_0+\beta_1 X_{i,1}+\dots+\beta_k X_{i,k}.$$
+Since the Poisson Regression model is also a GLM, we need to set up a link function for the mean. Let $X_{i,\text{width}}$ be the $i$th value for the regressor `width` in our dataset. An easy modelling solution would be an **identity** link function as in
+$$
+h(\lambda_i)=\lambda_i=\beta_0+\beta_1 X_{i,\text{width}}. \label{eq:pois-uni-iden}
+$$
 
-The general idea to solve this function is that solving the coefficients by maximizing the likelihood is equivalent to minimizing the log-likelihood. We solve the second-order Taylor expansion of the log-likelihood, which is in turn a squared norm, that is much easier to solve than the original objective with a closed-form solution. Then, the approximated problem is solved iteratively until the convergence criteria is satisfied. 
+However, **we have a response range issue!**
 
-The iteration procedure is as follows.
+The model @eq:pois-uni-iden for has a significant **drawback**: the right-hand side is allowed to take on even negative values, which does not align with the nature of the parameter $\lambda_i$ (that always has to be **non-negative**).
 
-- 1. Choose a set of initial value of the coefficients $\beta^0 = (\beta_0^0, \dots,\beta_k^0)$, which can be a vector of zeros.
-- 2. Compute the fitted value 
+Recall the essential characteristic of a GLM that should come into play for a link function. In this class of models, the direct relationship between the original response and the regressors may be **non-linear** as in $h(\lambda_i)$. Hence, instead of using the identity link function, we will use the natural logarithm of the mean: $\log(\lambda_i)$.
+
+Before continuing with the crabs dataset, let us generalize the Poisson regression model with $k$ regressors as:
+$$
+  h(\lambda_i) = \log(\lambda_i)=\beta_0+\beta_1 X_{i,1}+\dots+\beta_k X_{i,k}. \label{eq:pois-k}
+$$
+We could make more sense in the interpretation by exponentiating @eq:pois-k: 
+$$
+  \lambda_i = \exp(\beta_0+\beta_1 X_{i,1}+\dots+\beta_k X_{i,k}), \label{eq:pois-k-exp}
+$$
+where an increase in one unit in any of the $k$ regressors (while keeping the rest of them constant) multiplies the mean $\lambda_i$ by a factor $\exp(\beta_j)$, for all $j=i,\dots,k$.
+
+In the `crabs` dataset with width as a regressor, the Poisson regression model is depicted as:
+$$
+  \log(\lambda_i)=\lambda_i=\beta_0+\beta_1 X_{i,\text{width}}. \label{eq:pois-uni}
+$$
 
 
 ## Estimation
+
+The general idea to solve the Poisson regression in @eq:pois-k is to find the parameters $\lambda_j$s by maximizing the following likelihood: 
+$$
+  \prod_{i=1}^n p_{Y_i}(y_i) = \prod_{i=1}^n \frac{e^{-\lambda_i}{\lambda_i}^{y_i}}{y_i!}, 
+$$
+where $p_{Y_i}(y_i)$ is the probability mass function of $Y_i$, for $i=1,\dots,n$.
+
+Let $\boldsymbol{\beta}:=(\beta_0,\dots,\beta_k)^{\top}$ be the coefficient vector, and then @eq:pois-k-exp can be rewritten as $\lambda_i=\exp(X_{i}^{\top}\boldsymbol{\beta})$, where $X_{i}^{\top}$ is the row $i$ in the design matrix $X$. Maximizing the likelihood is equivalent to minimizing the log-likelihood in terms of solving for the parameters $\beta_j,j=1,\dots,k$:
+$$
+  {\arg\min}_{\boldsymbol{\lambda}} - \prod_{i=1}^n\frac{e^{-\lambda_i}{\lambda_i}^{y_i}}{y_i!} = {\arg\min}_{\boldsymbol{\lambda}} \sum_{i=1}^n \lambda_i - y_i \log(\lambda_i).
+$$
+Plugging in $\lambda_i=\exp(X_{i}^{\top}\boldsymbol{\beta})$ gives the minimization problem with respect to the Poisson regression coefficients: 
+$$
+  {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n \exp(X_{i}^{\top}\boldsymbol{\beta}) - y_i X_{i}^{\top}\boldsymbol{\beta}. \label{eq:pois-log}
+$$
+
+Since the objective in @eq:pois-log is not quadratic and there is no closed form solution, we could not solve the equation exactly. Iteratively reweighted least squares (IRLS) is a method to find an approximated solution with a specified accuracy or tolerance. The basic idea is that IRLS uses Newton-Raphson or Fisher scoring to solve an approximated problem of the original objective @eq:pois-log and solve it iteratively with weights updated through iteration until the specified accuracy is achieved, i.e., the objective is converged. 
+
+The approximated problem of the original objective at iterate $t+1$ is a weighted linear least squares problem written as: 
+$$
+  \begin{align}
+    \boldsymbol{\beta}^{t+1} &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i - X_i^{\top}\boldsymbol{\beta})^2 \\ 
+    &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i - \beta_0 - \beta_1 x_{i,\text{width}})^2 \label{eq:irls-approx}
+  \end{align}
+$$
+given the estimates at time $t$ for the univariate case using `crabs` dataset. The approximated problem has a closed-form solution and is much easier to solve than the original objective. 
+The weights comes from the second derivative (Hessian) of the log-likelihood. In our case, the weights at iterate $t+1$ can be updated given the coefficient estimates at $t$ using the following formula:
+$$
+  w_i^{t+1} = \exp(X_i^{\top} \boldsymbol{\beta}^t), \forall i=1,\dots,n.
+$$
+
+The IRLS iteration procedure is as follows. 
+
+1. Choose a set of initial coefficients $\boldsymbol{\lambda}^0 = (\lambda_0^0,\dots,\lambda_k^0)$, which can be a vector of zeros.
+2. Compute the weights based on the estimates from the previous iterate, or the inital coefficients at the first iterate.
+3. Solve the approximated problem @irls-approx.
+4. Check te convergence condition.
+5. Return estimates if the objective is converged; go back to step 2 if not.
+
 
 ## Goodness of Fit
 
