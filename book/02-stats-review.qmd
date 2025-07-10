@@ -730,7 +730,7 @@ with
 
 $$
 f_Y(y) \geq 0.
-$$
+$${#eq-lower-bound-PDF}
 
 Then, $f_Y(y)$ is considered a PDF if the probability of $Y$ taking on a value within the range represented by the subset $A \subset \mathcal{Y}$ is equal to
 
@@ -2063,9 +2063,9 @@ exponential_sd_plot
 
 Firstly, in @fig-exponential-standard-deviation, it is important to emphasize that the relationship between the Exponential parameter $\beta$ and the standard deviation $\text{sd}(T_j)$ is **linear**. We have highlighted three specific cases as vertical lines:
 
-- The orange dotted line on the left indicates a small spread with $\text{sd}(T_j) = 5$ when $\beta = 5$. This signifies that the square root of the average squared distance from the mean is 5 minutes for the waiting times corresponding to this specific population.
+- The orange dashed line on the left indicates a small spread with $\text{sd}(T_j) = 5$ when $\beta = 5$. This signifies that the square root of the average squared distance from the mean is 5 minutes for the waiting times corresponding to this specific population.
 - The solid purple line represents our ice cream case, where $\beta = 10$, resulting in a larger spread with $\text{sd}(T_j) = 10$ compared to the case above. This means that the square root of the average squared distance from the mean is 10 minutes for the waiting times related to this specific population.
-- The orange dotted line on the right indicates the largest spread, compared to the two cases above, with $\text{sd}(T_j) = 45$ when $\beta = 45$. This means that the square root of the average squared distance from the mean is 45 minutes for the waiting times corresponding to this specific population.
+- The orange dashed line on the right indicates the largest spread, compared to the two cases above, with $\text{sd}(T_j) = 45$ when $\beta = 45$. This means that the square root of the average squared distance from the mean is 45 minutes for the waiting times corresponding to this specific population.
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
@@ -2526,7 +2526,7 @@ $$
 P_Y \left( Y = y \mid n, \pi \right) &= {n \choose y} \pi^y (1 - \pi)^{n - y} \\
 & \qquad \qquad \qquad \text{for $y \in \{ 0, 1, \dots, n \}$.}
 \end{align*}
-$$
+$${#eq-binomial-PMF}
 
 Term ${n \choose y}$ represents the total number of combinations for $y$ successes out of $n$ trials:
 
@@ -2534,13 +2534,23 @@ $$
 {n \choose y} = \frac{n!}{y!(n - y)!}.
 $$
 
-To provide a clearer explanation, we will plot the PMFs of six Binomial random variables, as shown in @fig-binomial-PMFs. The following key points can be highlighted in these plots:
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the $n$ trials in the Binomial distribution!
+::::
+::::{.Heads-up-container}
+In our estimation framework, we use **random samples consisting of $n$ observed random variables**. Hence, it is important to avoid confusing this sample size with the above distributional parameter $n$, which refers to the **number of independent Bernoulli trials** in a Binomial random variable.
+::::
+:::
+
+To provide a practical explanation on the difference between a probability and a likelihood in statistics, we will plot the PMFs of six Binomial random variables, as shown in @fig-binomial-PMFs. The following key points can be highlighted in these plots:
 
 1. Each plot illustrates a Binomial PMF with the same number of trials $n = 10$, but the probabilities of success vary as in $\pi = 0.3, 0.4, 0.5, 0.6, 0.7, 0.8$. This variation results in six distinct PMFs.
 2. The $x$-axis depicts the possible values that the corresponding random variable can take, $y \in \{ 0, 1, \dots, 10 \}$.
 3. The $y$-axis displays the probability $P_Y \left( Y = y \mid n = 10, \pi \right)$. Above each bar, we indicate the probability $P_Y \left( Y = y \mid n = 10, \pi \right)$ for each observed value of $y$. When we sum all these probabilities, we arrive at a total of $1$.
 4. As the value of $\pi$ increases, the PMFs become more skewed to the left, indicating that larger probabilities are assigned to a greater number of successes.
-5. Lastly, the red bar highlights the specific probability $P(Y = 5 | n = 10, \pi)$. This value will be particularly important later in our proof of concept for MLE.
+5. Lastly, the red bar highlights the specific probability $P(Y = 7 | n = 10, \pi)$. This value will be particularly important later in our proof of concept for MLE.
 
 ```{r}
 #| label: fig-binomial-PMFs
@@ -2578,29 +2588,128 @@ binomial_PMF <- function(n, pi, interest) {
   return(PMF)
 }
 
-plot_grid(binomial_PMF(n = 10, pi = 0.3, interest = 5) +
+plot_grid(binomial_PMF(n = 10, pi = 0.3, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.3)"))),
-          binomial_PMF(n = 10, pi = 0.4, interest = 5) +
+          binomial_PMF(n = 10, pi = 0.4, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.4)"))),
-          binomial_PMF(n = 10, pi = 0.5, interest = 5) +
+          binomial_PMF(n = 10, pi = 0.5, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.5)"))),
-          binomial_PMF(n = 10, pi = 0.6, interest = 5) +
+          binomial_PMF(n = 10, pi = 0.6, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.6)"))),
-          binomial_PMF(n = 10, pi = 0.7, interest = 5) +
+          binomial_PMF(n = 10, pi = 0.7, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.7)"))),
-          binomial_PMF(n = 10, pi = 0.8, interest = 5) +
+          binomial_PMF(n = 10, pi = 0.8, interest = 7) +
   ggtitle(expression(paste("Bin(n = 10, ", pi, " = 0.8)"))), ncol = 2)
 ```
 
+Imagine you are interested in estimating the **unknown** probability of success $\pi$, from a population that you have chosen to model as Binomial. Therefore, you draw a random sample of a standalone Binomial observation and you obtain an observed value of $y = 7$ successes out of $n = 10$ trials. Within a frequentist framework, our main objective is to estimate the value of $\pi$ that is **most likely** given these specific $n = 10$ trials and $y = 7$ observed successes. 
+
+To achieve the above, we will introduce the concept of the **likelihood function**.
 
 ::: {#Definition-likelihood-function .definition}
 ::::{.definition-header}
 Definition of likelihood function
 ::::
 ::::{.definition-container}
+Suppose you observe some data $y$ from a population or system of interest which is governed by $k$ parameters contained in the following vector:
 
+$$
+\boldsymbol{\theta} = (\theta_1, \theta_2, \cdots, \theta_k)^T.
+$$
+
+The corresponding random variable $Y$ has a given probability function $P_Y(Y = y | \boldsymbol{\theta})$, which can be either a PMF in the discrete case or a PDF in the continuous case. Then, the likelihood function for the parameter vector $\boldsymbol{\theta}$ given the observed data $y$ is **mathematically equivalent** to the aforementioned probability function such that:
+
+$$
+L(\boldsymbol{\theta} | y) = P_Y(Y = y | \boldsymbol{\theta}).
+$${#eq-likelihood-function}
+
+It is important to note that the above likelihood is in function of the parameter vector $\boldsymbol{\theta}$ and conditioned on the observed data $y$. Additionally, **in many continuous cases**, the likelihood function may exceed $1$ given the definition of bounds we have already established for a PDF (see @eq-lower-bound-PDF).
 ::::
 :::
+
+Using the above definition, let us retake the PFM from @eq-binomial-PMF and turn into a likelihood function given $n = 10$ trials and $y = 7$ observed successes:
+
+$$
+\begin{align*}
+L \left( \pi | y = 7, n = 10 \right) &= P_Y \left( Y = 7 \mid n = 10, \pi \right) \\
+&= {10 \choose 7} \pi^7 (1 - \pi)^{10 - 7}.
+\end{align*}
+$${#eq-binomial-likelihood-y-7-10}
+
+To estimate the value of $\pi$ that is **most likely** given $n = 10$ trials and $y = 7$ observed successes, we need to find the value of $\pi$ that **maximizes** the above Binomial likelihood function. Since we know that the probability of success $\pi$ falls within the range $[0, 1]$, we can determine the value of $\pi$ that maximizes this function through trial and error by testing different values within this range. To illustrate this process more graphically, let us take a look at @fig-binomial-likelihood-y-7-10:
+
+1. This plot displays the likelihood function from @eq-binomial-likelihood-y-7-10 on the $y$-axis, compared to the plausible range of $\pi$ on the $x$-axis. The function is left-skewed.
+2. We have highlighted the values corresponding to the red bars in five of the previous Binomial PMFs from @fig-binomial-PMFs with vertical orange dashed lines at $\pi = 0.3, 0.4, 0.5, 0.6, 0.8$; since a probability function is mathematically equivalent to a likelihood function.
+3. The likelihood value for $\pi = 0.7$ is indicated by a solid purple vertical line. This value corresponds to the red bar in the Binomial PMF from @fig-binomial-PMFs when $\pi = 0.7$. It is important to note that this value of $\pi$ **maximizes this likelihood function**.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the intuition behind MLE!
+::::
+::::{.Heads-up-container}
+Retaking (3), given our observed data of $y = 7$ successes out of $n = 10$ trials, and assuming a Binomial-distributed population, we can say that the most plausible value of $\pi$ that is generating this **collected evidence** is $0.7$.
+::::
+:::
+
+
+```{r}
+#| label: fig-binomial-likelihood-y-7-10
+#| fig-cap: "Binomial likelihood function of the probability of success given 10 trials and 5 observed successes."
+#| warning: false
+#| echo: false
+#| fig.height: 7
+#| fig.width: 14
+
+plot_binomial_likelihood_pi <- ggplot(data = data.frame(x = c(0, 1)), aes(x)) +
+  stat_function(fun = dbinom, args = list(x = 7, size = 10), colour = "navyblue") +
+  labs(
+    x = expression(pi),
+    y = expression(paste("L(", pi, "|y = 7, n = 10)"))
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  geom_segment(aes(x = 0.3, y = 0, xend = 0.3, yend = dbinom(x = 7, size = 10, prob = 0.3)), 
+                   color = "red", linetype  ="dashed") +
+  geom_segment(aes(x = 0.4, y = 0, xend = 0.4, yend = dbinom(x = 7, size = 10, prob = 0.4)), 
+                   color = "red", linetype  ="dashed") +
+  geom_segment(aes(x = 0.5, y = 0, xend = 0.5, yend = dbinom(x = 7, size = 10, prob = 0.5)), 
+                   color = "red", linetype  ="dashed") +
+  geom_segment(aes(x = 0.6, y = 0, xend = 0.6, yend = dbinom(x = 7, size = 10, prob = 0.6)), 
+                   color = "red", linetype  ="dashed") +
+  geom_segment(aes(x = 0.7, y = 0, xend = 0.7, yend = dbinom(x = 7, size = 10, prob = 0.7)), 
+                   color = "darkmagenta", linetype  ="solid", linewidth = 1.1) +
+  geom_segment(aes(x = 0.8, y = 0, xend = 0.8, yend = dbinom(x = 7, size = 10, prob = 0.8)), 
+                   color = "red", linetype  ="dashed") +
+  coord_cartesian(ylim = c(0, 0.3)) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.1))
+
+plot_binomial_likelihood_pi
+```
+
+How can we translate this MLE principle to our **demand** and **time queries** in the ice cream case? Firstly, we need to make the corresponding jump from the joint probability to a likelihood function in each query. For the **demand query**, via @eq-joint-PMF-iid-demand, the likelihood function is mathematically defined as:
+
+$$
+\begin{align*}
+L \left( \pi | d_1, \dots, d_{n_D} \right) &= P_{D_1, \dots, D_{n_D}} \left( D_1 = d_1, \dots, D_{n_D} = d_{n_D} | \pi \right) \\
+&= \prod_{i = 1}^{n_D} \pi^{d_i } (1 - \pi)^{1 - d_i }.
+\end{align*}
+$${#eq-likelihood-demand}
+
+For the **time query**, via @eq-joint-PDF-iid-time, the likelihood function is mathematically defined as:
+
+$$
+\begin{align*}
+L \left( \beta | t_1, \dots, t_{n_T} \right) &= f_{T_1, \dots, T_{n_T}}(t_1, \dots, t_{n_T} | \beta) \\
+&= \prod_{j = 1}^{n_T} \frac{1}{\beta} \exp \left( -\frac{t_j}{\beta} \right).
+\end{align*}
+$${#eq-likelihood-time}
+
+To estimate the parameters $\pi$ and $\beta$ using MLE, we can pursue either an **empirical** or **analytical approach** based on our observed data, which is stored in `children_sample` and `waiting_sample`. The following two sections will elaborate on these approaches.
 
 ### Empirical Approach {#sec-mle-empirical}
 
