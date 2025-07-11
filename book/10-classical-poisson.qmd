@@ -92,6 +92,7 @@ library(ggplot2)
 library(asbio) # provides `crabs` dataset
 library(gridExtra) # combine ggplot2 figures
 library(ggExtra) # draw marginal histograms
+library(broom)
 
 library(reticulate)
 py_config()
@@ -103,6 +104,8 @@ py_require("pyreadr")
 py_require("plotnine")
 py_require("matplotlib")
 py_require("statsmodels")
+py_require("scikit-learn")
+py_require("spicy")
 
 pandas <- import("pandas")
 numpy <- import("numpy")
@@ -110,6 +113,8 @@ seaborn <- import("seaborn")
 pyreadr <- import("pyreadr")
 matplotlib <- import("matplotlib")
 statsmodels <- import("statsmodels")
+sklearn <- import("sklearn")
+scipy <- import("scipy")
 ```
 
 ```{python setup-py, include=FALSE}
@@ -120,6 +125,8 @@ import statsmodels.api as sm
 from statsmodels.formula.api import glm, ols
 from statsmodels.genmod.families import Poisson
 from matplotlib import pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import scipy.stats as stats
 ```
 
 ::: {.LO}
@@ -159,7 +166,9 @@ Some research questions you might explore using Poisson regression:
 
 ### A Graphical Look
 
-Below is a graphical demonstration of the comparison between the ordinary linear regression with Gaussian distributed response and Poisson regression with Poisson distributed response. The ordinary linear regression has a linear fitted blue line (in the left panel), while the Poisson regression, due to the use of log-link function, has a fitted blue curve (in the right panel). Segment the explanatory variable (in the x axis) in each scenario into five sections using the gray dashed vertical lines. The red horizontal segments represent the frequencies of binned response in each section, which represents the rotated histogram of the response. In ordinary linear regression, the response in each section is symmetrically distributed with similar variation across five sections (i.e., homoskedasticity); while in Poisson regression, the response is skewed with heteroskedasticity (specifically, increasing variances as the responses increase) across sections. 
+Below is a graphical demonstration of the comparison between the ordinary linear regression with Gaussian distributed response and Poisson regression with Poisson distributed response. The left panel illustrates the price of smartphones (in 100 USD) increase with the number of days listed on an online marketplace. The right panel illustrates the number of bacteria colonies on a petri dish versus the hours of incubation. 
+
+The ordinary linear regression has a linear fitted blue line (in the left panel), while the Poisson regression, due to the use of log-link function, has a fitted blue curve (in the right panel). Segment the explanatory variable (in the x axis) in each scenario into five sections using the gray dashed vertical lines. The red horizontal segments represent the frequencies of binned response in each section, which represents the rotated histogram of the response. In ordinary linear regression, the response in each section is symmetrically distributed with similar variation across five sections (i.e., homoskedasticity); while in Poisson regression, the response is skewed with heteroskedasticity (specifically, increasing variances as the responses increase) across sections. 
 
 ```{r, fig.width=14, fig.height=10}
 #| echo: false
@@ -211,7 +220,7 @@ plot_pois <- ggplot(df_pois, aes(x, y)) +
                    y = y_bin_mid, yend = y_bin_mid),
                color = "red", size = .8) +
   geom_vline(xintercept = bin_edges, linetype = "dashed", color = "black", size = .3) +
-  labs(title = "", x = "Width", y = "Counts") +
+  labs(title = "", x = "Hours of Incubation", y = "Numbers of bacteria colonies") +
   theme_bw() +
   theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
 
@@ -253,7 +262,7 @@ plot_norm <- ggplot(df_norm, aes(x, y)) +
                    y = y_bin_mid, yend = y_bin_mid),
                color = "red", size = .8) +
   geom_vline(xintercept = bin_edges, linetype = "dashed", color = "black", size = .3) +
-  labs(title = "", x = "Days", y = "Price") +
+  labs(title = "", x = "Days", y = "Prices (in 100 USD)") +
   theme_bw() +
   theme(axis.title = element_text(size = 18), axis.text = element_text(size = 16))
 
@@ -330,6 +339,88 @@ crabs = crabs.astype({
 })
 print(crabs.dtypes)
 crabs
+```
+
+:::
+
+Let's now split the data into training and test sets.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Use 70% data for training and 30% for testing
+par <- 0.7
+
+# Set seed for reproducible splitting
+set.seed(1046)
+n <- nrow(crabs)
+train_indices <- sample(seq_len(n), size = floor(par * n))
+
+# Create training and test sets
+train_set <- crabs[train_indices, ]
+test_set <- crabs[-train_indices, ]
+
+# Print the number of training and test samples
+cat("Number of training samples:", nrow(train_set), "\n")
+cat("Number of test samples:", nrow(test_set), "\n")
+```
+
+## Python Code
+
+```{.python}
+# Use 70% data for training and 30% for testing
+par = 0.7
+
+# Set seed for reproducible splitting
+np.random.seed(1046)
+n = len(crabs)
+train_indices = np.random.choice(n, size=int(par * n), replace=False)
+
+# Create training and test sets
+train_set = crabs.iloc[train_indices]
+test_set = crabs.drop(index=train_indices)
+
+# Print the number of training and test samples
+print(f"Number of training samples: {len(train_set)}")
+print(f"Number of test samples: {len(test_set)}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+n <- nrow(crabs)
+#RNGkind(kind = "Mersenne-Twister", normal.kind = "Inversion") # use Mersenne Twister (MT19937) PRNG to generate random seeds
+set.seed(1046)
+test_indices <- sample(seq_len(n), size = floor(0.3 * n))
+train_set <- crabs[-test_indices, ]
+test_set <- crabs[test_indices, ]
+cat("Number of training samples:", nrow(train_set), "\n")
+cat("Number of test samples:", nrow(test_set), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+n = len(crabs)
+#rng = np.random.default_rng(np.random.MT19937(seed=1046))
+#train_indices = rng.choice(np.arange(1, n + 1), size=int(0.3 * n), replace=False)
+test_indices = np.array([60,127,21,76,164,42,18,109,121,5,85,115,123,144,120,54,40,122,84,168,139,12,138,105,43,106,150,110,75,147,116,49,159,173,163,129,51,167,79,107,20,13,81,72,77,97,52,47,59,96,46]) - 1
+test_set = crabs.iloc[test_indices]
+train_set = crabs.drop(index=test_indices)
+print(f"Number of training samples: {len(train_set)}")
+print(f"Number of test samples: {len(test_set)}")
 ```
 
 :::
@@ -640,7 +731,9 @@ $$
 
 ## Estimation
 
-The general idea to solve the Poisson regression in @eq:pois-k is to find the parameters $\lambda_j$s by maximizing the following likelihood: 
+In generalized linear models (GLMs), parameter estimation is typically performed using maximum likelihood estimation (MLE). A widely used algorithm to compute the MLE in GLMs is the iteratively reweighted least squares (IRLS) method, which learns the regression coefficients by solving the weighted least squares problems through iteration. Below we learn the essential elements of the IRLS method and the MLE that it solves. We use Poisson regression as an example, but the procedure applies to other distributions straightforwardly. 
+
+The general idea to solve the generalized linear regression is to estimate the parameters by maximizing the likelihood. For Poisson regression in @eq:pois-k specifically, it is written as: 
 $$
   \prod_{i=1}^n p_{Y_i}(y_i) = \prod_{i=1}^n \frac{e^{-\lambda_i}{\lambda_i}^{y_i}}{y_i!}, 
 $$
@@ -655,17 +748,26 @@ $$
   {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n \exp(X_{i}^{\top}\boldsymbol{\beta}) - y_i X_{i}^{\top}\boldsymbol{\beta}. \label{eq:pois-log}
 $$
 
-Since the objective in @eq:pois-log is not quadratic and there is no closed form solution, we could not solve the equation exactly. Iteratively reweighted least squares (IRLS) is a method to find an approximated solution with a specified accuracy or tolerance. The basic idea is that IRLS uses Newton-Raphson or Fisher scoring to solve an approximated problem of the original objective @eq:pois-log and solve it iteratively with weights updated through iteration until the specified accuracy is achieved, i.e., the objective is converged. 
+Since the objective in @eq:pois-log is not quadratic and there is no closed form solution, we could not solve the equation exactly. IRLS solves an approximated solution with a specified accuracy or tolerance. The basic idea is that IRLS uses Fisher scoring (or Newton-Raphson) to solve an approximated problem of the original objective @eq:pois-log and solve it iteratively with weights updated through iteration until the specified accuracy is achieved, i.e., the objective is converged. 
 
-The approximated problem of the original objective at iterate $t+1$ is a weighted linear least squares problem written as: 
+The MLE $\hat{\boldsymbol{\beta}}$ satisfies the score function $U(\boldsymbol{\beta}) = \nabla_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}) = 0$. Applying the Fisher scoring update gives: 
+$$
+  \boldsymbol{\beta}^{t+1} \leftarrow \boldsymbol{\beta}^{t} + {\mathcal{I}(\boldsymbol{\beta}^t)}^{-1} U(\boldsymbol{\beta}^{t}),
+$$
+where $\mathcal{I}(\boldsymbol{\beta}^t) := \mathbb{E}\big[- \nabla^2_{\boldsymbol{\beta}} \ell(\boldsymbol{\beta}^t)\big]$ is the Fisher information, which is the expectation of the negative second-order derivative of the log-likelihood with respect to the parameters. 
+
+The Fisher scoring update corresponds to solve the following approximated problem of the original objective at iterate $t+1$, which is a weighted least squares problem written as: 
 $$
   \begin{align}
-    \boldsymbol{\beta}^{t+1} &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i - X_i^{\top}\boldsymbol{\beta})^2 \\ 
-    &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i - \beta_0 - \beta_1 x_{i,\text{width}})^2 \label{eq:irls-approx}
+    \boldsymbol{\beta}^{t+1} &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i^t - X_i^{\top}\boldsymbol{\beta})^2 \\ 
+    &= {\arg\min}_{\boldsymbol{\beta}} \sum_{i=1}^n w_i^t (y_i^t - \beta_0 - \beta_1 x_{i,\text{width}})^2 \label{eq:irls-approx}
   \end{align}
 $$
-given the estimates at time $t$ for the univariate case using `crabs` dataset. The approximated problem has a closed-form solution and is much easier to solve than the original objective. 
-The weights comes from the second derivative (Hessian) of the log-likelihood. In our case, the weights at iterate $t+1$ can be updated given the coefficient estimates at $t$ using the following formula:
+given the estimates at time $t$ for the univariate case using `crabs` dataset. The approximated problem has a closed-form solution and is much easier to solve than the original objective. The observations $y_i$ and weights $w_i$ should be updated per iterate. The arbitrary observations $y_i^{t+1}$ is a function of the original observations $y_i^0$ and the coefficient estimates. 
+The weights is updated by 
+$$w_i^{t+1} = \Big(\frac{1}{Var(Y_i)}\Big)\Big(\frac{1}{g'(\lambda_i)}\Big)^2,$$ 
+where $\lambda_i$ is the mean of the response $y_i$, $\eta_i=g(\lambda_i)$ is the link function of the mean. 
+In our case, the weights at iterate $t+1$ can be updated given the coefficient estimates at $t$ using the following formula:
 $$
   w_i^{t+1} = \exp(X_i^{\top} \boldsymbol{\beta}^t), \forall i=1,\dots,n.
 $$
@@ -678,9 +780,365 @@ The IRLS iteration procedure is as follows.
 4. Check te convergence condition.
 5. Return estimates if the objective is converged; go back to step 2 if not.
 
+Let's now fit the model on the training data.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Fit Poisson regression
+poisson_model <- glm(satell ~ width, family = poisson(link = "log"), data = train_data)
+
+# View summary
+summary(poisson_model)
+```
+
+## Python Code
+
+```{.python}
+# Fit Poisson regression
+poisson_model = glm(formula='satell ~ width', data=train_data, family=sm.families.Poisson(link=sm.families.links.log())).fit()
+
+# View summary
+print(poisson_model.summary())
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+poisson_model <- glm(satell ~ width, family = poisson(link = "log"), data = train_set)
+summary(poisson_model)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+poisson_model = glm(formula='satell ~ width', data=train_set, family=sm.families.Poisson(link=sm.families.links.log())).fit()
+print(poisson_model.summary())
+```
+
+:::
 
 ## Goodness of Fit
 
+In GLMs, we can use residual deviance and Chi-squared test to check the goodness of fit of the model. The residual deviance measures how well the fitted model explains the observed outcomes, compared to a perfect model (the saturated model) that explains the data exactly. A smaller residual deviance means a better fit of the data. It is computed as
+$$\text{Residual Deviance } = 2 (\ell_{\mathrm{saturated}} - \ell_{\mathrm{fitted}}),$$
+where $\ell_A$ is the log-likelihood of model $A$. For Poisson regression specifically, the residual deviance is $2\sum_{i=1}^n \Big[y_i\log\big(\frac{y_i}{\hat{\lambda}_i}\big) - (y_i-\hat{\lambda}_i)\Big]$.
+
+When the model is a good fit, the residual deviance is expected to follow a chi-squared distribution with degrees of freedom $df = n - p$, where $n$ is the number of observations and $p$ is the number of parameters, asymptotically for a large enough sample size. We then can compute the $p$-value using the chi-squared distribution:
+$$
+  p\text{-value} = 1-P(\chi^2_{\mathrm{df}} \leq \text{residual deviance}).
+$$
+
+$p$-value is the probability of observing a residual deviance as large as (or larger than) what we got, if the model is truly correct. A large p-value (e.g., > 0.05) means that the observed deviance is not surprisingly large. Out model is a good fit and could plausibly have generated the data. A small p-value (e.g., < 0.05) means that the deviance is too large to be due to chance. The model is a poor fit and likely missing something important. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Residual deviance and degrees of freedom
+res_dev <- deviance(poisson_model)
+df_res <- df.residual(poisson_model)
+
+# Chi-squared goodness-of-fit test
+p_value <- 1 - pchisq(res_dev, df_res)
+
+cat("Residual Deviance:", round(res_dev, 4), "\n")
+cat("Degrees of Freedom:", df_res, "\n")
+cat("Goodness-of-fit p-value:", round(p_value, 4), "\n")
+```
+
+## Python Code
+
+```{.python}
+res_dev = poisson_model.deviance
+df_res = poisson_model.df_resid
+
+p_value = 1 - stats.chi2.cdf(res_dev, df_res)
+
+print(f"Residual Deviance: {res_dev:.4f}")
+print(f"Degrees of Freedom: {df_res}")
+print(f"Goodness-of-fit p-value: {p_value:.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+res_dev <- deviance(poisson_model)
+df_res <- df.residual(poisson_model)
+p_value <- 1 - pchisq(res_dev, df_res)
+cat("Residual Deviance:", round(res_dev, 4), "\n")
+cat("Degrees of Freedom:", df_res, "\n")
+cat("Goodness-of-fit p-value:", round(p_value, 4), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+res_dev = poisson_model.deviance
+df_res = poisson_model.df_resid
+p_value = 1 - stats.chi2.cdf(res_dev, df_res)
+print(f"Residual Deviance: {res_dev:.4f}")
+print(f"Degrees of Freedom: {df_res}")
+print(f"Goodness-of-fit p-value: {p_value:.4f}")
+```
+
+:::
+
+The probability of observing a deviance as large as this if the model is truly correct (i.e., the goodness-of-fit $p$-value) is esentially 0, saying that there is significant evidence of lack-of-fit. 
+There can be several reasons for lack-of-fit. The model is misspecified, e.g., it is missing important covariates or nonlinear effects. The link function might be incorrect, so that the model is systematically overestimate or underestimate the data. There can be outliers or influential points that inflate the deviance. The data might be overdispersed, so that the residual deviance is inflated by the large variance. 
+
+## Inference
+
+The estimated model can be used for two purposes: inference and prediction. In terms of inference, we use the fitted model to identify the relationship between the response and regressors. 
+Wald’s test is a general method for hypothesis testing in maximum likelihood estimation (MLE), including generalized linear models (GLMs) like Poisson regression. It tests the hypotheses of the form:
+$$
+  \begin{align}
+    H_0 &: \beta_j = 0, \\
+    H_a &: \beta_j \neq 0.
+  \end{align}
+$$
+using the fact that $\frac{\hat{\beta}_j}{SE(\hat{\beta}_j)} \sim \mathcal{N}(0,1)$ asymptotically under $H_0$, where $\beta_j$ is the $j$th estimated regression coefficient and $SE(\hat{\beta}_j)$ is its corresponding variability which is reflected in the standard error of the estimate. 
+This ratio is the Wald's test statistic
+$$z_j = \frac{\hat{\beta}_j}{SE(\hat{\beta}_j)}$$
+that is used to determine the statistical significance of $\hat{\beta}_j$ using the fact that the squared statistic asymptotically follows a one-degree-of-freedom chi-squared test, i.e., 
+$$W_j = \Big(\frac{\hat{\beta}_j}{SE(\hat{\beta}_j)}\Big)^2\sim \chi_1^2.$$
+
+*Remark 1: A statistic like $t_j=\frac{\hat{\beta}_j}{SE(\hat{\beta}_j)}$ in t test is referred to as a $t$-value. It assumes finite-sample normality---a student's $t$-distribution under the null hypothesis with $H_0$ with $n-k-1$ degrees of freedom. It can only be used for linear models with normal errors. While the Wald's test applies to any MLE (e.g., Poisson or logistic) to be used in any GLMs, and assumes asymptotic normality---standard normal or $\chi^2$ distribution under $H_0$.*
+
+*Remark 2: Wald's test is validate under several conditions: 1-large sample size, so that the test statistic is asymptotically normal, 2-regularity conditions for MLE, including differentiable likelihood, positive definite Fisher information, correctly specified model and parameter space, 3-well-estimated parameters, i.e., parameters are not near the bounaries, 4-stable and finite standard errors, and 5-no outliers or high leverage points.*
+
+We can obtain the corresponding $p$-values for each $\beta_j$ associated to the Wald's test statistic under the null hypothesis $H_0$. **The smaller the $p$-value, the stronger the evidence against the null hypothesis $H_0$ in our sample.** Hence, small $p$-values (less than the significance level $\alpha$) indicate that the data provides evidence in favour of association (or **causation** if that is the case) between the response variable and the $j$th regressor.
+
+Similarly, given a specified $(1-\alpha)\times 100%$ level of confidence, we can construct **confidence intervals** for the corresponding true value of $\beta_j$:
+$$\hat{\beta}_j \pm t_{\alpha/2,n-k-1} SE(\hat{\beta}_j),$$
+where $t_{\alpha/2,n-k-1}$ is the upper $\alpha/2$ quantile of the $t$-distribution with $n-k-1$ degrees of freedom.
+
+Let's now compute the 95% confidence interval. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+tidy(poisson_model, conf.int = TRUE) %>% mutate_if(is.numeric, round, 3)
+```
+
+## Python Code
+
+```{.python}
+# Get coefficient table
+summary_df = poisson_model.summary2().tables[1]
+
+# Compute confidence intervals
+conf_int = poisson_model.conf_int()
+conf_int.columns = ['conf_low', 'conf_high']
+
+# Combine with coefficient table
+summary_df = summary_df.join(conf_int)
+
+# Round all numeric columns to 3 decimals
+summary_df = summary_df.round(3)
+
+print(summary_df)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+tidy(poisson_model, conf.int = TRUE) %>% mutate_if(is.numeric, round, 3)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+summary_df = poisson_model.summary2().tables[1]
+conf_int = poisson_model.conf_int()
+conf_int.columns = ['conf_low', 'conf_high']
+summary_df = summary_df.join(conf_int)
+summary_df = summary_df.round(3)
+print(summary_df)
+```
+
+:::
+
+Our sample gives us evidence to reject $H_0$ (with a nearly-zero $p$ value), which suggests that carapace width is statistically associated to the logarithm of the satellite size. Now, it is time to plot the fitted values coming from poisson_model to check whether it provides a positive relationship between `width` and the original scale of the response `satell`.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+p +
+  geom_smooth(
+    data = train_set, aes(width, satell),
+    method = "glm", formula = y ~ x,
+    method.args = list(family = poisson), se = FALSE
+  ) +
+  labs(title="Poisson Regression Fitted Curve")
+```
+
+## Python Code
+
+```{.python}
+# Compute the fitted values
+width_range = np.linspace(train_set['width'].min(), train_set['width'].max(), 100)
+predict_df = pd.DataFrame({'width': width_range})
+predict_df['predicted'] = poisson_model.predict(predict_df)
+
+# Draw the scatterplot
+sns.scatterplot(data=train_set, x='width', y='satell', label='Observed')
+
+# Add the Poisson regression line
+sns.lineplot(data=predict_df, x='width', y='predicted', color='red', label='Poisson fit')
+
+# Add title
+plt.title('Poisson Regression Fitted Curve')
+plt.xlabel('Width')
+plt.ylabel('Satellite size')
+plt.legend()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+p +
+  geom_smooth(
+    data = train_set, aes(width, satell),
+    method = "glm", formula = y ~ x,
+    method.args = list(family = poisson), se = FALSE
+  ) +
+  labs(title="Poisson Regression Fitted Curve") +
+  theme(
+    plot.title = element_text(size = 20, face = "bold"),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 14)
+  )
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+width_range = np.linspace(train_set['width'].min(), train_set['width'].max(), 100)
+predict_df = pd.DataFrame({'width': width_range})
+predict_df['predicted'] = poisson_model.predict(predict_df)
+sns.scatterplot(data=train_set, x='width', y='satell', label='Observed')
+sns.lineplot(data=predict_df, x='width', y='predicted', color='red', label='Poisson fit')
+plt.title('Poisson Regression Fitted Curve')
+plt.xlabel('Width')
+plt.ylabel('Satellite size')
+plt.legend()
+plt.show()
+```
+
+:::
+
+The blue line in the plot above is the fitted Poisson regression of `satell` versus `width`. The positive relationship is now clear with this regression line.
+
 ## Results
+
+Let's now predict on the test set. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Predict
+predictions <- predict(poisson_model, newdata = test_set, type = "response")
+actuals <- test_set$satell
+# Mean Squared Error
+mse <- mean((actuals - predictions)^2)
+
+cat("MSE:", mse, "\n")
+```
+
+## Python Code
+
+```{.python}
+# Predict
+predictions = poisson_model.predict(test_set)
+actuals = test_set['satell']
+# Mean Squared Error
+mse = mean_squared_error(actuals, predictions)
+
+print(f"MSE: {mse:.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+predictions <- predict(poisson_model, newdata = test_set, type = "response")
+actuals <- test_set$satell
+mse <- mean((actuals - predictions)^2)
+cat("MSE:", round(mse, 4), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+predictions = poisson_model.predict(test_set)
+actuals = test_set['satell']
+mse = mean_squared_error(actuals, predictions)
+print(f"MSE: {mse:.4f}")
+```
+
+:::
+
+The mean squared error (MSE) is 
 
 ## Storytelling
