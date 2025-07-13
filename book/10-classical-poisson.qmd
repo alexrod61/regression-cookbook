@@ -837,7 +837,7 @@ print(poisson_model.summary())
 
 :::
 
-## Goodness of Fit
+## Goodness of Fit {#goodness}
 
 In GLMs, we can use residual deviance and Chi-squared test to check the goodness of fit of the model. The residual deviance measures how well the fitted model explains the observed outcomes, compared to a perfect model (the saturated model) that explains the data exactly. A smaller residual deviance means a better fit of the data. It is computed as
 $$\text{Residual Deviance } = 2 (\ell_{\mathrm{saturated}} - \ell_{\mathrm{fitted}}),$$
@@ -1140,7 +1140,7 @@ train_set['color'].cat.categories
 ```
 
 :::
- 
+
 Using categorical variables such as `color` involves using **dummy variables** as in Binary Logistic regression. Taking the baseline `1 = medium light` by default, this Poisson regression model will incorporate three dummy variables: $X_{\mathrm{color_2}_i}$, $X_{\mathrm{color_3}_i}$, and $X_{\mathrm{color_4}_i}$. For different levels of `color`, these dummy variables take on the following values: 
 
 - When `color` is `1 = medium light`, then all three dummy variables $X_{\mathrm{color_2}_i} = X_{\mathrm{color_3}_i} = X_{\mathrm{color_4}_i}=0$.
@@ -1207,6 +1207,8 @@ print(summary_df.round(3))
 :::
 
 We can see that `width` and `color3` are significant according to the $p$-value column under the significance level $\alpha=0.05$.
+
+### Interpreting the results of a continuous variable
 
 First, let us focus on the coefficient corresponding to `width`, **while keeping `color` constant**. Consider an observation with a given shell width $X_{\mathrm{width}}=\texttt{w}$ cm, and another observation with a given $X_{\mathrm{width+1}}=\texttt{w}+1$ cm (i.e., an increase of $1$ cm). Denote the corresponding expected satell sizes as $\lambda_{\mathrm{width}}$ and $\lambda_{\mathrm{width+1}}$ respectively. Then we have their corresponding regression equations:
 
@@ -1293,6 +1295,8 @@ print(summary_exp_df)
 $\frac{\hat{\lambda}_{\mathrm{width + 1}} }{\hat{\lambda}_{\mathrm{width}}} = e^{\hat{\beta}_1} = 1.174$ indicates that **the averaged satellite size (`satell`) of male horseshoe crabs around a female breeding nest** increases by $17.4\%$ when increasing the crab `width` by $1$ cm, **while keeping `color` constant**.
 The interpretation of the significant coefficients corresponding to difference between the `color` groups and the baseline level.
 
+### Interpreting the results of a categorical variable
+
 Consider two observations, one with color `1 = medium light` of the prosoma (the baseline) and another with `4 = dark`. Their corresponding responses are denoted as $\lambda_{\mathrm{D}}$ (for `dark`) and $\lambda_{\mathrm{L}}$ (for `medium light`). While holding $X_{\mathrm{width}}$ constant, their regression equations are:
 $$
 \begin{gather*}
@@ -1305,18 +1309,18 @@ The corresponding `color` indicator variables for both $\lambda_{\mathrm{D}}$ an
 $$
 \begin{align*}
 \log \left( \lambda_{\mathrm{D}} \right) &= \beta_0 + \overbrace{\beta_1 X_{\mathrm{width}}}^{\text{Constant}} + \beta_2 X_{\mathrm{color_2}_{\mathrm{D}}} + \beta_3 X_{\mathrm{color_3}_{\mathrm{D}}} + \beta_4 X_{\mathrm{color_4}_{\mathrm{D}}} \\
+&= \beta_0 + \beta_1 X_{\mathrm{width}}+ \beta_2 \times 0 + \beta_3 \times 0 + \beta_4 \times 1 \\
+&= \beta_0 + \beta_1 X_{\mathrm{width}} + \beta_4, \\
+\log \left( \lambda_{\mathrm{L}} \right) &= \beta_0 + \beta_1 X_{\mathrm{width}} + \beta_2 X_{\mathrm{color_2}_{\mathrm{L}}} + \beta_3 X_{\mathrm{color_3}_{\mathrm{L}}} + \beta_4 X_{\mathrm{color_4}_{\mathrm{L}}} \\
 &= \beta_0 + \beta_1 X_{\mathrm{width}}+ \beta_2 \times 0 + \beta_3 \times 0 + \beta_4 \times 0 \\
-&= \beta_0 + \beta_1 X_{\mathrm{width}} \\
-\log \left( \lambda_{\mathrm{L}} \right) &= \beta_0 + \beta_1 X_{\mathrm{width}} + \beta_2 X_{\mathrm{color_darker}_{\mathrm{L}}} + \beta_3 X_{\mathrm{color_light}_{\mathrm{L}}} + \beta_4 X_{\mathrm{color_medium}_{\mathrm{L}}} \\
-&= \beta_0 + \beta_1 X_{\mathrm{width}}+ \beta_2 \times 0 + \beta_3 \times 1 + \beta_4 \times 0 \\
-&= \beta_0 + \underbrace{\beta_1 X_{\mathrm{width}}}_{\text{Constant}} + \beta_3.
+&= \beta_0 + \underbrace{\beta_1 X_{\mathrm{width}}}_{\text{Constant}}.
 \end{align*}
 $$
 
 Therefore, **what is the association of the level `medium light` with respect to `dark`?** Let us take the differences again:
 $$
 \begin{align*}
-\log \left( \frac{\lambda_{\mathrm{D}} }{\lambda_{\mathrm{L}}} \right) &= \log \left( \lambda_{\mathrm{L}} \right) - \log \left( \lambda_{\mathrm{D}} \right) \\
+\log \left( \frac{\lambda_{\mathrm{D}} }{\lambda_{\mathrm{L}}} \right) &= \log \left( \lambda_{\mathrm{D}} \right) - \log \left( \lambda_{\mathrm{L}} \right) \\
 &= \beta_4.
 \end{align*}
 $$
@@ -1333,13 +1337,13 @@ $\frac{\hat{\lambda}_{\mathrm{D}} }{\hat{\lambda}_{\mathrm{L}}} = e^{\hat{\beta}
 
 ### Prediction using test data
 
-Let's now predict on the test set. The model performance is measured by Kullback-Leibler (KL) divergence, which is defined as
+Let's now predict on the test set. Besides the residual deviance discussed in [Goodness of fit](#goodness), the model performance can also be measured by Kullback-Leibler (KL) divergence, which is defined as
 $$
 D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i) = y_i \log\left(\frac{\hat{y_i}}{\hat{\lambda}_i} \right) - y_i + \hat{\lambda}_i.
 $$
 Kullback–Leibler (KL) divergence is a measure of how one probability distribution diverges from a reference distribution. In the context of Poisson regression, KL divergence quantifies how much the predicted Poisson distribution diverges from the true observed data. 
 
-Averaging $\bar{D}_{\mathrm{KL}}(y\Vert \hat{\lambda}) = \frac{1}{n} \sum_{i=1}^n D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i)$ across all observations gives a measure of how well the model captures the true data distribution. Smaller averaged KL values indicate better fit.
+Averaging $\overline{D}_{\mathrm{KL}}(\hat{y}\Vert \hat{\lambda}) = \frac{1}{n} \sum_{i=1}^n D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i)$ across all observations gives a measure of how well the model captures the true data distribution. Smaller averaged KL values indicate better fit.
 
 ::: {.panel-tabset}
 
@@ -1403,9 +1407,7 @@ print(f"KL divergence: {kl:.4f}")
 
 :::
 
-Poisson deviance is also a standard, interpretable metric to measure the goodness of fit of Poisson regression. It is likelihood-based and equals to 2 times KL divergence summed across all points, i.e.,
-$$\text{Poisson Deviance = } 2\sum_i D_{\mathrm{KL}}(y_i\Vert \hat{\lambda}_i).$$
-It measures the difference in log-likelihood between a saturated model (perfect fit) and the fitted model. Lower deviance values indicate the model predictions are closer to the observed data.
+Poisson residual deviance equals 2 times the KL divergence of Poisson distribution summed across all points. It measures the difference in log-likelihood between a saturated model (perfect fit) and the fitted model as defined in [Goodness of fit](#goodness). Lower deviance values indicate the model predictions are closer to the observed data.
 
 ## Storytelling
 
