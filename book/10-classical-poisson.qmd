@@ -93,6 +93,7 @@ library(asbio) # provides `crabs` dataset
 library(gridExtra) # combine ggplot2 figures
 library(ggExtra) # draw marginal histograms
 library(broom)
+library(knitr)
 
 library(reticulate)
 py_config()
@@ -106,6 +107,8 @@ py_require("matplotlib")
 py_require("statsmodels")
 py_require("scikit-learn")
 py_require("spicy")
+#py_require("tabulate") # for displaying Markdown table using Python
+#py_require("IPython") # for displaying Markdown table using Python
 
 pandas <- import("pandas")
 numpy <- import("numpy")
@@ -115,6 +118,8 @@ matplotlib <- import("matplotlib")
 statsmodels <- import("statsmodels")
 sklearn <- import("sklearn")
 scipy <- import("scipy")
+#tabulate <- import("tabulate")
+#IPython <- import("IPython")
 ```
 
 ```{python setup-py, include=FALSE}
@@ -127,6 +132,8 @@ from statsmodels.genmod.families import Poisson
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import scipy.stats as stats
+#from tabulate import tabulate
+#from IPython.display import Markdown, display, HTML
 ```
 
 ::: {.LO}
@@ -1081,32 +1088,31 @@ The blue line in the plot above is the fitted Poisson regression of `satell` ver
 
 ## Results
 
-Let's now predict on the test set. 
+Let us fit a second model with two regressors: `width` ($X_{\mathrm{width}_i}$) and `color` ($X_{\mathrm{color_2}_i}$, $X_{\mathrm{color_3}_i}$, $X_{\mathrm{color_4}_i}$) for the $i$th observation: 
+$$
+  h(\lambda_i) = \log(\lambda_i) = \beta_0 + \beta_1 X_{\mathrm{width}_i} + \beta_2 X_{\mathrm{color_2}_i} + \beta_3 X_{\mathrm{color_3}_i} + \beta_4 X_{\mathrm{color_4}_i}.
+$$
+The explanatory variable `color` is of **factor-type (discrete)** and **nominal** (its levels do not follow any specific order). 
+There are four levels: `1 = medium light`, `2 = medium`, `3 = medium dark`, `4 = dark`.
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-# Predict
-predictions <- predict(poisson_model, newdata = test_set, type = "response")
-actuals <- test_set$satell
-# Mean Squared Error
-mse <- mean((actuals - predictions)^2)
-
-cat("MSE:", mse, "\n")
+# Factorize the variable
+train_set$color <- as.factor(train_set$color)
+# Print color categories
+levels(train_set$color)
 ```
 
 ## Python Code
 
 ```{.python}
-# Predict
-predictions = poisson_model.predict(test_set)
-actuals = test_set['satell']
-# Mean Squared Error
-mse = mean_squared_error(actuals, predictions)
-
-print(f"MSE: {mse:.4f}")
+# Factorize the variable
+train_set['color'] = train_set['color'].astype('category')
+# Print color categories
+train_set['color'].cat.categories
 ```
 
 :::
@@ -1119,10 +1125,8 @@ print(f"MSE: {mse:.4f}")
 #| echo: false
 #| message: false
 #| warning: false
-predictions <- predict(poisson_model, newdata = test_set, type = "response")
-actuals <- test_set$satell
-mse <- mean((actuals - predictions)^2)
-cat("MSE:", round(mse, 4), "\n")
+train_set$color <- as.factor(train_set$color)
+levels(train_set$color)
 ```
 
 ## Python Output
@@ -1131,14 +1135,278 @@ cat("MSE:", round(mse, 4), "\n")
 #| echo: false
 #| message: false
 #| warning: false
-predictions = poisson_model.predict(test_set)
-actuals = test_set['satell']
-mse = mean_squared_error(actuals, predictions)
-print(f"MSE: {mse:.4f}")
+train_set['color'] = train_set['color'].astype('category')
+train_set['color'].cat.categories
+```
+
+:::
+ 
+Using categorical variables such as `color` involves using **dummy variables** as in Binary Logistic regression. Taking the baseline `1 = medium light` by default, this Poisson regression model will incorporate three dummy variables: $X_{\mathrm{color_2}_i}$, $X_{\mathrm{color_3}_i}$, and $X_{\mathrm{color_4}_i}$. For different levels of `color`, these dummy variables take on the following values: 
+
+- When `color` is `1 = medium light`, then all three dummy variables $X_{\mathrm{color_2}_i} = X_{\mathrm{color_3}_i} = X_{\mathrm{color_4}_i}=0$.
+- When `color` is `2 = medium`, then $X_{\mathrm{color_2}_i}=1$ while the other two dummy variables $X_{\mathrm{color_3}_i} = X_{\mathrm{color_4}_i}=0$.
+- When `color` is `3 = medium dark`, then $X_{\mathrm{color_3}_i}=1$ while the other two dummy variables $X_{\mathrm{color_2}_i} = X_{\mathrm{color_4}_i}=0$.
+- When `color` is `4 = dark`, then $X_{\mathrm{color_4}_i}=1$ while the other two dummy variables $X_{\mathrm{color_2}_i} = X_{\mathrm{color_3}_i}=0$.
+
+Note that the level `1 = medium light` is depicted as the baseline here. Hence, the interpretation of the coefficients in the model for each dummy variable will be compared to this baseline.
+
+Now, let us fit this second Poisson regression model and print the model summary including coefficient estimates, standard errors, Wald's test statistic ($z$-test), the corresponding $p$-value, and 95\% confidence intervals.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Fit the Poisson model
+poisson_model2 <- glm(satell ~ width + color, family = poisson, data = train_set)
+# Summarise the model output
+summary_df <- tidy(poisson_model2, conf.int = TRUE) %>% mutate_if(is.numeric, round, 3)
+# Display the output in table
+kable(summary_df, "pipe")
+```
+
+## Python Code
+
+```{.python}
+# Fit the Poisson regression model
+poisson_model2 = glm(formula='satell ~ width + color', data=train_set, family=sm.families.Poisson()).fit()
+# Extract the summary table
+summary_df = poisson_model2.summary2().tables[1]
+# Display the table
+print(summary_df.round(3))
 ```
 
 :::
 
-The mean squared error (MSE) is 
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+poisson_model2 <- glm(satell ~ width + color, family = poisson, data = train_set)
+summary_df <- tidy(poisson_model2, conf.int = TRUE) %>% mutate_if(is.numeric, round, 3)
+kable(summary_df, "pipe")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+poisson_model2 = glm(formula='satell ~ width + color', data=train_set, family=sm.families.Poisson()).fit()
+summary_df = poisson_model2.summary2().tables[1]
+print(summary_df.round(3))
+#md_table = tabulate(summary_df, headers='keys', tablefmt='pipe')
+#display(Markdown(md_table)) 
+```
+
+:::
+
+We can see that `width` and `color3` are significant according to the $p$-value column under the significance level $\alpha=0.05$.
+
+First, let us focus on the coefficient corresponding to `width`, **while keeping `color` constant**. Consider an observation with a given shell width $X_{\mathrm{width}}=\texttt{w}$ cm, and another observation with a given $X_{\mathrm{width+1}}=\texttt{w}+1$ cm (i.e., an increase of $1$ cm). Denote the corresponding expected satell sizes as $\lambda_{\mathrm{width}}$ and $\lambda_{\mathrm{width+1}}$ respectively. Then we have their corresponding regression equations:
+
+$$
+\begin{align}
+  \log \left( \lambda_{\mathrm{width}} \right) &= \beta_0 + \beta_1 \overbrace{\texttt{w}}^{X_{\mathrm{width}}} + \overbrace{\beta_2 X_{\mathrm{color_2}} + \beta_3 X_{\mathrm{color_3}} + \beta_4 X_{\mathrm{color_4}}}^{\mathrm{Constant}} \\
+  \log \left( \lambda_{\mathrm{width + 1}} \right) &= \beta_0 + \beta_1 \underbrace{(\texttt{w} + 1)}_{X_{\mathrm{width + 1}}} + \underbrace{\beta_2 X_{\mathrm{color_2}} + \beta_3 X_{\mathrm{color_3}} + \beta_4 X_{\mathrm{color_4}}}_{\mathrm{Constant}}.
+\end{align}
+$$
+
+We take the difference between both equations as:
+$$
+\begin{align}
+\log \left( \lambda_{\mathrm{width + 1}} \right) - \log \left( \lambda_{\mathrm{width}} \right) &= \beta_1 (\texttt{w} + 1) - \beta_1 \texttt{w} \\
+&= \beta_1.
+\end{align}
+$$
+
+We apply the logarithm property for a ratio:
+$$
+\begin{align*}
+\log \left( \frac{\lambda_{\mathrm{width + 1}} }{\lambda_{\mathrm{width}}} \right) &= \log \left( \lambda_{\mathrm{width + 1}} \right) - \log \left( \lambda_{\mathrm{width}} \right) \\
+&= \beta_1.
+\end{align*}
+$$
+
+Finally, we have to exponentiate the previous equation: 
+$$\frac{\lambda_{\mathrm{width+1}}}{\lambda_{\mathrm{width}}} = e^{\beta_1},$$
+which indicates that the satellite size varies in a **multiplicative way** when 1 cm is increased in satellite width.
+
+Therefore, by using the estimate $\hat{\beta_1}$ (note the hat notation) coming from the model `poisson_model2`, we calculate this multiplicative effect as follows (via `exponentiate = TRUE` in `tidy()`):
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+summary_exp_df <- tidy(poisson_model2, exponentiate = TRUE, conf.int = TRUE) 
+  %>% mutate_if(is.numeric, round, 3)
+knitr::kable(summary_exp_df, "pipe")
+```
+
+## Python Code
+
+```{.python}
+summary_exp_df = summary_df.copy()
+summary_exp_df['Coef.'] = np.exp(summary_df['Coef.'])
+summary_exp_df['[0.025'] = np.exp(summary_df['[0.025'])
+summary_exp_df['0.975]'] = np.exp(summary_df['0.975]'])
+summary_exp_df = summary_exp_df.round(3)
+print(summary_exp_df)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+summary_exp_df <- tidy(poisson_model2, exponentiate = TRUE, conf.int = TRUE) %>% mutate_if(is.numeric, round, 3)
+knitr::kable(summary_exp_df, "pipe")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+summary_exp_df = summary_df.copy()
+summary_exp_df['Coef.'] = np.exp(summary_df['Coef.'])
+summary_exp_df['[0.025'] = np.exp(summary_df['[0.025'])
+summary_exp_df['0.975]'] = np.exp(summary_df['0.975]'])
+summary_exp_df = summary_exp_df.round(3)
+print(summary_exp_df)
+```
+
+:::
+
+$\frac{\hat{\lambda}_{\mathrm{width + 1}} }{\hat{\lambda}_{\mathrm{width}}} = e^{\hat{\beta}_1} = 1.174$ indicates that **the averaged satellite size (`satell`) of male horseshoe crabs around a female breeding nest** increases by $17.4\%$ when increasing the crab `width` by $1$ cm, **while keeping `color` constant**.
+The interpretation of the significant coefficients corresponding to difference between the `color` groups and the baseline level.
+
+Consider two observations, one with color `1 = medium light` of the prosoma (the baseline) and another with `4 = dark`. Their corresponding responses are denoted as $\lambda_{\mathrm{D}}$ (for `dark`) and $\lambda_{\mathrm{L}}$ (for `medium light`). While holding $X_{\mathrm{width}}$ constant, their regression equations are:
+$$
+\begin{gather*}
+\log \left( \lambda_{\mathrm{D}} \right) = \beta_0 + \overbrace{\beta_1 X_{\mathrm{width}}}^{\text{Constant}} + \beta_2 X_{\mathrm{color_2}_{\mathrm{D}}} + \beta_3 X_{\mathrm{color_3}_{\mathrm{D}}} + \beta_4 X_{\mathrm{color_4}_{\mathrm{D}}} \\
+\log \left( \lambda_{\mathrm{L}} \right) = \beta_0 + \underbrace{\beta_1 X_{\mathrm{width}}}_{\text{Constant}} + \beta_2 X_{\mathrm{color_2}_{\mathrm{L}}} + \beta_3 X_{\mathrm{color_3}_{\mathrm{L}}} + \beta_4 X_{\mathrm{color_4}_{\mathrm{L}}}
+\end{gather*}
+$$
+
+The corresponding `color` indicator variables for both $\lambda_{\mathrm{D}}$ and $\lambda_{\mathrm{L}}$ take on these values:
+$$
+\begin{align*}
+\log \left( \lambda_{\mathrm{D}} \right) &= \beta_0 + \overbrace{\beta_1 X_{\mathrm{width}}}^{\text{Constant}} + \beta_2 X_{\mathrm{color_2}_{\mathrm{D}}} + \beta_3 X_{\mathrm{color_3}_{\mathrm{D}}} + \beta_4 X_{\mathrm{color_4}_{\mathrm{D}}} \\
+&= \beta_0 + \beta_1 X_{\mathrm{width}}+ \beta_2 \times 0 + \beta_3 \times 0 + \beta_4 \times 0 \\
+&= \beta_0 + \beta_1 X_{\mathrm{width}} \\
+\log \left( \lambda_{\mathrm{L}} \right) &= \beta_0 + \beta_1 X_{\mathrm{width}} + \beta_2 X_{\mathrm{color_darker}_{\mathrm{L}}} + \beta_3 X_{\mathrm{color_light}_{\mathrm{L}}} + \beta_4 X_{\mathrm{color_medium}_{\mathrm{L}}} \\
+&= \beta_0 + \beta_1 X_{\mathrm{width}}+ \beta_2 \times 0 + \beta_3 \times 1 + \beta_4 \times 0 \\
+&= \beta_0 + \underbrace{\beta_1 X_{\mathrm{width}}}_{\text{Constant}} + \beta_3.
+\end{align*}
+$$
+
+Therefore, **what is the association of the level `medium light` with respect to `dark`?** Let us take the differences again:
+$$
+\begin{align*}
+\log \left( \frac{\lambda_{\mathrm{D}} }{\lambda_{\mathrm{L}}} \right) &= \log \left( \lambda_{\mathrm{L}} \right) - \log \left( \lambda_{\mathrm{D}} \right) \\
+&= \beta_4.
+\end{align*}
+$$
+
+Then, we exponentiate the previous equation:
+
+$$
+\frac{\lambda_{\mathrm{D}} }{\lambda_{\mathrm{L}}} = e^{\beta_4}.
+$$
+
+The expression $\frac{\lambda_{\mathrm{D}} }{\lambda_{\mathrm{L}}} = e^{\beta_4}$ indicates that the response varies in a **multiplicative way** when the `color` of the prosoma changes from `medium light` to `dark`.
+
+$\frac{\hat{\lambda}_{\mathrm{D}} }{\hat{\lambda}_{\mathrm{L}}} = e^{\hat{\beta}_4} = 0.66$ indicates that **the mean satellite size (`satell`) of male horseshoe crabs around a female breeding nest** decreases by $34\%$ when the `color` of the prosoma changes from `medium light` to `dark`, **while keeping the carapace `width` constant**.
+
+### Prediction using test data
+
+Let's now predict on the test set. The model performance is measured by Kullback-Leibler (KL) divergence, which is defined as
+$$
+D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i) = y_i \log\left(\frac{\hat{y_i}}{\hat{\lambda}_i} \right) - y_i + \hat{\lambda}_i.
+$$
+Kullback–Leibler (KL) divergence is a measure of how one probability distribution diverges from a reference distribution. In the context of Poisson regression, KL divergence quantifies how much the predicted Poisson distribution diverges from the true observed data. 
+
+Averaging $\bar{D}_{\mathrm{KL}}(y\Vert \hat{\lambda}) = \frac{1}{n} \sum_{i=1}^n D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i)$ across all observations gives a measure of how well the model captures the true data distribution. Smaller averaged KL values indicate better fit.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Factorize `color` in test set
+test_set$color <- as.factor(test_set$color)
+# Predict
+predictions <- predict(poisson_model2, newdata = test_set, type = "response")
+actuals <- test_set$satell
+# KL divergence
+kf = 1
+
+cat("KL divergence:", kf, "\n")
+```
+
+## Python Code
+
+```{.python}
+# Factorize `color` in test set
+test_set['color'] = test_set['color'].astype('category')
+# Predict
+predictions = poisson_model2.predict(test_set)
+actuals = test_set['satell']
+# KL divergence
+kf = 1
+
+print(f"KF divergence: {kf:.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r, fig.width=14, fig.height=8}
+#| echo: false
+#| message: false
+#| warning: false
+test_set$color <- as.factor(test_set$color)
+predictions <- predict(poisson_model2, newdata = test_set, type = "response")
+actuals <- test_set$satell
+kl <- 1
+cat("KL divergence:", round(kl, 4), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+test_set['color'] = test_set['color'].astype('category')
+predictions = poisson_model2.predict(test_set)
+actuals = test_set['satell']
+kl = 1
+print(f"KL divergence: {kl:.4f}")
+```
+
+:::
+
+Poisson deviance is also a standard, interpretable metric to measure the goodness of fit of Poisson regression. It is likelihood-based and equals to 2 times KL divergence summed across all points, i.e.,
+$$\text{Poisson Deviance = } 2\sum_i D_{\mathrm{KL}}(y_i\Vert \hat{\lambda}_i).$$
+It measures the difference in log-likelihood between a saturated model (perfect fit) and the fitted model. Lower deviance values indicate the model predictions are closer to the observed data.
 
 ## Storytelling
+
+The data case explores the relationship between satellite size, i.e., the number of male horseshoe crabs around the female horseshoe breeding nests, and several phenotypic characteristis of the female horseshoe crabs. The graphical display suggests that there is a dependence between satellite sizes and female horseshoe crab widths. The Poisson regression modelling suggests that widths is significantely related to satellite size and the dark color is significantly different to the medium light color of the female horseshoe size, given constant confoudning variables at the 5\% significance level.
