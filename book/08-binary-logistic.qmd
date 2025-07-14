@@ -106,10 +106,10 @@ By the end of this chapter, you will be able to:
 In many real-world problems, the outcome we're trying to predict is **not a number** — it's a **yes or no**, **success or failure**, **clicked or didn’t click**. For example:
 
 - Will a customer **default on a loan** given their credit score and income?
-- Does having a part-time job **increase the chance of passing** a course?
-- Is a student **likely to graduate on time**, based on their academic record?
+- Will a student **pass a course** based on whether they have a part-time job and how many hours they studied?
+- Will a student **likely graduate within 4 years**, based on their academic record and declared major?
 
-These outcomes are **binary**: they can take only two values.
+These outcomes are **binary**: they can take on only two possible values, typically coded as `1` (event occurs) and `0` (event does not occur).
 
 To model such outcomes, we need a regression approach that produces **predicted probabilities** between 0 and 1 — not arbitrary numbers on the real line. This is where **Binary Logistic Regression** comes in.
 
@@ -124,6 +124,51 @@ To understand the need for logistic regression, consider applying Ordinary Least
 
 Suppose we are trying to predict whether a customer **defaulted** on a loan (`1`) or **did not default** (`0`) using a continuous predictor like `credit_score`.
 
+Before diving into the technical reasons why OLS is inappropriate for binary outcomes, let’s look at a simplified version of the dataset we’ll use throughout this chapter:
+
+```r
+# Prepare data: numeric default variable and select predictor
+blr_data <- BLR %>%
+  select(credit_score, defaulted) %>%
+  mutate(defaulted = as.numeric(defaulted))
+```
+
+Below is a sample of this dataset:
+
+| **age** | **income** | **education\_years** | **married** | **owns\_home** | **credit\_score** | **defaulted** | **successes** | **trials** |
+| ------: | ---------: | -------------------: | ----------: | -------------: | ----------------: | ------------: | ------------: | ---------: |
+|      56 |      25287 |                   11 |           1 |              1 |               789 |             1 |             1 |         10 |
+|      46 |      54387 |                   17 |           1 |              0 |               372 |             0 |             4 |         10 |
+|      32 |      28512 |                   14 |           0 |              0 |               808 |             1 |             4 |         10 |
+|      60 |      21342 |                   10 |           1 |              1 |               689 |             1 |             4 |         10 |
+|      25 |      83076 |                   12 |           0 |              0 |               594 |             0 |             5 |         10 |
+|      38 |      39216 |                   19 |           1 |              1 |               668 |             0 |             3 |         10 |
+|      56 |     113070 |                   17 |           1 |              1 |               848 |             1 |             6 |         10 |
+|      36 |      99767 |                   13 |           0 |              1 |               486 |             1 |             5 |         10 |
+|      40 |     117829 |                   16 |           0 |              1 |               744 |             0 |             1 |         10 |
+|      28 |      46614 |                   19 |           1 |              0 |               662 |             1 |             2 |         10 |
+
+
+Now, let’s narrow in on the key variables of interest for this section.
+
+
+| **credit\_score** | **defaulted** |
+| ----------------- | ------------- |
+| 789               | 1             |
+| 372               | 0             |
+| 808               | 1             |
+| 689               | 1             |
+| 594               | 0             |
+| 668               | 0             |
+| 848               | 1             |
+| 486               | 1             |
+| 744               | 0             |
+| 662               | 1             |
+
+
+This dataset allows us to examine whether a student defaulted on a loan (`defaulted = 1`) based on their `credit_score`. It’s a classic binary outcome: a "yes" or "no" event.
+
+
 If we use OLS, we estimate:
 
 $$
@@ -131,6 +176,9 @@ $$
 $$
 
 This means we’re treating the **probability of default** as a linear function of credit score.
+
+![TODO: CORRECT IMG OLS fails to constrain predictions between 0 and 1.](img/OLSFittedFailure1.png){#fig-ols-failure-binary width="80%"}
+
 
 However, there are **two fundamental issues** with using OLS here:
 
@@ -314,6 +362,63 @@ plt.show()
 ```
 
 :::
+
+## The Logit Function
+
+When modeling binary outcomes, our goal is to estimate the **probability** that an event occurs, such as whether a customer will **default** on a loan:
+
+$$
+Y_i \sim \text{Bernoulli}(p_i), \quad \mathbb{E}(Y_i) = p_i
+$$
+
+In the OLS framework, we treated this probability linearly, but as we’ve seen, this leads to predictions outside the $[0,1]$ range.
+
+So how can we model the probability in a way that:
+
+* Keeps predictions in $[0, 1]$,
+* Allows us to use linear predictors, and
+* Provides meaningful interpretations?
+
+We do this by modeling the **log-odds** — the **logit function**.
+
+### Logit: A Link Between Probability and Linear Predictors
+
+The **logit function** transforms the probability $p\_i$ into a value on the entire real line:
+
+$$
+\text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right) = \beta_0 + \beta_1 X_i
+$$
+
+This transformation:
+
+* Is **monotonic** (it preserves order),
+* Maps probabilities $p\_i \in (0, 1)$ to $(-\infty, \infty)$, and
+* Solves the range issue of OLS.
+
+::: {.callout-note}
+
+
+
+The **logit function** is defined as:
+
+$$
+\text{logit}(p_i) = \log\left(\frac{p_i}{1 - p_i}\right)
+$$
+
+:::
+
+It models the **log-odds** of the outcome as a linear function of predictors.
+
+### From Log-Odds Back to Probability
+
+We can invert the logit function to get predicted probabilities:
+
+$$
+p_i = \frac{\exp\left(\beta_0 + \beta_1 X_i\right)}{1 + \exp\left(\beta_0 + \beta_1 X_i\right)} \in (0,1)
+$$
+
+This **sigmoid function** outputs values strictly between 0 and 1, no matter what $X\_$ is — making it ideal for modeling probabilities.
+
 
 
 ## What is Binary Logistic Regression?
