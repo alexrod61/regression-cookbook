@@ -1404,14 +1404,108 @@ In this final section, you can test your understanding with the following concep
 
 1. Why does OLS minimize the sum of *squared* residuals instead of just the sum of residuals? What problem would arise if we used absolute errors?
 
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Squaring residuals ensures errors don’t cancel out, and penalizes large errors more. Absolute errors lack *differentiability* for optimization.
+</details>
 
 2. In the house price example (Figure 3.1), if Line A has an SSE of 83 and Line B has an SSE of 3972, which line would OLS choose? Why?
 
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Line A, as lower SSE implies a better fit. OLS minimizes SSE.
+</details>
 
 3. Could a regression line ever have an SSE of zero? What would that imply about the data?
 
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Yes, if all points lie exactly on the line. This would indicate a perfect fit with no noise, which is highly unlikely with real data.
+</details>
 
+4. In the student finance dataset, EDA reveals a strong correlation between `Monthly_Earnings` and `Net_Money`. Can we conclude that large monthly earnings lead to the students have greater net money?
 
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+No, since Correlation $\neq$ causation. Omitted variables may link earnings to savings.
+</details>
+
+5. If a histogram of `Net_Money` showed extreme right skewness, how could this violate OLS assumptions? What transformation could be done to address this?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Right skew violates normality, a log transformation could help resolve this.
+</details>
+
+6. Why did we convert binary variables (such as `Has_Job`) to factors in R? What could happen if they were left as numeric 1s and 0s?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Factors ensure correct interpretation as categories (not continuous variables). Numeric 0/1 could work but increases risks of misspecification.
+</details>
+
+7. The regression equation includes `Living_Situation` as a categorical predictor. How would the coefficient for `Living_Situation=2` be interpreted compared to the *baseline* category?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Compared to baseline, `Living_Situation=2` predicts $107.92 higher Net_Money, holding other variables constant.
+</details>
+
+8. The coefficient for `Drinks_Alcohol` is −$139.96. How would you explain this in simple terms to a university administrator advocating for alcohol-free campuses?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+We could say something along the lines of: "Students who drink alcohol average $140 fewer savings. Policies reducing drinking may improve students' financial well-being."
+</details>
+
+9. If `Monthly_Allowance` had been measured in hundreds of dollars (6.58 instead of 658.99), how would the coefficient of `Monthly_Allowance` change?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The coefficient simply scales from 1.52 to 152.
+</details>
+
+10. The Breusch-Pagan test for heteroscedasticity returns a p-value of 0.16. What does this imply about the residuals?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+p > 0.05 implies no heteroscedasticity.
+</details>
+
+11. In the Q-Q p plot shown in 3.9.1, if the residuals deviated sharply from the red line at the tails, what would this suggest? How might you address it?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+This would suggest non-normally distributed tails. You could consider transformations (such as logging) or robust regression techniques.
+</details>
+
+12. The model’s $R^2$ is 0.89. What might a high $R^2$ indicate? Is a higher $R^2$ always better?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+A high $R^2$ may hide overfitting or omitted variables. It is important to also check residuals for the full picture.
+</details>
+
+13. The coefficient for `Financially_Dependent` is −$488.10. Propose a few real-world mechanisms that could explain this relationship.
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+(1) Dependent students earn less; (2) Dependents may have stricter budgets
+</details>
+
+14. If you suspected that the effect of `Monthly_Earnings` on `Net_Money` differs for students who `Cook_at_Home`, how would you modify the regression equation?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Add a term: `Monthly_Earnings * Cooks_at_Home`. This would allow slope differences.
+</details>
+
+15. The dataset lacks variables like "student debt" or "scholarships." How might this lead to *omitted variable bias*?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Missing debt/scholarships could *bias the coefficients* (for instance overstating job impact).
+</details>
 
 
 ### Coding Question 
@@ -1421,21 +1515,164 @@ In this final section, you can test your understanding with the following concep
 In this problem, you will investigate a dataset of surveyed students taking a programming course with a final exam at the end.
 Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they previously took, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, and `exam_score` respectively. 
 
-For future iterations of the course, you are curious to know if it's possible to understand how well a student will do on the final given these three factors.
+For future iterations of the course, you are curious to know if it is possible to understand how well a student will do on the final given these three factors.
 
-To guide you through answering the above, we will first start with a few conceptual questions from this chapter, and then move to performing an OLS analysis on this data.
+To answer this, the questions below will guide you through an OLS analysis on this data.
 
 ### A. Exploratory Data Analysis {.unnumbered}
-1. What type of analysis approach will you be taking here?
-2. Read in the data from `problem-1-data.csv`, checking for any missing entries. 
-3. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
-4. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
+1. Read in the data from `problem-1-data.csv`, checking for any missing entries. 
+2. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
+3. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## Python Code
+```{.python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from scipy import stats
+
+# Read data
+# point this to the data location
+df = pd.read_csv("./problem-1-data.csv") 
+
+# 1.2 Check for missing entries
+print("Missing values:\n", df.isnull().sum())
+
+# 1.3 Plot histograms
+fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
+for i, col in enumerate(df.columns):
+    axes[i].hist(df[col], bins=30, alpha=0.5)
+    axes[i].set_title(f'Distribution of {col}')
+plt.tight_layout()
+plt.show()
+
+# 1.4 Plot relationships with outcome
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
+predictors = ['current_grade', 'prior_courses', 'hours_studied']
+for i, pred in enumerate(predictors):
+    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
+    axes[i].set_title(f'exam_score vs {pred}')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## Python Output
+```{python}
+#| echo: false
+#| message: false
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from scipy import stats
+
+# Read data
+# point this to the data location
+df = pd.read_csv("./problem-1-data.csv") 
+
+# A.1 Check for missing entries
+print("Missing values:\n", df.isnull().sum())
+
+# A.2 Plot histograms
+fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
+for i, col in enumerate(df.columns):
+    axes[i].hist(df[col], bins=30, alpha=0.5)
+    axes[i].set_title(f'Distribution of {col}')
+plt.tight_layout()
+plt.show()
+
+# A.3 Plot relationships with outcome
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
+predictors = ['current_grade', 'prior_courses', 'hours_studied']
+for i, pred in enumerate(predictors):
+    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
+    axes[i].set_title(f'exam_score vs {pred}')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+</details>
 
 ### B. Initial Modelling {.unnumbered}
 1. Fit a multiple linear regression model predicting `exam_score` using the other variables. Display a statistics summary table.
-2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they wouldn't? We will revisit this.
+2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they would not? We will revisit this. 
 3. Plot residuals against the fitted values. Is heteroscedasticity present?
 4. Create a Q-Q plot of the residuals. Are they normally distributed?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## Python Code
+
+```{.python}
+# B.1 Fit initial model
+model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
+print(model1.summary())
+
+# B.2 Report R² and coefficients
+print(f"\nR-squared: {model1.rsquared:.3f}")
+print("Coefficients:")
+print(model1.params)
+
+# B.3 Residuals vs fitted
+sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.title('Residuals vs Fitted')
+plt.show()
+
+# B.4 Q-Q plot
+sm.qqplot(model1.resid, line='45')
+plt.title('Q-Q Plot of Residuals')
+plt.show()
+```
+</details>
+:::
+
+::: {.panel-tabset}
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+# B.1 Fit initial model
+model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
+print(model1.summary())
+
+# B.2 Report R² and coefficients
+print(f"\nR-squared: {model1.rsquared:.3f}")
+print("Coefficients:")
+print(model1.params)
+
+# B.3 Residuals vs fitted
+sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.title('Residuals vs Fitted')
+plt.show()
+
+# B.4 Q-Q plot
+sm.qqplot(model1.resid, line='45')
+plt.title('Q-Q Plot of Residuals')
+plt.show()
+```
+</details>
+:::
 
 ### C. Model Improvements {.unnumbered}
 1. Should `prior_courses` be converted to another variable type? Try converting it to categorical and re-fit. Do you notice any improvements?
@@ -1443,22 +1680,127 @@ To guide you through answering the above, we will first start with a few concept
 > Hint: the true data generation process used `log(hours_studied)`!
 3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
 
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## Python Code
+
+```{.python}
+# C.1 Convert prior_courses to categorical
+df["prior_courses_category"] = df['prior_courses'].astype('category')
+model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
+             data=df.dropna()).fit()
+print(model2.summary())
+print("##########################################################")
+
+
+# C.2 Log transform hours_studied
+df['log_hours'] = np.log(df['hours_studied'])
+model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
+             data=df.dropna()).fit()
+print(model3.summary())
+print("##########################################################")
+
+
+# C.3 Add interaction term
+model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
+             data=df.dropna()).fit()
+print(model4.summary())
+```
+</details>
+:::
+::: {.panel-tabset}
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+# C.1 Convert prior_courses to categorical
+df["prior_courses_category"] = df['prior_courses'].astype('category')
+model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
+             data=df.dropna()).fit()
+print(model2.summary())
+print("##########################################################")
+
+
+# C.2 Log transform hours_studied
+df['log_hours'] = np.log(df['hours_studied'])
+model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
+             data=df.dropna()).fit()
+print(model3.summary())
+print("##########################################################")
+
+
+# C.3 Add interaction term
+model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
+             data=df.dropna()).fit()
+print(model4.summary())
+```
+</details>
+:::
 ### D. Final Evaluation {.unnumbered}
 1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
 2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
 3. Why might having taken more `prior_courses` show diminishing returns in `exam_score`?
 
-
-### Answers
-
 <details>
-<summary><strong>Click to reveal the answer</strong></summary>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## Python Code
+```{.python}
+# D.1 Compare models
+models = {
+    'Initial': model1,
+    'Categorical': model2,
+    'Log Transform': model3,
+    'Interaction': model4
+}
 
-```python
-print("This is the hidden answer!")
+results = pd.DataFrame({
+    'Model': models.keys(),
+    'R-squared': [m.rsquared for m in models.values()],
+    'RMSE': [np.sqrt(m.mse_resid) for m in models.values()]
+})
+print(results.sort_values('R-squared', ascending=False))
+
+# D.2 Interpretation of final model (model3)
+final_model = model3
+coef = final_model.params['current_grade']
+print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
+
+# D.3 Diminishing returns explanation
+print("\nDiminishing returns explanation:")
+print("Example: students might feel overconfident having taken more courses.")
 ```
+::: {.panel-tabset}
+## Python Output
+```{python}
+#| echo: false
+#| message: false
+# D.1 Compare models
+models = {
+    'Initial': model1,
+    'Categorical': model2,
+    'Log Transform': model3,
+    'Interaction': model4
+}
 
-Or any other **Markdown/Quarto content** here.
+results = pd.DataFrame({
+    'Model': models.keys(),
+    'R-squared': [m.rsquared for m in models.values()],
+    'RMSE': [np.sqrt(m.mse_resid) for m in models.values()]
+})
+print(results.sort_values('R-squared', ascending=False))
+
+# D.2 Interpretation of final model (model3)
+final_model = model3
+coef = final_model.params['current_grade']
+print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
+
+# D.3 Diminishing returns explanation
+print("\nDiminishing returns explanation:")
+print("Example: students might feel overconfident having taken more courses.")
+```
 </details>
 
 
