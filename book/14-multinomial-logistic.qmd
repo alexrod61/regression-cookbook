@@ -774,3 +774,292 @@ Walking has a much wider spread in age, with a high median (around 60) and some 
 The variability in age is greatest for walking, suggesting diverse usage across age groups.
 
 You can also visualize the relationship across other explanatory variables or predictors in various types of figures for practice.
+
+## Data Modelling
+
+A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is categorical and nominal (our response of interest) subject to the numerical regressors `commute_distance` and `age` and binary regressors `has_car_available` and `weekend_commuter`. Moreover, its corresponding regression estimates will allow us to measure variable association.
+
+This regression approach assumes a [Multinomial distribution](https://www.sciencedirect.com/topics/mathematics/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities that will belong to categories $1,2,\dots,m$ respectively; i.e., 
+$$P(Y_i=1)=p_{i,1}, P(Y_i=2)=p_{i,2}, \dots, P(Y_i=m)=p_{i,m}$$
+where
+$$
+\sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
+$$
+
+*A particular highlight is that the Binomial distriution is a special Multinomial distribution when $m=2$.*
+
+The Multinomial Logistic regression **also models the logarithm of the odds**. However, only one logarithm of the odds (or **logit**) will not be enough anymore. Recall we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
+
+Here is what we can do:
+
+1. Pick one of the categories to be the **baseline**. For example, the category "$1$".
+2. For each of the **other** categories, we model the logarithm of the odds to the baseline category.
+
+Now, **what is the math for the general case with $m$ response categories and $k$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ link functions in the Multinomial Logistic regression model as follows:
+
+$$
+\begin{gather*} \label{eq:multinomial-model}
+\eta_i^{(2,1)} = \log\left[\frac{P(Y_i = 2\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k})}\right] = \beta_0^{(2,1)} + \beta_1^{(2,1)} X_{i, 1} + \beta_2^{(2,1)} X_{i, 2} + \ldots + \beta_k^{(2,1)} X_{i, k} \\
+\eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 3\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k})}\right] = \beta_0^{(3,1)} + \beta_1^{(3,1)} X_{i, 1} + \beta_2^{(3,1)} X_{i, 2} + \ldots + \beta_k^{(3,1)} X_{i, k} \\
+\vdots \\
+\eta_i^{(m,1)} = \log\left[\frac{P(Y_i = m\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k})}\right] = \beta_0^{(m,1)} + \beta_1^{(m,1)} X_{i, 1} + \beta_2^{(m,1)} X_{i, 2} + \ldots + \beta_k^{(m,1)} X_{i, k}.
+\end{gather*}
+$$
+
+***Note that the superscript $(j, 1)$ in @eq:multinomial-model indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, **the regression coefficients are different for each link function**.***
+
+Each of the logit-linear functions in @eq:multinomial-model writes the log of odds between each category $j=2,\dots,m$ and the baseline category $j=1$ as a linear combination of the regressors. To compare between the categories $j=2,\dots,m$, we can simply deduct one equation be another, e.g.,
+$$
+\begin{gather*} \label{eq:multinomial-deduct}
+\eta_i^{(2,1)} - \eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 2\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k})}\right] - \log\left[\frac{P(Y_i = 3\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k})}\right] \\
+= \log\left[\frac{P(Y_i = 3\mid X_{i,1}, \ldots, X_{i,k})}{P(Y_i = 2 \mid X_{i,1}, \ldots, X_{i,k})}\right] 
+= (\beta_0^{(2,1)}-\beta_0^{(3,1)}) + (\beta_1^{(2,1)}-\beta_1^{(3,1)}) X_{i, 1} + (\beta_2^{(2,1)}-\beta_2^{(3,1)}) X_{i, 2} + \ldots
+\end{gather*}
+$$
+
+With some algebraic manipulation, we can show that the probabilities $p_{i,1}, p_{i,2}, \dots, p_{i,m}$ of $Y_i$ belonging to categories $1, 2, \dots, m$ are:
+
+$$ 
+\begin{gather*} \label{eq:prob-multinomial}
+p_{i,1} = P(Y_i = 1 \mid X_{i,1}, \ldots, X_{i,k}) = \frac{1}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)} \\
+p_{i,2} = P(Y_i = 2 \mid X_{i,1}, \ldots, X_{i,k}) = \frac{\exp \big( \eta_i^{(2,1)} \big)}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)} \\
+\vdots \\
+p_{i,m} = P(Y_i = m \mid X_{i,1}, \ldots, X_{i,k}) = \frac{\exp \big( \eta_i^{(m,1)} \big)}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)}.
+\end{gather*}
+$$
+
+***If we sum all $m$ probabilities in @eq:prob-multinomial, the sum will be equal to $1$ for the $i$th observation. This is particularly important when we want to use this model for making predictions in classification matters.***
+
+Goting back to our data example, let us set the Multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public_Transit`, `Bicycle`, and `Walking` (denoted as `Car`, `Public`, `Bike`, `Walk` respectively) subject to the continuous regressors `commute_distance` and `age`, denoted as $X_{\texttt{distance}}$ and $X_{\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{\texttt{car}}$ and $Z_{\texttt{weekend}}$ respectively. Use `Car` class as the baseline model.
+
+$$
+\begin{align*}
+\eta_i^{(\texttt{Public},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Public} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&= \beta_0^{(\texttt{Public},\texttt{Car})} + \beta_1^{(\texttt{Public},\texttt{Car})} X_{i, \texttt{distance}} + \beta_2^{(\texttt{Public},\texttt{Car})} X_{i, \texttt{age}} + \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}, \\
+\eta_i^{(\texttt{Bike},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Bike} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&= \beta_0^{(\texttt{Bike},\texttt{Car})} + \beta_1^{(\texttt{Bike},\texttt{Car})} X_{i, \texttt{distance}} + \beta_2^{(\texttt{Bike},\texttt{Car})} X_{i, \texttt{age}}  + \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}, \\
+\eta_i^{(\texttt{Walk},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Walk} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&= \beta_0^{(\texttt{Walk},\texttt{Car})} + \beta_1^{(\texttt{Walk},\texttt{Car})} X_{i, \texttt{distance}} + \beta_2^{(\texttt{Walk},\texttt{Car})} X_{i, \texttt{age}} + \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}} .
+\end{align*}
+$$
+
+***In a Multinomial Logistic regression model, each link function has its own intercept and regression coefficients.***
+
+Taking exponential on both sides of the model equations gives the ratio of probability of each category `Public_Transit`, `Bicycle`, and `Walking` over the probability of the baseline level `Car`:
+
+$$
+\begin{align*}
+&\frac{P(Y_i = \texttt{Public} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} \\
+=& \exp\left[\beta_0^{(\texttt{Public},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Public},\texttt{Car})} X_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Public},\texttt{Car})} X_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}\right]\\
+&\frac{P(Y_i = \texttt{Bike} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} \\
+=& \exp\left[\beta_0^{(\texttt{Bike},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Bike},\texttt{Car})} X_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Bike},\texttt{Car})} X_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}\right]\\
+&\frac{P(Y_i = \texttt{Walk} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} \\
+=& \exp\left[\beta_0^{(\texttt{Walk},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Walk},\texttt{Car})} X_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Walk},\texttt{Car})} X_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}}\right]
+\end{align*}
+$$
+
+Finally, the probability of $Y_i$ belonging to categories `Car`, `Public_Transit`, `Bicycle`, and `Walking` are:
+
+
+## Estimation
+
+
+
+
+
+
+Now, we fit the multinomial regression model using the `nnet` package in R or `sklearn` package in Python. To handle the imbalanced groups, we resample the training sets to balance out the groups to eliminate the bias in modelling. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Upsample minority classes in the training set
+train_set_balanced <- upSample(x = train_set[, setdiff(names(train_set), "transport_mode")],
+                               y = train_set$transport_mode,
+                               yname = "transport_mode")
+
+# Fit multinomial logistic regression on the balanced data
+multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
+```
+
+## Python Code
+
+```{.python}
+# Prepare features and target
+X = train_set.drop(columns=['transport_mode'])
+y = train_set['transport_mode']
+
+# Convert categorical variables to dummy/indicator variables
+X_encoded = pd.get_dummies(X, drop_first=True)
+
+# Fit multinomial logistic regression
+model = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500, class_weight='balanced')
+model.fit(X_encoded, y)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+train_set_balanced <- upSample(x = train_set[, setdiff(names(train_set), "transport_mode")],
+                               y = train_set$transport_mode, yname = "transport_mode")
+multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+# Prepare features and target
+X = train_set.drop(columns=['transport_mode'])
+y = train_set['transport_mode']
+
+# Convert categorical variables to dummy/indicator variables
+X_encoded = pd.get_dummies(X, drop_first=True)
+
+# Fit multinomial logistic regression
+model = LogisticRegression(multi_class='multinomial', solver='lbfgs', max_iter=500, class_weight='balanced')
+model.fit(X_encoded, y)
+```
+
+:::
+
+
+
+## Goodness of Fit
+
+Let's visualize how good the model performs on the training set.
+
+
+
+
+## Inference
+
+Similar as in Poisson regression, we use Wald's test, which defines the asymptotically normal Z-statistic, to test the siginificance of the coefficients. 
+
+
+
+
+
+
+We predict the model on test set and visualize the prediction results in the confusion matrix below.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Predict transport_mode on the test set using the balanced model
+predicted <- predict(multinom_fit_balanced, newdata = test_set)
+
+# Compute confusion matrix
+conf_matrix <- confusionMatrix(factor(predicted, levels = levels(test_set$transport_mode)),
+                              factor(test_set$transport_mode, levels = levels(test_set$transport_mode)))
+
+
+cm_table <- as.table(conf_matrix$table)
+cm_df <- as.data.frame(cm_table)
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df %>%
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 4) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)", x = "Predicted", y = "Actual") +
+  theme_bw()
+```
+
+## Python Code
+
+```{.python}
+# Prepare test features and target
+X_test = test_set.drop(columns=['transport_mode'])
+y_test = test_set['transport_mode']
+
+# Encode test features to match training
+X_test_encoded = pd.get_dummies(X_test, drop_first=True)
+X_test_encoded = X_test_encoded.reindex(columns=X_encoded.columns, fill_value=0)
+
+# Predict on test set
+y_pred_test = model.predict(X_test_encoded)
+
+# Print confusion matrix
+cm = confusion_matrix(y_test, y_pred_test, labels=model.classes_)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+disp.plot(cmap='Blues')
+plt.title("Confusion Matrix (Test Set)")
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+# Predict transport_mode on the test set using the balanced model
+predicted <- predict(multinom_fit_balanced, newdata = test_set)
+
+# Compute confusion matrix
+conf_matrix <- confusionMatrix(factor(predicted, levels = levels(test_set$transport_mode)),
+                              factor(test_set$transport_mode, levels = levels(test_set$transport_mode)))
+
+
+cm_table <- as.table(conf_matrix$table)
+cm_df <- as.data.frame(cm_table)
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df %>%
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 4) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)", x = "Predicted", y = "Actual") +
+  theme_bw()
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+# Prepare test features and target
+X_test = test_set.drop(columns=['transport_mode'])
+y_test = test_set['transport_mode']
+
+# Encode test features to match training
+X_test_encoded = pd.get_dummies(X_test, drop_first=True)
+X_test_encoded = X_test_encoded.reindex(columns=X_encoded.columns, fill_value=0)
+
+# Predict on test set
+y_pred_test = model.predict(X_test_encoded)
+
+# Print confusion matrix
+cm = confusion_matrix(y_test, y_pred_test, labels=model.classes_)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=model.classes_)
+disp.plot(cmap='Blues')
+plt.title("Confusion Matrix (Test Set)")
+plt.show()
+```
+
+:::
+
+## Results
+
+## Storytelling
