@@ -82,3 +82,695 @@ mindmap
             (Multinomial <br/>Outcome Y)
 ```
 :::
+
+
+```{r setup-r, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(gridExtra) # combine ggplot2 figures
+library(ggExtra) # draw marginal histograms
+library(broom)
+library(knitr)
+#devtools::install_github("andytai7/cookbook")
+library(cookbook)
+library(nnet) # fit multinomial regression
+library(caret) # upsampling and confusion matrix
+
+library(reticulate)
+py_config()
+
+py_require("pandas")
+py_require("numpy")
+py_require("seaborn")
+py_require("pyreadr")
+py_require("plotnine")
+py_require("matplotlib")
+py_require("statsmodels")
+py_require("scikit-learn")
+py_require("spicy")
+
+reticulate::py_install("plotnine")
+
+pandas <- import("pandas")
+numpy <- import("numpy")
+seaborn <- import("seaborn")
+pyreadr <- import("pyreadr")
+matplotlib <- import("matplotlib")
+statsmodels <- import("statsmodels")
+sklearn <- import("sklearn")
+scipy <- import("scipy")
+plotnine <- import("plotnine")
+```
+
+```{python setup-py, include=FALSE}
+import numpy as np
+import pandas as pd
+from plotnine import *
+import statsmodels.api as sm
+from statsmodels.formula.api import glm, ols
+from statsmodels.genmod.families import Poisson
+from matplotlib import pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error, classification_report
+import scipy.stats as stats
+import seaborn as sns
+from matplotlib.gridspec import GridSpec
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+```
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- 
+::::
+:::
+
+## Introduction
+
+Multinomial logistic regression is a statistical modeling technique used to analyze relationships between a multi-class categorical response variable and a set of explanatory variables. Unlike binary logistic regression, which models outcomes with two categories, multinomial logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the predictors by modeling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
+
+
+### Multinomial Logistic Regression Assumptions
+
+- The response or dependent variable should be measured at the nominal level with more than two values. 
+- There should be one or more independent variables that are continuous, ordinal or nominal (including dichotomous variables).
+- **Logit linearity assumption**: There needs to be a linear relationship between any continuous independent variables and the logit transformation of the dependent variable.
+- **Independent observations**: The observations should be independent and the dependent variable should have mutually exclusive and exhaustive categories (i.e. no individual belonging to two different categories).
+- **No Multicollinearity**: Multicollinearity occurs when you have two or more independent variables that are highly correlated with each other.
+- There should be no outliers, high leverage values or highly influential points.
+
+## Case Study
+
+We will explore a dataset containing information on individuals' commuting behaviors and demographics, with a focus on their primary mode of transportation. We explore a couple of research problems based on the dataset. 
+
+- How is the transportation mode of people **associated** by their commuting distances, given the individuals' commuting behaviors and demographics including if they have a car, if they commute on weekends, and ages?
+- Can we accurately **predict** the transportation mode of an individual based on their commuting behaviors and demographics including if they have a car, if they commute on weekends, their commute distance, and age?
+
+The two research problems correspond to **inferential** and **predictive** **statistical objectives** respectively:
+
+- To estimate the **association** between the explanatory variable---commute distance---and the probability of each category of the response---each transport mode, given the confounding effects of age, car availability, and weekend commuter status. 
+- To develop a **predictive** model that classifies individuals into their most likely transport mode using the predictors commute distance, age, car availability, and weekend commuting status. 
+
+## Data Collection and Wrangling
+
+The dataset includes the following five variables:
+
+- `transport_mode` (categorical, 4 levels):
+  - The primary mode of transport used by the individual. Categories: "Bicycle", "Car", "Public Transit", "Walking". This variable is used as the response in data modelling.
+
+- `commute_distance` (numeric):
+  - The one-way commuting distance in kilometers.
+
+- `age` (numeric):
+   - The age of the individual in years.
+
+- `has_car_available` (binary categorical):
+  - Indicates whether the individual has access to a car. Levels: "Yes" or "No".
+
+- `weekend_commuter` (binary categorical):
+  - Indicates whether the individual commutes during weekends. Levels: "Yes" or "No".
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+data(multinomial_transport)
+data <- multinomial_transport[,-1]
+cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
+print(data)
+```
+
+## Python Code
+
+```{.python}
+url = "https://raw.githubusercontent.com/andytai7/cookbook/refs/heads/main/raw-data/multinomial_transport.csv"
+data = pd.read_csv(url)
+data = data.iloc[:, :-1]
+print(f"There are {data.shape[0]} observations and {data.shape[1]} variables in the dataset.")
+print(data)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+data(multinomial_transport)
+data <- multinomial_transport %>% select(-'income_bracket')
+cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
+print(data)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+url = "https://raw.githubusercontent.com/andytai7/cookbook/refs/heads/main/raw-data/multinomial_transport.csv"
+data = pd.read_csv(url)
+data = data.iloc[:, :-1]
+print(f"There are {data.shape[0]} observations and {data.shape[1]} variables in the dataset.")
+print(data)
+```
+
+:::
+
+Factorize the categorical variables. There are four types of transport mode which are by bicycle, car, public transit, and walking. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Factorize the categorical variables and print their levels
+categorical_cols <- c('transport_mode', 'has_car_available', 'weekend_commuter')
+for (col in categorical_cols) {
+  data[[col]] <- as.factor(data[[col]])
+  cat("Levels of", col, ":", levels(data[[col]]), "\n")
+}
+```
+
+## Python Code
+
+```{.python}
+# Factorize the categorical variables and print their levels
+categorical_cols = ['transport_mode', 'has_car_available', 'weekend_commuter']
+for col in categorical_cols:
+  data[col] = data[col].astype('category')
+  print(f"Levels of {col}: {list(data[col].cat.categories)}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+categorical_cols <- c('transport_mode', 'has_car_available', 'weekend_commuter')
+for (col in categorical_cols) {
+  data[[col]] <- as.factor(data[[col]])
+  cat("Levels of", col, ":", levels(data[[col]]), "\n")
+}
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+categorical_cols = ['transport_mode', 'has_car_available', 'weekend_commuter']
+for col in categorical_cols:
+  data[col] = data[col].astype('category')
+  print(f"Levels of {col}: {list(data[col].cat.categories)}")
+```
+
+:::
+
+Now, we split the dataset into training and test sets, use training set to fit the model, and use test set to assess the model performance. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Split the data: first 90% for training, last 10% for test
+n <- nrow(data)
+split_idx <- floor(0.9 * n)
+train_set <- data[1:split_idx, ]
+test_set <- data[(split_idx + 1):n, ]
+
+cat("Training set size:", nrow(train_set))
+cat("Test set size:", nrow(test_set))
+```
+
+## Python Code
+
+```{.python}
+# Split the data: first 90% for training, last 10% for test
+split_idx = int(len(data) * 0.9)
+train_set = data.iloc[:split_idx].reset_index(drop=True)
+test_set = data.iloc[split_idx:].reset_index(drop=True)
+
+print(f"Training set size: {len(train_set)}")
+print(f"Test set size: {len(test_set)}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+n <- nrow(data)
+split_idx <- floor(0.9 * n)
+train_set <- data[1:split_idx, ]
+test_set <- data[(split_idx + 1):n, ]
+cat("Training set size:", nrow(train_set))
+cat("Test set size:", nrow(test_set))
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+split_idx = int(len(data) * 0.9)
+train_set = data.iloc[:split_idx].reset_index(drop=True)
+test_set = data.iloc[split_idx:].reset_index(drop=True)
+print(f"Training set size: {len(train_set)}")
+print(f"Test set size: {len(test_set)}")
+```
+
+:::
+
+## Exploratory Data Analysis
+
+Let's visualize the response `transport_mode` and its relationship with the continuous or categorical(binary) explanatory variables (predictors).
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Custom color palette `cbPalette` 
+cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+# Sort `transport_mode` by frequency
+train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
+
+p1 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  labs(y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Car Availability"))
+
+p2 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "Count", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Weekend Commuter"))
+
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Code
+
+```{.python}
+# Custom color palette `cbPalette` 
+cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+
+# Sort transport_mode by frequency
+order = train_set['transport_mode'].value_counts().index
+train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
+
+# Set up the plot
+sns.set_theme(style="whitegrid")
+fig = plt.figure()
+fig.set_size_inches(8, 6)
+gs = GridSpec(1, 2, figure=fig)
+_ = fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
+
+# Plot: Stacked bar for Car Availability
+car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
+car_counts = car_counts.loc[order] 
+
+ax1 = fig.add_subplot(gs[0, 0])
+bottom = None
+for i, col in enumerate(car_counts.columns):
+    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
+ax1.set_title("With Car Availability")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Count")
+ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Plot: Stacked bar for Weekend Commuter
+weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts.loc[order]
+
+ax2 = fig.add_subplot(gs[0, 1])
+bottom = None
+for i, col in enumerate(weekend_counts.columns):
+    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
+ax2.set_title("With Weekend Commuter Status")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("")
+ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Adjust plot layout
+plt.tight_layout(rect=[0, 0.05, 1, 1])
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
+p1 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Car Availability"))
+p2 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Weekend Commuter"))
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+order = train_set['transport_mode'].value_counts().index
+train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
+
+sns.set_theme(style="whitegrid")
+fig = plt.figure()
+fig.set_size_inches(8, 6)
+gs = GridSpec(1, 2, figure=fig)
+_ = fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
+
+# Plot 1: Stacked bar for Car Availability
+car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
+car_counts = car_counts.loc[order] 
+ax1 = fig.add_subplot(gs[0, 0])
+bottom = None
+for i, col in enumerate(car_counts.columns):
+    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
+ax1.set_title("With Car Availability")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Count")
+ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Plot 2: Stacked bar for Weekend Commuter
+weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts.loc[order]
+ax2 = fig.add_subplot(gs[0, 1])
+bottom = None
+for i, col in enumerate(weekend_counts.columns):
+    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
+ax2.set_title("With Weekend Commuter Status")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("")
+ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Adjust layout
+plt.tight_layout(rect=[0, 0.05, 1, 1])
+plt.show()
+```
+
+:::
+
+
+The bar plots displays the distribution of transport mode across car availability and weekend commute status. 
+
+Car is the dominant mode of transport, especially among those who have access to a car (blue bar is much taller than orange).
+Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
+Bicycle and Walking are rare overall but tend to occur more when no car is available. 
+
+Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the “No” (non-weekend commuter) group (orange).
+However, Public Transit has a noticeable number of weekend commuters (blue), indicating some weekend reliance on public transit.
+Walking and Bicycling show little weekend commuting activity.
+
+Visualize the relationship between `transport_mode` and continuous variables `commute_distance` and `age`.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# visualize boxplots and violin plots of commute_distance v.s. transport_mode
+p3 <- train_set %>%
+    ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(alpha = 1, fill = NA) +
+    labs(x = "Transport Mode", y = "Commute Distance (km)", title =
+        "Commute Distance by Transport Mode") +
+    scale_fill_manual(values = cbPalette[3:6]) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    guides(fill = guide_legend(title = "Transport Mode"))
+
+p4 <- train_set %>%
+    ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(alpha = 1, fill = NA) +
+    labs(x = "Transport Mode", y = "Age", title =
+        "Age by Transport Mode") +
+    scale_fill_manual(values = cbPalette[3:6]) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    guides(fill = guide_legend(title = "Transport Mode"))
+
+grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Code
+
+```{.python}
+sns.set_theme(style="whitegrid")
+
+# Set up side-by-side subplots with shared layout
+fig = plt.figure(figsize=(8, 7))
+gs = GridSpec(1, 2, figure=fig)
+fig.suptitle("Box Plots and Violin Plots", fontsize=16, fontweight='bold')
+
+# Plot Commute Distance vs Transport Mode
+ax1 = fig.add_subplot(gs[0, 0])
+sns.violinplot(
+    data=train_set,
+    x='transport_mode',
+    y='commute_distance',
+    palette=cbPalette[2:6],
+    ax=ax1,
+    alpha=0.6,
+    inner=None,
+    order=order,
+    cut=3
+)
+sns.boxplot(
+    data=train_set,
+    x='transport_mode',
+    y='commute_distance',
+    showcaps=True,
+    boxprops={'facecolor': 'none', 'edgecolor': 'black'},
+    whiskerprops={'color': 'black'},
+    flierprops={'markerfacecolor': 'black', 'markersize': 3},
+    ax=ax1,
+    order=order
+)
+ax1.set_title("Commute Distance by Transport Mode")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Commute Distance (km)")
+ax1.get_legend()
+
+# Plot Age vs Transport Mode
+ax2 = fig.add_subplot(gs[0, 1])
+sns.violinplot(
+    data=train_set,
+    x='transport_mode',
+    y='age',
+    palette=cbPalette[2:6],
+    ax=ax2,
+    alpha=0.6,
+    inner=None,
+    order=order,
+    cut=3
+)
+sns.boxplot(
+    data=train_set,
+    x='transport_mode',
+    y='age',
+    showcaps=True,
+    boxprops={'facecolor': 'none', 'edgecolor': 'black'},
+    whiskerprops={'color': 'black'},
+    flierprops={'markerfacecolor': 'black', 'markersize': 3},
+    ax=ax2,
+    order=order
+)
+ax2.set_title("Age by Transport Mode")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("Age")
+ax2.get_legend()
+
+plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+p3 <- train_set %>%
+    ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(alpha = 1, fill = NA) +
+    labs(x = "Transport Mode", y = "Commute Distance (km)", title =
+        "Commute Distance by Transport Mode") +
+    scale_fill_manual(values = cbPalette[3:6]) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    guides(fill = guide_legend(title = "Transport Mode"))
+p4 <- train_set %>%
+    ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
+    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_boxplot(alpha = 1, fill = NA) +
+    labs(x = "Transport Mode", y = "Age", title =
+        "Age by Transport Mode") +
+    scale_fill_manual(values = cbPalette[3:6]) +
+    theme_bw() +
+    theme(legend.position = "none") +
+    guides(fill = guide_legend(title = "Transport Mode"))
+grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+sns.set_theme(style="whitegrid")
+
+# Set up side-by-side subplots with shared layout
+fig = plt.figure(figsize=(8, 7))
+gs = GridSpec(1, 2, figure=fig)
+fig.suptitle("Box Plots and Violin Plots", fontsize=16, fontweight='bold')
+
+# Plot Commute Distance vs Transport Mode
+ax1 = fig.add_subplot(gs[0, 0])
+sns.violinplot(
+    data=train_set,
+    x='transport_mode',
+    y='commute_distance',
+    palette=cbPalette[2:6],
+    ax=ax1,
+    alpha=0.6,
+    inner=None,
+    order=order,
+    cut=3
+)
+sns.boxplot(
+    data=train_set,
+    x='transport_mode',
+    y='commute_distance',
+    showcaps=True,
+    boxprops={'facecolor': 'none', 'edgecolor': 'black'},
+    whiskerprops={'color': 'black'},
+    flierprops={'markerfacecolor': 'black', 'markersize': 3},
+    ax=ax1,
+    order=order
+)
+ax1.set_title("Commute Distance by Transport Mode")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Commute Distance (km)")
+ax1.get_legend()  # no legend to remove manually
+
+# Plot p4: Age vs Transport Mode
+ax2 = fig.add_subplot(gs[0, 1])
+sns.violinplot(
+    data=train_set,
+    x='transport_mode',
+    y='age',
+    palette=cbPalette[2:6],
+    ax=ax2,
+    alpha=0.6,
+    inner=None,
+    order=order,
+    cut=3
+)
+sns.boxplot(
+    data=train_set,
+    x='transport_mode',
+    y='age',
+    showcaps=True,
+    boxprops={'facecolor': 'none', 'edgecolor': 'black'},
+    whiskerprops={'color': 'black'},
+    flierprops={'markerfacecolor': 'black', 'markersize': 3},
+    ax=ax2,
+    order=order
+)
+ax2.set_title("Age by Transport Mode")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("Age")
+ax2.get_legend()  # no legend to remove manually
+
+plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+plt.show()
+```
+
+:::
+
+Box and violin plots present that how commute distance and age vary across different transport modes.
+
+Public transit users tend to have the longest commutes on average, with a wide distribution and a median around 17–18 km.
+Car users also have moderately long commutes, with a median around 10-11 km and a relatively broad spread.
+Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end.
+All modes show some long-distance commuters (long tails), especially public transit and car.
+
+Car and public transit users have similar age distributions, with median ages in the mid-30s to early 40s.
+Bicycle users skew slightly younger, but with a long tail of older users.
+Walking has a much wider spread in age, with a high median (around 60) and some very young walkers as well.
+The variability in age is greatest for walking, suggesting diverse usage across age groups.
+
+You can also visualize the relationship across other explanatory variables or predictors in various types of figures for practice.
