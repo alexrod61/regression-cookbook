@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# The Regression Cookbook: Now with Machine Learning and Stats Flavours!
+# The Regression Cookbook
 
 <!-- badges: start -->
 
