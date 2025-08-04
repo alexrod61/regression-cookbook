@@ -23,14 +23,276 @@ colourize <- function(x, color) {
 }
 ```
 
+```{r setup, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(ggplot2)
+library(ggcorrplot)
+library(cookbook)
+library(tidyverse)
+library(car)
+library(lmtest)
+library(fastDummies)
+
+# Setting up Python dependencies
+library(reticulate)
+py_require("pandas") 
+py_require("numpy")
+py_require("matplotlib")
+py_require("statsmodels")
+py_require("pyreadr")
+py_require("scikit-learn")
+py_require("seaborn")
+py_require("scipy")
+
+pandas <- import("pandas")
+numpy <- import("numpy")
+matplotlib <- import("matplotlib")
+statsmodels <- import("statsmodels")
+pyreadr <- import("pyreadr")
+sklearn <- import("sklearn")
+seaborn <- import("seaborn")
+scipy <- import("scipy")
+
+# Load data in R
+data <- gamma_server
+
+py$data <- r_to_py(gamma_server)
+```
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- Explain what Gamma regression is and when it is appropriate to use
+- Recognize the types of problems suited for Gamma regression, especially those with positive, skewed outcomes
+- Describe the Gamma distribution and how its shape is influenced by its parameters
+- Understand the role of the link function, especially the log link, in Gamma regression
+- Set up a Gamma regression model using a log link and interpret its coefficients in the context of the original variables
+- Evaluate model fit using deviance residuals, spread patterns, and AIC
+::::
+:::
+
+## Introduction
+
+Some types of data are always positive and tend to have a few really large values. For example, imagine we are looking at how much people spend at a grocery store. Most people might spend a small to medium amount, but a few people might spend a lot more. This kind of data is not evenly spread out, and it does not look like a nice bell curve. Instead, it is skewed to the right, with a long tail of higher numbers.
+
+```{python skewed-distribution}
+#| echo: false
+#| message: false
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+# Generate synthetic data with a Gamma distribution (right-skewed)
+np.random.seed(0)
+data_gamma = np.random.gamma(shape=2, scale=2, size=1000)
+
+# Create the plot
+plt.figure(figsize=(8, 5))
+sns.histplot(data_gamma, bins=30, kde=True, color="skyblue")
+
+# Add annotation
+plt.axvline(np.mean(data_gamma), color="red", linestyle="--", label="Mean")
+plt.text(np.mean(data_gamma) + 1, 50, "Mean", color="red")
+
+# Titles and labels
+plt.title("Example of Right-Skewed Data (Gamma Distribution)", fontsize=13)
+plt.xlabel("Value (e.g., Spending Amount in $)", fontsize=11)
+plt.ylabel("Frequency", fontsize=11)
+plt.legend()
+plt.tight_layout()
+
+# Save to file
+plt.show()
+```
+
+
+In these situations, the usual type of regression (called [ordinary least squares, or OLS](03-ols.qmd)) does not work very well. OLS assumes that the data is evenly spread out around the average and that big values and small values are equally likely. But when we have only positive numbers and some very big ones, we need a different approach.
+
+This is where **Gamma regression** can help.
+
+## What is Gamma Regression
+
+Gamma regression is a tool we use when the outcome we are trying to predict is always positive and can vary a lot. For example, we might want to predict:
+
+- how long it takes for someone to complete a task
+- how much money someone spends at a store
+- the cost of a medical procedure
+
+These kinds of numbers are not evenly spread out. Most values might be small or medium, but a few can be very large. This makes the data skewed, and not a good fit for regular linear regression.
+
+Gamma regression gives us a better way to model this kind of data. Instead of drawing a straight line, it adjusts to the uneven spread and focuses on predicting the average value based on other inputs.
+
+## Understanding the Gamma Distribution
+
+Gamma regression is built on something called the **Gamma distribution**. This distribution is used to describe values that are:
+
+- always above zero
+- and can have a long tail of larger values
+
+What makes the Gamma distribution flexible is a number called the **shape** parameter. This controls how the data is spread out.
+
+- When the shape is small (like 1), the distribution is very skewed. Most values are small, but a few are much larger.
+- When the shape is larger (like 5 or 9), the curve becomes more balanced, though it still never includes negative numbers.
+
+Let’s look at what this means visually:
+
+```{python gamma-distribution}
+#| echo: false
+#| message: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gamma
+
+x = np.linspace(0, 200, 500)
+shape_params = [1, 2, 5, 9]
+colors = ['darkred', 'orange', 'green', 'blue']
+
+plt.figure(figsize=(10, 6))
+for shape, color in zip(shape_params, colors):
+    y = gamma.pdf(x, a=shape, scale=20)
+    plt.plot(x, y, label=f"shape = {shape}", color=color)
+
+plt.title("How the Shape Parameter Affects the Gamma Distribution")
+plt.xlabel("Value")
+plt.ylabel("Density")
+plt.legend(title="Gamma Shape")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
+
+This plot shows how the shape parameter changes the look of the Gamma distribution. It helps explain why Gamma regression is such a good match for skewed data.
+
+## How Gamma Regression Works
+
+Gamma regression helps us understand how the average value of something positive changes with different conditions. But it does this in a slightly different way than regular linear regression.
+
+> Instead of predicting the outcome directly, Gamma regression predicts the log of the average outcome. This is done using something called a **link function**.
+
+### The Role of the Link Function
+
+::: {#Definition-sample .definition}
+::::{.definition-header}
+Link Function
+::::
+::::{.definition-container}
+A link function is just a transformation that helps the model do a better job. For Gamma regression, the most common link function is the log link.
+::::
+:::
+
+Using the log has three main benefits:
+
+- It helps control large numbers by flattening them out
+- It makes sure our predictions stay positive
+- It turns certain patterns into straight lines, which are easier to model
+
+This means that Gamma regression is actually fitting a model like:
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \cdots + \beta_p x_{ip}
+$$
+
+where:
+
+- $\mu_i$ is the average (expected) outcome for the $i$-th observation  
+- $x_{i1}, x_{i2}, \ldots$ are the input values (predictors)
+
+Later, we can convert the predicted log value back to the original scale using the exponential function:
+
+$$
+\mu_i = \exp(\beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip})
+$$
+
+This guarantees that our predictions will always be positive.
+
+::: {.Tip}
+::::{.Tip-header}
+Tip
+::::
+::::{.Tip-container}
+
+The idea of a **link function** can seem abstract at first, but a quick plot can help make it more concrete. In Gamma regression, we usually use the **log link**, which means the model fits a straight line to the log of the mean response, then transforms it back to the original scale.
+
+Here’s a visual example:
+
+```{python}
+#| echo: false
+#| message: false
+#| 
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Create values for the predictor x
+x = np.linspace(0, 10, 100)
+
+# Linear model on the log scale
+log_mu = 2 + 0.5 * x
+
+# Back-transform to original scale
+mu = np.exp(log_mu)
+
+# Plot
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
+# Left: Linear on log scale
+ax1.plot(x, log_mu, color="steelblue")
+ax1.set_title("Linear on Log Scale")
+ax1.set_xlabel("x (predictor)")
+ax1.set_ylabel("log(μ)")
+ax1.grid(True)
+
+# Right: Transformed back to original scale
+ax2.plot(x, mu, color="darkorange")
+ax2.set_title("Exponential on Original Scale")
+ax2.set_xlabel("x (predictor)")
+ax2.set_ylabel("μ (predicted response)")
+ax2.grid(True)
+
+plt.tight_layout()
+plt.show()
+```
+
+- In Gamma regression, we fit a model to the log of the expected outcome $\log(\mu)$, not directly to $\mu$.
+- The left plot shows a straight-line relationship: $\log(\mu) = 2 + 0.5x$.
+- The right plot shows the back-transformed version: $\mu = \exp(2 + 0.5x)$, which curves upward.
+- This transformation ensures that all predicted values are positive and allows the model to capture multiplicative effects that are common in skewed, positive data.
+
+::::
+:::
+
+### Examples of What Gamma Regression Is Trying to Predict
+
+Gamma regression is often used when we want to understand how average outcomes change under different conditions. It is especially helpful when those outcomes vary widely between observations.
+
+Some practical examples include:
+
+- In healthcare, estimating the average cost of treatment for patients based on their age or diagnosis  
+- In retail, modeling how much customers typically spend depending on their shopping behavior  
+- In web analytics, analyzing how different system settings affect the average page load time  
+
+In all these cases, we are interested in typical outcomes, not just predicting individual values. Gamma regression lets us model these averages in a flexible and meaningful way.
+
+## When to Use and Not Use Gamma Regression
+
+Now that we understand what Gamma regression does and how it models positive, skewed outcomes, it is helpful to summarize the specific conditions under which this method is appropriate and when it might not be a good fit.
+
 ::: {.Warning}
-::::{.Warning-header}
+:::: {.Warning-header}
 When to Use and Not Use Gamma Regression
 ::::
-::::{.Warning-container}
+:::: {.Warning-container}
+
 Gamma regression is a type of generalized linear model that is appropriately used under the following conditions:
 
-- The outcome variable is **continuous** and **non-negative** as shown in @fig-gamma-regression. Examples include insurance claim amounts, pollutant concentrations, and operational spending. Note that this outcome should not be a count variable.
+- The outcome variable is **continuous** and **non-negative** as shown in `@fig-gamma-regression`. Examples include insurance claim amounts, pollutant concentrations, and operational spending. Note that this outcome should not be a count variable.
 - Outcomes are **statistically independent** from one to the next.
 - The distribution of the outcome is **right-skewed**. This means that as the mean of the outcome increases, the variance also increases at a faster rate.
 - We intend to use the **logarithm of the mean** of the outcome as a **link function**, which ensures that our predictions are always positive.
@@ -40,8 +302,888 @@ However, Gamma regression should not be used in the following scenarios:
 - The outcome variable **includes zeros or negative values**.
 - The outcome variable is of the count type. In this case, check the [Classical Poisson](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), [Negative Binomial](https://alexrod61.github.io/regression-cookbook/book/11-negative-binomial.html), [Zero-Inflated Poisson](https://alexrod61.github.io/regression-cookbook/book/12-zero-inflated-poisson.html) or [Generalized Poisson](https://alexrod61.github.io/regression-cookbook/book/13-generalized-poisson.html) regressions.
 - The variance of the outcome **increases at a constant rate** relative to the corresponding mean.
+
 ::::
 :::
+
+## Case Study: Modeling Web Server Performance
+
+To demonstrate Gamma regression in action, we will walk through a case study using a toy dataset. This case study will help us understand what affects the *response time of a web server*. Specifically, how long it takes (in milliseconds) for the server to respond to a user’s request.
+
+We will approach this case study using the [data science workflow](01-intro.qmd) introduced earlier. This ensures a structured approach to framing the problem, selecting a model, and building an interpretation based on the model’s results.
+
+### The Dataset
+
+The dataset captures various features of web requests across different servers and regions. Each row represents a single request and contains information about the server load, the number of users at the time, how complex the request was, and other related factors. Below is a summary of the variables:
+
+| **Variable Name**     | **Description**                                                                 |
+|-----------------------|---------------------------------------------------------------------------------|
+| **response_time_ms**  | The time it takes for the server to respond to a request (in milliseconds).    |
+| **concurrent_users**  | Number of users on the server at the time of the request.                      |
+| **database_queries**  | Number of database queries triggered by the request.                            |
+| **cache_hit_rate**    | Percentage of data requests served from the cache (0 to 100).                   |
+| **server_load**       | Server CPU load at the time of the request (0 to 100).                          |
+| **time_of_day**       | Hour of the day when the request was made (0 = midnight, 23 = 11 PM).           |
+| **day_of_week**       | Day of the week (e.g., Monday, Tuesday).                                        |
+| **geographic_region** | Geographic region where the request originated.                                 |
+| **request_complexity**| Categorical value describing request complexity: "Simple", "Moderate", or "Complex". |
+| **cdn_usage**         | Whether a content delivery network was used ("Yes" or "No").                    |
+| **memory_usage**      | Memory used on the server at the time of request (in percent).                  |
+
+Here’s a snapshot of the dataset:
+
+<div style="overflow-x: auto; white-space: nowrap;">
+| **response_time_ms** | **concurrent_users** | **database_queries** | **cache_hit_rate** | **server_load** | **time_of_day** | **day_of_week** | **geographic_region** | **request_complexity** | **cdn_usage** | **memory_usage** |
+|----------------------|----------------------|-----------------------|--------------------|-----------------|------------------|------------------|------------------------|-------------------------|----------------|-------------------|
+| 54.2                 | 40                   | 10                    | 94.8               | 61.4            | 8                | Saturday         | North_America          | Moderate                | Yes            | 63.6              |
+| 28.6                 | 148                  | 1                     | 56.1               | 43.2            | 18               | Thursday         | North_America          | Complex                 | Yes            | 25.5              |
+| 50.2                 | 195                  | 14                    | 94.6               | 67.0            | 1                | Thursday         | North_America          | Complex                 | No             | 26.6              |
+| 24.8                 | 82                   | 10                    | 77.9               | 83.9            | 14               | Monday           | Africa                 | Simple                  | Yes            | 67.5              |
+| 127.1                | 85                   | 10                    | 58.7               | 47.1            | 7                | Thursday         | South_America          | Moderate                | Yes            | 54.4              |
+</div>
+
+This dataset allows us to analyze performance differences in web servers under different conditions and determine what contributes to longer or shorter response times.
+
+### The Problem We’re Trying to Solve
+
+Our main goal in this case study is to understand which factors lead to slower or faster server response times. Since response time is continuous, strictly positive, and often right-skewed, it fits the assumptions of Gamma regression well.
+
+The key question we aim to answer is:
+
+> **Which server or request characteristics have the biggest influence on response time?**
+
+By fitting a Gamma regression model, we can go beyond just identifying important factors. We can also:
+
+- Estimate how each variable affects the *average* response time
+- Determine whether a factor increases or decreases response time, and by how much
+- Control for confounding variables and isolate individual effects
+- Make predictions about future requests based on their characteristics
+- Build a system-level model that can inform performance monitoring and infrastructure planning
+
+In short, this approach helps us both understand and manage what influences response speed.
+
+## Study Design
+
+With our case study and dataset introduced, we now follow the data science workflow by clarifying the goal of the analysis. Our main question is:
+
+> **Which server or request characteristics have the biggest influence on response time?**
+
+This leads us to adopt an inferential approach, where the focus is on understanding relationships between variables, rather than simply predicting outcomes.
+
+### Inferential vs. Predictive Analysis
+
+- Inferential analysis helps us understand and quantify how different variables affect the average outcome. For example, we might ask: Does using a content delivery network (CDN) significantly reduce response time? How much slower are complex requests compared to simple ones? The goal is to explain relationships and check which effects are statistically meaningful.
+
+- Predictive analysis, by contrast, is about making accurate forecasts. For instance: Can we predict the response time of a future request based on its characteristics?
+
+While Gamma regression supports both goals, our focus in this chapter is inferential.
+
+### What This Means for Our Analysis
+
+We will use Gamma regression to estimate the average effect of each factor on response time, while accounting for skewness in the outcome variable. Our analysis will help answer questions like:
+
+- How do concurrent users affect response time?
+- Does request complexity lead to slower responses?
+- What is the typical effect of CDN usage?
+- How are server load and memory usage related to delays?
+
+Rather than building a black-box prediction tool, we aim to uncover which factors matter most and how they shape server performance. This insight can guide system tuning, policy changes, and resource planning.
+
+## Data Collection and Wrangling
+
+With our statistical question clearly defined, the next step is to make sure the data is suitable for analysis. Although we already have the dataset, it is useful to reflect on how this type of server performance data might have been collected. Understanding the data collection process helps us recognize potential limitations and prepare the data appropriately.
+
+### Data Collection
+
+For a study like this, where we analyze server response times across different conditions, data could have been collected through several common methods:
+
+- **Server Logs**: Most web servers automatically record detailed logs of every request. These logs typically include information like timestamps, request types, response time, server load, and geographic origin. This is a likely source for our dataset and provides reliable, machine-recorded data.
+
+- **Monitoring Tools**: Infrastructure monitoring platforms such as New Relic, Datadog, or AWS CloudWatch can capture performance metrics in real time. These tools often collect a richer set of metrics, including CPU usage, memory usage, and cache hit rates.
+
+- **Simulated Load Testing**: In controlled environments, engineers may run scripted performance tests to evaluate how different types of requests behave under varying traffic loads. While simulated data offers consistency, it may not reflect real-world user behavior.
+
+Each data collection method has its own strengths and trade-offs:
+
+- Server logs are objective but may lack high-level context (such as request complexity or user intent).
+- Monitoring tools are detailed but might involve sampling or missing values due to downtime.
+- Simulated tests offer control but may lack realism.
+
+Regardless of how the data was collected, it’s important to check for common issues such as:
+
+- Missing values in fields like server load or memory usage  
+- Incorrect or inconsistent formatting (e.g., “Yes” vs “yes” vs “TRUE”)  
+- Outliers in response time that may skew the results  
+- Categorical variables that need to be converted into a numerical format for modeling  
+
+All of these issues will be addressed in the next stage: data wrangling.
+
+### Data Wrangling
+
+Before we can apply Gamma regression, we need to prepare the data for modeling. This involves several key steps, including:
+
+- making sure the response variable is valid,
+- transforming categorical variables,
+- checking for missing or extreme values,
+- and scaling variables if needed.
+
+Let’s walk through how we might handle each part of the dataset.
+
+#### 1. Validating the Response Variable
+
+Gamma regression is designed for modeling outcomes that are strictly positive and continuous, especially when they are right-skewed. This makes it suitable for response variables like `response_time_ms`, which measures how long it takes for the server to respond to a request.
+
+Before fitting a Gamma model, we need to confirm that all values in `response_time_ms` are greater than zero.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+summary(gamma_server$response_time_ms)
+```
+
+## Python Code
+```{python}
+# Summary statistics for the response variable
+print(data["response_time_ms"].describe())
+
+# Check for any non-positive values
+print((data["response_time_ms"] <= 0).sum())
+```
+:::
+
+The summary shows that all values are strictly positive, which supports the use of Gamma regression for this task. If the dataset had included zeros or negative values, we would have needed to filter them out or consider applying a small offset.
+
+#### 2. Encoding Categorical Variables
+
+Gamma regression can only work with numeric inputs, so we need to convert categorical variables into numeric form. This includes:
+
+- `day_of_week`
+- `geographic_region`
+- `request_complexity`
+- `cdn_usage`
+
+The most common approach is **one-hot encoding**, where each category in a variable gets its own binary (0 or 1) column. For example, the variable `request_complexity` with three categories (`Simple`, `Moderate`, `Complex`) would be converted into:
+
+- `request_complexity_Simple`
+- `request_complexity_Moderate`
+- `request_complexity_Complex`
+
+To avoid **multicollinearity** (perfect correlation between predictors), we drop one category from each group. This dropped category becomes the reference level that all other levels are compared against.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+gamma_server_encoded <- fastDummies::dummy_cols(
+  gamma_server,
+  select_columns = c("day_of_week", "geographic_region", "request_complexity", "cdn_usage"),
+  remove_first_dummy = TRUE,
+  remove_selected_columns = TRUE
+)
+
+head(gamma_server_encoded)
+```
+
+## Python Code
+```{python}
+import pandas as pd
+
+# Perform one-hot encoding, drop first level from each category
+categorical_vars = ["day_of_week", "geographic_region", "request_complexity", "cdn_usage"]
+
+# Create dummy variables, drop first category from each
+data_encoded = pd.get_dummies(data, columns=categorical_vars, drop_first=True)
+
+# View the first few rows
+data_encoded.head()
+```
+:::
+
+This step ensures that all features going into the Gamma regression model are numeric and suitable for estimation. It also allows us to interpret the effect of each category relative to the baseline, which is the dropped category from each group.
+
+#### 3. Checking for Missing Values
+
+We now check for missing data across all variables:
+
+::: {.panel-tabset}
+## R Code
+```{r}
+# Count missing values in each column
+colSums(is.na(gamma_server_encoded))
+```
+
+## Python Code
+```{python}
+# Count missing values in each column
+data_encoded.isna().sum()
+```
+::: 
+
+If any variables have missing values, we could choose to:
+
+- drop rows with missing values,
+- or impute them using the median, mean, or another strategy.
+
+In this case, our toy dataset does not contain missing values, so we can proceed.
+
+#### 4. Examining Potential Outliers
+
+Outliers can sometimes affect regression models, especially in skewed data. Even though Gamma regression is robust to skew, it is still worth visualizing `response_time_ms`.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(ggplot2)
+
+ggplot(gamma_server_encoded, aes(x = response_time_ms)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  labs(title = "Distribution of Response Time", x = "Response Time (ms)", y = "Count")
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Histogram of response time
+plt.figure(figsize=(8, 5))
+sns.histplot(data_encoded["response_time_ms"], bins=30, color="steelblue", edgecolor="white")
+plt.title("Distribution of Response Time")
+plt.xlabel("Response Time (ms)")
+plt.ylabel("Count")
+plt.tight_layout()
+plt.show()
+```
+:::
+
+This histogram helps us confirm that the distribution is right-skewed, which matches our expectation and justifies the use of Gamma regression.
+
+Because Gamma-distributed data is naturally right-skewed, large values are often expected rather than abnormal. This makes it harder to define true outliers just by looking at the upper tail. Instead of removing them, we use a model (like Gamma regression) that can account for this kind of variation.
+
+#### 5. Scaling Continuous Variables (Optional)
+
+Gamma regression does not require inputs to be on the same scale, but scaling can improve model convergence and sometimes make coefficient interpretation easier, especially when the predictors have very different ranges.
+
+You may consider standardizing the following continuous predictors:
+
+- `concurrent_users`
+- `database_queries`
+- `cache_hit_rate`
+- `server_load`
+- `memory_usage`
+- `time_of_day`
+
+::: {.panel-tabset}
+## R Code
+```{r}
+gamma_server_encoded <- gamma_server_encoded %>%
+  mutate(across(c(concurrent_users, database_queries, cache_hit_rate, server_load, memory_usage, time_of_day), scale))
+```
+
+## Python Code
+```{python}
+from sklearn.preprocessing import StandardScaler
+
+# List of columns to scale
+scale_cols = ["concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day"]
+
+# Initialize scaler and apply to selected columns
+scaler = StandardScaler()
+data_encoded[scale_cols] = scaler.fit_transform(data_encoded[scale_cols])
+```
+:::
+
+
+#### A Note on Data Splitting
+
+In many machine learning tasks, it is common to split the data into training and test sets. However, in this case study, we are not aiming to build a predictive model. Our goal is to understand how different server and request characteristics influence the average response time, which is an inferential task.
+
+Because we are focused on interpreting the model rather than predicting new outcomes, we will use the entire dataset for model fitting. This allows us to make the best use of our data when estimating the effects of each variable.
+
+If our goal were to build a model that predicts server response time for future requests, we would consider splitting the dataset and evaluating prediction accuracy on a holdout set.
+
+## Exploratory Data Analysis (EDA)
+
+Before building a model, it is essential to explore the dataset to understand the structure of the variables and how they relate to one another. This process, known as Exploratory Data Analysis (EDA), helps uncover patterns, detect potential issues such as skewness or outliers, and guide modeling decisions.
+
+### Classifying Variables
+
+Our response variable is:
+
+- `response_time_ms`: a continuous, strictly positive variable measuring how long a server takes to respond to a request. This is well-suited for Gamma regression.
+
+The regressors in the dataset include:
+
+- **Continuous variables**:  
+  - `concurrent_users`, `database_queries`, `cache_hit_rate`, `server_load`, `memory_usage`, `time_of_day`
+- **Categorical variables**:  
+  - `cdn_usage`, `request_complexity`, `day_of_week`, `geographic_region`
+
+This classification helps us select appropriate plots and informs how we will encode variables for modeling.
+
+### Visualizing Variable Distributions
+
+#### Response Variable: `response_time_ms`
+
+We begin by examining the distribution of the response variable.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(ggplot2)
+
+ggplot(gamma_server_encoded, aes(x = response_time_ms)) +
+  geom_histogram(bins = 10, fill = "skyblue", color = "white") +
+  labs(title = "Histogram of Response Time (ms)",
+       x = "Response Time (ms)",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.histplot(data_encoded["response_time_ms"], bins=10, kde=True, color="skyblue")
+plt.title("Histogram of Response Time (ms)")
+plt.xlabel("Response Time (ms)")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+:::
+
+This histogram confirms that `response_time_ms` is strictly positive and right-skewed—just as we saw during data wrangling when we checked for negative values and visualized potential outliers.
+
+#### Categorical Variables
+
+We next examine how the categorical predictors are distributed. This visualization is based on the original dataset, before encoding. Visualizing these variables helps us check if any levels are underrepresented or imbalanced, which can affect model stability and interpretation.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(ggplot2)
+library(tidyr)
+
+categorical_vars <- c("cdn_usage", "request_complexity", "day_of_week", "geographic_region")
+
+for (var in categorical_vars) {
+  p <- ggplot(gamma_server, aes_string(x = var)) +
+    geom_bar(fill = "steelblue") +
+    labs(title = paste("Distribution of", var),
+         x = var,
+         y = "Count") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(p)
+}
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+categorical_vars = ["cdn_usage", "request_complexity", "day_of_week", "geographic_region"]
+
+for var in categorical_vars:
+    sns.countplot(x=var, data=data, palette="pastel")
+    plt.title(f"{var.replace('_', ' ').title()} Distribution")
+    plt.xlabel(var.replace("_", " ").title())
+    plt.ylabel("Count")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+```
+:::
+
+By examining these distributions, we can ensure that each category has enough observations to be meaningfully included in the model. If a category is rarely observed, it may need to be combined with others or omitted.
+
+#### Numerical Variables
+
+We now explore the distribution of each continuous predictor.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(ggplot2)
+
+continuous_vars <- c("concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day")
+
+for (var in continuous_vars) {
+  p <- ggplot(gamma_server, aes_string(x = var)) +
+    geom_histogram(bins = 10, fill = "cornflowerblue", color = "white") +
+    labs(title = paste("Distribution of", var),
+         x = var,
+         y = "Frequency") +
+    theme_minimal()
+  print(p)
+}
+```
+
+## Python Code
+```{python}
+continuous_vars = ["concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day"]
+
+for var in continuous_vars:
+    sns.histplot(data[var], bins=10, kde=True, color="cornflowerblue")
+    plt.title(f"Distribution of {var}")
+    plt.xlabel(var)
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.show()
+```
+:::
+
+These histograms help us detect skewness or outliers. Most variables are right-skewed but within expected ranges.
+
+
+### Visualizing Predictor Relationships to Response
+
+To understand how each predictor may influence response time, we examine:
+
+- Boxplots for categorical predictors
+- Scatterplots with trend lines for continuous predictors
+
+#### Categorical Predictors vs. Response
+
+::: {.panel-tabset}
+## R Code
+```{r categorical_to_response_R}
+categorical_vars <- c("cdn_usage", "request_complexity", "day_of_week", "geographic_region")
+
+for (var in categorical_vars) {
+  p <- ggplot(gamma_server, aes_string(x = var, y = "response_time_ms")) +
+    geom_boxplot(fill = "lightblue") +
+    labs(title = paste("Response Time by", var),
+         x = var,
+         y = "Response Time (ms)") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  print(p)
+}
+
+```
+
+## Python Code
+```{python categorical_to_response_Python}
+for var in ["cdn_usage", "request_complexity", "day_of_week", "geographic_region"]:
+    sns.boxplot(x=var, y="response_time_ms", data=data, palette="Set3")
+    plt.title(f"Response Time by {var.replace('_', ' ').title()}")
+    plt.xlabel(var.replace('_', ' ').title())
+    plt.ylabel("Response Time (ms)")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+```
+:::
+
+These boxplots help us assess whether server response times differ meaningfully across different categories.
+
+#### Continuous Predictors vs. Response
+
+::: {.panel-tabset}
+## R Code
+```{r numerical_to_response_R}
+continuous_vars <- c("concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day")
+
+for (var in continuous_vars) {
+  p <- ggplot(gamma_server, aes_string(x = var, y = "response_time_ms")) +
+    geom_point(color = "#008080") +
+    geom_smooth(method = "lm", se = FALSE, color = "red") +
+    labs(title = paste(var, "vs. Response Time"),
+         x = var,
+         y = "Response Time (ms)") +
+    theme_minimal()
+  print(p)
+}
+```
+
+## Python Code
+```{python numerical_to_response_Python}
+for var in ["concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day"]:
+
+    sns.scatterplot(x=var, y="response_time_ms", data=data, color="teal")
+    sns.regplot(x=var, y="response_time_ms", data=data, scatter=False, color="red")
+    plt.title(f"{var.replace('_', ' ').title()} vs. Response Time")
+    plt.xlabel(var.replace('_', ' ').title())
+    plt.ylabel("Response Time (ms)")
+    plt.tight_layout()
+    plt.show()
+```
+:::
+
+These plots help reveal trends or patterns that might inform model structure (e.g., transformations or interactions).
+
+### Key Takeaways from EDA
+
+From our exploratory analysis, we can make a few early observations:
+
+- The response variable (`response_time_ms`) is strictly positive and right-skewed, making Gamma regression an appropriate choice.
+- Most requests come from North America, while Africa and South America have relatively fewer entries.
+- The `concurrent_users` variable is also right-skewed, indicating that most requests happen under low to moderate user load, but some occur under heavy load.
+- Complex requests tend to have higher response times on average, as seen in the boxplots.
+
+These patterns help us understand the structure of the data and form initial hypotheses.
+
+::: {.Tip}
+::::{.Tip-header}
+Tip
+::::
+::::{.Tip-container}
+EDA is meant to explore patterns, not confirm conclusions. While these insights help guide model building, we should wait until after model fitting and diagnostics before making final interpretations.
+::::
+:::
+
+#### What other insights can you derive from the EDA?  
+Consider looking for interaction patterns, underrepresented categories, or any surprising trends that might affect how the model performs.
+
+
+## Data Modeling
+
+After conducting Exploratory Data Analysis (EDA), we now move into the modeling stage, where we apply a statistical model to better understand how different factors influence server response times. In this case study, we will use Gamma regression, a type of generalized linear model (GLM) that is well-suited for modeling continuous, positive, and skewed outcomes.
+
+Gamma regression models the average of the response variable, using a log link function to ensure the predicted values are always positive. This makes it a strong choice for data like `response_time_ms`, which can vary widely and never go below zero.
+
+### Choosing a Suitable Regression Model
+
+The choice of regression model depends on both the nature of the response variable and the goal of the analysis. In our case:
+
+- The response variable, `response_time_ms`, is continuous, strictly positive, and right-skewed.
+- The goal is to explain which factors influence the average response time, not to predict future outcomes.
+
+Because of this, Gamma regression with a log link is an appropriate model. It allows us to:
+
+- model the response in its original (positive-only) scale,
+- handle right-skewed data,
+- and interpret results in terms of multiplicative changes in the mean response.
+
+This makes it more flexible than Ordinary Least Squares (OLS), which assumes constant variance and symmetry around the mean, assumptions that don’t hold in our dataset.
+
+### Defining Modeling Parameters
+
+With the model chosen, we now define the variables that will go into our equation.
+
+#### Response Variable (Y):
+
+- `response_time_ms`: the time (in milliseconds) for the server to respond to a request. This is the outcome we want to explain.
+
+#### Predictor Variables (X):
+
+We include the following variables as predictors, based on the dataset and our exploratory analysis:
+
+- `concurrent_users` (Continuous) – Number of users on the server at the time of the request  
+- `database_queries` (Continuous) – Number of database operations triggered by the request  
+- `cache_hit_rate` (Continuous) – Percentage of data served from cache  
+- `server_load` (Continuous) – Current CPU load on the server  
+- `memory_usage` (Continuous) – Percent of memory currently used  
+- `time_of_day` (Continuous) – Hour of the day when the request was made (0–23)  
+- `cdn_usage` (Categorical) – Whether or not a content delivery network (CDN) was used  
+- `request_complexity` (Categorical) – Complexity of the request: Simple, Moderate, or Complex  
+- `day_of_week` (Categorical) – Day of the week the request was made  
+- `geographic_region` (Categorical) – Region where the request originated  
+
+These variables represent a mix of technical metrics (server load, memory usage), behavioral context (request complexity, time of day), and infrastructure details (CDN usage, region), providing a well-rounded view of what affects response time.
+
+### Setting Up the Modeling Equation
+
+With our predictors defined, the Gamma regression equation models the **log of the average response time** as a linear function of the predictors:
+
+<div style="overflow-x: auto; white-space: nowrap;">
+
+$$
+\begin{align*}
+\log(\mu_i) &= \beta_0 \\
+&\quad + \beta_1 \times \text{concurrent\_users}_i \\
+&\quad + \beta_2 \times \text{database\_queries}_i \\
+&\quad + \beta_3 \times \text{cache\_hit\_rate}_i \\
+&\quad + \beta_4 \times \text{server\_load}_i \\
+&\quad + \beta_5 \times \text{memory\_usage}_i \\
+&\quad + \beta_6 \times \text{time\_of\_day}_i \\
+&\quad + \beta_7 \times \text{cdn\_usage}_i \\
+&\quad + \beta_8 \times \text{request\_complexity}_i \\
+&\quad + \beta_9 \times \text{day\_of\_week}_i \\
+&\quad + \beta_{10} \times \text{geographic\_region}_i
+\end{align*}
+$$
+
+</div>
+
+We can then back-transform the predicted value from the log scale using the exponential function:
+
+$$
+\mu_i = \exp(\text{linear combination of predictors})
+$$
+
+where:
+
+- $\mu_i$ is the expected average response time for the $i$-th request  
+- $\beta_0$ is the intercept  
+- $\beta_1, \beta_2, \ldots \beta_{10}$ are the coefficients for each predictor  
+
+Each coefficient describes the **multiplicative effect** on the mean response time:
+
+- $\beta_1$: How response time changes as the number of concurrent users increases  
+- $\beta_7$: The impact of CDN usage versus not using a CDN  
+- $\beta_8$: How request complexity levels (Moderate or Simple) compare to the base level (Complex)  
+- $\beta_{10}$: Regional differences in server response behavior
+
+This model structure allows us to capture both technical and contextual effects on server performance using a regression framework suited for positive and skewed outcomes.
+
+
+## Estimation
+
+With the data modeling stage completed, we now move on to **estimation**, where we fit the Gamma regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how each predictor influences the **average server response time**.
+
+Unlike OLS, which minimizes squared errors, Gamma regression uses **maximum likelihood estimation**, which is more appropriate when the outcome is skewed and strictly positive.
+
+### Fitting the Model
+
+We fit the Gamma regression model using the log link function, which models the logarithm of the average response time. This ensures all predicted values remain positive.
+
+In R, you can use the `glm()` function with `family = Gamma(link = "log")`. In Python, we use `statsmodels` with the Gamma family and log link:
+
+::: {.panel-tabset}
+## R Code
+```{r r-model}
+# Load required library
+library(stats)
+
+# Fit Gamma regression model
+gamma_model <- glm(
+  response_time_ms ~ concurrent_users + database_queries + cache_hit_rate +
+    server_load + time_of_day + memory_usage +
+    day_of_week_Monday + day_of_week_Saturday + day_of_week_Sunday +
+    day_of_week_Thursday + day_of_week_Tuesday + day_of_week_Wednesday +
+    geographic_region_Asia_Pacific + geographic_region_Europe +
+    geographic_region_North_America + geographic_region_South_America +
+    request_complexity_Moderate + request_complexity_Simple +
+    cdn_usage_Yes,
+  family = Gamma(link = "log"),
+  data = gamma_server_encoded
+)
+
+# Display model summary
+summary(gamma_model)
+```
+
+## Python Code
+```{python python-model}
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+# Fit Gamma regression model using log link
+gamma_model = smf.glm(
+    formula="""
+        response_time_ms ~ concurrent_users + database_queries + cache_hit_rate +
+        server_load + time_of_day + memory_usage +
+        day_of_week_Monday + day_of_week_Saturday + day_of_week_Sunday +
+        day_of_week_Thursday + day_of_week_Tuesday + day_of_week_Wednesday +
+        geographic_region_Asia_Pacific + geographic_region_Europe +
+        geographic_region_North_America + geographic_region_South_America +
+        request_complexity_Moderate + request_complexity_Simple +
+        cdn_usage_Yes
+    """,
+    data=data_encoded,
+    family=sm.families.Gamma(link=sm.families.links.log())
+).fit()
+
+# Display model summary
+print(gamma_model.summary())
+
+```
+:::
+
+### Interpreting the Coefficients
+
+The regression equation models the log of the average response time as a linear combination of the predictors. Based on our estimates, the fitted equation is approximately:
+
+<div style="overflow-x: auto; white-space: nowrap;">
+
+$$
+\begin{align*}
+\log(\mu) &= 5.85 \\
+&\quad + 0.276 \times \text{concurrent\_users} \\
+&\quad + 0.407 \times \text{database\_queries} \\
+&\quad - 0.384 \times \text{cache\_hit\_rate} \\
+&\quad + 0.411 \times \text{server\_load} \\
+&\quad + 0.197 \times \text{memory\_usage} \\
+&\quad + \cdots \\
+&\quad - 0.116 \times \text{geographic\_region\_South\_America}
+\end{align*}
+$$
+
+</div>
+
+Let’s interpret a few statistically significant coefficients:
+
+- `cdn_usage_Yes` has a coefficient of $-0.382$ ($p < 0.001$). Taking the exponent gives $\exp(-0.382) \approx 0.682$, which means CDN usage is associated with about a 32% reduction in average response time.
+
+- `request_complexity_Simple` has a coefficient of $-1.321$ ($p < 0.001$). Since $\exp(-1.321) \approx 0.27$, simple requests take about 73% less time than complex ones (the reference category).
+
+- `cache_hit_rate` has a coefficient of $-0.384$ ($p < 0.001$). This means each 1 unit increase in cache hit rate (from 0 to 1) multiplies the response time by $\exp(-0.384) \approx 0.68$, or reduces it by about 31.6%. For small changes, we can say a 1% increase reduces time by about 0.384%.
+
+- `concurrent_users` has a coefficient of $+0.276$ ($p < 0.001$). This implies each additional user increases the expected response time by about 32%, since $\exp(0.276) \approx 1.32$.
+
+- `server_load` has a coefficient of $+0.411$ ($p < 0.001$). An increase of 1 unit in load multiplies the response time by $\exp(0.411) \approx 1.51$, or a 51% increase.
+
+- Requests from `Europe` ($-0.551$), `North_America` ($-0.750$), and `Asia_Pacific` ($-0.352$) all have negative coefficients compared to the reference group (Africa). This means they are associated with shorter response times: about 42%, 53%, and 30% shorter respectively after exponentiating the coefficients.
+
+
+## Goodness of Fit
+
+After fitting our Gamma regression model, the next step is to check whether it fits the data well. In other words, does the model capture the patterns in the data, or is it missing something?
+
+A common way to do this is by examining the residuals — the differences between what the model predicts and what we actually observe.
+
+### Deviance Residuals vs. Fitted Values
+
+In generalized linear models like Gamma regression, we use something called deviance residuals. These are special residuals that account for the type of model we're using. They're designed to help us detect if the model is systematically making mistakes.
+
+Below is a plot of deviance residuals against the model’s fitted values (the predicted average response time for each observation):
+
+::: {.panel-tabset}
+## R Code
+```{r}
+# Plot deviance residuals vs fitted values
+plot(gamma_model$fitted.values, residuals(gamma_model, type = "deviance"),
+     main = "Deviance Residuals vs Fitted Values",
+     xlab = "Fitted Values",
+     ylab = "Deviance Residuals",
+     pch = 19, col = "blue")
+abline(h = 0, lty = 2, col = "red")
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+# Fitted values and deviance residuals
+fitted_values = gamma_model.fittedvalues
+deviance_residuals = gamma_model.resid_deviance
+
+# Plot
+plt.scatter(fitted_values, deviance_residuals, color="blue", s=30)
+plt.axhline(0, linestyle="--", color="red")
+plt.title("Deviance Residuals vs Fitted Values")
+plt.xlabel("Fitted Values")
+plt.ylabel("Deviance Residuals")
+plt.tight_layout()
+plt.show()
+```
+:::
+
+####  How to Read This Plot
+
+- The horizontal axis shows the predicted values from the model
+- The vertical axis shows the deviance residuals
+- The red dashed line at 0 represents perfect predictions (a residual of 0 means the model’s prediction was spot-on)
+
+In a well-fitting model, we expect the residuals to:
+
+- Be centered around zero (no major bias above or below)
+- Show no strong patterns
+- Be roughly equally spread out across the range of fitted values
+
+This plot checks those boxes pretty well.
+
+#### Why the Spread Looks Flat
+
+You might expect residuals to spread out more as the predicted value increases, especially in a Gamma model, where variance increases with the mean. But remember: deviance residuals have already been scaled to account for that.
+
+That’s why the spread of points looks more even instead of fanning outward. This is actually a good sign. It tells us the model is appropriately handling the increasing variability.
+
+### Deviance and AIC
+
+Along with examining the residual plot, we can also use a few numeric summaries to check how well our model fits.
+
+#### Residual Deviance
+
+In linear regression, we often talk about “squared error” to see how close the model’s predictions are to the actual values. In Gamma regression, we use something called **residual deviance** instead. It tells us how much error remains after fitting the model.
+
+We also compare this to the **null deviance**, which is the error you'd get if the model only used the overall average and ignored all predictors.
+
+Here’s what we got:
+
+- **Null deviance**: 1447.44  
+- **Residual deviance**: 565.82  
+
+This is a big drop in deviance, which means the predictors in our model are doing a good job explaining the variation in response time.
+
+#### AIC (Akaike Information Criterion)
+
+Another summary is the **Akaike Information Criterion (AIC)**. You can think of AIC as a score that balances two things:
+
+- How well the model fits the data  
+- How simple the model is (fewer predictors = simpler)
+
+A lower AIC means a better model overall. Our model’s AIC is:
+
+- **AIC**: 10028
+
+While this number is hard to interpret on its own, it becomes useful if we want to compare this model to another version with fewer or different predictors. In those cases, the model with the lower AIC is preferred.
+
+## Results
+
+Now that we have fit the model and checked its assumptions, we can focus on the key findings. These results help us answer our original question:
+
+> **What factors influence the average response time of a server?**
+
+Because we used a Gamma regression model with a log link, the coefficients are interpreted multiplicatively on the original scale. That means a one-unit change in a predictor corresponds to a percentage change in the expected response time, holding other variables constant.
+
+### Statistically Significant Predictors
+
+Several predictors in our model have p-values less than 0.05, which means there is strong statistical evidence that they influence average server response time:
+
+- Concurrent users: The coefficient is 0.276. This means for each additional concurrent user, the expected response time increases by a factor of $e^{0.276} \approx 1.32$, or 32%. This is a substantial increase.
+
+- Database queries: With a coefficient of 0.407, each additional database query increases the response time by a factor of $e^{0.407} \approx 1.50$, or 50%. More queries mean heavier processing load.
+
+- Cache hit rate: The coefficient is $-0.384$. This means that a one-unit increase in cache hit rate (e.g., from 60% to 61%) is associated with a decrease in response time by $e^{-0.384} \approx 0.68$, or 32%.
+
+- Server load: The coefficient is 0.411. This corresponds to a 50.9% increase in response time per unit increase in server load ($e^{0.411} \approx 1.51$), which aligns with intuition.
+
+- Memory usage: This has a positive coefficient of 0.197. Each unit increase in memory usage increases expected response time by $e^{0.197} \approx 1.22$, or 22%.
+
+- CDN usage: The coefficient is $-0.382$. Using a content delivery network is associated with a 31.8% decrease in expected response time ($e^{-0.382} \approx 0.68$).
+
+- Request complexity (Moderate and Simple): Compared to complex requests, moderate requests reduce response time by about 44.7% ($e^{-0.589} \approx 0.55$), and simple requests reduce it by about 73.4% ($e^{-1.321} \approx 0.27$).
+
+- Geographic region: Requests from Asia Pacific, Europe, and North America all show significantly shorter response times compared to the reference region. For example, the coefficient for North America is $-0.750$, meaning a 52.8% shorter response time on average ($e^{-0.750} \approx 0.47$).
+
+### Non-Significant Predictors
+
+The following predictors have p-values greater than 0.05 and are not statistically significant in this model:
+
+- Time of day: This does not appear to have a measurable effect on response time.
+
+- Day of week: Most weekday indicators are not significant, suggesting that response time is consistent across the week.
+
+- South America: The coefficient is small and the p-value is high, indicating no strong evidence of different response times compared to the baseline region.
+
+These variables might still play a role in different datasets or under different modeling assumptions, but here they do not provide strong enough evidence to conclude an effect.
+
+
+### Bringing It All Together
+
+The model gives us a clear picture: response time increases with server demand and processing effort, and decreases with smart infrastructure choices like caching and using CDNs. These findings are consistent with what we would expect in a real-world web performance scenario.
+
+We now have both statistical evidence and model-based estimates to support these insights. In the next section, we will discuss how to communicate these results clearly through storytelling.
+
+## Storytelling
+
+Now that we’ve estimated the model and assessed its fit, the final step is to consider how the results can actually be used. This part of the workflow is often referred to as **storytelling**, where we connect the analysis back to practical decision-making.
+
+The Gamma regression model helps identify which factors are associated with longer or shorter server response times. This insight can be used by different teams to:
+
+- Optimize system performance (e.g., improving caching or handling complex requests)
+- Allocate server resources more effectively during high traffic
+- Justify infrastructure choices, such as the use of CDNs
+- Make informed product and design decisions based on performance trade-offs
+
+Rather than just reporting coefficients or p-values, storytelling is about translating results into actions. This ensures that the analysis leads to meaningful improvements or supports evidence-based decisions.
+
 
 ::: {#fig-gamma-regression}
 ```{mermaid}
