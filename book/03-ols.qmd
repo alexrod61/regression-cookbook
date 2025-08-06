@@ -1041,6 +1041,8 @@ These estimates provide an initial understanding of the direction and magnitude 
 
 ## Goodness of Fit
 
+
+
 After estimating the regression coefficients, the next step is to assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation ensures that the model is not only statistically valid but also generalizes well to unseen data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are violated, model estimates may be biased, leading to misleading conclusions.
 
 ### Checking Model Assumptions
@@ -1120,9 +1122,13 @@ If the test suggests autocorrelation, a possible solution is to use time-series 
 
 #### Homoscedasticity (Constant Variance of Errors)
 
+
+
 OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
 
 To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.
+
+
 
 ::: {.panel-tabset}
 ## R Code
@@ -1142,22 +1148,28 @@ exog = ols_model.model.exog  # independent variables (with intercept)
 bp_test = het_breuschpagan(residuals, exog)
 
 # Unpack results
-bp_stat, bp_pvalue, _, _ = bp_test
+bp_stat, bp_pvalue, empty, empty = bp_test
 
 print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
 print(f"P-value: {bp_pvalue:.4f}")
 ```
 :::
 
+
+
 Since the p-value (0.1563) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
 
 If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
+
+
 
 #### Normality of Residuals
 
 For valid hypothesis testing and confidence interval estimation, OLS assumes that residuals follow a normal distribution. If residuals deviate significantly from normality, statistical inference may be unreliable, particularly for small sample sizes.
 
 A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
+
+
 
 ::: {.panel-tabset}
 ## R Code
@@ -1176,12 +1188,14 @@ residuals = ols_model.resid
 
 # Q-Q plot of residuals
 plt.figure(figsize=(6, 4))
-_ = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
+empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
 plt.title("Q-Q Plot of Residuals")
 plt.tight_layout()
 plt.show()
 ```
 :::
+
+
 
 The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.
 
@@ -1285,11 +1299,17 @@ plt.show()
 ```
 :::
 
+
+
 In the plot above, all observations have Cook’s Distance values well below the 0.5 threshold. This indicates that no individual data point has an undue influence on the model’s estimates. 
 
 If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
 
+
+
 ## Results
+
+
 
 After validating the goodness of fit, we now assess how well the model performs in both predictive analysis and inferential analysis. This step involves using the trained model to generate predictions on unseen data and evaluating how well it generalizes beyond the training set. Additionally, we analyze the estimated regression coefficients to draw meaningful conclusions about student financial behaviors.
 
@@ -1378,6 +1398,9 @@ In this case, the model’s performance metrics are encouraging. With a MAE of 1
 
 Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in `Net_Money` for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.
 
+
+
+
 #### Insights from Regression Coefficients
 
 Here are a few insights that we can extract from the regression model result:
@@ -1392,7 +1415,6 @@ These findings suggest that students can improve their financial position throug
 ## Storytelling
 
 The final step in our data science workflow is storytelling, where we translate our analytical findings into actionable insights. This stage ensures that our results are clearly understood by both technical and non-technical audiences. Effective storytelling involves summarizing insights, using visuals for clarity, and making data-driven recommendations.
-
 
 ## Practice Problems
 
@@ -1528,49 +1550,44 @@ To answer this, the questions below will guide you through an OLS analysis on th
 <summary><strong>Click to reveal answer</strong></summary>
 
 ::: {.panel-tabset}
-## Python Code
-```{.python}
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from scipy import stats
+## R Code
+```{r}
+# Load required libraries
+library(readr)
+library(ggplot2)
+library(tidyverse)
 
 # Read data
-# point this to the data location
-df = pd.read_csv("./problem-1-data.csv") 
+df <- read_csv("./problem-1-data.csv")
 
-# 1.2 Check for missing entries
-print("Missing values:\n", df.isnull().sum())
+# A.1 Check for missing entries
+cat("Missing values:\n")
+print(colSums(is.na(df)))
 
-# 1.3 Plot histograms
-fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
-for i, col in enumerate(df.columns):
-    axes[i].hist(df[col], bins=30, alpha=0.5)
-    axes[i].set_title(f'Distribution of {col}')
-plt.tight_layout()
-plt.show()
+# A.2 Plot histograms (using ggplot2)
+# Pivot the data longer so we can facet
+df_long <- df %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
 
-# 1.4 Plot relationships with outcome
-fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
-predictors = ['current_grade', 'prior_courses', 'hours_studied']
-for i, pred in enumerate(predictors):
-    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
-    axes[i].set_title(f'exam_score vs {pred}')
-plt.tight_layout()
-plt.show()
+ggplot(df_long, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.5) +
+  facet_wrap(~ variable, scales = "free", nrow = 1) +
+  theme_minimal() +
+  ggtitle("Distribution of each variable")
+
+# A.3 Plot relationships with outcome
+predictors <- c("current_grade", "prior_courses", "hours_studied")
+
+for (pred in predictors) {
+  p <- ggplot(df, aes(x = .data[[pred]], y = exam_score)) +
+    geom_point(alpha = 0.6) +
+    ggtitle(paste("exam_score vs", pred)) +
+    theme_minimal()
+  print(p)
+}
 ```
 
-:::
-
-::: {.panel-tabset}
-
-## Python Output
+## Python Code
 ```{python}
-#| echo: false
-#| message: false
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1617,47 +1634,43 @@ plt.show()
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
-## Python Code
-
-```{.python}
+## R Code
+```{r}
 # B.1 Fit initial model
-model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
-print(model1.summary())
+model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
+summary(model1)
 
 # B.2 Report R² and coefficients
-print(f"\nR-squared: {model1.rsquared:.3f}")
-print("Coefficients:")
-print(model1.params)
+cat(sprintf("\nR-squared: %.3f\n", summary(model1)$r.squared))
+cat("Coefficients:\n")
+print(coef(model1))
 
-# B.3 Residuals vs fitted
-sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
-plt.xlabel('Fitted values')
-plt.ylabel('Residuals')
-plt.title('Residuals vs Fitted')
-plt.show()
+# B.3 Residuals vs Fitted
+ggplot(data = NULL, aes(x = fitted(model1), y = resid(model1))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(x = "Fitted values", y = "Residuals", title = "Residuals vs Fitted") +
+  theme_minimal()
 
 # B.4 Q-Q plot
-sm.qqplot(model1.resid, line='45')
-plt.title('Q-Q Plot of Residuals')
-plt.show()
-```
-</details>
-:::
+ggplot(data = NULL, aes(sample = resid(model1))) +
+  stat_qq(alpha = 0.6) +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Residuals") +
+  theme_minimal()
 
-::: {.panel-tabset}
-## Python Output
+```
+
+## Python Code
 
 ```{python}
-#| echo: false
-#| message: false
 # B.1 Fit initial model
 model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
 print(model1.summary())
 
 # B.2 Report R² and coefficients
 print(f"\nR-squared: {model1.rsquared:.3f}")
-print("Coefficients:")
-print(model1.params)
+print("Coefficients:\n", model1.params)
 
 # B.3 Residuals vs fitted
 sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
@@ -1683,38 +1696,34 @@ plt.show()
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
+## R Code
+```{r}
+# C.1 Convert prior_courses to categorical and fit model
+df <- df %>% mutate(prior_courses_category = factor(prior_courses))
+
+model2 <- lm(exam_score ~ current_grade + prior_courses_category + hours_studied, data = df)
+cat("Model 2:\n")
+summary(model2)
+cat("##########################################################\n")
+
+# C.2 Log transform hours_studied and fit model
+df <- df %>% mutate(log_hours = log(hours_studied))
+
+model3 <- lm(exam_score ~ current_grade + prior_courses + log_hours, data = df)
+cat("Model 3:\n")
+summary(model3)
+cat("##########################################################\n")
+
+# C.3 Add interaction term
+model4 <- lm(exam_score ~ current_grade * prior_courses + hours_studied, data = df)
+cat("Model 4:\n")
+summary(model4)
+
+```
+
 ## Python Code
 
-```{.python}
-# C.1 Convert prior_courses to categorical
-df["prior_courses_category"] = df['prior_courses'].astype('category')
-model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
-             data=df.dropna()).fit()
-print(model2.summary())
-print("##########################################################")
-
-
-# C.2 Log transform hours_studied
-df['log_hours'] = np.log(df['hours_studied'])
-model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
-             data=df.dropna()).fit()
-print(model3.summary())
-print("##########################################################")
-
-
-# C.3 Add interaction term
-model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
-             data=df.dropna()).fit()
-print(model4.summary())
-```
-</details>
-:::
-::: {.panel-tabset}
-## Python Output
-
 ```{python}
-#| echo: false
-#| message: false
 # C.1 Convert prior_courses to categorical
 df["prior_courses_category"] = df['prior_courses'].astype('category')
 model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
@@ -1738,6 +1747,7 @@ print(model4.summary())
 ```
 </details>
 :::
+
 ### D. Final Evaluation {.unnumbered}
 1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
 2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
@@ -1746,37 +1756,41 @@ print(model4.summary())
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
+## R Code
+```{r}
+# D.1 Compare models
+# Create a comparison table of R² and RMSE
+models <- list(
+  Initial = model1,
+  Categorical = model2,
+  Log_Transform = model3,
+  Interaction = model4
+)
+
+results <- tibble(
+  Model = names(models),
+  R_squared = sapply(models, function(m) summary(m)$r.squared),
+  RMSE = sapply(models, function(m) sqrt(mean(resid(m)^2)))
+)
+
+# Show models sorted by R-squared
+results %>% arrange(desc(R_squared)) %>% print()
+
+
+# D.2 Interpretation of final model (model3)
+# Interpretation: effect of a 5% increase in current_grade
+coef <- coef(model3)["current_grade"]
+effect <- 0.05 * coef
+
+cat(sprintf("\nA 5%% increase in current_grade increases exam_score by %.5f points\n", effect))
+
+# D.3 Diminishing returns explanation
+cat("\nDiminishing returns explanation:\n")
+cat("Example: students might feel overconfident having taken more courses.\n")
+```
+
 ## Python Code
-```{.python}
-# D.1 Compare models
-models = {
-    'Initial': model1,
-    'Categorical': model2,
-    'Log Transform': model3,
-    'Interaction': model4
-}
-
-results = pd.DataFrame({
-    'Model': models.keys(),
-    'R-squared': [m.rsquared for m in models.values()],
-    'RMSE': [np.sqrt(m.mse_resid) for m in models.values()]
-})
-print(results.sort_values('R-squared', ascending=False))
-
-# D.2 Interpretation of final model (model3)
-final_model = model3
-coef = final_model.params['current_grade']
-print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
-
-# D.3 Diminishing returns explanation
-print("\nDiminishing returns explanation:")
-print("Example: students might feel overconfident having taken more courses.")
-```
-::: {.panel-tabset}
-## Python Output
 ```{python}
-#| echo: false
-#| message: false
 # D.1 Compare models
 models = {
     'Initial': model1,
@@ -1801,6 +1815,7 @@ print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f}
 print("\nDiminishing returns explanation:")
 print("Example: students might feel overconfident having taken more courses.")
 ```
+
 </details>
 
 
