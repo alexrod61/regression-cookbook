@@ -169,13 +169,13 @@ plt.tight_layout()
 plt.show()
 ```
 
-This plot shows how the shape parameter changes the look of the Gamma distribution. It helps explain why Gamma regression is such a good match for skewed data.
+The plot above shows how the shape parameter changes the look of the Gamma distribution. It helps explain why Gamma regression is such a good match for skewed data.
 
 ## How Gamma Regression Works
 
-Gamma regression helps us understand how the average value of something positive changes with different conditions. But it does this in a slightly different way than regular linear regression.
+Now that we know what Gamma regression is and the kinds of problems it solves, let’s look at how it actually works. The key idea is that Gamma regression doesn’t model the outcome values directly. Instead, it focuses on the average outcome and relates it to predictors in a way that respects the positive, skewed nature of the data.
 
-> Instead of predicting the outcome directly, Gamma regression predicts the log of the average outcome. This is done using something called a **link function**.
+To make this possible, Gamma regression relies on a **link function**. A link function is simply a transformation that connects the predictors to the mean of the response in a way that makes modeling easier. In the case of Gamma regression, the **log link** is most common.
 
 ### The Role of the Link Function
 
@@ -184,17 +184,11 @@ Gamma regression helps us understand how the average value of something positive
 Link Function
 ::::
 ::::{.definition-container}
-A link function is just a transformation that helps the model do a better job. For Gamma regression, the most common link function is the log link.
+A link function is a transformation that connects predictors to the mean of the response. For Gamma regression, the most common link function is the log link.
 ::::
 :::
 
-Using the log has three main benefits:
-
-- It helps control large numbers by flattening them out
-- It makes sure our predictions stay positive
-- It turns certain patterns into straight lines, which are easier to model
-
-This means that Gamma regression is actually fitting a model like:
+With the log link, the model is mathematically expressed as:
 
 $$
 \log(\mu_i) = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \cdots + \beta_p x_{ip}
@@ -205,13 +199,19 @@ where:
 - $\mu_i$ is the average (expected) outcome for the $i$-th observation  
 - $x_{i1}, x_{i2}, \ldots$ are the input values (predictors)
 
-Later, we can convert the predicted log value back to the original scale using the exponential function:
+To return to the original outcome scale, we simply apply the exponential function:
 
 $$
 \mu_i = \exp(\beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip})
 $$
 
-This guarantees that our predictions will always be positive.
+This transformation ensures that all predicted values remain strictly positive.
+
+#### Why use the log link?
+
+- It compresses very large values, making them easier to handle.
+- It guarantees that predicted outcomes are positive.
+- It turns multiplicative patterns in the data into additive ones on the log scale, which makes them easier to model with straight-line relationships.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -219,9 +219,8 @@ Tip
 ::::
 ::::{.Tip-container}
 
-The idea of a **link function** can seem abstract at first, but a quick plot can help make it more concrete. In Gamma regression, we usually use the **log link**, which means the model fits a straight line to the log of the mean response, then transforms it back to the original scale.
+The log link can seem abstract at first, but the plots below show what it does. On the left, the model is fit as a straight line to the log of the mean response: $\log(\mu) = 2 + 0.5x$. On the right, that line is transformed back to the original scale, where it becomes a smooth exponential curve: $\mu = \exp(2 + 0.5x)$.
 
-Here’s a visual example:
 
 ```{python}
 #| echo: false
@@ -260,17 +259,20 @@ plt.tight_layout()
 plt.show()
 ```
 
-- In Gamma regression, we fit a model to the log of the expected outcome $\log(\mu)$, not directly to $\mu$.
-- The left plot shows a straight-line relationship: $\log(\mu) = 2 + 0.5x$.
-- The right plot shows the back-transformed version: $\mu = \exp(2 + 0.5x)$, which curves upward.
-- This transformation ensures that all predicted values are positive and allows the model to capture multiplicative effects that are common in skewed, positive data.
+This example highlights three important points:
+
+- We fit the regression on the log scale, not directly on the outcome scale.
+- After back-transforming, predictions are curved but always stay positive.
+- The log link lets us capture multiplicative effects (percent changes) using a simple straight-line relationship.
+
+So, the log link is really just a way of “straightening the curve” so the model can handle skewed, positive data more easily.
 
 ::::
 :::
 
 ### Examples of What Gamma Regression Is Trying to Predict
 
-Gamma regression is often used when we want to understand how average outcomes change under different conditions. It is especially helpful when those outcomes vary widely between observations.
+Now that we’ve seen how the log link helps Gamma regression connect predictors to a positive, skewed outcome, let’s look at the kinds of questions this model is most useful for. In practice, Gamma regression is often applied when we care about average outcomes that vary widely but must remain above zero.
 
 Some practical examples include:
 
@@ -278,11 +280,11 @@ Some practical examples include:
 - In retail, modeling how much customers typically spend depending on their shopping behavior  
 - In web analytics, analyzing how different system settings affect the average page load time  
 
-In all these cases, we are interested in typical outcomes, not just predicting individual values. Gamma regression lets us model these averages in a flexible and meaningful way.
+In all these cases, the focus is not on predicting any single outcome perfectly, but on understanding how conditions shift the expected value. Gamma regression provides a flexible and reliable way to capture those relationships.
 
 ## When to Use and Not Use Gamma Regression
 
-Now that we understand what Gamma regression does and how it models positive, skewed outcomes, it is helpful to summarize the specific conditions under which this method is appropriate and when it might not be a good fit.
+The examples above show the kinds of problems Gamma regression is well-suited for. But how do we know if it’s the right choice in practice? To answer that, let’s pin down the conditions where Gamma regression works best and where it doesn’t.
 
 ::: {.Warning}
 :::: {.Warning-header}
@@ -290,18 +292,20 @@ When to Use and Not Use Gamma Regression
 ::::
 :::: {.Warning-container}
 
-Gamma regression is a type of generalized linear model that is appropriately used under the following conditions:
+Gamma regression is powerful, but it isn’t a one-size-fits-all tool. It shines in some situations and breaks down in others. The checklist below can help you decide.
 
-- The outcome variable is **continuous** and **non-negative** as shown in `@fig-gamma-regression`. Examples include insurance claim amounts, pollutant concentrations, and operational spending. Note that this outcome should not be a count variable.
-- Outcomes are **statistically independent** from one to the next.
-- The distribution of the outcome is **right-skewed**. This means that as the mean of the outcome increases, the variance also increases at a faster rate.
-- We intend to use the **logarithm of the mean** of the outcome as a **link function**, which ensures that our predictions are always positive.
+Use Gamma regression when:
 
-However, Gamma regression should not be used in the following scenarios:
+- The outcome is continuous and strictly positive (e.g., insurance claim amounts, pollutant concentrations, operational spending).
+- Observations are statistically independent.
+- The distribution is right-skewed, where variance grows faster than the mean.
+- You want to model the logarithm of the mean as a link function, which guarantees positive predictions.
 
-- The outcome variable **includes zeros or negative values**.
-- The outcome variable is of the count type. In this case, check the [Classical Poisson](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), [Negative Binomial](https://alexrod61.github.io/regression-cookbook/book/11-negative-binomial.html), [Zero-Inflated Poisson](https://alexrod61.github.io/regression-cookbook/book/12-zero-inflated-poisson.html) or [Generalized Poisson](https://alexrod61.github.io/regression-cookbook/book/13-generalized-poisson.html) regressions.
-- The variance of the outcome **increases at a constant rate** relative to the corresponding mean.
+Avoid Gamma regression when:
+
+- The outcome includes zeros or negative values.
+- The outcome is a count variable. In that case, consider alternatives like [Classical Poisson](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), [Negative Binomial](https://alexrod61.github.io/regression-cookbook/book/11-negative-binomial.html), [Zero-Inflated Poisson](https://alexrod61.github.io/regression-cookbook/book/12-zero-inflated-poisson.html) or [Generalized Poisson](https://alexrod61.github.io/regression-cookbook/book/13-generalized-poisson.html).
+- The variance increases at a constant rate with the mean, rather than at a faster rate (a sign another GLM family may be more appropriate).
 
 ::::
 :::
