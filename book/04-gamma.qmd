@@ -314,7 +314,7 @@ Avoid Gamma regression when:
 
 To demonstrate Gamma regression in action, we will walk through a case study using a toy dataset. This case study will help us understand what affects the *response time of a web server*. Specifically, how long it takes (in milliseconds) for the server to respond to a user’s request.
 
-We will approach this case study using the [data science workflow](01-intro.qmd) introduced earlier. This ensures a structured approach to framing the problem, selecting a model, and building an interpretation based on the model’s results.
+We will approach this case study using the [data science workflow](01-intro.qmd) introduced in the first chapter. This ensures a structured approach to framing the problem, selecting a model, and building an interpretation based on the model’s results.
 
 ### The Dataset
 
@@ -350,41 +350,33 @@ This dataset allows us to analyze performance differences in web servers under d
 
 ### The Problem We’re Trying to Solve
 
-Our main goal in this case study is to understand which factors lead to slower or faster server response times. Since response time is continuous, strictly positive, and often right-skewed, it fits the assumptions of Gamma regression well.
+In this case study, our goal is to analyze what drives differences in web server response times. Because response time is continuous, strictly positive, and often right-skewed, Gamma regression is a natural choice for modeling it.
 
 The key question we aim to answer is:
 
 > **Which server or request characteristics have the biggest influence on response time?**
 
-By fitting a Gamma regression model, we can go beyond just identifying important factors. We can also:
-
-- Estimate how each variable affects the *average* response time
-- Determine whether a factor increases or decreases response time, and by how much
-- Control for confounding variables and isolate individual effects
-- Make predictions about future requests based on their characteristics
-- Build a system-level model that can inform performance monitoring and infrastructure planning
-
-In short, this approach helps us both understand and manage what influences response speed.
+Answering this question requires more than just prediction. It requires understanding the relationships between server conditions, request features, and performance. In the next section, we’ll clarify our study design and show how Gamma regression supports this goal.
 
 ## Study Design
 
-With our case study and dataset introduced, we now follow the data science workflow by clarifying the goal of the analysis. Our main question is:
+With the case study framed, we now follow the data science workflow by defining the purpose of the analysis. Again, our central question is:
 
 > **Which server or request characteristics have the biggest influence on response time?**
 
-This leads us to adopt an inferential approach, where the focus is on understanding relationships between variables, rather than simply predicting outcomes.
+This leads us to adopt an inferential study design, where the focus is on explaining relationships between variables, rather than only predicting outcomes.
 
 ### Inferential vs. Predictive Analysis
 
-- Inferential analysis helps us understand and quantify how different variables affect the average outcome. For example, we might ask: Does using a content delivery network (CDN) significantly reduce response time? How much slower are complex requests compared to simple ones? The goal is to explain relationships and check which effects are statistically meaningful.
+- Inferential analysis helps us understand and quantify how different variables affect the average outcome. For example: Does using a content delivery network (CDN) significantly reduce response time? How much slower are complex requests compared to simple ones?
 
 - Predictive analysis, by contrast, is about making accurate forecasts. For instance: Can we predict the response time of a future request based on its characteristics?
 
-While Gamma regression supports both goals, our focus in this chapter is inferential.
+Gamma regression can serve both purposes, but our focus in this chapter is inferential.
 
 ### What This Means for Our Analysis
 
-We will use Gamma regression to estimate the average effect of each factor on response time, while accounting for skewness in the outcome variable. Our analysis will help answer questions like:
+We will use Gamma regression to estimate the average effect of each factor on response time, while properly accounting for skewness in the outcome. Our analysis will help answer questions like:
 
 - How do concurrent users affect response time?
 - Does request complexity lead to slower responses?
@@ -424,20 +416,22 @@ All of these issues will be addressed in the next stage: data wrangling.
 
 ### Data Wrangling
 
-Before we can apply Gamma regression, we need to prepare the data for modeling. This involves several key steps, including:
+Once the data has been collected, the next step is to prepare it for modeling. Even reliable sources like server logs or monitoring tools produce raw data that needs cleaning before it can be used effectively.
 
-- making sure the response variable is valid,
-- transforming categorical variables,
-- checking for missing or extreme values,
-- and scaling variables if needed.
+For Gamma regression, data wrangling typically involves:
 
-Let’s walk through how we might handle each part of the dataset.
+- Validating the response variable to ensure all values are strictly positive and meaningful.
+- Transforming categorical variables (e.g., request complexity, geographic region) into numerical formats that the model can handle.
+- Checking for missing values or extreme outliers that could bias results.
+- Scaling or normalizing predictors if large differences in measurement units make interpretation difficult.
+
+Let’s walk through how to apply these steps to our dataset.
 
 #### 1. Validating the Response Variable
 
-Gamma regression is designed for modeling outcomes that are strictly positive and continuous, especially when they are right-skewed. This makes it suitable for response variables like `response_time_ms`, which measures how long it takes for the server to respond to a request.
+Gamma regression assumes the outcome is strictly positive and continuous, making it a good fit for `response_time_ms`, which records how long the server takes to respond to a request.
 
-Before fitting a Gamma model, we need to confirm that all values in `response_time_ms` are greater than zero.
+Before fitting the model, we need to confirm that all values in `response_time_ms` are greater than zero:
 
 ::: {.panel-tabset}
 ## R Code
@@ -455,24 +449,24 @@ print((data["response_time_ms"] <= 0).sum())
 ```
 :::
 
-The summary shows that all values are strictly positive, which supports the use of Gamma regression for this task. If the dataset had included zeros or negative values, we would have needed to filter them out or consider applying a small offset.
+The summary confirms that all values are strictly positive, so `response_time_ms` is suitable for Gamma regression. If zeros or negative values had been present, we may need to remove them or add a small offset before proceeding.
 
 #### 2. Encoding Categorical Variables
 
-Gamma regression can only work with numeric inputs, so we need to convert categorical variables into numeric form. This includes:
+Like most regression and machine learning models, Gamma regression requires all inputs to be numeric. This means categorical variables must be converted into numerical form. In our dataset, this includes:
 
 - `day_of_week`
 - `geographic_region`
 - `request_complexity`
 - `cdn_usage`
 
-The most common approach is **one-hot encoding**, where each category in a variable gets its own binary (0 or 1) column. For example, the variable `request_complexity` with three categories (`Simple`, `Moderate`, `Complex`) would be converted into:
+The standard approach is **one-hot encoding**, where each category is represented by a new binary column (0 or 1). For example, the variable `request_complexity` with three categories (`Simple`, `Moderate`, `Complex`) would become:
 
 - `request_complexity_Simple`
 - `request_complexity_Moderate`
 - `request_complexity_Complex`
 
-To avoid **multicollinearity** (perfect correlation between predictors), we drop one category from each group. This dropped category becomes the reference level that all other levels are compared against.
+To avoid **multicollinearity** (perfect correlation among dummies), we drop one category from each group. The dropped category becomes the reference level that all other categories are compared against.
 
 ::: {.panel-tabset}
 ## R Code
@@ -484,7 +478,8 @@ gamma_server_encoded <- fastDummies::dummy_cols(
   remove_selected_columns = TRUE
 )
 
-head(gamma_server_encoded)
+# Print resulting column names  
+colnames(gamma_server_encoded)  
 ```
 
 ## Python Code
@@ -497,16 +492,28 @@ categorical_vars = ["day_of_week", "geographic_region", "request_complexity", "c
 # Create dummy variables, drop first category from each
 data_encoded = pd.get_dummies(data, columns=categorical_vars, drop_first=True)
 
-# View the first few rows
-data_encoded.head()
+# Print resulting column names  
+print(data_encoded.columns.tolist())  
 ```
 :::
 
 This step ensures that all features going into the Gamma regression model are numeric and suitable for estimation. It also allows us to interpret the effect of each category relative to the baseline, which is the dropped category from each group.
 
+For example, the variable `request_complexity` originally had three categories: `Simple`, `Moderate`, and `Complex`. After encoding, the dataset contains two dummy variables:
+
+- `request_complexity_Simple`
+- `request_complexity_Moderate`
+
+Here, `Complex` has been dropped and serves as the reference category. This means:
+
+- The coefficient for `request_complexity_Simple` tells us how much faster or slower requests marked as `Simple` are compared to `Complex`.
+- The coefficient for `request_complexity_Moderate` tells us the difference between `Moderate` and `Complex`.
+
+This same logic applies to all other categorical variables: one level is chosen as the baseline, and all coefficients are interpreted relative to it.
+
 #### 3. Checking for Missing Values
 
-We now check for missing data across all variables:
+Before fitting a regression model, it’s important to confirm that the dataset has no gaps. Missing values can cause estimation errors or lead to dropped observations if not handled properly.
 
 ::: {.panel-tabset}
 ## R Code
@@ -522,16 +529,16 @@ data_encoded.isna().sum()
 ```
 ::: 
 
-If any variables have missing values, we could choose to:
+If missing values were present, we would need to either:
 
-- drop rows with missing values,
-- or impute them using the median, mean, or another strategy.
+- Remove rows with missing values (simple but may reduce sample size), or
+- Impute values using the mean, median, or another suitable method.
 
-In this case, our toy dataset does not contain missing values, so we can proceed.
+In our toy dataset, all variables are complete, so no further action is needed here.
 
 #### 4. Examining Potential Outliers
 
-Outliers can sometimes affect regression models, especially in skewed data. Even though Gamma regression is robust to skew, it is still worth visualizing `response_time_ms`.
+Outliers can distort regression results, so it’s always good practice to check the distribution of the response variable. In our case, we visualize `response_time_ms`:
 
 ::: {.panel-tabset}
 ## R Code
@@ -559,15 +566,15 @@ plt.show()
 ```
 :::
 
-This histogram helps us confirm that the distribution is right-skewed, which matches our expectation and justifies the use of Gamma regression.
+The histogram confirms that response_time_ms is right-skewed, which aligns with our expectations and supports the use of Gamma regression.
 
-Because Gamma-distributed data is naturally right-skewed, large values are often expected rather than abnormal. This makes it harder to define true outliers just by looking at the upper tail. Instead of removing them, we use a model (like Gamma regression) that can account for this kind of variation.
+It’s important to note that with Gamma-distributed data, large values in the upper tail are often part of the natural variation, not necessarily outliers to be removed. Instead of trimming them away, we rely on a model like Gamma regression that is designed to accommodate this skewness.
 
 #### 5. Scaling Continuous Variables (Optional)
 
-Gamma regression does not require inputs to be on the same scale, but scaling can improve model convergence and sometimes make coefficient interpretation easier, especially when the predictors have very different ranges.
+Gamma regression does not require predictors to be on the same scale. However, scaling can sometimes help with model convergence and make coefficients easier to interpret, especially when predictors have very different ranges (for example, `concurrent_users` in the hundreds vs. `cache_hit_rate` as a percentage).
 
-You may consider standardizing the following continuous predictors:
+For this dataset, it may be helpful to standardize the following continuous variables:
 
 - `concurrent_users`
 - `database_queries`
@@ -579,23 +586,41 @@ You may consider standardizing the following continuous predictors:
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-gamma_server_encoded <- gamma_server_encoded %>%
-  mutate(across(c(concurrent_users, database_queries, cache_hit_rate, server_load, memory_usage, time_of_day), scale))
+# gamma_server_encoded <- gamma_server_encoded %>%
+#   mutate(across(c(concurrent_users, database_queries, cache_hit_rate, server_load, memory_usage, time_of_day), scale))
 ```
 
 ## Python Code
 ```{python}
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
 
-# List of columns to scale
-scale_cols = ["concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day"]
+# # List of columns to scale
+# scale_cols = ["concurrent_users", "database_queries", "cache_hit_rate", "server_load", "memory_usage", "time_of_day"]
 
-# Initialize scaler and apply to selected columns
-scaler = StandardScaler()
-data_encoded[scale_cols] = scaler.fit_transform(data_encoded[scale_cols])
+# # Initialize scaler and apply to selected columns
+# scaler = StandardScaler()
+# data_encoded[scale_cols] = scaler.fit_transform(data_encoded[scale_cols])
 ```
 :::
 
+Standardizing doesn’t change the underlying fit of the Gamma regression, but it can make estimation numerically more stable and the coefficients easier to compare side by side.
+
+After scaling, coefficients are interpreted differently: they now represent the effect of a one-standard-deviation increase in the predictor, rather than a one-unit increase.
+
+::: {.Tip}
+::::{.Tip-header}
+Example of Interpretation After Scaling
+::::
+::::{.Tip-container}
+Without scaling, suppose the coefficient for `cache_hit_rate` (measured as a percentage from 0–100) is -0.01. This means that for every 1 percentage point increase in cache hit rate, the expected response time decreases slightly.
+
+With scaling, suppose the coefficient for `cache_hit_rate` becomes -0.25. This means that a one-standard-deviation increase in cache hit rate (say, about 15 percentage points in this dataset) is associated with a 0.25 decrease (on the log scale) in expected response time.
+
+This rescaling doesn’t change the underlying relationship. It just shifts the unit of interpretation from “1 raw unit” to “1 standard deviation,” which often makes cross-variable comparisons more meaningful.
+::::
+:::
+
+For simplicity, we will not scale the variables in this case study, but it’s a useful option to keep in mind.
 
 #### A Note on Data Splitting
 
