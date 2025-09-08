@@ -169,118 +169,287 @@ plt.tight_layout()
 plt.show()
 ```
 
-The plot above shows how the shape parameter changes the look of the Gamma distribution. It helps explain why Gamma regression is such a good match for skewed data.
+The plot above shows how the shape parameter changes the look of the Gamma distribution. It helps explain why Gamma regression is such a good match for skewed data. In the frequentist paradigm, we aim to find the Gamma distribution with the shape parameter that best fits the observed data.
 
 ## How Gamma Regression Works
 
-Now that we know what Gamma regression is and the kinds of problems it solves, let’s look at how it actually works. The key idea is that Gamma regression doesn’t model the outcome values directly. Instead, it focuses on the average outcome and relates it to predictors in a way that respects the positive, skewed nature of the data.
+Now that we know what Gamma regression is and the kinds of problems it solves, let’s look at how it actually works. 
 
-To make this possible, Gamma regression relies on a **link function**. A link function is simply a transformation that connects the predictors to the mean of the response in a way that makes modeling easier. In the case of Gamma regression, the **log link** is most common.
+> The key idea is that Gamma regression doesn’t model the outcome values directly. Instead, it focuses on the average outcome and relates it to predictors in a way that respects the positive, skewed nature of the data.
 
-### The Role of the Link Function
+To understand this, we need to take a step back and talk about a broader family of models called **Generalized Linear Models**, or **GLMs**. These are a flexible class of models that let us deal with many types of data, not just bell-shaped curves. GLMs allow us to model outcomes that are counts, proportions, or, as in our case, continuous and strictly positive.
 
-::: {#Definition-sample .definition}
-::::{.definition-header}
-Link Function
-::::
-::::{.definition-container}
-A link function is a transformation that connects predictors to the mean of the response. For Gamma regression, the most common link function is the log link.
-::::
-:::
 
-With the log link, the model is mathematically expressed as:
+### Generalized Linear Models
 
-$$
-\log(\mu_i) = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \cdots + \beta_p x_{ip}
-$$
+Generalized Linear Models (GLMs) are a powerful extension of linear regression. They allow us to model a wide variety of response variables beyond just those that follow a normal distribution. This makes GLMs especially useful in real-world situations where data often breaks the assumptions of [ordinary least squares (OLS) regression](03-ols.qmd).
 
-where:
+Let’s walk through an example that shows why a standard linear model doesn’t always make sense.
 
-- $\mu_i$ is the average (expected) outcome for the $i$-th observation  
-- $x_{i1}, x_{i2}, \ldots$ are the input values (predictors)
+#### Problem with Linear Regression for Non-Normal Data
 
-To return to the original outcome scale, we simply apply the exponential function:
+Suppose we want to model the number of daily website visits for a company, based on the company’s advertising budget. This outcome is:
 
-$$
-\mu_i = \exp(\beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip})
-$$
+- always positive
+- right-skewed
+- and often grows rapidly with budget
 
-This transformation ensures that all predicted values remain strictly positive.
-
-#### Why use the log link?
-
-- It compresses very large values, making them easier to handle.
-- It guarantees that predicted outcomes are positive.
-- It turns multiplicative patterns in the data into additive ones on the log scale, which makes them easier to model with straight-line relationships.
-
-::: {.Tip}
-::::{.Tip-header}
-Tip
-::::
-::::{.Tip-container}
-
-The log link can seem abstract at first, but the plots below show what it does. On the left, the model is fit as a straight line to the log of the mean response: $\log(\mu) = 2 + 0.5x$. On the right, that line is transformed back to the original scale, where it becomes a smooth exponential curve: $\mu = \exp(2 + 0.5x)$.
-
+Let’s simulate this data:
 
 ```{python}
 #| echo: false
 #| message: false
-#| 
+
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
 
-# Create values for the predictor x
-x = np.linspace(0, 10, 100)
+# Generate synthetic data
+np.random.seed(42)
+budget = np.linspace(0, 10, 100)
+true_visits = 50 * np.exp(0.3 * budget)
+noise = np.random.normal(scale=100, size=budget.shape)
+visits = true_visits + noise
 
-# Linear model on the log scale
-log_mu = 2 + 0.5 * x
+# Add intercept for statsmodels
+X = sm.add_constant(budget)  # Adds column of 1s for intercept
+model = sm.OLS(visits, X).fit()
+visits_pred = model.predict(X)
 
-# Back-transform to original scale
-mu = np.exp(log_mu)
-
-# Plot
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-
-# Left: Linear on log scale
-ax1.plot(x, log_mu, color="steelblue")
-ax1.set_title("Linear on Log Scale")
-ax1.set_xlabel("x (predictor)")
-ax1.set_ylabel("log(μ)")
-ax1.grid(True)
-
-# Right: Transformed back to original scale
-ax2.plot(x, mu, color="darkorange")
-ax2.set_title("Exponential on Original Scale")
-ax2.set_xlabel("x (predictor)")
-ax2.set_ylabel("μ (predicted response)")
-ax2.grid(True)
-
+# Plot 1: Natural nonlinear pattern
+plt.figure(figsize=(10, 4))
+plt.plot(budget, true_visits, color="orange", label="True relationship")
+plt.scatter(budget, visits, color="steelblue", s=15, alpha=0.6, label="Observed data")
+plt.title("Nonlinear Pattern: Website Visits vs. Advertising Budget")
+plt.xlabel("Advertising Budget")
+plt.ylabel("Daily Website Visits")
+plt.legend()
+plt.grid(True)
 plt.tight_layout()
 plt.show()
 ```
 
-This example highlights three important points:
 
-- We fit the regression on the log scale, not directly on the outcome scale.
-- After back-transforming, predictions are curved but always stay positive.
-- The log link lets us capture multiplicative effects (percent changes) using a simple straight-line relationship.
+Linear regression tries to fit a straight line through this data, but the result is clearly problematic.
 
-So, the log link is really just a way of “straightening the curve” so the model can handle skewed, positive data more easily.
+```{python}
+#| echo: false
+#| message: false
 
-::::
-:::
+# Extend budget range for prediction (from -5 to 15)
+budget_extended = np.linspace(-5, 15, 200)
+X_extended = sm.add_constant(budget_extended)
+visits_pred_extended = model.predict(X_extended)
 
-### Examples of What Gamma Regression Is Trying to Predict
+# Plot 2: Show prediction line extended beyond the original range
+plt.figure(figsize=(10, 4))
+plt.scatter(budget, visits, color="steelblue", s=15, alpha=0.6, label="Observed data")
+plt.plot(budget_extended, visits_pred_extended, color="red", linewidth=2, label="Linear Regression Line")
+plt.title("Linear Regression Predicts Unrealistic Values Outside Range")
+plt.xlabel("Advertising Budget")
+plt.ylabel("Daily Website Visits")
+plt.axhline(0, color="gray", linestyle="--", linewidth=1)
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
 
-Now that we’ve seen how the log link helps Gamma regression connect predictors to a positive, skewed outcome, let’s look at the kinds of questions this model is most useful for. In practice, Gamma regression is often applied when we care about average outcomes that vary widely but must remain above zero.
+We run into several issues here:
 
-Some practical examples include:
+- Predictions can be negative, which makes no sense for visit counts
+- Predictions do not capture the multiplicative or curved nature of the relationship
+- Variability grows with the mean, violating the constant variance assumption
 
-- In healthcare, estimating the average cost of treatment for patients based on their age or diagnosis  
-- In retail, modeling how much customers typically spend depending on their shopping behavior  
-- In web analytics, analyzing how different system settings affect the average page load time  
+These problems stem from assumptions built into OLS:
 
-In all these cases, the focus is not on predicting any single outcome perfectly, but on understanding how conditions shift the expected value. Gamma regression provides a flexible and reliable way to capture those relationships.
+- The outcome is normally distributed
+- The outcome has constant variance
+- The relationship between predictors and outcome is linear
+
+When those assumptions are broken, OLS can give misleading or invalid results.
+
+#### What GLMs Do Differently
+
+Despite these problems, linear regression has a big strength: it’s interpretable. The formula tells us exactly how the outcome changes with the predictor. But wouldn’t it be great if we could retain this interpretability while also accounting for the data’s quirks? That’s what Generalized Linear Models do.
+
+The original linear regression formula looks like this:
+
+$$
+\mu = \beta_0 + \beta_1 x
+$$
+
+
+As demonstrated above, this assumes $\mu$ (the expected outcome) can take any real value, including negatives, and grows in a straight-line fashion, which just doesn't make much sense given the data.
+
+Now, imagine we make one small change, apply a log transformation to the mean:
+
+$$
+\log(\mu) = \beta_0 + \beta_1 x
+$$
+
+This small adjustment makes a huge difference. Here's how the fitted curve now looks with this small change:
+
+```{python}
+#| echo: false
+#| message: false
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+# Assemble data into a DataFrame
+df = pd.DataFrame({
+    "budget": budget,
+    "visits": visits
+})
+
+# Step 3: Fit GLM with Gamma family and log link
+gamma_model = smf.glm(formula="visits ~ budget", data=df,
+                      family=sm.families.Gamma(link=sm.families.links.Log()))
+gamma_results = gamma_model.fit()
+
+# Step 4: Make predictions
+df["predicted_glm"] = gamma_results.predict(df)
+
+# Step 5: Plot observed vs predicted
+plt.figure(figsize=(8, 5))
+plt.scatter(df["budget"], df["visits"], alpha=0.5, label="Observed Visits", color="gray")
+plt.plot(df["budget"], df["predicted_glm"], color="mediumseagreen", linewidth=2, label="New Fit")
+plt.xlabel("Ad Budget ($k)")
+plt.ylabel("Daily Website Visits")
+plt.title("GLM Fit with Gamma Regression and Log Link")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
+
+
+This new setup has several advantages:
+
+- All predicted values of $\mu$ are strictly positive
+- The relationship between predictors and response is multiplicative, not additive
+- The variance increases with the mean, which reflects how real-world data often behaves
+- We still retain a straight-line interpretation, but now it's on the log scale
+
+What you have just witnessed is an example of Generalized Linear Model. It is a flexible extension of linear regression that allows you to model outcomes in a way that reflects how they are actually distributed, while also preserving the ability to interpret coefficients like in linear regression
+
+
+#### The Three Components of GLM
+
+Now that we have seen an example of a GLM, let's properly introduce the components that make up a GLM. Every Generalized Linear Model (GLM) is built on the same three key components. This structure gives GLMs the flexibility to model many types of data while still being easy to interpret.
+
+1. Random Component (Distribution of the Response)
+
+This specifies how the response variable is distributed. In linear regression, the response is normally distributed. But GLMs allow for many other distributions, depending on what kind of data you are modeling.
+
+| Type of Data          | Example Distribution |
+| --------------------- | -------------------- |
+| Continuous, symmetric | Normal               |
+| Count                 | Poisson              |
+| Proportion or binary  | Binomial             |
+| Positive, skewed      | Gamma                |
+
+This is where the flexibility of GLMs comes from. You choose a distribution that matches your outcome.
+
+2. Systematic Component (Linear Predictor)
+
+This is the familiar part from linear regression. It is a linear combination of the predictors:
+
+$$
+\begin{align*}
+\eta &= \beta_0 + \beta_1 x_{1} + \beta_2 x_{2} + \cdots + \beta_p x_{p} 
+\end{align*}
+$$
+
+This linear predictor, often denoted by $\eta$, is the foundation of the model. The link function (coming next) will connect this to the mean of the response variable.
+
+3. Link Function (Connecting Predictors to the Mean)
+
+The link function transforms the expected value of the response variable so that it can be modeled as a linear combination of predictors.
+
+$$
+\begin{align*}
+g(\mu) = \eta &= \beta_0 + \beta_1 x_{1} + \beta_2 x_{2} + \cdots + \beta_p x_{p} 
+\end{align*}
+$$
+
+Different distributions tend to pair with different link functions:
+
+| Distribution | Typical Link Function | Equation Example                                  |
+| ------------ | --------------------- | ------------------------------------------------- |
+| Normal       | Identity              | $\mu = \eta$                                    |
+| Binomial     | Logit                 | $\log\left( \frac{\mu}{1 - \mu} \right) = \eta$ |
+| Poisson      | Log                   | $\log(\mu) = \eta$                              |
+| Gamma        | Log                   | $\log(\mu) = \eta$                              |
+
+The link function helps ensure that predictions stay within a valid range (e.g., probabilities stay between 0 and 1, counts stay positive, etc.).
+
+
+#### Gamma Regression as a GLM
+
+Now that we’ve seen how Generalized Linear Models (GLMs) provide a flexible framework for modeling non-normal outcomes, we’re ready to bring the focus back to Gamma regression.
+
+Gamma regression is not a new kind of model, it is simply one specific case of a GLM. What makes it special is that it is designed for situations where the outcome:
+
+- is strictly positive
+- tends to be right-skewed
+- and often shows larger variance when the mean is higher
+
+These characteristics are common in many real-world problems. Some examples include:
+
+- In healthcare, modeling the average cost of treatment for patients with different diagnoses
+- In retail, estimating how much a customer spends based on their shopping habits
+- In web analytics, measuring how system settings influence average server response times
+
+In each of these cases, a typical linear regression model would be inappropriate. It could predict negative values, ignore the increasing variability, and fail to capture the nonlinear patterns often present in the data.
+
+Gamma regression offers a better alternative by aligning with the true structure of the data and it does so using the same three components of a GLM:
+
+1. Random Component
+
+The response variable $Y$ is assumed to follow a Gamma distribution, which is continuous, strictly positive, and right-skewed. The variance of $Y$ increases with its mean, often expressed as:
+	​
+$$
+\operatorname{Var}(Y_i) = \phi \mu_i^2
+$$
+
+This makes Gamma regression a good match for data where larger expected values come with more uncertainty.
+
+2. Systematic Component
+
+Just like in linear regression, the predictors are combined linearly:
+
+$$
+\eta_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \cdots + \beta_p x_{ip}
+$$
+
+This linear predictor $\eta_i$ serves as the backbone of the model.
+
+3. Link Function
+
+To connect the predictors to the expected outcome $\mu_i = \mathbb{E}(Y_i)$, Gamma regression uses the log link:
+
+$$
+\log(\mu_i) = \eta_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip}
+$$
+
+This ensures that:
+
+- All predicted values of $\mu_i$ are strictly positive
+- The relationship between predictors and the mean is multiplicative, not additive
+- We can interpret coefficients on the log scale, preserving interpretability
+
+In other words, Gamma regression is just a GLM with a Gamma distribution and a log link. If we return to our earlier definition:
+
+> Gamma regression does not model the outcome values directly. Instead, it focuses on the average outcome and relates it to predictors in a way that respects the positive, skewed nature of the data.
+
+This is exactly what the GLM structure allows it to do.
+
 
 ## When to Use and Not Use Gamma Regression
 
@@ -627,7 +796,7 @@ For simplicity, we will not scale the variables in this case study, but it’s a
 In many machine learning tasks, it is common to split the data into training and test sets. However, in this case study, we are not aiming to build a predictive model. Our goal is to understand how different server and request characteristics influence the average response time, which is an inferential task.
 
 Because we are focused on interpreting the model rather than predicting new outcomes, we will use the entire dataset for model fitting. This allows us to make the best use of our data when estimating the effects of each variable.
-
+gi
 If our goal were to build a model that predicts server response time for future requests, we would consider splitting the dataset and evaluating prediction accuracy on a holdout set.
 
 ## Exploratory Data Analysis (EDA)
