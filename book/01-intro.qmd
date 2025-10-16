@@ -21,6 +21,39 @@ colourize <- function(x, color) {
       x)
   } else x
 }
+
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string')) 
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr', 
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
+
+print_as_dt_all <- function(x){
+  DT::datatable(
+    x,
+    rownames = FALSE,
+    options = list(
+      dom = 't',  # Only show the table (no filter/search/pagination info)
+      paging = FALSE,
+      scrollX = TRUE,
+      autoWidth = TRUE,
+      columnDefs = list(
+        list(className = 'dt-left', targets = "_all")
+        # Optionally remove width limitation or set only for specific columns
+      )
+    )
+  )
+}
 ```
 
 First things first! Let us prepare for all the different regression techniques to be introduced in @sec-ols.
@@ -32,9 +65,9 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
-- Define **the three core pillars** to be applied in regression modelling throughout this book.
+- Define **the three core pillars** to be applied in regression modelling throughout this book: a data science workflow, the right workflow flavour, and the most appropriate model.
 - Outline how the ML-Stats dictionary works **to bridge the terminology** used in machine learning (ML) and statistics.
-- Explain how **the data science workflow** can be applied in regression analysis
+- Explain how **the data science workflow** can be applied in regression analysis.
 - Describe how the mind map of regression analysis acts as **the primary chapter structure** of this book and as a **toolboox**.
 - Contrast **the differences and simmilarities** between **supervised learning** and **regression analysis**.
 ::::
@@ -185,20 +218,35 @@ Data science workflow for *inferential* and *predictive* inquiries in regression
 
 The first stage of this workflow is centered around defining the **main statistical inquiries** we aim to address throughout the data analysis process. As a data scientist, your primary task is to translate these inquiries from the stakeholders into one of two categories: *inferential* or *predictive*. This classification determines the direction of your analysis and the methods you will use.
 
-- **Inferential:** The objective here is to explore and quantify relationships of *association* or *causation* between explanatory variables (regressors) and the response variable within the context of the problem at hand. For example, you may seek to determine whether a specific marketing campaign (regressor) significantly impacts sales revenue (response) and, if so, by how much.
+- **Inferential:** The objective here is to explore and quantify relationships of **association** or **causation** between explanatory variables (referred to as regressors in the models discussed in this textbook) and the response variable within the context of the specific problem at hand. For example, you might statistically seek to determine whether a particular marketing campaign (the regressor) significantly influences sales revenue (the response), and if it does, by how much.
+- **Predictive:**  In this case, the focus is on making **accurate predictions** about the response variable based on future observations of the regressors. Unlike inferential inquiries, where understanding the relationship between variables is key, the primary goal here is to **maximize** prediction accuracy. This approach is fundamental in machine learning. For instance, you might build a model to predict future sales revenue based on past marketing expenditures, without necessarily needing to understand the underlying relationship between the two.
 
-- **Predictive:**  In this case, the focus is on making accurate predictions about the response variable based on future observations of the regressors. Unlike inferential inquiries, where understanding the relationship between variables is key, the primary goal here is to maximize prediction accuracy. This approach is fundamental in machine learning. For instance, you might build a model to predict future sales revenue based on past marketing expenditures, without necessarily needing to understand the underlying relationship between the two.
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
 
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the inquiry focus of this book!
+::::
+::::{.Heads-up-container}
+In the regression chapters of this book, we will emphasize both types of inquiries. As we follow the workflow from @fig-ds-workflow, we will explore the two pathways identified by the decision points concerning inference and prediction.
+::::
+:::
 
-#### Example: Predicting Housing Prices
+#### Example: Housing Prices
 
-To illustrate the study design stage, let’s consider a simple example: predicting housing prices in a specific city.
+To illustrate the study design stage, let us consider a simple example involving housing prices in a specific city:
 
-- If our goal is *inferential*, we might be interested in understanding the relationship between various factors (like square footage, number of bedrooms, and proximity to schools) and housing prices. Specifically, we would ask questions like, "How much does the number of bedrooms affect the price of a house, after accounting for other factors?"
+- If our goal is **inferential**, we might be interested in understanding the relationship between various factors—such as square footage, number of bedrooms, and proximity to schools—and housing prices. Specifically, we would ask questions like:
 
-- If our goal is *predictive*, we would focus on creating a model that can accurately predict the price of a house based on its features, regardless of whether we fully understand how each factor contributes to the price.
+> **How does the number of bedrooms affect the price of a house, once we account for other factors?**
 
-In both cases, the study design stage involves clearly defining these objectives and determining the appropriate methods to address them. This stage sets the foundation for all subsequent steps in the data science workflow, as illustrated in @fig-ds-workflow-study-design. Once the study design is established, the next stage is data collection and wrangling.
+- If our goal is **predictive**, we would focus on creating a model that can accurately predict the price of a house based on its features (i.e., the characteristics of a given house), regardless of whether we fully understand how each feature contributes to the price. Hence, we would be able to answer questions such as:
+
+> **What would be the predicted price of a house with 3,500 square feet and 3 bedrooms located on a block where the closest school is at 2.5 km?**
+
+![Image by [*Tomislav Kaučić*](https://pixabay.com/users/tkaucic-1450822/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=2827164) via [*Pixabay*](https://pixabay.com/vectors/blueprint-house-architecture-2827164/).](img/house.png){width="350"}
+
+In both cases, the study design stage involves **clearly defining** these objectives and determining the appropriate data modelling methods to address them. This stage sets the foundation for all subsequent steps in the data science workflow. After establishing the study design, the next step is **data collection and wrangling**, as shown in @fig-ds-workflow-study-design.
 
 ::: {#fig-ds-workflow-study-design}
 ![](img/study-design.png){width="1000"}
@@ -208,33 +256,39 @@ In both cases, the study design stage involves clearly defining these objectives
 
 ### Data Collection and Wrangling {#sec-ds-workflow-data-collection}
 
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
 Once we have clearly defined our statistical questions, the next crucial step is to collect the data that will form the basis of our analysis. The way we collect this data is vital because it directly affects the accuracy and reliability of our results:
 
-- **For inferential inquiries**, we focus on understanding large groups or systems (populations) that we cannot fully observe. These populations are governed by characteristics (parameters) that we want to estimate. Because we can’t study every individual in the population, we collect a smaller, representative subset called a sample. The method we use to collect this sample—known as **sampling**—is crucial. A proper sampling method ensures that our sample reflects the larger population, allowing us to make accurate generalizations (inferences) about the entire group. After collecting the sample, it's common practice to **randomly split the data into training and test sets**. This split allows us to build and validate our models, ensuring that the findings are robust and not overly tailored to the specific data at hand.
+- For **inferential inquiries**, we focus on understanding **populations** or systems that we cannot fully observe. These populations are governed by characteristics (referred to as **parameters**) that we want to estimate. Because we cannot study every individual in the population or system, we collect a smaller, representative subset called a sample. The method we use to collect this sample—known as **sampling**—is crucial. A proper sampling method ensures that our sample reflects the larger population or system, allowing us to make accurate and precise generalizations (i.e., inferences) about the entire population or system. After collecting the sample, it is common practice to **randomly split the data into training and test sets**. This split allows us to build and assess our models, ensuring that the findings are robust and not overly tailored to the specific data at hand.
+- **For predictive inquiries**, our goal is often to use existing data to make predictions about future events or outcomes. In these cases, we usually work with large datasets (databases) that have already been collected. Instead of focusing on whether the data represents a population (as in inferential inquiries), we focus on cleaning and preparing the data so that it can be used to train models that make accurate predictions. After wrangling the data, it is typically **split into training, validation (if necessary, depending on our chosen modelling strategy), and test sets**. The training set is used to build the model, the validation set is used to tune model parameters, and the test set evaluates the model’s final performance on unseen data.
 
-::: {.callout-tip}
-# A Quick Debrief on Sampling!
-
-Although this book does not cover sampling methods in detail, it's important to know that the way you collect your sample can greatly influence your results. Depending on the problem, you might use different techniques:
-
-- **Simple Random Sampling:** Every individual in the population has an equal chance of being selected.
-- **Systematic Sampling:** You select individuals at regular intervals from a list of the population.
-- **Stratified Sampling:** You divide the population into subgroups (strata) and take a proportional sample from each subgroup.
-- **Clustered Sampling:** You divide the population into clusters and randomly select whole clusters for your sample.
-- Etc.
-
-As in the case of Regression Analysis, statistical sampling is a vast field, and we could spend a whole course on it. If you're interested in learning more about these methods, [*Sampling: design and analysis*](https://webcat.library.ubc.ca/vwebv/holdingsInfo?bibId=2206157) by Lohr is a great resource. 
+::::: Tip
+::: Tip-header
+Tip on sampling techniques!
 :::
+::: Tip-container
+Careful attention to sampling design is a crucial step in any research aimed at supporting valid regression-based inference. The selection of an **appropriate sampling design** should be guided by the structural characteristics of the population as well as the specific goals of the analysis. A well-designed sampling strategy enhances the accuracy, precision, and generalizability of parameter estimates derived from regression models, particularly when the intention is to extend model-based conclusions beyond the observed data to the whole population or system.
 
-- **For predictive inquiries**, our goal is often to use existing data to make predictions about future events or outcomes. In these cases, we usually work with large datasets (databases) that have already been collected. Instead of focusing on whether the data represents a population (as in inferential inquiries), we focus on cleaning and preparing the data so that it can be used to train models that make accurate predictions. After wrangling the data, it is typically **split into training, validation, and test sets**. The training set is used to build the model, the validation set is used to tune model parameters, and the test set evaluates the model’s final performance on unseen data.
+Below, we summarize some commonly used probability-based sampling designs, each of which has distinct implications for model validity and estimation efficiency:
 
-#### Example: Collecting Data for Housing Price Predictions
+- **Simple random sampling:** Every unit in the population has an equal probability of selection. While this method is straightforward to implement and analyze, it may be inefficient or impractical for populations with heterogeneous subgroups.
+- **Systematic sampling:** Sampling occurs at fixed intervals from an ordered list, starting from a randomly chosen point. This design can improve efficiency under certain ordering schemes, but caution is necessary to avoid biases related to periodicity.
+- **Stratified sampling:** The population is divided into mutually exclusive strata based on key characteristics (e.g., age, income, region, etc.). Samples are drawn within each stratum, often in proportion to the strata sizes or based on optimal allocation. This approach increases precision for subgroup estimates and enhances overall model efficiency.
+- **Cluster sampling:** The population is divided into naturally occurring clusters (e.g., households, schools, geographic units, etc.), and entire clusters are sampled randomly. This design is often preferred for cost efficiency, but it typically requires adjustments for intracluster correlation during analysis.
 
-Let’s continue with our housing price prediction example to illustrate these concepts:
+In the context of our regression-based inferential framework, it is necessary to carefully plan data collection and preparation around the sampling strategy. The choice of sampling design can influence not only model estimation but also the interpretation and generalizability of the results. While this textbook does not provide an exhaustive treatment of sampling theory, we recommend @lohr2021 for an in-depth reference. Their work offers both theoretical insights and applied examples that are highly relevant for data scientists engaged in model-based inference.
+:::
+:::::
 
-- **Inferential Approach:** Suppose we want to understand how the number of bedrooms affects housing prices in a city. To do this, we would collect a sample of house sales that accurately represents the city’s entire housing market. For instance, we might use stratified sampling to ensure that we include houses from different neighborhoods in proportion to how common they are. After collecting the data, we would split it into training and test sets. The training set helps us build our model and estimate the relationship between variables, while the test set allows us to evaluate how well our findings generalize to new data.
+#### Example: Collecting Data for Housing Inference and Predictions
 
-- Predictive Approach: If our goal is to predict the selling price of a house based on its features (like size, number of bedrooms, and location), we would gather a large dataset of recent house sales. This data might come from a real estate database that tracks the details of each sale. Before we can use this data to train a model, we would clean it by filling in any missing information, converting data to a consistent format, and making sure all variables are ready for analysis. After preprocessing, we would split the data into training, validation, and test sets. The training set would be used to fit the model, the validation set to fine-tune it, and the test set to assess how well the model can predict prices for houses it hasn’t seen before.
+Let us continue with our housing example to illustrate the above concepts:
+
+- **Inferential Approach:** Suppose we want to understand how the number of bedrooms affects housing prices in a city. To do this, we would collect a sample of house sales that accurately represents the city’s entire housing market. For instance, we might use stratified sampling to ensure that we include houses from different neighbourhoods in proportion to how common they are. After collecting the data, we would split it into training and test sets. The training set helps us build our model and estimate the relationship between variables, while the test set allows us to evaluate how well our findings generalize to new data.
+- **Predictive Approach:** If our goal is to predict the selling price of a house based on its features (such as size, number of bedrooms, and location), we would gather a large dataset of recent house sales. This data might come from a real estate database that tracks the details of each sale. Before we can use this data to train a model, we would clean it by filling in any missing information, converting data to a consistent format, and making sure all variables are ready for analysis. After preprocessing, we would split the data into training, validation, and test sets. The training set would be used to fit the model, the validation set to fine-tune it, and the test set to assess how well the model can predict prices for houses it has not seen before.
+
+![Image by [*Stefan*](https://pixabay.com/users/io-images-1096650/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=4941338) via [*Pixabay*](https://pixabay.com/vectors/database-manage-administer-4941338/).](img/database.png){width=50%}
 
 As shown in @fig-ds-workflow-data-collection-wrangling, the data collection and wrangling stage is fundamental to the workflow. It directly follows the study design and sets the stage for exploratory data analysis.
 
@@ -246,62 +300,393 @@ As shown in @fig-ds-workflow-data-collection-wrangling, the data collection and 
 
 ### Exploratory Data Analysis {#sec-ds-workflow-eda}
 
-Before diving into data modelling, it's crucial to develop a deep understanding of the relationships between the variables in your training data. This is where the third stage of the data science workflow—**Exploratory Data Analysis (EDA)**—comes into play. EDA serves as a vital process that allows you to visualize and summarize your data, uncover patterns, detect anomalies, and test key assumptions that will inform your modelling decisions.
+Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between the variables in our training data. This is where the third stage of the data science workflow comes into play: **exploratory data analysis (EDA)**. EDA serves as a vital process that allows us to visualize and summarize our data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions.
 
-The first step in EDA is to classify your variables according to their types. This classification is essential because it guides your choice of analysis techniques and models. Specifically, you need to determine whether each variable is discrete or continuous, and whether it has any specific characteristics such as being bounded or unbounded.
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-outlook-success-3704053/).](img/explore.png){width="400"}
 
-- **Response Variable:**
-  - Determine if your response variable is *discrete* (e.g., binary, count-based, categorical) or *continuous*.
-  - If it is *continuous*, consider whether it is *bounded* (e.g., percentages that range between 0 and 100) or *unbounded* (e.g., a variable like temperature that can take on a wide range of values).
+The first step in EDA is to classify our variables according to their types. This classification is essential because it guides our choice of analysis techniques and models. Specifically, we need to determine whether each variable is **discrete** or **continuous**, and whether it has any specific characteristics such as being bounded or unbounded.
 
-- **Regressors**:
-  - For each regressor, identify whether it is *discrete* or *continuous*.
-  - If a regressor is discrete, classify it further as binary, count-based, or categorical.
-  - If a regressor is continuous, determine whether it is bounded or unbounded.
+- **Response (i.e., the $Y$):**
+  + Determine if the response variable is **discrete** (e.g., binary, count-based, categorical) or **continuous**.
+  + If it is **continuous**, let us consider whether it is **bounded** (e.g., percentages that range between $0$ and $100$) or **unbounded** (e.g., a variable like company profits/losses that can take on a wide range of values).
+- **Regressors (i.e., the $X$s):**
+  - For each regressor, we must identify whether it is **discrete** or **continuous**.
+  - If a regressor is **discrete**, let us classify it further as binary, count-based, or categorical.
+  - If a regressor is **continuous**, let us determine whether it is bounded or unbounded.
 
-This classification step ensures that you are prepared to choose the correct visualization and statistical methods for your analysis, as different types of variables often require different approaches.
+This classification scheme helps us select the appropriate visualization and statistical methods for our analysis, as different variable types often need different approaches. It ensures that we are well-equipped to make the right choices in our analyses.
 
-This classification step ensures that you are prepared to choose the correct visualization and statistical methods for your analysis, as different types of variables often require different approaches.
+After classifying your variables, the next step is to create **visualizations** and calculate **descriptive statistics** using our training data. This involves coding plots that can reveal the underlying distribution of each variable and the relationships between them. For instance, we might create histograms to visualize distributions, scatter plots to explore relationships between continuous variables, and box plots to compare discrete and categorical variables against the continuous variable. 
 
-After classifying your variables, the next step is to create visualizations and calculate descriptive statistics using your training data. This involves coding plots that can reveal the underlying distribution of each variable and the relationships between them. For instance, you might create histograms to visualize distributions, scatter plots to explore relationships between continuous variables, and box plots to compare categorical variables against the response variable.
+Alongside these visualizations, it is important to calculate key descriptive statistics such as the mean, median, and standard deviation if our variables are numeric. These statistics provide a summary of our data, offering insights into **central tendency** and **variability**. We might also use a correlation matrix to assess the strength of relationships between continuous variables.
 
-Alongside these visualizations, it is important to calculate key descriptive statistics such as the mean, median, and standard deviation. These statistics provide a numerical summary of your data, offering insights into central tendency and variability. You might also use a correlation matrix to assess the strength of relationships between continuous variables.
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-to-learn-goal-3674110/).](img/mean.png){width="600"}
 
-Once you have generated these plots and statistics, they should be displayed in a clear and logical manner. The goal here is to interpret the data and draw preliminary conclusions about the relationships between variables. Presenting these findings effectively helps to uncover key insights and prepares you for the modelling stage.
+Once we have generated these plots and statistics, they should be displayed in a clear and logical manner. The goal here is to interpret the data and draw preliminary conclusions about the relationships between variables. Presenting these findings effectively helps to uncover key insights and prepares you for the subsequent modelling stage. Finally, the insights gained from our EDA must be **clearly articulated**. This involves summarizing the key findings and considering their implications for the next stage of the workflow—data modelling. Observing patterns, correlations, and potential outliers in this stage will inform your modelling approach and ensure that it is grounded in a thorough and informed analysis.
 
-Finally, the insights gained from this exploratory analysis must be clearly articulated. This involves summarizing the key findings and considering their implications for the next stage of the workflow—data modelling. Observing patterns, correlations, and potential outliers in this stage will inform your modelling approach and ensure that it is grounded in a thorough and informed analysis.
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the use of EDA to deliver inferential conclusions!
+::::
+::::{.Heads-up-container}
+While EDA plays a critical role in uncovering patterns, detecting anomalies, and generating hypotheses. However, it is important to emphasize that the results of EDA **should not be generalized beyond the specific sample data being analyzed**. EDA is inherently descriptive and focused on the sample, and it is not intended to support inferential claims about larger populations. The insights gained from EDA are contingent on the specific sample and may not accurately reflect systematic relationships within the broader population. Nevertheless, EDA can provide valuable information to inform our modelling decisions.
 
-This structured approach to EDA is visually summarized in @fig-ds-workflow-eda, illustrating the sequential steps from variable classification to the delivery of exploratory insights.
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-fear-expression-6230192/).](img/curious.png){width="250"}
 
-#### Example: EDA for Housing Price Predictions
+Generalizing findings to a larger population requires formal statistical inference, which takes into account **sampling variability**, **model uncertainty**, and the **precision of estimates**. This is particularly important in regression analysis, where extending patterns observed in a sample to the wider population needs rigorous modelling assumptions, estimation procedures, and a quantification of uncertainty (e.g., through confidence intervals). Treating EDA findings as if they were inferential conclusions can lead to misleading interpretations throughout our data science workflow.
+::::
+:::
 
-To illustrate the EDA process, let's apply it to the example of predicting housing prices.
+#### Example: EDA for Housing Data
 
-We start with **variable classification**:
+To illustrate the EDA process, we will follow it within the context of the housing example used in the previous two workflow stages, utilizing simulated data. Suppose we have a sample size of $n = 2,000$ houses drawn from various Canadian cities through **cluster sampling**. As shown in @tbl-housing-variables, our earlier **inferential** and **predictive inquiries** focus on **sale price** in CAD as our response variable in a regression context. Note that this numeric response cannot be negative, which classifies it as **positively unbounded**. Additionally, @tbl-housing-variables provides the relevant details for the regressors in this case: the number of bedrooms, square footage, neighbourhood type, and proximity to schools.
 
-- The **response variable** is the *sale price of a house*, a continuous and unbounded variable.
-- The **regressors** include:
-  - *Number of bedrooms*: Discrete, count-based.
-  - *Square footage*: Continuous and unbounded.
-  - *Neighborhood type*: Discrete, categorical (e.g., urban, suburban, rural).
-  - *Proximity to schools*: Continuous, potentially bounded by distance.
+| **Variable**              | **Type**                   | **Scale**            | **Model Role** |
+|:-----------------------:|:------------------------:|:------------------:|:------------:|
+| Sale Price (*CAD*)                           | Continuous             | Positively unbounded        | Response   |
+| Number of Bedrooms           | Discrete | Count            | Regressor  |
+| Square Footage                 | Continuous             | Positively unbounded        | Regressor  |
+| Neighbourhood Type (*Rural*, *Suburban* or *Urban*)  | Discrete | Categorical          | Regressor  |
+| Proximity to Schools (*km*)                | Continuous             | Positively unbounded | Regressor  |
 
-Once the variables are classified, we move on to **coding plots and calculating descriptive statistics**. Here are a couple of visualizations that can be helpful in this context:
+: Classification table for variables in housing data. {#tbl-housing-variables .striped .hover}
 
-- A **histogram** of sale prices helps visualize the distribution and spot any outliers.
-- A **scatter plot** of square footage versus sale price shows the relationship, typically revealing a positive correlation.
-- **Box plots** compare sale prices across different neighborhood types, highlighting any variations in median prices.
-- **Descriptive statistics** like the mean and standard deviation provide a numerical summary, while a **correlation matrix** helps assess relationships between continuous variables like square footage and sale price.
+We will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. In addition, @tbl-training-housing-data displays the first 100 rows of our training data which is subset of size equal to $400$.
 
-Finally, in **displaying and interpreting results**, these plots and statistics guide us in understanding the data:
+```{r}
+#| label: tbl-training-housing-data
+#| tbl-cap: "First 100 rows of training housing data."
+#| echo: false 
+#| message: false
 
-- The histogram might show most houses fall within a mid-range price.
-- The scatter plot could confirm that larger houses generally sell for more.
-- Box plots may reveal that urban homes tend to have higher prices.
+library(tidyverse)
+library(scales)
 
-These **exploratory insights** help identify key predictors like square footage and neighborhood type, and highlight any outliers that may require further attention during modelling.
+# Simulating housing data with n = 2000
+set.seed(123)
 
-By following these steps, the EDA process in the housing price prediction example lays a solid foundation for effective modelling, ensuring that the key variables and their relationships are well understood.
+n <- 2000
+
+# Simulating covariates
+bedrooms <- rpois(n, lambda = 3) + 1                         # Number of bedrooms: 1 to ~7 bedrooms
+sqft <- round(rnorm(n, mean = 1800, sd = 400), 2)     # Square footage: continuous and positively unbounded
+neighbourhood <- factor(sample(c("Urban", "Suburban", "Rural"),
+  n,
+  replace = TRUE,
+  prob = c(0.4, 0.4, 0.2)
+))                                                     # Neighbourhood type: discrete and categorical
+school_dist <- round(runif(n, min = 0.1, max = 5), 2)  # Distance in km
+
+# Create sale price with a linear model + noise
+sale_price <- round(50000 + 15000 * bedrooms + 100 * sqft +
+  ifelse(neighbourhood == "Urban", 60000,
+    ifelse(neighbourhood == "Suburban", 30000, 0)
+  ) -
+  8000 * school_dist + rnorm(n, mean = 0, sd = 30000), 2)
+
+# Bundle into a data frame
+housing_data <- data.frame(
+  sale_price,
+  bedrooms,
+  sqft,
+  neighbourhood,
+  school_dist
+)
+
+# Data splitting (20% for training and 80% for testing)
+set.seed(42)
+train_indices <- sample(1:nrow(housing_data), size = 0.2 * nrow(housing_data))  # 400 rows
+training_data <- housing_data[train_indices, ]  # 20% training set
+testing_data <- housing_data[-train_indices, ]  # 80% testing set
+
+training_data_display <- data.frame(
+  sale_price = dollar(sale_price),
+  bedrooms,
+  sqft = scales::comma(sqft, accuracy = 0.01),
+  neighbourhood,
+  school_dist
+)
+
+# Showing the first 100 rows
+print_as_dt(head(setNames(
+  training_data_display[, c("sale_price", "bedrooms", "sqft", "neighbourhood", "school_dist")],
+  c(
+    "Sale Price", "Number of Bedrooms", "Square Footage", "Neighbourhood Type",
+    "Proximity to Schools"
+  )
+), 100))
+```
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on data splitting for inferential inquiries!
+::::
+::::{.Heads-up-container}
+In machine learning, data splitting is a foundational practice designed to prevent data leakage in **predictive inquiries**. However, you may wonder:
+
+> **Why should we also split the data for inferential inquiries?**
+
+In the context of statistical inference, especially when making claims about population parameters, data splitting plays a different but important role: it helps prevent **double dipping**. Double dipping refers to the misuse of the same data for both exploring hypotheses (as in EDA) and formally testing those hypotheses. This practice undermines the validity of inferential claims **by increasing the probability of Type I errors**—incorrectly rejecting the null hypothesis $H_0$ when it is actually true for the population under study.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-social-network-3704049/).](img/paint.png){width="525"}
+
+To illustrate this, consider conducting a one-sample $t$-test in a double-dipping scenario. Suppose we first observe a sample mean of $\bar{x} = 9.5$, and then decide to test the null hypothesis 
+
+$$\text{$H_0$: } \mu \geq 10$$ 
+
+against the alternative hypothesis 
+
+$$\text{$H_1$: } \mu < 10,$$ 
+
+**after performing EDA on the same data**. If we proceed with the formal $t$-test using that same data, we are essentially tailoring the hypothesis to fit our sample. Empirical simulations can show that such practices lead to **inflated false positive rates**, which threaten the reproducibility and integrity of statistical inference.
+
+Unlike predictive modelling, **data splitting is not a routine practice in statistical inference**. However, it becomes relevant when the line between exploration and formal testing is blurred. For more information on double dipping in statistical inference, Chapter 6 of @reinhart2015 offers in-depth insights and some real-life examples.
+::::
+:::
+
+After classifying the variables and splitting our data, we will move on to coding the plots and calculating the summary statistics. We provide a list of these plots and summary statistics, along with their corresponding EDA outputs and interpretations, based on our training data, which has a subset size of $400$:
+
+- A **histogram** of sale prices, as in @fig-histogram-sales-prices, shows the response's distribution and helps identify any outliers. The training set reveals a **fairly symmetric distribution** of sale prices, with a noticeable concentration of sales between $\$200,000$ and $\$400,000$. However, there are a few outliers. Even with just 20% of the total data, this plot provides valuable graphical insights into central tendency and variability.
+
+```{r}
+#| label: fig-histogram-sales-prices
+#| fig-cap: "Histogram of sale prices via training set."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+
+hist_sale_prices <- ggplot(training_data, aes(x = as.numeric(sale_price))) +
+  geom_histogram(binwidth = 10000, fill = "navyblue", color = "white") +
+  labs(x = "\n Sale Price (CAD)", y = "Count\n") +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(xlim = c(0, 500000), ylim = c(0, 45)) +
+  scale_x_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 100000)) +
+  scale_y_continuous(breaks = seq(0, 40, by = 10))
+
+hist_sale_prices
+```
+
+- Side-by-side **jitter plots**, as in @fig-jitter-plot-sales-prices-bedrooms, visualize the distribution of sale prices across different bedroom counts, highlighting spread. Overall, these plots indicate a **positive association** between the number of bedrooms and home sale price. Note that the average price (represented by red diamonds) tends to increase with the addition of more bedrooms. The training set predominantly has homes with 3 to 5 bedrooms, and there are some high-priced outliers present even among mid-sized homes.
+
+```{r}
+#| label: fig-jitter-plot-sales-prices-bedrooms
+#| fig-cap: "Side-by-side jitter plots of sale prices by number of bedrooms via training set (red diamonds indicate sale price means by number of bedrooms)."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+
+jitteplots_by_bedroom <- ggplot(training_data, aes(x = factor(bedrooms), y = sale_price)) +
+  geom_jitter(width = 0.2, alpha = 0.55, color = "#0072B2", size = 2) +
+  stat_summary(fun = mean, geom = "point", shape = 18, size = 6, color = "red") +
+  labs(
+    x = "\n Number of Bedrooms",
+    y = "Sale Price (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(0, 500000)) +
+  scale_y_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 100000))
+
+jitteplots_by_bedroom
+```
+
+- A **scatter plot** displaying the relationship between square footage and sale price, as in @fig-scatter-plot-sqft-sales-prices, illustrates how these two continuous variables interact. There is a clear **upward trend** in the training data, indicated by the fitted solid red line of the simple linear regression. Although the variability increases with larger square footage, the overall **positive linear pattern** is still clear.
+
+```{r}
+#| label: fig-scatter-plot-sqft-sales-prices
+#| fig-cap: "Scatter plot of square footage versus sale prices via training set (solid red line indicates a simple linear regression fitting)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+scatterplot_sqft_vs_sale_price <- ggplot(training_data, aes(x = sqft, y = sale_price)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "\n Square Footage",
+       y = "Sale Price (CAD)\n") +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(0, 500000), xlim = c(300, 3200)) +
+  scale_y_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 100000)) +
+  scale_x_continuous(breaks = seq(500, 3000, by = 500))
+
+scatterplot_sqft_vs_sale_price
+```
+
+- Side-by-side **box plots**, as in @fig-box-plot-neighbourhood-sale-prices, are used to compare sale prices across different types of neighbourhoods, highlighting variations in median prices. The training data reveals neighbourhood-specific price patterns: urban homes tend to have higher prices, while rural homes are generally less expensive. However, from a graphical perspective, we do not observe significant differences in price spreads between these types of neighbourhoods.
+
+```{r}
+#| label: fig-box-plot-neighbourhood-sale-prices
+#| fig-cap: "Side-by-side box plots of sale prices by neighbourhood type via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+boxplots_neighbourhood <- ggplot(training_data, aes(
+  x = neighbourhood,
+  y = sale_price,
+  fill = neighbourhood
+)) +
+  geom_boxplot() +
+  labs(
+    x = "\n Neighbourhood",
+    y = "Sale Price (CAD)\n"
+  ) +
+  scale_fill_manual(values = c("Urban" = "#E69F00", "Suburban" = "#56B4E9", "Rural" = "#009E73")) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(0, 500000)) +
+  scale_y_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 100000)) +
+  theme(legend.position = "none")
+
+boxplots_neighbourhood
+```
+
+- The **scatter plot** showing the relationship between proximity to schools and sale price, as in @fig-scatter-plot-prox-schools-sales-prices, reveals an **almost flat trend** in the training data. This observation is supported by the fitted solid red line of the simple linear regression, indicating a **weak graphical relationship** between these two variables.
+
+```{r}
+#| label: fig-scatter-plot-prox-schools-sales-prices
+#| fig-cap: "Scatter plot of proximity to schools versus sale prices via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+scatterplot_sqft_vs_sale_price <- ggplot(training_data, aes(x = school_dist, y = sale_price)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "\n Proximity to schools (km)",
+       y = "Sale Price (CAD)\n") +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(0, 500000)) +
+  scale_y_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 100000))
+
+scatterplot_sqft_vs_sale_price
+```
+
+- **Descriptive statistics** from @tbl-housing-data-summary-stats, such as the mean and standard deviation, summarize continuous variables. In addition, a **Pearson correlation matrix** from @tbl-housing-data-correlation-matrix numerically assesses the relationships between these variables. Note that square footage is positively correlated with sale price, while proximity to schools has a negative association.
+
+```{r}
+#| label: tbl-housing-data-summary-stats
+#| tbl-cap: "Descriptive statistics of housing data via training set."
+#| echo: false
+
+library(dplyr)
+library(tidyr)
+
+summary_housing <- training_data |>
+  select(sale_price, bedrooms, sqft, school_dist) |>
+  summarise(across(everything(),
+    list(
+      mean = ~ mean(.x, na.rm = TRUE),
+      sd = ~ sd(.x, na.rm = TRUE),
+      min = ~ min(.x, na.rm = TRUE),
+      max = ~ max(.x, na.rm = TRUE),
+      median = ~ median(.x, na.rm = TRUE)
+    ),
+    .names = "{.fn}_{.col}"
+  )) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = c("stat", "variable"),
+    names_pattern = "([^_]+)_(.+)",
+    values_to = "value"
+  ) |>
+  pivot_wider(names_from = stat, values_from = value) |>
+  mutate(
+    variable = dplyr::recode(as.character(variable),
+      "sale_price" = "Sale Price (CAD)",
+      "bedrooms" = "Number of Bedrooms",
+      "sqft" = "Square Footage",
+      "school_dist" = "Proximity to Schools (km)"
+    )
+  ) |>
+  rename(
+    Variable = variable,
+    Mean = mean,
+    `Standard Deviation` = sd,
+    Minimum = min,
+    Maximum = max,
+    Median = median
+  ) |>
+  mutate(across(
+    c(Mean, `Standard Deviation`, Minimum, Maximum, Median),
+    ~ case_when(
+      Variable == "Sale Price (CAD)" ~ dollar(.x),
+      Variable == "Square Footage" ~ comma(.x),
+      TRUE ~ format(round(.x, 2), nsmall = 2)
+    )
+  ))
+
+print_as_dt_all(summary_housing)
+```
+
+```{r}
+#| label: tbl-housing-data-correlation-matrix
+#| tbl-cap: "Pearson correlation matrix of housing data, via training set, for numeric variables."
+#| echo: false
+#| message: false
+
+library(corrplot)
+library(viridis)
+
+# Compute correlation matrix for selected variables
+eda_corr <- cor(training_data[, c("sale_price", "sqft", "school_dist")])
+
+# Rename correlation matrix row and column names
+colnames(eda_corr) <- rownames(eda_corr) <- c("Sale Price", "Square Feet", "Proximity to Schools")
+
+# Generate viridis color palette (no white included)
+col_palette <- viridis::viridis(200)
+
+# Plot correlation matrix with viridis colors and new variable names
+corrplot(
+  eda_corr,
+  method = "number",
+  type = "upper",
+  tl.col = "black",
+  col = col_palette,
+  cl.ratio = 0.3
+)
+```
+
+In **displaying and interpreting results**, the plots and statistics will guide us in understanding the data. In this specific example, these exploratory insights help identify key factors, such as square footage and neighborhood type, that influence housing prices. They also highlight any outliers that may need further attention during modelling. By following this EDA process, we will establish a **solid descriptive foundation** for effective data modelling, ensuring that the key variables and their relationships are well understood.
+
+Finally, this structured approach to EDA is visually summarized in @fig-ds-workflow-eda, which shows the sequential steps from variable classification to the delivery of exploratory insights.
 
 ::: {#fig-ds-workflow-eda}
 ![](img/eda.png){width="1000"} 
@@ -349,8 +734,12 @@ By following these steps, the EDA process in the housing price prediction exampl
 *Storytelling* stage from the data science workflow in @fig-ds-workflow. This stage preceded by *results*.
 :::
 
-
 ## Mind Map of Regression Analysis {#sec-regression-mindmap}
+
+<br>
+<center>
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-mindmap-3704048/).](img/mind-map.png){width="350"}
+</center>
 
 Having defined the necessary statistical aspects to execute a proper supervised learning analysis, either *inferential* or *predictive* across its seven sequential phases, we must dig into the different approaches we might encounter in practice as regression models. The nature of our outcome of interest will dictate any given modelling approach to apply, depicted as clouds in @fig-regression-mindmap. Note these regression models can be split into two sets depending on whether the outcome of interest is *continuous* or *discrete*. Therefore, under a probabilistic view, identifying the nature of a given random variable is crucial in regression analysis.
 
