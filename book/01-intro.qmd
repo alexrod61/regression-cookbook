@@ -13,6 +13,18 @@
 ```{r}
 #| include: false
 
+library(reticulate)
+
+# Setting up Python dependencies
+py_require("pandas")
+py_require("numpy")
+py_require("statsmodels")
+pandas <- import("pandas")
+numpy <- import("numpy")
+statsmodels <- import("statsmodels")
+
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string')) 
+
 colourize <- function(x, color) {
   if (knitr::is_latex_output()) {
     sprintf("\\textcolor{%s}{%s}", color, x)
@@ -706,7 +718,7 @@ c. Its **interpretability** (i.e., can we effectively communicate our statistica
 
 In statistical literature, we often encounter **classical linear regression models**, such as the Ordinary Least-squares (OLS) model discussed in @sec-ols. This model enables us to explain our continuous response variable of interest, denoted as a **random variable $Y$**, in the form of a **linear combination** of a specified set of regressors (the **observed $x$ variables**). A linear combination is essentially an additive relationship where $Y$ depends on the $x$ variables, which are multiplied by **regression coefficients**. Alternatively, for both continuous and discrete response variables, we can utilize more complex models that establish a **non-linear relationship** between $Y$ and the $x$ variables. Some of these models are referred to as generalized linear models (GLMs).
 
-For this workflow stage, whether using a classical linear regression model like OLS or a more complex one such as a GLM (which are covered in this book along other models that explain **survival time responses**), we need to establish modelling equations that align with both theoretical and data-driven considerations. These modelling equations will need definitions for the parameters, link functions (if applicable as in the case of GLMs), and any relevant distributional assumptions based on the chosen model. Then, once we have defined our modelling equation(s), we can proceed to the estimation stage. Note that this data modelling stage is iterative, as illustrated in @fig-ds-workflow-data-modelling. The process will depend heavily on the results obtained during the goodness of fit stage.
+For this workflow stage, whether using a classical linear regression model like OLS or a more complex one such as a GLM (a type of model that is covered in this book along other models that explain **survival time responses**), we need to establish modelling equations that align with both theoretical and data-driven considerations. These modelling equations will need definitions for the parameters, link functions (if applicable as in the case of GLMs), and any relevant distributional assumptions based on the chosen model. Then, once we have defined our modelling equation(s), we can proceed to the estimation stage. Note that this data modelling stage is iterative, as illustrated in @fig-ds-workflow-data-modelling. The process will depend heavily on the results obtained during the goodness of fit stage.
 
 ::: {#fig-ds-workflow-data-modelling}
 ![](img/data-modelling.png){width="1000"} 
@@ -752,7 +764,7 @@ x_{i, 4} =
 1 \quad \text{if the house belongs to a suburban neighbourhood},\\
 0 \quad \text{otherwise};
 \end{cases}
-$$
+$${#eq-dummy-housing-1}
 
 and 
 
@@ -762,7 +774,7 @@ x_{i, 5} =
 1 \quad \text{if the house belongs to an urban neighbourhood},\\
 0 \quad \text{otherwise}.
 \end{cases}
-$$
+$${#eq-dummy-housing-2}
 
 | **Level** | $x_{i,4}$ | $x_{i,5}$ |
 |:----------:|:----------:|:----------:|
@@ -839,15 +851,186 @@ Before we conclude this stage, note that @sec-stats-review will explore the fund
 
 ### Estimation {#sec-ds-workflow-estimation}
 
-<!--
-The inferential inquiry focuses on understanding the statistical associations (via a suitable model) between the sale price and other variables, such as square footage, number of bedrooms, and proximity to schools. In contrast, the predictive inquiry involves fitting a suitable model to obtain estimates that will enable us to predict housing sale prices based on these same features.
--->
+Based on the data we have and our EDA, defining an suitable regression model (along with the equations that relate the response variable $Y$ to the regressors $x$ and the corresponding regression parameters) is an essential step in our data science workflow. This leads us to the next stage: **estimation**. In this stage, we aim to obtain what we refer to as **modelling estimates** using our **training dataset**. The method we choose for estimation largely depends on the specific regression model we adopt to address our inquiries.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-college-3702064/).](img/plug.png){width="500"}
+
+In all core chapters of this book, except for @sec-ols, the default method we will use is **maximum likelihood estimation (MLE)** (the fundamental insights are provided in @sec-mle). Regardless of the chosen estimation method, these estimates (denoted with a hat notation) will allow us to quantify the association (or causation, if applicable) between the outcome variable $Y$ and the $x$ regressors. This is particularly relevant in inferential inquiries, provided that the results are statistically significant, as discussed in @sec-ds-workflow-results.
+
+As illustrated in @fig-ds-workflow-estimation, the data modelling stage will yield the necessary components for this phase in the form of a suitable model, modelling equation, and regression parameters. We will then use the corresponding `R` or `Python` fitting function, where the inputs will include the coded modelling equation (which contains the variables of interest: the outcome and the regressors) along with the training set. These fitting functions serve the following purposes:
+
+- In most regression models, obtaining analytical (i.e., exact) solutions for our **parameter estimates** is not feasible. Specifically, MLE can employ an optimization method such as **Newton-Raphson** or **iteratively reweighted least squares (IRLS)**, as we aim to **maximize** the log-likelihood function that involves our observed data and unknown parameters. This function is numerically optimized to estimate these parameters. More information regarding numerical optimization in MLE, including a brief discussion of the Newton-Raphson method, can be found in @sec-num-optimization. Throughout the core chapters of the book, we will delve deeper into the fundamentals of IRLS. 
+- Once the estimation process has been completed using the appropriate log-likelihood function and numerical optimization method (i.e., when the method has converged to an optimal solution), we will obtain outputs that include **parameter estimates**. These parameter estimates will be used in the subsequent workflow stage, called goodness of fit, to statistically assess whether our **fitted model** satisfies the assumptions we made about our data in the previous modelling stage.
 
 ::: {#fig-ds-workflow-estimation}
 ![](img/estimation.png){width="1000"} 
 
 *Estimation* stage from the data science workflow in @fig-ds-workflow. This stage is directly preceded by *data modelling* and followed by *goodness of fit*. If necessary, the *goodness of fit* stage could retake the process to *data modelling* and then to *estimation*.
 :::
+
+#### Example: Fitting the OLS Regression Model for Housing Data
+
+Before continuing with this housing example, let us make a quick note on this textbook's coding delivery.
+
+![Image by [*Gustavo Rezende*](https://pixabay.com/users/gustavorezende-1488336/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=8500500) via [*Pixabay*](https://pixabay.com/vectors/town-city-village-isometric-houses-8500500/).](img/houses.png){width="400"}
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on coding tabs!
+::::
+::::{.Heads-up-container}
+You might be wondering:
+
+> **Where do we begin with some `R` or `Python` code?**
+
+It is time to introduce our very first lines of code and provide some explanations about the coding approach in this book. Our goal is to make this book "*bilingual*," meaning that all hands-on coding practices can be performed in either `R` or `Python`. Whenever we present a specific proof of concept or data modelling exercise, you will find two tabs: one for `R` and another for `Python`. We will first show the input code, followed by the output.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
+
+With this format, you can choose your coding journey based on your language preferences and interests as you progress throughout the book.
+::::
+:::
+
+Let us examine the `training_data` for this housing case, which consists of $n = 400$ observations. As shown in @tbl-housing-variables, for the $i$th house, we have different regressors: the number of bedrooms (`bedrooms`, denoted as $x_{i, 1}$), the continuous square footage (`sqft`, denoted as $x_{i, 2}$), the continuous proximity to schools in km (`school_dist`, denoted as $x_{i, 3}$), and neighborhood type (represented by dummy variables $x_{i, 4}$ as in @eq-dummy-housing-1 and $x_{i, 5}$ as in @eq-dummy-housing-2, where *rural* is the baseline). The response variable we are interested in is the continuous housing sale price in CAD (`sale price`, denoted as $Y_i$). Additionally, we will revisit our modeling approach as outlined in @eq-housing-OLS:
+
+$$
+Y_i = \beta_0 + \beta_1 x_{i, 1} + \beta_2 x_{i, 2} + \beta_3 x_{i, 3} + \beta_4 x_{i, 4} + \beta_5 x_{i, 5} + \varepsilon_i,
+$$
+
+where $\beta_0$, $\beta_1$, $\beta_2$, $\beta_3$, $\beta_4$, and $\beta_5$ represent the unknown regression parameters to be estimated to address our inferential and predictive inquiries. Additionally, we have another parameter to estimate, that is the common variance between the random components of each observation ($i = 1, 2, \ldots, n$):
+
+$$
+\text{Var}(\varepsilon_i) = \sigma^2.
+$$
+
+
+The code below displays the first 100 rows of the `training_data`, which was also utilized in the previous EDA. Note we import the [{pandas}](https://pypi.org/project/pandas/) library to manipulate the data frame in `Python`.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+training_data
+
+# Showing the first 100 training data points
+head(training_data, n = 100) 
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Importing library
+import pandas as pd
+
+training_data
+
+# Showing the first 100 training data points
+print(training_data.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+
+# Showing the first 100 training data points
+head(training_data, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+# Importing library
+import pandas as pd
+
+training_data = r.training_data
+```
+
+```{r}
+#| echo: false
+
+# Showing the first 100 training data points
+print_as_dt(head(py$training_data, 100))
+```
+
+:::
+
+Having set up the coding starting point for this estimation, we need to use the corresponding fitting functions to find $\hat{\beta}_0$, $\hat{\beta}_1$, $\hat{\beta}_2$, $\hat{\beta}_3$, $\hat{\beta}_4$, $\hat{\beta}_5$, $\hat{\sigma}^2$ via OLS regression (as we already decided in the data modelling stage). Therefore, let us the following function and libraries:
+
+- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_dist`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
+- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) [@numpy] libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_dist`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Loading libraries
+library(tidyverse)
+library(broom)
+
+# Fitting the OLS model
+OLS_model <- lm(
+  formula = sale_price ~ bedrooms + sqft +
+    school_dist + neighbourhood,
+  data = training_data
+)
+
+# Displaying the tidy table
+tidy(OLS_model) |>
+  mutate_if(is.numeric, round, 2)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+# Importing libraries
+import statsmodels.formula.api as smf
+import numpy as np
+
+# Fitting the OLS model
+OLS_model = smf.ols(
+    formula="sale_price ~ bedrooms + sqft + school_dist + neighbourhood",
+    data=training_data
+).fit()
+
+# Creating a tidy summary table
+OLS_tidy = pd.DataFrame({
+    "term": OLS_model.params.index,
+    "estimate": np.round(OLS_model.params.values, 2),
+    "std_error": np.round(OLS_model.bse.values, 2),
+    "t_value": np.round(OLS_model.tvalues.values, 2),
+    "p_value": np.round(OLS_model.pvalues.values, 2)
+})
+
+# Displaying the tidy table
+print(OLS_tidy)
+```
+
+:::
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the OLS analytical estimates!
+::::
+::::{.Heads-up-container}
+Unlike GLMs, which will be discussed beginning in @sec-gamma, OLS regression provides exact analytical estimates. Therefore, it is not necessary to rely on numerical optimization in this case. You can find further details about this matter in @sec-ols.
+::::
+:::
+
+Since the **inferential inquiry** in this example aims to understand the **statistical associations** between housing sale prices and their explanatory variables, while the **predictive inquiry** seeks to fit a suitable model that allows us to **predict housing sale prices** based on these same features, we might be tempted to use `OLS_model` to address both inquiries right away. However, according to our data science workflow, these analyses should be conducted during the **results stage**, after we have completed model diagnostic checks. For now, we will use the `training_data` and `OLS_model` to perform this corresponding **goodness of fit** in the next stage.
 
 ### Goodness of Fit {#sec-ds-workflow-goodness-of-fit}
 
@@ -858,6 +1041,11 @@ The inferential inquiry focuses on understanding the statistical associations (v
 :::
 
 ### Results {#sec-ds-workflow-results}
+
+<!--
+and **standard errors**. Note that standard errors are essential for inferential inquiries, as they are used in **hypothesis testing**. Additionally, these standard errors can be utilized in a later workflow stage to calculate **confidence intervals (CIs)** for our **statistically significant** estimated regression parameters. CIs provide a measure of uncertainty associated with the estimations derived from the sampled data. For a refresher on statistical inference, please refer to @sec-basics-inf.
+
+-->
 
 ::: {#fig-ds-workflow-results}
 ![](img/results.png){width="1000"}
@@ -942,7 +1130,8 @@ That said, we will go beyond OLS regression and explore further regression techn
 
 As we can see in the clouds of @fig-regression-mindmap, there are 13 regression models: 8 belonging to discrete outcomes and 5 to continuous outcomes. Each of these models is contained in a chapter of this book, beginning with the most basic regression tool known as ordinary least-squares in @sec-ols. We must clarify that the current statistical literature is not restricted to these 13 regression models. The field of regression analysis is vast, and one might encounter more complex models to target certain specific inquiries. Nonetheless, I consider these models the fundamental regression approaches that any data scientist must be familiar with in everyday practice.
 
-Even though this book comprises 13 chapters, each depicting a different regression model, we have split these chapters into two major subsets: those with *continuous* outcomes and those with *discrete* outcomes. 
+Even though this book comprises thirteen core chapters, each depicting a different regression model, we have split these chapters into two major subsets: those with *continuous* outcomes and those with *discrete* outcomes. 
 
-# Supervised Learning and Regression Analysis {#sec-sup-learning-regression}
+## Supervised Learning and Regression Analysis {#sec-sup-learning-regression}
 
+## Chapter Summary {#sec-chapter-3-summary}
