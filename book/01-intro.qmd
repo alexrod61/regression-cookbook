@@ -351,59 +351,127 @@ Generalizing findings to a larger population requires formal statistical inferen
 
 #### Example: EDA for Housing Data
 
-To illustrate the EDA process, we will follow it within the context of the housing example used in the previous two workflow stages, utilizing simulated data. Suppose we have a sample size of $n = 2,000$ houses drawn from various Canadian cities through **cluster sampling**. As shown in @tbl-housing-variables, our earlier **inferential** and **predictive inquiries** focus on **housing sale price** in *CAD* as our response variable in a regression context. Note that this numeric response cannot be negative, which classifies it as **positively unbounded**. Additionally, @tbl-housing-variables provides the relevant details for the regressors in this case: the number of bedrooms, square footage, neighbourhood type, and proximity to schools.
+To illustrate the EDA process, we will follow it within the context of the housing example used in the previous two workflow stages, utilizing simulated data. Suppose we have a sample of $n = 2,000$ houses drawn from various Canadian cities through **cluster sampling**. As shown in @tbl-housing-variables, our earlier **inferential** and **predictive inquiries** focus on **housing sale price** in *CAD* as our response variable in a regression context. Note that this numeric response cannot be negative, which classifies it as **positively unbounded**. Additionally, @tbl-housing-variables provides the relevant details for the regressors in this case: the number of bedrooms, square footage, neighbourhood type, and proximity to schools. Note that we also indicate the **coding names** of all the variables involved.
 
-| **Variable**              | **Type**                   | **Scale**            | **Model Role** |
-|:-----------------------:|:------------------------:|:------------------:|:------------:|
-| Housing Sale Price (*CAD*)                           | Continuous             | Positively unbounded        | Response   |
-| Number of Bedrooms           | Discrete | Count            | Regressor  |
-| Square Footage                 | Continuous             | Positively unbounded        | Regressor  |
-| Neighbourhood Type (*Rural*, *Suburban* or *Urban*)  | Discrete | Categorical          | Regressor  |
-| Proximity to Schools (*km*)                | Continuous             | Positively unbounded | Regressor  |
+| **Variable**              | **Type**                   | **Scale**            | **Model Role** | **Coding Name** |
+|:-----------------------:|:------------------------:|:------------------:|:------------:|:------------:|
+| Housing Sale Price (*CAD*)                           | Continuous             | Positively unbounded        | Response   | `sale_price` |
+| Number of Bedrooms           | Discrete | Count            | Regressor  | `bedrooms` |
+| Square Footage                 | Continuous             | Positively unbounded        | Regressor  | `sqft` |
+| Neighbourhood Type (*Rural*, *Suburban* or *Urban*)  | Discrete | Categorical          | Regressor  | `neighbourhood` |
+| Proximity to Schools (*km*)                | Continuous             | Positively unbounded | Regressor  | `school_distance` |
 
 : Classification table for variables in housing data. {#tbl-housing-variables .striped .hover}
 
-We will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. In addition, @tbl-training-housing-data displays the first 100 rows of our training data which is subset of size equal to $400$.
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on coding tabs!
+::::
+::::{.Heads-up-container}
+You might be wondering:
+
+> **Where do we begin with some `R` or `Python` code?**
+
+It is time to introduce our very first lines of code and provide some explanations about the coding approach in this book. Our goal is to make this book "*bilingual*," meaning that all hands-on coding practices can be performed in either `R` or `Python`. Whenever we present a specific proof of concept or data modelling exercise, you will find two tabs: one for `R` and another for `Python`. We will first show the input code, followed by the output.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
+
+With this format, you can choose your coding journey based on your language preferences and interests as you progress throughout the book.
+::::
+:::
+
+Having clarified the bilingual nature of this book with respect to coding, let us load this sample of $n = 2,000$ houses in both `R` and `Python`. For `Python`, we will need the [{pandas}](https://pypi.org/project/pandas/) library. @tbl-housing-data-r and @tbl-housing-data-py show the first 100 rows of this full dataset and `R` and `Python`, respectively.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Loading dataset
+housing_data <- read.csv("data/housing_data.csv")
+
+# Showing the first 100 houses of the full dataset
+head(housing_data, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Importing library
+import pandas as pd
+
+# Loading dataset
+housing_data = pd.read_csv("data/housing_data.csv")
+
+# Showing the first 100 houses of the full dataset
+print(housing_data.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: tbl-housing-data-r
+#| tbl-cap: "First 100 rows of full housing data."
+#| echo: false
+#| message: false
+
+# Loading dataset
+housing_data <- read.csv("data/housing_data.csv")
+
+# Showing the first 100 houses of the full dataset
+head(housing_data, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+# Importing library
+import pandas as pd
+
+# Loading dataset
+housing_data = pd.read_csv("data/housing_data.csv")
+```
+
+```{r}
+#| label: tbl-housing-data-py
+#| tbl-cap: "First 100 rows of full housing data."
+#| echo: false
+
+# Showing the first 100 houses of the full dataset
+print_as_dt(head(py$housing_data, 100))
+```
+
+:::
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on this simulated housing data!
+::::
+::::{.Tip-container}
+The `housing_data` mentioned above is not an actual dataset; it is a simulated one designed to effectively illustrate our **data science workflow** in this chapter. This simulated dataset will somehow enable us to meet the assumptions of the chosen model during the **data modelling stage** outlined in @sec-ds-workflow-modelling. If you would like to learn more about this **generative modelling process**, you can refer to the provided `R` script.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/aha.png){width="300"}
+::::
+:::
+
+Now, we will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. In addition, @tbl-training-housing-data displays the first 100 rows of our training data which is subset of size equal to $400$.
 
 ```{r}
 #| label: tbl-training-housing-data
 #| tbl-cap: "First 100 rows of training housing data."
-#| echo: false 
+#| echo: true 
 #| message: false
 
 library(tidyverse)
 library(scales)
-
-# Simulating housing data with n = 2000
-set.seed(123)
-
-n <- 2000
-
-# Simulating covariates
-bedrooms <- rpois(n, lambda = 3) + 1                         # Number of bedrooms: 1 to ~7 bedrooms
-sqft <- round(rnorm(n, mean = 1800, sd = 400), 2)     # Square footage: continuous and positively unbounded
-neighbourhood <- factor(sample(c("Urban", "Suburban", "Rural"),
-  n,
-  replace = TRUE,
-  prob = c(0.4, 0.4, 0.2)
-))                                                     # Neighbourhood type: discrete and categorical
-school_dist <- round(runif(n, min = 0.1, max = 5), 2)  # Distance in km
-
-# Create sale price with a linear model + noise
-sale_price <- round(50000 + 15000 * bedrooms + 100 * sqft +
-  ifelse(neighbourhood == "Urban", 60000,
-    ifelse(neighbourhood == "Suburban", 30000, 0)
-  ) -
-  8000 * school_dist + rnorm(n, mean = 0, sd = 30000), 2)
-
-# Bundle into a data frame
-housing_data <- data.frame(
-  sale_price,
-  bedrooms,
-  sqft,
-  neighbourhood,
-  school_dist
-)
 
 # Data splitting (20% for training and 80% for testing)
 set.seed(42)
@@ -411,22 +479,8 @@ train_indices <- sample(1:nrow(housing_data), size = 0.2 * nrow(housing_data))  
 training_data <- housing_data[train_indices, ]  # 20% training set
 testing_data <- housing_data[-train_indices, ]  # 80% testing set
 
-training_data_display <- data.frame(
-  sale_price = dollar(sale_price),
-  bedrooms,
-  sqft = scales::comma(sqft, accuracy = 0.01),
-  neighbourhood,
-  school_dist
-)
-
 # Showing the first 100 rows
-print_as_dt(head(setNames(
-  training_data_display[, c("sale_price", "bedrooms", "sqft", "neighbourhood", "school_dist")],
-  c(
-    "Housing Sale Price", "Number of Bedrooms", "Square Footage", "Neighbourhood Type",
-    "Proximity to Schools"
-  )
-), 100))
+print_as_dt(head(training_data, 100))
 ```
 
 ::: {.Heads-up}
@@ -592,7 +646,7 @@ boxplots_neighbourhood
 #| fig.height: 8
 #| fig.width: 14
 
-scatterplot_sqft_vs_sale_price <- ggplot(training_data, aes(x = school_dist, y = sale_price)) +
+scatterplot_sqft_vs_sale_price <- ggplot(training_data, aes(x = school_distance, y = sale_price)) +
   geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
   geom_smooth(method = "lm", se = FALSE, color = "red") +
   labs(x = "\n Proximity to schools (km)",
@@ -621,7 +675,7 @@ library(dplyr)
 library(tidyr)
 
 summary_housing <- training_data |>
-  select(sale_price, bedrooms, sqft, school_dist) |>
+  select(sale_price, bedrooms, sqft, school_distance) |>
   summarise(across(everything(),
     list(
       mean = ~ mean(.x, na.rm = TRUE),
@@ -644,7 +698,7 @@ summary_housing <- training_data |>
       "sale_price" = "Housing Sale Price (CAD)",
       "bedrooms" = "Number of Bedrooms",
       "sqft" = "Square Footage",
-      "school_dist" = "Proximity to Schools (km)"
+      "school_distance" = "Proximity to Schools (km)"
     )
   ) |>
   rename(
@@ -677,7 +731,7 @@ library(corrplot)
 library(viridis)
 
 # Compute correlation matrix for selected variables
-eda_corr <- cor(training_data[, c("sale_price", "sqft", "school_dist")])
+eda_corr <- cor(training_data[, c("sale_price", "sqft", "school_distance")])
 
 # Rename correlation matrix row and column names
 colnames(eda_corr) <- rownames(eda_corr) <- c("Housing Sale Price", "Square Feet", "Proximity to Schools")
@@ -874,24 +928,7 @@ Before continuing with this housing example, let us make a quick note on this te
 
 ![Image by [*Gustavo Rezende*](https://pixabay.com/users/gustavorezende-1488336/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=8500500) via [*Pixabay*](https://pixabay.com/vectors/town-city-village-isometric-houses-8500500/).](img/houses.png){width="400"}
 
-::: {.Heads-up}
-::::{.Heads-up-header}
-Heads-up on coding tabs!
-::::
-::::{.Heads-up-container}
-You might be wondering:
-
-> **Where do we begin with some `R` or `Python` code?**
-
-It is time to introduce our very first lines of code and provide some explanations about the coding approach in this book. Our goal is to make this book "*bilingual*," meaning that all hands-on coding practices can be performed in either `R` or `Python`. Whenever we present a specific proof of concept or data modelling exercise, you will find two tabs: one for `R` and another for `Python`. We will first show the input code, followed by the output.
-
-![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
-
-With this format, you can choose your coding journey based on your language preferences and interests as you progress throughout the book.
-::::
-:::
-
-Let us examine the `training_data` for this housing case, which consists of $n = 400$ observations. As shown in @tbl-housing-variables, for the $i$th house, we have different regressors: the number of bedrooms (`bedrooms`, denoted as $x_{i, 1}$), the continuous square footage (`sqft`, denoted as $x_{i, 2}$), the continuous proximity to schools in km (`school_dist`, denoted as $x_{i, 3}$), and neighborhood type (represented by dummy variables $x_{i, 4}$ as in @eq-dummy-housing-1 and $x_{i, 5}$ as in @eq-dummy-housing-2, where *rural* is the baseline). The response variable we are interested in is the continuous housing sale price in CAD (`sale price`, denoted as $Y_i$). Additionally, we will revisit our modeling approach as outlined in @eq-housing-OLS:
+Let us examine the `training_data` for this housing case, which consists of $n = 400$ observations. As shown in @tbl-housing-variables, for the $i$th house, we have different regressors: the number of bedrooms (`bedrooms`, denoted as $x_{i, 1}$), the continuous square footage (`sqft`, denoted as $x_{i, 2}$), the continuous proximity to schools in km (`school_distance`, denoted as $x_{i, 3}$), and neighborhood type (represented by dummy variables $x_{i, 4}$ as in @eq-dummy-housing-1 and $x_{i, 5}$ as in @eq-dummy-housing-2, where *rural* is the baseline). The response variable we are interested in is the continuous housing sale price in CAD (`sale price`, denoted as $Y_i$). Additionally, we will revisit our modeling approach as outlined in @eq-housing-OLS:
 
 $$
 Y_i = \beta_0 + \beta_1 x_{i, 1} + \beta_2 x_{i, 2} + \beta_3 x_{i, 3} + \beta_4 x_{i, 4} + \beta_5 x_{i, 5} + \varepsilon_i,
@@ -967,8 +1004,8 @@ print_as_dt(head(py$training_data, 100))
 
 Having set up the coding starting point for this estimation, we need to use the corresponding fitting functions to find $\hat{\beta}_0$, $\hat{\beta}_1$, $\hat{\beta}_2$, $\hat{\beta}_3$, $\hat{\beta}_4$, $\hat{\beta}_5$, $\hat{\sigma}^2$ via OLS regression (as we already decided in the data modelling stage). Therefore, let us the following function and libraries:
 
-- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_dist`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
-- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) [@numpy] libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_dist`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
+- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
+- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) [@numpy] libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
 
 ::: {.panel-tabset}
 
@@ -983,7 +1020,7 @@ library(broom)
 # Fitting the OLS model
 OLS_model <- lm(
   formula = sale_price ~ bedrooms + sqft +
-    school_dist + neighbourhood,
+    school_distance + neighbourhood,
   data = training_data
 )
 
@@ -1002,7 +1039,7 @@ import numpy as np
 
 # Fitting the OLS model
 OLS_model = smf.ols(
-    formula="sale_price ~ bedrooms + sqft + school_dist + neighbourhood",
+    formula="sale_price ~ bedrooms + sqft + school_distance + neighbourhood",
     data=training_data
 ).fit()
 
