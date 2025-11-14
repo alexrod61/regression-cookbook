@@ -19,9 +19,11 @@ library(reticulate)
 py_require("pandas")
 py_require("numpy")
 py_require("statsmodels")
+py_require("scikit-learn")
 pandas <- import("pandas")
 numpy <- import("numpy")
 statsmodels <- import("statsmodels")
+sklearn <- import("sklearn")
 
 options(htmlwidgets.TOJSON_ARGS = list(na = 'string')) 
 
@@ -363,6 +365,8 @@ To illustrate the EDA process, we will follow it within the context of the housi
 
 : Classification table for variables in housing data. {#tbl-housing-variables .striped .hover}
 
+Before continuing with this housing example, let us make a quick note on this textbook's coding delivery.
+
 ::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up on coding tabs!
@@ -456,32 +460,210 @@ print_as_dt(head(py$housing_data, 100))
 Tip on this simulated housing data!
 ::::
 ::::{.Tip-container}
-The `housing_data` mentioned above is not an actual dataset; it is a simulated one designed to effectively illustrate our **data science workflow** in this chapter. This simulated dataset will somehow enable us to meet the assumptions of the chosen model during the **data modelling stage** outlined in @sec-ds-workflow-modelling. If you would like to learn more about this **generative modelling process**, you can refer to the provided `R` script.
+The `housing_data` mentioned above is not an actual dataset; it is a simulated one designed to effectively illustrate our **data science workflow** in this chapter. This simulated dataset will somehow enable us to meet the assumptions of the chosen model during the **data modelling stage** outlined in @sec-ds-workflow-modelling. If you would like to learn more about this **generative modelling process**, you can refer to [the provided `R` script](https://github.com/alexrod61/regression-cookbook/blob/main/book/code/housing-data.R).
 
 ![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/aha.png){width="300"}
 ::::
 :::
 
-Now, we will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. In addition, @tbl-training-housing-data displays the first 100 rows of our training data which is subset of size equal to $400$.
+Now, we will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. The below codes do the following:
+
+- `R`: This code executes an 80/20 random split of the `housing_data` dataset using the [{rsample}](https://rsample.tidymodels.org/) package [@rsample]. The `set.seed()` function ensures reproducibility, while `initial_split()` partitions the data into training and testing subsets. The resulting split object is then passed to `training()` and `testing()` to extract the corresponding datasets. A sanity check follows, where `dim()` and `nrow()` are used to inspect the shapes of each subset and to compute their observed proportions, confirming that the split aligns with the intended allocation.
+- `Python`: This code performs an analogous 80/20 partition of `housing_data` using `train_test_split()` from [{scikit-learn}](https://scikit-learn.org/stable/) [@scikit-learn], with `random_state` ensuring reproducibility. The function returns the training and testing subsets directly. A subsequent sanity check uses `.shape` and `len()` to inspect the size of each subset and to verify the observed proportions of the split, ensuring that the partitioning matches the expected configuration before proceeding with further modelling steps. Note that we also use the [{numpy}](https://pypi.org/project/numpy/) library [@numpy].
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on the different training and testing sets obtained via `R` and `Python`!
+:::
+::: Heads-up-container
+It turns out that both the [{rsample}](https://rsample.tidymodels.org) package in `R` and [{scikit-learn}](https://scikit-learn.org/stable/) in `Python` utilize different pseudo-random number generators. As a result, they produce **different training and testing data splits**, even when using **the same seed values**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-to-learn-3674106/).](img/pieces.png){width="250"}
+:::
+:::::
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Loading library
+library(rsample)
+
+# Seed for reproducibility
+set.seed(123)
+
+# Randomly splitting into training and testing sets
+housing_data_splitting <- initial_split(housing_data,
+  prop = 0.2
+)
+
+# Assigning data points to training and testing sets
+training_data <- training(housing_data_splitting)
+testing_data <- testing(housing_data_splitting)
+
+# Dimension check
+cat("Training shape:", dim(training_data), "\n")
+cat("Testing shape:", dim(testing_data), "\n\n")
+
+# Proportion check
+n_total <- nrow(housing_data)
+n_train <- nrow(training_data)
+n_test  <- nrow(testing_data)
+cat("Training proportion:", round(n_train / n_total, 3), "\n")
+cat("Testing proportion:",  round(n_test  / n_total, 3), "\n")
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Importing libraries
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+# Seed for reproducibility
+random_state = 123
+
+# Randomly splitting into training and testing sets
+training_data, testing_data = train_test_split(
+    housing_data,
+    test_size=0.8,
+    random_state=random_state
+)
+
+# Dimension check
+print("Training shape:", training_data.shape)
+print("Testing shape:", testing_data.shape, "\n")
+
+# Proportion check
+n_total = len(housing_data)
+n_train = len(training_data)
+n_test  = len(testing_data)
+print("Training proportion:", round(n_train/n_total, 3))
+print("Testing proportion:",  round(n_test/n_total, 3))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
 
 ```{r}
-#| label: tbl-training-housing-data
-#| tbl-cap: "First 100 rows of training housing data."
-#| echo: true 
+#| echo: false
 #| message: false
 
-library(tidyverse)
-library(scales)
+# Loading library
+library(rsample)
 
-# Data splitting (20% for training and 80% for testing)
-set.seed(42)
-train_indices <- sample(1:nrow(housing_data), size = 0.2 * nrow(housing_data))  # 400 rows
-training_data <- housing_data[train_indices, ]  # 20% training set
-testing_data <- housing_data[-train_indices, ]  # 80% testing set
+# Seed for reproducibility
+set.seed(123)
 
-# Showing the first 100 rows
-print_as_dt(head(training_data, 100))
+# Randomly splitting into training and testing sets
+housing_data_splitting <- initial_split(housing_data,
+  prop = 0.2
+)
+
+# Assigning data points to training and testing sets
+training_data <- training(housing_data_splitting)
+testing_data <- testing(housing_data_splitting)
+
+# Dimension check
+cat("Training shape:", dim(training_data), "\n")
+cat("Testing shape:", dim(testing_data), "\n\n")
+
+# Proportion check
+n_total <- nrow(housing_data)
+n_train <- nrow(training_data)
+n_test  <- nrow(testing_data)
+cat("Training proportion:", round(n_train / n_total, 3), "\n")
+cat("Testing proportion:",  round(n_test  / n_total, 3), "\n")
 ```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+
+# Importing libraries
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+# Seed for reproducibility
+random_state = 123
+
+# Randomly splitting into training and testing sets
+training_data, testing_data = train_test_split(
+    housing_data,
+    test_size=0.8,
+    random_state=random_state
+)
+
+# Dimension check
+print("Training shape:", training_data.shape)
+print("Testing shape:", testing_data.shape, "\n")
+
+# Proportion check
+n_total = len(housing_data)
+n_train = len(training_data)
+n_test  = len(testing_data)
+print("Training proportion:", round(n_train/n_total, 3))
+print("Testing proportion:",  round(n_test/n_total, 3))
+```
+
+:::
+
+In addition, the code below displays the first 100 rows of our training data, which is a subset of size equal to `r nrow(training_data)` data points.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Showing the first 100 houses of the training set
+head(training_data, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Showing the first 100 houses of the training set
+print(training_data.head(100))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: tbl-housing-training-data-r
+#| tbl-cap: "First 100 rows of training data."
+#| echo: false
+#| message: false
+
+# Showing the first 100 houses of the training set
+head(training_data, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{r}
+#| label: tbl-housing-training-data
+#| tbl-cap: "First 100 rows of training data."
+#| echo: false
+
+# Showing the first 100 houses of the training set
+print_as_dt(head(py$training_data, 100))
+```
+
+:::
+
+Due to the use of different pseudo-random number generators for data splitting in `R` and `Python`, the `training_data` in the tables above differs. Now, let us make a necessary clarification about why we need to split the data in inferential inquiries.
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
@@ -510,7 +692,22 @@ Unlike predictive modelling, **data splitting is not a routine practice in stati
 ::::
 :::
 
-After classifying the variables and splitting our data, we will move on to coding the plots and calculating the summary statistics. We provide a list of these plots and summary statistics, along with their corresponding EDA outputs and interpretations, based on our training data, which has a subset size of $400$:
+After classifying the variables and splitting our data, we will move on to coding the plots and calculating the summary statistics. 
+
+::: {.Heads-up}
+:::: Heads-up-header
+Heads-up on the use of `R`-generated training and testing for the rest of the data science workflow!
+:::
+::: Heads-up-container
+We have clarified that both `R` and `Python` produce different random data splits, even when using the same seeds. Therefore, in all the following `Python` code snippets related to this housing price case, we will be utilizing **both the training and testing sets** generated by the `R`-based data splitting. This approach ensures consistency in our coding outputs. 
+
+![Image by [*manfredsteger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/idea-visualization-line-art-3976295/).](img/idea.png){width="500"}
+
+If you want to reproduce all these outputs in `Python` using `Quarto` [@quarto], while utilizing the `R`-generated sets, you can import these datasets from the `R` environment using the [{reticulate}](https://rstudio.github.io/reticulate/) package [@reticulate]. 
+::::
+:::
+
+As we move forward, we provide a list of plots and summary statistics, along with their corresponding EDA outputs and interpretations. This is based on our training data, which has a size of `r nrow(training_data)`. Note that we are not providing the code to generate all of the EDA output directly (though you can find the `R` source [here](https://github.com/alexrod61/regression-cookbook/blob/main/book/01-intro.qmd)). However, subsequent chapters will include both `R` and `Python` code snippets to generate the corresponding EDA insights. Below is the list:
 
 - A **histogram** of housing sale prices, as in @fig-histogram-sales-prices, shows the response's distribution and helps identify any outliers. The training set reveals a **fairly symmetric distribution** of sale prices, with a noticeable concentration of sales between $\$200,000$ and $\$400,000$. However, there are a few outliers. Even with just 20% of the total data, this plot provides valuable graphical insights into central tendency and variability.
 
@@ -521,6 +718,9 @@ After classifying the variables and splitting our data, we will move on to codin
 #| echo: false
 #| fig.height: 8
 #| fig.width: 14
+
+library(scales)
+library(tidyverse)
 
 hist_sale_prices <- ggplot(training_data, aes(x = as.numeric(sale_price))) +
   geom_histogram(binwidth = 10000, fill = "navyblue", color = "white") +
@@ -784,7 +984,7 @@ For this workflow stage, whether using a classical linear regression model like 
 
 Let us continue with our housing example, where our response of interest is the **sale price** of a house in CAD, as shown in @tbl-housing-variables. During the study design stage outlined in @sec-ds-workflow-study-design, we identified two key inquiries: **inferential** and **predictive**. The inferential inquiry focuses on understanding the statistical associations between the sale price and other variables, such as square footage, number of bedrooms, and proximity to schools. In contrast, the predictive inquiry involves fitting a suitable model to obtain estimates that will enable us to predict housing sale prices based on these same features.
 
-Before selecting a model, we need to define our mathematical notation for all the variables involved. Let $Y_i$ represent the continuous sale price of the $i$th house in CAD from the training dataset of size $n$ used to estimate the chosen model, where $i = 1, 2, \ldots, n$. For the observed explanatory variables, we define the following:
+Before selecting a model, we need to define our mathematical notation for all the variables involved. Let $Y_i$ represent the continuous sale price of the $i$th house in CAD from a dataset of size $n$ used to estimate a chosen model **in general**, where $i = 1, 2, \ldots, n$. For the observed explanatory variables, we define the following:
 
 - $x_{i, 1}$ is the number of bedrooms in the $i$th house, which is a count-type variable.
 - $x_{i, 2}$ is the continuous square footage of the $i$th house.
@@ -859,7 +1059,7 @@ $${#eq-housing-OLS}
 
 @eq-housing-OLS indicates two important components in this regression model on its righ-hand side:
 
-1. **Systematic Component:** This component includes six **fixed and unknown** regression parameters ($\beta_0$, $\beta_1$, $\beta_2$, $\beta_3$, $\beta_4$, and $\beta_5$) that we will estimate in the next stage using our training data. Note that this component represents the expected value of the response variable $Y$, **conditioned on the observed values of the regressors**, such as:
+1. **Systematic Component:** This component includes six **fixed and unknown** regression parameters ($\beta_0$, $\beta_1$, $\beta_2$, $\beta_3$, $\beta_4$, and $\beta_5$) that we will estimate in the next stage using our training data. Note that this component represents the expected value of the response variable $Y$, **conditioned on the observed values of the regressors** and it is also the result of the assumptions on the random component below:
 
 $$
 \begin{align*}
@@ -901,11 +1101,11 @@ This linearity condition on the parameters makes our OLS model flexible enough t
 ::::
 :::
 
-Before we conclude this stage, note that @sec-stats-review will explore the fundamentals of probability and statistical inference in greater depth. This exploration will enhance our understanding of the modelling assumptions associated with all the regression models discussed throughout this book. Additionally, we will broaden our perspective on regression to consider more appropriate models for **nonnegative responses**, instead of relying on OLS with the assumption of an **unbounded, normally distributed response**.
+Before we conclude this stage, note that @sec-stats-review will explore the fundamentals of probability and statistical inference in greater depth. This exploration will enhance our understanding of the modelling assumptions underlying the regression models discussed throughout this book. Additionally, we will broaden our perspective on regression to consider more appropriate models for **nonnegative responses**, instead of relying on OLS with the assumption of an **unbounded, normally distributed response** which might be unrealistic for nonnegative housing prices (and still a mild violation on our response assumptions, given that the housing prices appear to have a bell-shaped distribution as shown in @fig-histogram-sales-prices).
 
 ### Estimation {#sec-ds-workflow-estimation}
 
-Based on the data we have and our EDA, defining an suitable regression model (along with the equations that relate the response variable $Y$ to the regressors $x$ and the corresponding regression parameters) is an essential step in our data science workflow. This leads us to the next stage: **estimation**. In this stage, we aim to obtain what we refer to as **modelling estimates** using our **training dataset**. The method we choose for estimation largely depends on the specific regression model we adopt to address our inquiries.
+Based on the data we have and our EDA, defining a suitable regression model (along with the equations that relate the response variable $Y$ to the regressors $x$ and the corresponding regression parameters) is an essential step in our data science workflow. This leads us to the next stage: **estimation**. In this stage, we aim to obtain what we refer to as **modelling estimates** using our **training dataset**. The method we choose for estimation largely depends on the specific regression model we adopt to address our inquiries.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-college-3702064/).](img/plug.png){width="500"}
 
@@ -924,11 +1124,9 @@ As illustrated in @fig-ds-workflow-estimation, the data modelling stage will yie
 
 #### Example: Fitting the OLS Regression Model for Housing Data
 
-Before continuing with this housing example, let us make a quick note on this textbook's coding delivery.
-
 ![Image by [*Gustavo Rezende*](https://pixabay.com/users/gustavorezende-1488336/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=8500500) via [*Pixabay*](https://pixabay.com/vectors/town-city-village-isometric-houses-8500500/).](img/houses.png){width="400"}
 
-Let us examine the `training_data` for this housing case, which consists of $n = 400$ observations. As shown in @tbl-housing-variables, for the $i$th house, we have different regressors: the number of bedrooms (`bedrooms`, denoted as $x_{i, 1}$), the continuous square footage (`sqft`, denoted as $x_{i, 2}$), the continuous proximity to schools in km (`school_distance`, denoted as $x_{i, 3}$), and neighborhood type (represented by dummy variables $x_{i, 4}$ as in @eq-dummy-housing-1 and $x_{i, 5}$ as in @eq-dummy-housing-2, where *rural* is the baseline). The response variable we are interested in is the continuous housing sale price in CAD (`sale price`, denoted as $Y_i$). Additionally, we will revisit our modeling approach as outlined in @eq-housing-OLS:
+Let us examine the `training_data` for this housing case, which consists of `r nrow(training_data)` observations. As shown in @tbl-housing-variables, for the $i$th house, we have different regressors: the number of bedrooms (`bedrooms`, denoted as $x_{i, 1}$), the continuous square footage (`sqft`, denoted as $x_{i, 2}$), the continuous proximity to schools in km (`school_distance`, denoted as $x_{i, 3}$), and neighborhood type (represented by dummy variables $x_{i, 4}$ as in @eq-dummy-housing-1 and $x_{i, 5}$ as in @eq-dummy-housing-2, where *rural* is the baseline). The response variable we are interested in is the continuous housing sale price in CAD (`sale price`, denoted as $Y_i$). Additionally, we will revisit our modeling approach as outlined in @eq-housing-OLS:
 
 $$
 Y_i = \beta_0 + \beta_1 x_{i, 1} + \beta_2 x_{i, 2} + \beta_3 x_{i, 3} + \beta_4 x_{i, 4} + \beta_5 x_{i, 5} + \varepsilon_i,
@@ -940,72 +1138,10 @@ $$
 \text{Var}(\varepsilon_i) = \sigma^2.
 $$
 
-
-The code below displays the first 100 rows of the `training_data`, which was also utilized in the previous EDA. Note we import the [{pandas}](https://pypi.org/project/pandas/) library to manipulate the data frame in `Python`.
-
-::: {.panel-tabset}
-
-## **`R` Code**
-
-``` {.r}
-training_data
-
-# Showing the first 100 training data points
-head(training_data, n = 100) 
-```
-
-## **`Python` Code**
-
-``` {.python}
-# Importing library
-import pandas as pd
-
-training_data
-
-# Showing the first 100 training data points
-print(training_data.head(100))
-```
-
-:::
-
-::: {.panel-tabset}
-
-## **`R` Output**
-
-```{r}
-#| echo: false
-#| message: false
-
-# Showing the first 100 training data points
-head(training_data, n = 100) |> 
-  print_as_dt()
-```
-
-## **`Python` Output**
-
-```{python}
-#| echo: false
-#| message: false
-
-# Importing library
-import pandas as pd
-
-training_data = r.training_data
-```
-
-```{r}
-#| echo: false
-
-# Showing the first 100 training data points
-print_as_dt(head(py$training_data, 100))
-```
-
-:::
-
 Having set up the coding starting point for this estimation, we need to use the corresponding fitting functions to find $\hat{\beta}_0$, $\hat{\beta}_1$, $\hat{\beta}_2$, $\hat{\beta}_3$, $\hat{\beta}_4$, $\hat{\beta}_5$, $\hat{\sigma}^2$ via OLS regression (as we already decided in the data modelling stage). Therefore, let us the following function and libraries:
 
-- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
-- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) [@numpy] libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
+- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `training_OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
+- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
 
 ::: {.panel-tabset}
 
@@ -1016,16 +1152,18 @@ Having set up the coding starting point for this estimation, we need to use the 
 # Loading libraries
 library(tidyverse)
 library(broom)
+# To import R-generated datasets to Python environment
+library(reticulate)
 
 # Fitting the OLS model
-OLS_model <- lm(
+training_OLS_model <- lm(
   formula = sale_price ~ bedrooms + sqft +
     school_distance + neighbourhood,
   data = training_data
 )
 
 # Displaying the tidy table
-tidy(OLS_model) |>
+tidy(training_OLS_model) |>
   mutate_if(is.numeric, round, 2)
 ```
 
@@ -1035,25 +1173,27 @@ tidy(OLS_model) |>
 #| message: false
 # Importing libraries
 import statsmodels.formula.api as smf
-import numpy as np
+
+# Importing R-generated training set via R library reticulate
+training_data = r.training_data
 
 # Fitting the OLS model
-OLS_model = smf.ols(
+training_OLS_model = smf.ols(
     formula="sale_price ~ bedrooms + sqft + school_distance + neighbourhood",
     data=training_data
 ).fit()
 
 # Creating a tidy summary table
-OLS_tidy = pd.DataFrame({
-    "term": OLS_model.params.index,
-    "estimate": np.round(OLS_model.params.values, 2),
-    "std_error": np.round(OLS_model.bse.values, 2),
-    "t_value": np.round(OLS_model.tvalues.values, 2),
-    "p_value": np.round(OLS_model.pvalues.values, 2)
+training_OLS_tidy = pd.DataFrame({
+    "term": training_OLS_model.params.index,
+    "estimate": np.round(training_OLS_model.params.values, 2),
+    "std_error": np.round(training_OLS_model.bse.values, 2),
+    "t_value": np.round(training_OLS_model.tvalues.values, 2),
+    "p_value": np.round(training_OLS_model.pvalues.values, 2)
 })
 
 # Displaying the tidy table
-print(OLS_tidy)
+print(training_OLS_tidy)
 ```
 
 :::
@@ -1067,7 +1207,7 @@ Unlike GLMs, which will be discussed beginning in @sec-gamma, OLS regression pro
 ::::
 :::
 
-Since the **inferential inquiry** in this example aims to understand the **statistical associations** between housing sale prices and their explanatory variables, while the **predictive inquiry** seeks to fit a suitable model that allows us to **predict housing sale prices** based on these same features, we might be tempted to use `OLS_model` to address both inquiries right away. However, according to our data science workflow, these analyses should be conducted during the **results stage**, after we have completed model diagnostic checks. For now, we will use the `training_data` and `OLS_model` to perform this corresponding **goodness of fit** in the next stage.
+Since the **inferential inquiry** in this example aims to understand the **statistical associations** between housing sale prices and their explanatory variables, while the **predictive inquiry** seeks to fit a suitable model that allows us to **predict housing sale prices** based on these same features, we might be tempted to use `training_OLS_model` to address both inquiries right away. However, according to our data science workflow, these analyses should be conducted during the **results stage**, after we have completed model diagnostic checks. For now, we will use the `training_data` and `training_OLS_model` to perform this corresponding **goodness of fit** in the next stage.
 
 ### Goodness of Fit {#sec-ds-workflow-goodness-of-fit}
 
