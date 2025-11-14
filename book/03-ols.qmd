@@ -176,6 +176,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+import statsmodels.stats.api as sms
 
 # Sample data
 np.random.seed(42)
@@ -1535,13 +1536,20 @@ Missing debt/scholarships could *bias the coefficients* (for instance overstatin
 ### Problem 1 {.unnumbered}
 
 In this problem, you will investigate a dataset of surveyed students taking a programming course with a final exam at the end.
-Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they previously took, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, and `exam_score` respectively. 
+Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they previously took, how many hours they spent studying for the final, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, `hours_studied` and `exam_score` respectively. Below is a full breakdown of the variables:
+
+| **Variable Name** | **Description** |
+|-------------------|-----------------|
+| **current_grade** | The current average of the student in the course. Float from 0 to 100 (e.g. 87.9, 50.18, etc.).|
+| **prior_courses** | The number of prior courses the student took. Integer (e.g. 0, 4, etc.).|
+| **hours_studied** | The number of hours that the student spent studying for the final exam. Float (e.g. 10.7, 3.4, etc.).|
+| **exam_score**    | The score that the student received on their final exam. Float from 0 to 30 (e.g. 27.5, 29.1, etc.).|
 
 For future iterations of the course, you are curious to know if it is possible to understand how well a student will do on the final given these three factors.
 
 To answer this, the questions below will guide you through an OLS analysis on this data.
 
-### A. Exploratory Data Analysis {.unnumbered}
+### A. Data Wrangling and Exploratory Data Analysis {.unnumbered}
 1. Read in the data from `problem-1-data.csv`, checking for any missing entries. 
 2. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
 3. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
@@ -1558,7 +1566,7 @@ library(ggplot2)
 library(tidyverse)
 
 # Read data
-df <- read_csv("./problem-1-data.csv")
+df <- read_csv("./03-ols_files/simulations/problem-1-data.csv")
 
 # A.1 Check for missing entries
 cat("Missing values:\n")
@@ -1598,7 +1606,7 @@ from scipy import stats
 
 # Read data
 # point this to the data location
-df = pd.read_csv("./problem-1-data.csv") 
+df = pd.read_csv("./03-ols_files/simulations/problem-1-data.csv") 
 
 # A.1 Check for missing entries
 print("Missing values:\n", df.isnull().sum())
@@ -1625,7 +1633,7 @@ plt.show()
 
 </details>
 
-### B. Initial Modelling {.unnumbered}
+### B. Data Modelling {.unnumbered}
 1. Fit a multiple linear regression model predicting `exam_score` using the other variables. Display a statistics summary table.
 2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they would not? We will revisit this. 
 3. Plot residuals against the fitted values. Is heteroscedasticity present?
@@ -1687,8 +1695,88 @@ plt.show()
 </details>
 :::
 
-### C. Model Improvements {.unnumbered}
-1. Should `prior_courses` be converted to another variable type? Try converting it to categorical and re-fit. Do you notice any improvements?
+### C. Goodness of Fit {.unnumbered}
+1. Perform the Durbin-Watson test to check for autocorrelation in the residuals. What does the test statistic tell you about the independence of errors assumption?
+2. Test for Homoscedasticity: You already plotted residuals against fitted values. Perform the Breusch-Pagan test to formally assess homoscedasticity. What does the p-value of the test indicate about the model?
+3. Identify Outliers: Create a plot of the residuals against the observation index. Does this plot reveal any obvious outliers or problematic patterns?
+4. Check for Influential Points: Calculate and plot the Cook's Distance for each observation. Are there any data points that have a disproportionately large influence on the model's coefficients?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+# B.1 Fit initial model
+model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
+summary(model1)
+
+# B.2 Report R² and coefficients
+cat(sprintf("\nR-squared: %.3f\n", summary(model1)$r.squared))
+cat("Coefficients:\n")
+print(coef(model1))
+
+# B.3 Residuals vs Fitted
+ggplot(data = NULL, aes(x = fitted(model1), y = resid(model1))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(x = "Fitted values", y = "Residuals", title = "Residuals vs Fitted") +
+  theme_minimal()
+
+# B.4 Q-Q plot
+ggplot(data = NULL, aes(sample = resid(model1))) +
+  stat_qq(alpha = 0.6) +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Residuals") +
+  theme_minimal()
+
+```
+
+## Python Code
+
+```{python}
+import statsmodels.stats.api as sms
+# C.1 Perform the Durbin-Watson test...
+dw_stat = durbin_watson(residuals)
+print(f"Durbin-Watson statistic: {dw_stat:.4f}")
+ 
+# C.2 Perform the Breusch-Pagan test...
+# bp_test = sms.het_breuschpagan(residuals, model.model.exog)
+# labels = ['LM Statistic', 'LM-Test p-value', 'F-Statistic', 'F-Test p-value']
+# bp_results = dict(zip(labels, bp_test))
+# print(f"Breusch-Pagan test p-value: {bp_results['LM-Test p-value']:.4f}")
+# 
+# C.3 Plot the residuals against the observation index...
+plt.figure(figsize=(6, 4))
+plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Residual Plot vs. Observation Index")
+plt.xlabel("Observation Index")
+plt.ylabel("Residuals")
+plt.tight_layout()
+plt.show()
+
+# C.4 Calculate and plot Cook's Distance...
+influence = model.get_influence()
+cooks_d = influence.cooks_distance[0]
+
+plt.figure(figsize=(6, 4))
+# use_line_collection=True is for compatibility
+plt.stem(np.arange(len(cooks_d)), cooks_d, markerfmt=",")
+plt.axhline(y=0.5, color='red', linestyle='--', label='Threshold (0.5)')
+plt.title("Cook's Distance")
+plt.xlabel("Observation Index")
+plt.ylabel("Cook's Distance")
+plt.legend()
+plt.tight_layout()
+plt.show()
+```
+</details>
+:::
+
+
+
+### C. Data Modelling - Improvements {.unnumbered}
+1. Should `prior_courses` be converted to another variable type? If so, why and which one? If you answered yes, try converting it and re-fit. Do you notice any improvements?
 2. Create `log_hours_studied`, the log of `hours_studied`. Re-fit the OLS using this predictor instead. Does $R^2$ improve? 
 > Hint: the true data generation process used `log(hours_studied)`!
 3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
@@ -1698,7 +1786,7 @@ plt.show()
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-# C.1 Convert prior_courses to categorical and fit model
+# C.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df <- df %>% mutate(prior_courses_category = factor(prior_courses))
 
 model2 <- lm(exam_score ~ current_grade + prior_courses_category + hours_studied, data = df)
@@ -1724,7 +1812,7 @@ summary(model4)
 ## Python Code
 
 ```{python}
-# C.1 Convert prior_courses to categorical
+# C.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df["prior_courses_category"] = df['prior_courses'].astype('category')
 model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
              data=df.dropna()).fit()
