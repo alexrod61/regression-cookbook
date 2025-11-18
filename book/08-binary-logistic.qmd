@@ -253,10 +253,10 @@ This dataset allows us to examine whether a student defaulted on a loan (`defaul
 If we use OLS, we estimate:
 
 $$
-\mathbb{E}(Y_i \mid X_i) = p_i = \beta_0 + \beta_1 X_i
+\mathbb{E}(Y_i \mid X_i) = \pi_i = \beta_0 + \beta_1 X_i
 $$
 
-This means we’re treating the **probability of default** as a linear function of credit score.
+This means we’re treating the **probability of default** ($\pi_i$) as a linear function of credit score.
 
 However, there are **two fundamental issues** with using OLS here:
 
@@ -264,7 +264,7 @@ However, there are **two fundamental issues** with using OLS here:
 2. OLS assumes **constant variance** of the residuals, but binary outcomes inherently violate this assumption, because their variance depends on the mean:
 
 $$
-\text{Var}(Y_i) = p_i(1 - p_i)
+\text{Var}(Y_i) = \pi_i(1 - \pi_i)
 $$
 
 To see this issue in action, let’s try fitting an OLS regression model using our binary outcome and a continuous predictor. While OLS is designed to minimize squared error, it doesn't account for the discrete nature of the response — which means it can return predicted probabilities below 0 or above 1. In the example below, we use a customer's credit score to predict the probability of default, and you’ll see how the linear model fails to respect the fundamental constraints of probability.
@@ -462,15 +462,15 @@ One transformation that checks all these boxes is the **logit function**.
 
 ### Logit: A Link Between Probability and Linear Predictors
 
-The **logit function** transforms the probability $p_i$ into a value on the entire real line:
+The **logit function** transforms the probability $\pi_i$ into a value on the entire real line:
 $$
-\text{logit}(p_i) = \log\!\left(\frac{p_i}{1 - p_i}\right) = \beta_0 + \beta_1 X_i
+\text{logit}(\pi_i) = \log\!\left(\frac{\pi_i}{1 - \pi_i}\right) = \beta_0 + \beta_1 X_i
 $$
 
 This transformation:
 
 - Is **monotonic** (it preserves order),
-- Maps probabilities $p_i \in (0, 1)$ to $(-\infty, \infty)$, and
+- Maps probabilities $\pi_i \in (0, 1)$ to $(-\infty, \infty)$, and
 - Solves the range issue of OLS by letting us fit a linear model in the transformed space.
 
 By modeling the **log-odds** as a linear function of predictors and then inverting the transformation, we obtain valid predicted **probabilities** that remain within $[0,1]$.
@@ -478,19 +478,38 @@ By modeling the **log-odds** as a linear function of predictors and then inverti
 ::: {.callout-note}
 The **logit function** is defined as:
 $$
-\text{logit}(p_i) = \log\!\left(\frac{p_i}{1 - p_i}\right)
+\text{logit}(\pi_i) = \log\!\left(\frac{\pi_i}{1 - \pi_i}\right)
 $$
 It models the **log-odds** of the outcome as a linear function of predictors.
 :::
 
 ### From Log-Odds Back to Probability
 
-We can invert the logit function to get predicted probabilities:
+While the model calculates linearly on the log-odds scale, we ultimately want to understand the probability of the outcome ($\pi_i$). To do this, we invert the logit function.
+
+The inverse of the logit is the **Sigmoid function** (also called the logistic function):
+
 $$
-p_i = \frac{\exp\!\left(\beta_0 + \beta_1 X_i\right)}{1 + \exp\!\left(\beta_0 + \beta_1 X_i\right)} \in (0,1)
+\pi_i = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_i)}}
 $$
 
-This **sigmoid function** outputs values strictly between 0 and 1 for any real-valued linear predictor, making it ideal for modeling probabilities.
+This function takes our linear prediction ($\beta_0 + \beta_1 X_i$), which can range from $-\infty$ to $+\infty$, and "squashes" it into the range $(0, 1)$. This mathematical trick ensures that no matter how extreme our predictor values get, our predicted probability never exceeds 1 or drops below 0.
+
+![The Logistic Function showing the S-shape curve](img/logistic-curve.png){#fig-logistic-curve width="80%"}
+
+### Understanding the "S" Shape
+
+The sigmoid function is not just a boundary enforcer; it fundamentally changes how we interpret the relationship between $X$ and $Y$. Unlike a straight line, the sigmoid curve is **non-linear**.
+
+**1. The Steep Middle (High Sensitivity)**
+When the probability is near 0.5 (the "tipping point"), the curve is steepest. This means that small changes in the predictor $X$ result in **large changes** in the probability $\pi_i$.
+* *Context:* If a borrower is borderline (e.g., 50/50 chance of default), a small improvement in their credit score can drastically reduce their default risk.
+
+**2. The Flat Tails (Diminishing Returns)**
+As the probability approaches 0 or 1, the curve flattens out (asymptotes). In these regions, even large changes in $X$ result in **tiny changes** in $\pi_i$.
+* *Context:* If a borrower has a near-perfect credit score (risk $\approx 0.01\%$), increasing their score further makes almost no difference to their probability of default. The model recognizes that they are already "maxed out" on safety.
+
+This captures a realistic property of many binary outcomes: **interventions are most effective when the outcome is uncertain.**
 
 This transformation lets us use a linear predictor on the **log-odds** scale and then recover valid probabilities.  
 This idea forms the basis of **binary logistic regression**, introduced next.
@@ -498,98 +517,90 @@ This idea forms the basis of **binary logistic regression**, introduced next.
 
 
 ::: {.callout-note}
-## TODO:
-Add an annotated diagram showing how increasing `X` impacts odds, log-odds, and probabilities.
+## Visualizing the Difference
+In **OLS (Linear Regression)**, the slope is constant ($\beta_1$).
+In **Logistic Regression**, the "slope" (rate of change in probability) changes constantly—it is steepest at $\pi = 0.5$ and approaches zero at the extremes.
 :::
+
 
 ---
 
-### The Logistic Function and Its Shape
+### The Logistic Function and Its Shape (Code)
 
-```{.r}
-#| fig-cap: "The logistic (sigmoid) curve maps any real-valued linear predictor to probabilities in [0,1]. A linear fit can wander outside [0,1]."
-#| fig-width: 7
-#| fig-height: 4
+The following plot illustrates this behavior. Notice how the linear model (red dashed line) marches blindly past 0 and 1, while the logistic model (blue solid line) respects the boundaries and shows the characteristic "S" shape.
 
-set.seed(1)
-x <- seq(-4, 4, length.out = 200)
-eta <- -1 + 1.2 * x                    # linear predictor
-p   <- 1 / (1 + exp(-eta))             # sigmoid
-
-# A naive linear "probability" for comparison (clipped display range only)
-p_lin <- scales::rescale(eta, to = c(-0.4, 1.4))
-
-library(ggplot2)
-df <- data.frame(x = x, sigmoid = p, linear = p_lin)
-
-ggplot(df, aes(x = x)) +
-  geom_line(aes(y = sigmoid), linewidth = 1.1) +
-  geom_line(aes(y = linear), linetype = 2) +
-  coord_cartesian(ylim = c(-0.1, 1.1)) +
-  labs(x = "Linear predictor  (η = β0 + β1 X)",
-       y = "Mapped value",
-       caption = "Solid: logistic (valid probabilities).  Dashed: naive linear (can leave [0,1]).") +
-  theme_minimal(base_size = 12)
-```
-
-- Introduce the **sigmoid** function:
-
-$$
-p_i = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_i)}}
-$$
-
-- It maps real-valued input to the [0, 1] interval.
-- Shape: S-curve — slow rise at ends, steep middle.
-- Contrast visually with a linear line from OLS.
+![The Sigmoid 'S-Curve' vs. Linear Fit. The logistic model (blue solid line) respects the [0,1] probability bounds and captures the non-linear "diminishing returns" at the extremes, whereas the linear model (red dashed line) extends indefinitely.](img/logistic-sigmoid.png){#fig-logistic-sigmoid width="90%"}
 
 ::: {.panel-tabset}
 ## R Code
-```{r}
+```{.r}
 # Logistic vs Linear fit demo
 set.seed(1)
 x <- seq(-4, 4, length.out = 200)
-eta <- -1 + 1.2 * x
-p   <- 1 / (1 + exp(-eta))   # logistic sigmoid
+eta <- -1 + 1.2 * x                  # linear predictor (log-odds)
+pi  <- 1 / (1 + exp(-eta))           # sigmoid (probability)
 
-# Linear "probability" rescaled to [−0.4, 1.4] just for comparison
+# A naive linear "probability" for comparison
+# Rescaled to make the visual comparison clear
 p_lin <- scales::rescale(eta, to = c(-0.4, 1.4))
 
-df <- data.frame(x = x, sigmoid = p, linear = p_lin)
+df <- data.frame(x = x, sigmoid = pi, linear = p_lin)
 
 ggplot(df, aes(x = x)) +
-  geom_line(aes(y = sigmoid), linewidth = 1.2, color = "blue") +
-  geom_line(aes(y = linear), linetype = "dashed", color = "red") +
+  # The Sigmoid Curve
+  geom_line(aes(y = sigmoid), linewidth = 1.2, color = "#2C3E50") +
+  # The Naive Linear Line
+  geom_line(aes(y = linear), linetype = "dashed", color = "#E74C3C") +
+  # Visual guide for the "Steep Middle"
+  geom_segment(aes(x = 0.8, y = 0.2, xend = 0.8, yend = 0.8), 
+               arrow = arrow(length = unit(0.2, "cm")), color = "gray50", size = 0.1) +
+  annotate("text", x = 1.5, y = 0.5, label = "Steepest change\nat p ~ 0.5", 
+           size = 3.5, hjust = 0, color = "gray30") +
   coord_cartesian(ylim = c(-0.1, 1.1)) +
-  labs(x = "Linear predictor  (η = β0 + β1 X)",
-       y = "Mapped value",
-       caption = "Blue: logistic sigmoid (valid probabilities).  Red dashed: naive linear fit (can leave [0,1]).") +
+  labs(x = "Linear predictor (η = β0 + β1 X)",
+       y = "Probability (π)",
+       title = "The Sigmoid 'S-Curve' vs. Linear Fit",
+       subtitle = "Logistic regression captures diminishing returns at the extremes",
+       caption = "Blue: Logistic Sigmoid (Valid Probabilities). Red: Naive Linear (Violates Bounds).") +
   theme_minimal(base_size = 12)
-
 ```
 
 ## Python Code
-```{python}
+```{.python}
 import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(1)
 x = np.linspace(-4, 4, 200)
 eta = -1 + 1.2 * x
-p = 1 / (1 + np.exp(-eta))  # logistic sigmoid
+pi = 1 / (1 + np.exp(-eta))  # logistic sigmoid
 
-# Linear "probability" rescaled
-p_lin = (eta - eta.min()) / (eta.max() - eta.min()) * (1.4 - (-0.4)) + (-0.4)
+# Linear "probability" rescaled for comparison
+p_lin = (eta - eta.min()) / (eta.max() - eta.min()) * (1.8) - 0.4
 
-plt.figure(figsize=(7,4))
-plt.plot(x, p, label="Logistic sigmoid", linewidth=2, color="blue")
-plt.plot(x, p_lin, "--", label="Naive linear fit", color="red")
+plt.figure(figsize=(8, 5))
+
+# Plot Sigmoid
+plt.plot(x, pi, label="Logistic Sigmoid (Valid $\pi$)", linewidth=2.5, color="#2C3E50")
+
+# Plot Naive Linear
+plt.plot(x, p_lin, "--", label="Naive Linear (Violates Bounds)", color="#E74C3C")
+
+# Annotate the "Steep Middle"
+plt.annotate('Steepest change\nat $\pi \\approx 0.5$', xy=(0.83, 0.5), xytext=(2, 0.45),
+             arrowprops=dict(facecolor='black', arrowstyle='->', alpha=0.5),
+             fontsize=10, color="#555555")
+
 plt.ylim(-0.1, 1.1)
-plt.xlabel("Linear predictor  (η = β0 + β1 X)")
-plt.ylabel("Mapped value")
-plt.legend()
-plt.title("Logistic curve vs. linear fit")
+plt.axhline(0, color='grey', lw=0.5, ls=':')
+plt.axhline(1, color='grey', lw=0.5, ls=':')
+plt.xlabel("Linear predictor ($\eta = \\beta_0 + \\beta_1 X$)")
+plt.ylabel("Probability ($\pi$)")
+plt.title("The Sigmoid 'S-Curve' vs. Linear Fit")
+plt.legend(loc='upper left')
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
 plt.show()
-
 ```
 :::
 
@@ -626,15 +637,31 @@ This is a **binary classification problem**: given a mix of continuous and categ
 
 ### The Problem We’re Trying to Solve
 
-Banks and lenders routinely face the question:
+Banks and lenders routinely face a critical decision:
 
-> *Given a customer’s information, what is the probability that they will default on a loan?*
+> *Given a customer’s financial history, should we approve their loan application?*
 
-Why it matters:
+While this sounds like a simple "Yes" or "No" question, the reality is a complex game of **probability and risk management**.
 
-* Accurate predictions reduce **financial risk**.
-* Misclassification can be costly (approving high-risk loans or rejecting low-risk ones).
-* Logistic regression provides both **probability estimates** and interpretable **odds ratios** for each predictor.
+#### 1. The Balancing Act of Lending
+Lending is a trade-off between two competing goals:
+
+* **Maximizing Profit:** The bank wants to lend to as many people as possible to earn interest.
+
+* **Minimizing Loss:** The bank wants to avoid lending to people who will not pay the money back (default).
+
+If a bank is too strict, they reject good customers and lose profit. If they are too lenient, they lose their principal investment. The goal of **Binary Logistic Regression** here is not just to guess who defaults, but to **quantify the risk** ($\hat{\pi}_i$) so the bank can find the profitable "sweet spot."
+
+#### 2. The Asymmetry of Errors
+In this context, being wrong in one direction is much more expensive than being wrong in the other.
+
+* **False Positive (Type I Error):** The model predicts a customer will default, but they would have paid.
+    * *Cost:* The bank loses the potential interest (opportunity cost).
+    
+* **False Negative (Type II Error):** The model predicts a customer is safe, but they default.
+    * *Cost:* The bank loses the entire loan amount.
+
+Because a False Negative is usually much costlier than a False Positive, lenders need a model that outputs a precise **probability** (e.g., "There is an 18% chance this person defaults"). This allows them to set a custom **decision threshold**—perhaps they only approve loans if the risk of default is below 10%, rather than the standard 50%.
 
 ---
 
@@ -653,108 +680,199 @@ Why it matters:
 
 ### Applying Study Design to Our Case Study
 
-Before modeling, we:
+Before we fit the model, we must prepare the data. In predictive modeling, this involves three critical steps: **splitting**, **checking for imbalance**, and **handling outliers**.
 
-* **Split data** into training and testing sets.
-* **Encode categorical variables** (e.g., `student` → 0/1).
-* **Standardize or rescale predictors** if needed for interpretation.
-* **Preview** the structure of the data:
+#### Why We Split the Data (Training vs. Testing)
 
-```{r}
-# Peek at dataset
-head(BLR)
+A common mistake is to fit a model on all available data and then evaluate its performance on that same data. This leads to **overfitting**: the model memorizes the specific noise in the dataset rather than learning the underlying patterns.
+
+To ensure our model generalizes to new, unseen borrowers, we split the data into two sets:
+
+  * **Training Set (e.g., 70%):** Used to estimate the coefficients ($\hat{\beta}$). The model "sees" this data.
+  * **Testing Set (e.g., 30%):** Used *only* to evaluate performance. The model never sees this data during fitting.
+
+#### The Challenge of Class Imbalance
+
+In loan default data, "success" (paying back the loan) is much more common than "failure" (defaulting). This is known as **class imbalance**.
+
+If 95% of borrowers pay back their loans, a naive model could simply predict "No Default" for everyone and achieve **95% accuracy**. However, this model is useless to the bank because it identifies **zero** risks.
+
+To handle this during the split, we use **stratified sampling**. This ensures that the proportion of defaulters is exactly the same in both the training and testing sets, preventing the "rare" event from disappearing entirely in the test set.
+
+#### Influential Points and Outliers
+
+Logistic regression is sensitive to **outliers** (extreme values). A single borrower with an income of $10,000,000 or an age of 110 can pull the logistic curve disproportionately, biasing the results.
+
+Before modeling, we should check for:
+
+  * **Data Entry Errors:** (e.g., a credit score of 9000, which is impossible).
+  * **Extreme Leverage Points:** Legitimate but extreme values that might need to be capped or investigated.
+
+-----
+
+### Data Preparation in Action
+
+Below, we split the data while preserving the class balance (stratification) and encode the categorical variables.
+
+::: {.panel-tabset}
+
+## R Code
+
+```r
+library(rsample) # Part of tidymodels for splitting
+library(dplyr)
+
+# 1. Check Class Imbalance
+# Notice if defaults are rare (e.g., < 10%)
+prop.table(table(BLR$defaulted))
+
+# 2. Stratified Split
+# We use 'strata = defaulted' to ensure both sets have the same % of defaults
+set.seed(123)
+split <- initial_split(BLR, prop = 0.70, strata = defaulted)
+
+train_data <- training(split)
+test_data  <- testing(split)
+
+# 3. Verify the split
+nrow(train_data)
+nrow(test_data)
 ```
 
-```{python}
-# Python equivalent
+## Python Code
+
+```python
 import pandas as pd
-pd.DataFrame(py$data).head()
+from sklearn.model_selection import train_test_split
+
+# 1. Check Class Imbalance
+print(df['defaulted'].value_counts(normalize=True))
+
+# 2. Stratified Split
+# We use 'stratify=y' to ensure both sets have the same % of defaults
+X = df.drop(columns=['defaulted'])
+y = df['defaulted']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, 
+    test_size=0.3, 
+    random_state=123, 
+    stratify=y  # Crucial for imbalanced data
+)
+
+# 3. Verify the split
+print(f"Training set shape: {X_train.shape}")
+print(f"Testing set shape: {X_test.shape}")
 ```
 
-
-With the dataset understood and prepared, we’re ready to fit a **binary logistic regression model** to predict loan default.
+:::
 
 ---
 
 
 ## Fitting the Binary Logistic Regression Model
 
-Now that we’ve introduced the dataset and design, we can fit a **binary logistic regression model**.
-Our goal is to estimate how predictors like `credit_score`, `income`, and `student` status influence the likelihood of **default**.
+Now that we’ve prepared the data, we fit the model. Our goal is to estimate the unknown parameters ($\beta$) that link our predictors (like `credit_score`) to the probability of default.
+
 
 ---
 
 ### Model Specification
 
-The model assumes:
+We define the relationship between the predictors and the probability of default $\pi_i$ as:
 
 $$
-\begin{aligned}
-\text{logit}(p_i) &= \log\!\left(\frac{p_i}{1 - p_i}\right) \\
-&= \beta_0
-  + \beta_1\,\text{credit\_score}_i
-  + \beta_2\,\text{income}_i \\
-&\quad + \beta_3\,\text{age}_i
-  + \beta_4\,\text{loan\_amount}_i
-  + \beta_5\,\text{student}_i
-\end{aligned}
+\log\!\left(\frac{\pi_i}{1 - \pi_i}\right) = \beta_0 + \beta_1\,\text{credit\_score}_i + \beta_2\,\text{income}_i + \dots + \beta_k X_{ki}
 $$
 
+Here is what the parameters entail:
 
+* $\pi_i$: The probability that the $i$-th student defaults.
+* $\beta_0$ (**The Intercept**): The expected log-odds of default when all predictors are zero. (Often theoretical, as no one has 0 credit score).
+* $\beta_1, \dots, \beta_k$ (**The Slopes**): The change in the **log-odds** of default for a one-unit increase in the predictor, holding all other variables constant.
 
-where:
+### Fitting the Model
 
-* $p\_i =$ probability of default for customer $i$
-* $\beta\_j =$ regression coefficients
+To estimate these $\beta$ parameters, we use **Maximum Likelihood Estimation (MLE)**.
 
----
+In R, we use the `glm()` function (Generalized Linear Model). Crucially, we must specify `family = binomial`.
 
-### Fitting in R
+* **Why `family = binomial`?**
+    Standard regression (OLS) assumes the target variable follows a **Normal (Gaussian)** distribution. However, our target is binary (0/1), which follows a **Bernoulli/Binomial** distribution. This argument tells the software to switch from "Least Squares" to "Maximum Likelihood" using the binomial distribution.
 
-```{r}
-# Fit logistic regression model
-fit_r <- glm(defaulted ~ credit_score + income + age + loan_amount + student,
-             data = BLR,
-             family = binomial(link = "logit"))
+* **Why Logit?**
+    By default, `family = binomial` uses the **logit** link function. While other links exist (like *probit*), the logit is preferred for its interpretability (odds ratios) and mathematical properties.
 
-summary(fit_r)
+::: {.panel-tabset}
+
+## R Code
+
+```r
+# Fit the model using Generalized Linear Model (glm)
+# family = binomial automatically defaults to link = "logit"
+fit_glm <- glm(defaulted ~ credit_score + income + age + loan_amount + student,
+               data = BLR,
+               family = binomial)
+
+summary(fit_glm)
 ```
 
----
+## Python Code
 
-### Fitting in Python
-
-```{python}
+```python
 import statsmodels.api as sm
 
-# Define predictors (X) and outcome (y)
-X = py$data[['credit_score', 'income', 'age', 'loan_amount', 'student']]
-X = sm.add_constant(X)  # add intercept
-y = py$data['defaulted']
+# 1. Define Predictors (X) and Target (y)
+# Note: We access the R dataframe 'BLR' using 'r.BLR'
+df = r.BLR
+X = df[['credit_score', 'income', 'age', 'loan_amount', 'student']]
+y = df['defaulted']
 
-# Fit logistic regression
+# 2. Add Intercept manually (Statsmodels does not add it by default)
+X = sm.add_constant(X)
+
+# 3. Fit the Logit model
 model = sm.Logit(y, X).fit()
+
 print(model.summary())
 ```
 
+:::
+
+### Model Output Interpretation
+
+The output table provides the **Estimate** (the $\beta$ coefficients) for each predictor.
+
+* **Positive Coefficient (+):** As this variable increases, the log-odds of default *increase* (Higher Risk).
+* **Negative Coefficient (-):** As this variable increases, the log-odds of default *decrease* (Lower Risk).
+
+In the next section, we will convert these raw log-odds into **Odds Ratios**, which are much easier to interpret for business decisions.
+
 ---
 
-### Model Output
+## Interpreting Model Results: Log-Odds and Odds Ratios
 
-* Each coefficient ($\beta\_j$) is expressed on the **log-odds scale**.
-* Positive coefficients → higher log-odds of default (greater risk).
-* Negative coefficients → lower log-odds of default (less risk).
+In the previous section, we fit a model with several predictors. To clearly demonstrate how to interpret the coefficients, let's focus on a simplified model using just two key variables: `credit_score` and `income`.
 
-We will later translate these log-odds into **odds ratios** and **predicted probabilities** for interpretation.
+### The "Log-Odds" Output
 
----
+By default, logistic regression software outputs coefficients ($\hat{\beta}$) in **log-odds**.
 
-## Fitting the Logistic Regression Model
+  * **R:** The `estimate` column.
+  * **Python:** The `coef` column.
 
-We model the **log‑odds** of default as a linear function of predictors. In practice:
+While mathematically necessary, log-odds are difficult for humans to visualize. (e.g., *"What does a -0.004 change in log-odds mean?"*).
 
-* **R:** `glm(..., family = binomial(link = "logit"))`
-* **Python:** `statsmodels.Logit(...)`
+### The "Odds Ratio" (OR)
+
+To make these numbers interpretable, we exponentiate the coefficients:
+$$\text{OR} = e^{\hat{\beta}}$$
+
+  * **If $\text{OR} > 1$:** The predictor is associated with **higher** odds of default.
+  * **If $\text{OR} < 1$:** The predictor is associated with **lower** odds of default.
+  * **If $\text{OR} = 1$:** No association.
+
+Below, we fit the simplified model and calculate the Odds Ratios with 95% Confidence Intervals.
 
 ::: {.panel-tabset}
 
@@ -765,23 +883,27 @@ We model the **log‑odds** of default as a linear function of predictors. In pr
 #| message: false
 #| warning: false
 
-# Fit a simple, interpretable model
-fit_glm <- glm(
+# Fit a simplified model for clear interpretation
+fit_simple <- glm(
   defaulted ~ credit_score + income,
   data = BLR,
   family = binomial(link = "logit")
 )
 
-# Coefficients (log-odds) and odds ratios
-coef_table <- broom::tidy(fit_glm, conf.int = TRUE, conf.level = 0.95)
+# We use broom::tidy to easily extract coefficients and convert them
+library(broom)
+coef_table <- tidy(fit_simple, conf.int = TRUE, conf.level = 0.95)
+
+# Calculate Odds Ratios (OR) by exponentiating estimates and CIs
 coef_table$odds_ratio <- exp(coef_table$estimate)
 coef_table$or_low     <- exp(coef_table$conf.low)
 coef_table$or_high    <- exp(coef_table$conf.high)
 
+# Display the table
 knitr::kable(
-  coef_table[, c("term","estimate","std.error","statistic","p.value","odds_ratio","or_low","or_high")],
-  digits = 3,
-  col.names = c("Term","Log-Odds (β)","SE","z","p","Odds Ratio","OR 2.5%","OR 97.5%")
+  coef_table[, c("term","estimate","std.error","p.value","odds_ratio","or_low","or_high")],
+  digits = 4,
+  col.names = c("Term","Log-Odds (β)","SE","p","Odds Ratio","OR 2.5%","OR 97.5%")
 )
 ```
 
@@ -796,63 +918,57 @@ import pandas as pd
 import statsmodels.api as sm
 import numpy as np
 
-# BLR was exported from R in the setup; use it directly
-df = BLR.copy()
-df['defaulted'] = df['defaulted'].astype(int)
-
-X = df[['credit_score','income']]
-X = sm.add_constant(X)
+# Access the data from R
+df = r.BLR
+X = sm.add_constant(df[['credit_score', 'income']])
 y = df['defaulted']
 
+# Fit the simplified model
 logit_model = sm.Logit(y, X).fit(disp=False)
 
-# Build a coefficient table with odds ratios and CIs
+# 1. Extract Parameters (Log-Odds)
 params = logit_model.params
-bse    = logit_model.bse
-zvals  = params / bse
-pvals  = logit_model.pvalues
 conf   = logit_model.conf_int()
-or_    = np.exp(params)
-or_lo  = np.exp(conf[0])
-or_hi  = np.exp(conf[1])
 
-coef_table = pd.DataFrame({
-    "Term": params.index,
-    "Log-Odds (β)": params.values,
-    "SE": bse.values,
-    "z": zvals.values,
-    "p": pvals.values,
-    "Odds Ratio": or_.values,
-    "OR 2.5%": or_lo.values,
-    "OR 97.5%": or_hi.values
+# 2. Calculate Odds Ratios (OR)
+# We exponentiate the log-odds to get the OR
+odds_ratios = np.exp(params)
+conf_or     = np.exp(conf)
+
+# 3. Create a clean summary table
+results_table = pd.DataFrame({
+    "Log-Odds (β)": params,
+    "p-value": logit_model.pvalues,
+    "Odds Ratio": odds_ratios,
+    "OR 2.5%": conf_or[0],
+    "OR 97.5%": conf_or[1]
 })
 
-coef_table
+print(results_table.round(4))
 ```
 
 :::
 
-**Notes**
+**Interpretation of the Output**
 
-* Coefficients are in **log‑odds** units.
-* Exponentiating a coefficient gives the **odds ratio**: $\text{OR} = e^{\beta}$.
-* E.g., $\beta_{\text{credit\_score}}=-0.01\Rightarrow \text{OR}\approx 0.99$: each 1‑point increase in credit score multiplies the odds of default by \~0.99 (≈1% decrease).
-
+  * **Intercept:** usually ignored in interpretation.
+  * **credit\_score:** If the coefficient is $\beta \approx -0.01$, then $\text{OR} \approx 0.99$.
+      * *Meaning:* For every 1-point increase in credit score, the odds of default are multiplied by 0.99 (a \~1% decrease), holding income constant.
+  * **income:** If the $\text{OR} \approx 1.00$, the effect per dollar is tiny. In such cases, it is often useful to rescale the variable (e.g., income in $10k units) to see a meaningful effect size.
+  
 ---
 
-## From Log‑Odds to Probabilities
+## From Log-Odds to Probabilities (Simple Model)
 
-The inverse‑logit (a.k.a. logistic/sigmoid) maps any linear predictor $\eta$ back to a valid probability:
+To fully understand how the model converts abstract "log-odds" into a tangible "probability," it is best to start with the simplest case: **one predictor**.
+
+In a simple binary logistic regression, the relationship is:
 
 $$
-p = \text{logit}^{-1}(\eta) = \frac{1}{1 + e^{-\eta}}
+\hat{\pi} = \frac{1}{1 + e^{-(\hat{\beta}_0 + \hat{\beta}_1 X)}}
 $$
 
-Below we:
-
-1. get **linear predictors** ($\eta$),
-2. transform to **probabilities** $p$, and
-3. compute example probabilities at low/median/high credit scores (holding income at its mean).
+Below, we fit a model using **only** `credit_score` to predict default. We will then calculate the predicted probability ($\hat{\pi}$) for a student with a Low, Median, and High credit score.
 
 ::: {.panel-tabset}
 
@@ -863,25 +979,29 @@ Below we:
 #| message: false
 #| warning: false
 
-# 1) Linear predictor (η) and probability (p) for observed rows
-BLR$eta_hat <- predict(fit_glm, type = "link")         # η = Xβ
-BLR$p_hat   <- predict(fit_glm, type = "response")     # p = logistic(η)
+# 1. Fit a Simple Model (1 Predictor)
+fit_simple <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
 
-# 2) Example scenarios at low / median / high credit score
+# 2. Define Scenarios: Low, Median, and High Credit Score
+# We pick the 25th, 50th, and 75th percentiles
 qs <- quantile(BLR$credit_score, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
-newdat <- tibble::tibble(
-  credit_score = as.numeric(qs),
-  income = mean(BLR$income, na.rm = TRUE),
-  label = c("Low (25th %)","Median (50th %)","High (75th %)")
+
+scenarios <- data.frame(
+  scenario = c("Low (25th %)", "Median (50th %)", "High (75th %)"),
+  credit_score = as.numeric(qs)
 )
 
-newdat$eta   <- predict(fit_glm, newdata = newdat, type = "link")
-newdat$prob  <- predict(fit_glm, newdata = newdat, type = "response")
+# 3. Calculate Linear Predictor (Log-Odds) and Probability
+# type = "link" gives log-odds (eta)
+# type = "response" gives probability (pi)
+scenarios$log_odds <- predict(fit_simple, newdata = scenarios, type = "link")
+scenarios$prob_pi  <- predict(fit_simple, newdata = scenarios, type = "response")
 
+# Display Results
 knitr::kable(
-  newdat[, c("label","credit_score","income","eta","prob")],
-  digits = 4,
-  col.names = c("Scenario","Credit Score","Income (mean)","η (linear predictor)","Probability")
+  scenarios,
+  digits = 3,
+  col.names = c("Scenario", "Credit Score", "Log-Odds (η)", "Probability (π)")
 )
 ```
 
@@ -892,144 +1012,150 @@ knitr::kable(
 #| message: false
 #| warning: false
 
-import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+import numpy as np
 
-# 1) Linear predictor and probabilities for observed rows
-eta_hat = np.dot(X, logit_model.params)      # η = Xβ
-p_hat   = 1 / (1 + np.exp(-eta_hat))         # logistic(η)
+# 1. Fit a Simple Model (1 Predictor)
+# We define X with only credit_score
+X_simple = sm.add_constant(df[['credit_score']])
+y = df['defaulted']
+model_simple = sm.Logit(y, X_simple).fit(disp=0)
 
-df_out = df[['credit_score','income','defaulted']].copy()
-df_out['eta_hat'] = eta_hat
-df_out['p_hat']   = p_hat
-
-# 2) Example scenarios at low / median / high credit score (income at mean)
+# 2. Define Scenarios
 qs = df['credit_score'].quantile([0.25, 0.5, 0.75]).values
-inc_mean = df['income'].mean()
+scenarios = pd.DataFrame({
+    'const': 1.0, 
+    'credit_score': qs
+}, index=["Low (25th %)", "Median (50th %)", "High (75th %)"])
 
-newX = pd.DataFrame({
-    'const': 1.0,
-    'credit_score': qs,
-    'income': [inc_mean, inc_mean, inc_mean]
-}, index=["Low (25th %)","Median (50th %)","High (75th %)"])
+# 3. Calculate Linear Predictor and Probability manually
+# eta = beta0 + beta1 * score
+eta = np.dot(scenarios, model_simple.params)
+# pi = 1 / (1 + e^-eta)
+pi  = 1 / (1 + np.exp(-eta))
 
-eta = np.dot(newX, logit_model.params)
-prob = 1 / (1 + np.exp(-eta))
-
-pd.DataFrame({
-    "Scenario": newX.index,
-    "Credit Score": newX['credit_score'].values,
-    "Income (mean)": newX['income'].values,
-    "η (linear predictor)": eta,
-    "Probability": prob
+# Display Results
+results = pd.DataFrame({
+    "Credit Score": scenarios['credit_score'],
+    "Log-Odds (η)": eta,
+    "Probability (π)": pi
 })
+
+print(results.round(3))
 ```
 
 :::
 
+**Interpretation**
 
-**Takeaway**
+* **At Low Credit Score:** The log-odds are likely positive (or less negative), resulting in a higher probability ($\pi$) of default.
+* **At High Credit Score:** The log-odds become strongly negative. Because of the exponent in the denominator ($e^{-\text{negative}}$ is large), the probability $\pi$ shrinks toward 0.
 
-* The model fits a straight line on the **log‑odds** scale, then the **inverse‑logit** maps it to valid probabilities in $[0,1]$.
-* You can read coefficients as changes in **log‑odds**, or exponentiate to **odds ratios**; but to **communicate**, show **probabilities** for realistic scenarios (like low/median/high credit score).
+This demonstrates the **inverse relationship**: as credit score goes *up*, the probability of default goes *down*, following the S-curve shape we saw earlier.
 
----
-
-## Data Collection and Wrangling
-
-Before building a logistic regression model, we need to ensure our data is **reliable, clean, and structured** for analysis. Poor data preparation can undermine even the best statistical methods.
-
-### Data Collection
-
-In our case, we’re working with a **loan default dataset**. Each row represents a borrower, and the key outcome is whether they **defaulted on their loan** (`defaulted = 1`) or not (`defaulted = 0`).
-Predictors include:
-
-* **credit\_score** (continuous)
-* **income** (continuous)
-* **education\_years** (continuous)
-* **married** (binary categorical)
-* **owns\_home** (binary categorical)
-* **age** (continuous)
-
-The dataset also contains `successes` and `trials` (grouped-binomial form), but in this chapter we’ll treat outcomes as **individual-level Bernoulli trials**.
-
-### Data Wrangling
-
-To prepare the dataset:
-
-* **Handling Missing Data:** If borrowers have missing credit scores or income values, we must decide whether to impute them (mean, median, regression-based) or drop those cases. Missingness should be checked systematically.
-* **Encoding Categorical Variables:** Variables like `married` and `owns_home` need to be encoded as 0/1 indicators. In R and Python, logistic regression functions handle factors/dummies automatically, but it’s important to confirm coding.
-* **Dealing with Class Imbalance:** Loan defaults are usually much rarer than non-defaults. A dataset with 90% non-defaults and 10% defaults might lead a model to always predict “no default” and still achieve 90% accuracy. Strategies include:
-
-  * Adjusting the decision threshold (not always 0.5),
-  * Using resampling methods (oversampling defaults, undersampling non-defaults), or
-  * Applying class weights in the model.
-* **Splitting Data for Training/Testing:** To fairly assess predictive performance, we split the dataset into **training** (used to fit the model) and **testing** (used to evaluate it). A common split is 70/30. This prevents overfitting and ensures the model generalizes to new borrowers.
+**Next Steps:**
+Now that we understand the mechanics of the simple model, we can expand our view. Real-world problems are rarely caused by a single factor. In the following sections, we will add more variables (like `income` and `student` status) to build a **multiple** logistic regression model.
 
 ---
 
-**TODOs for this section:**
+## Data Preparation and Wrangling
 
-* Check for missing values and document how they were handled.
-* Ensure categorical variables (`married`, `owns_home`) are encoded properly.
-* Assess class balance in `defaulted` and consider strategies if imbalance is severe.
-* Split dataset into training and test sets, keeping class balance in mind.
+Before we can train a model, we must bridge the gap between how data is *collected* and how a regression model *consumes* it. Raw data is often messy, incomplete, or stored in text formats that mathematical algorithms cannot process.
 
----
+Data wrangling ensures our inputs are **reliable** (free of errors), **complete** (no missing values), and **structured** (numerical matrices). Without this step, even the most sophisticated algorithm will fail—a principle known as "Garbage In, Garbage Out."
+
+### Handling Missing Data
+
+Real-world datasets frequently have gaps—a borrower might leave the "Income" field blank. Logistic regression requires a complete set of observations; it cannot calculate a coefficient for a "blank" space.
+
+We must first check the extent of the problem. If only a few rows have missing data, we typically remove them.
+
+::: {.callout-tip}
+
+## Strategies for Missing Values
+
+When data is missing, you have three main options:
+
+1.  **Deletion (Complete Case Analysis):** If missingness is rare (\<5% of data) and random, simply remove those rows. This is the most common approach in introductory texts.
+2.  **Imputation:** Replace missing values with the mean, median, or a value predicted by other variables. This preserves sample size but adds complexity.
+3.  **Flagging:** Create a new binary variable (e.g., `income_missing = 1`) to model the missingness explicitly.
+
+:::
+
+### Encoding Categorical Variables
+
+Logistic regression works with **matrices of numbers**. It cannot mathematically multiply a coefficient $\beta$ by the text string "Married."
+
+To fix this, we perform **One-Hot Encoding** (or Dummy Encoding). This converts a categorical variable into a binary 0/1 flag.
+
+  * **Original:** `student = "Yes"`
+  * **Encoded:** `student_yes = 1`
+
+**Note on Multicollinearity:** If a variable has two categories (Student: Yes/No), we only need **one** column (`is_student`). If we included both `student_yes` and `student_no`, they would be perfectly correlated, causing the math to break (the "Dummy Variable Trap").
+
+### Splitting the Data
+
+Finally, as discussed in the study design, we split our clean, encoded dataset into training and testing sets to evaluate performance fairly.
 
 ::: {.panel-tabset}
 
 ## R Code
 
-```{.r}
+```r
 library(dplyr)
 library(caret)
 
-# Check missing data
-colSums(is.na(BLR))
+# 1. Handling Missing Data
+# We check for NAs and, for this chapter, remove incomplete rows
+sum(is.na(BLR)) 
+BLR_clean <- na.omit(BLR)
 
-# Encode categorical variables (ensure they are factors)
-BLR <- BLR %>%
+# 2. Encoding
+# R handles factor encoding automatically in glm(), 
+# but it is good practice to ensure variables are factors.
+BLR_clean <- BLR_clean %>%
   mutate(
+    student = as.factor(student),
     married = as.factor(married),
     owns_home = as.factor(owns_home)
   )
 
-# Check class balance
-table(BLR$defaulted)
-prop.table(table(BLR$defaulted))
-
-# Split into training/testing sets
+# 3. Splitting (Stratified to handle class imbalance)
 set.seed(123)
-trainIndex <- createDataPartition(BLR$defaulted, p = .7, list = FALSE)
-train <- BLR[ trainIndex, ]
-test  <- BLR[-trainIndex, ]
+trainIndex <- createDataPartition(BLR_clean$defaulted, p = 0.7, list = FALSE)
+train_data <- BLR_clean[trainIndex, ]
+test_data  <- BLR_clean[-trainIndex, ]
 ```
 
 ## Python Code
 
-```{.python}
+```python
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# Check missing data
-print(df.isnull().sum())
+# 1. Handling Missing Data
+# Drop rows with any missing values
+df_clean = df.dropna().copy()
 
-# Encode categorical variables
-df['married'] = df['married'].astype('category')
-df['owns_home'] = df['owns_home'].astype('category')
+# 2. Encoding Categorical Variables
+# We use pd.get_dummies to convert text categories to 0s and 1s.
+# drop_first=True prevents the "Dummy Variable Trap" (e.g., keeps 'student_Yes', drops 'student_No')
+df_clean = pd.get_dummies(df_clean, columns=['student', 'married', 'owns_home'], drop_first=True)
 
-# Check class balance
-print(df['defaulted'].value_counts(normalize=True))
+# Display the new columns to verify
+print(df_clean.head())
 
-# Split into train/test sets (stratify to preserve class balance)
-train, test = train_test_split(df, test_size=0.3, random_state=123,
-                               stratify=df['defaulted'])
+# 3. Splitting (Stratified)
+X = df_clean.drop(columns=['defaulted'])
+y = df_clean['defaulted']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=123, stratify=y
+)
 ```
 
 :::
-
-
 
 ---
 
@@ -1039,32 +1165,35 @@ Before fitting a logistic regression, we need to understand the structure of our
 
 ### Classifying Variables
 
-Our dataset contains predictors such as `credit_score`, `income`, `education_years`, `married`, `owns_home`, and `age`. The response variable `defaulted` is binary (`0` = no default, `1` = default).
+To select the appropriate modeling technique, we must first classify our variables. In this analysis, `defaulted` is our binary outcome, and the remaining variables serve as **regressors** (explanatory variables).
+
+| Variable | Type | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `defaulted` | Categorical (Binary) | Outcome ($Y$) | $1=$ Default, $0=$ No Default |
+| `credit_score` | Continuous (Integer) | Regressor ($X$) | Credit rating (300-850) |
+| `income` | Continuous | Regressor ($X$) | Annual income in CAD |
+| `age` | Continuous (Integer) | Regressor ($X$) | Borrower age in years |
+| `loan_amount` | Continuous | Regressor ($X$) | Size of loan in CAD |
+| `education_years` | Count / Discrete | Regressor ($X$) | Years of schooling |
+| `married` | Categorical (Nominal) | Regressor ($X$) | Marital status |
+| `owns_home` | Categorical (Nominal) | Regressor ($X$) | Home ownership status |
 
 ### Visualizing Distributions
 
-* **Continuous predictors** (e.g., credit score, income) can be visualized with histograms or density plots, split by default status.
-* **Categorical predictors** (e.g., married, owns\_home) can be compared with barplots of default rates.
+  * **Continuous regressors** (e.g., `credit_score`, `income`) can be visualized with histograms or density plots, split by default status.
+  * **Categorical regressors** (e.g., `married`, `owns_home`) can be compared with barplots of default rates.
 
 ### Exploring Relationships with Binary Outcome
 
-Boxplots or violin plots of credit score by default status, or barplots of default rates by home ownership, help reveal potential predictors. Correlations among continuous predictors can also be checked to watch for multicollinearity.
-
-**TODOs for this section:**
-
-* Plot distribution of credit scores for defaulters vs non-defaulters.
-* Plot default rates by categorical predictors (`married`, `owns_home`).
-* Correlation heatmap for continuous predictors.
-* Summarize key EDA takeaways (e.g., lower credit scores → higher default rates).
-
----
+Boxplots or violin plots of `credit_score` by default status, or barplots of default rates by home ownership, help reveal potential relationships. We also check correlations among continuous regressors to watch for multicollinearity.
 
 ::: {.panel-tabset}
 
 ## R Code
 
-```{.r}
+```r
 library(ggplot2)
+library(ggcorrplot)
 
 # Boxplot of credit score by default
 ggplot(BLR, aes(x = as.factor(defaulted), y = credit_score)) +
@@ -1079,15 +1208,14 @@ ggplot(BLR, aes(x = as.factor(owns_home), fill = as.factor(defaulted))) +
        fill = "Defaulted",
        title = "Default Rates by Home Ownership")
 
-# Correlation heatmap
-library(ggcorrplot)
+# Correlation heatmap (Numeric regressors only)
 corr <- cor(BLR[,c("credit_score","income","education_years","age")])
 ggcorrplot(corr, lab = TRUE)
 ```
 
 ## Python Code
 
-```{.python}
+```python
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -1097,60 +1225,71 @@ plt.title("Credit Score Distribution by Default Status")
 plt.show()
 
 # Barplot default by home ownership
-sns.barplot(data=df, x="owns_home", y="defaulted", ci=None)
+sns.barplot(data=df, x="owns_home", y="defaulted", errorbar=None)
 plt.title("Default Rates by Home Ownership")
 plt.show()
 
 # Correlation heatmap
 corr = df[['credit_score','income','education_years','age']].corr()
 sns.heatmap(corr, annot=True, cmap="coolwarm")
-plt.title("Correlation Heatmap of Continuous Predictors")
+plt.title("Correlation Heatmap of Continuous Regressors")
 plt.show()
 ```
 
 :::
 
----
+-----
 
 ## Data Modelling
 
-With EDA complete, we’re ready to specify our logistic regression model.
+With EDA complete, we’re ready to formally specify our logistic regression model.
 
 ### Choosing a Logistic Regression Model
 
-The response variable is binary: `defaulted ∈ {0,1}`. Logistic regression is appropriate because it ensures predictions stay between 0 and 1.
+The response variable is binary: `defaulted` $\in \{0,1\}$. Logistic regression is appropriate because it models the probability of the event occurring ($\pi_i$) rather than the raw outcome.
 
-### Defining Modeling Parameters
+### Defining the Probability Distribution
 
-* **Response Variable (Y):** `defaulted` (1 = default, 0 = no default).
-* **Predictors (X):** Key predictors like `credit_score` and `income`. Categorical variables (e.g., `married`) can be included as factors/dummies.
+Unlike linear regression, we do not model $Y_i$ directly. Instead, we assume that the outcome follows a **Bernoulli distribution**:
+
+$$
+Y_i \sim \text{Bernoulli}(\pi_i)
+$$
+where $\pi_i$ is the probability that the $i$-th customer defaults.
 
 ### Setting Up the Logistic Regression Equation
 
-The logistic regression model is:
+We link the regressors to the probability $\pi_i$ using the logit function:
 
+$$\log\left(\frac{\pi_i}{1 - \pi_i}\right) = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \dots + \beta_k X_{ki}
 $$
-\log\left(\frac{p_i}{1 - p_i}\right) = \beta_0 + \beta_1 \cdot \text{credit\_score}_i + \beta_2 \cdot \text{income}_i + \cdots
-$$
 
-where $p_i$ is the probability that customer $i$ defaults.
+### The Missing Error Term ($\epsilon$)
 
-This means coefficients describe changes in the **log-odds of default** for a one-unit change in the predictor, holding other predictors constant.
+You may notice a key difference here compared to OLS equations ($Y = \beta X + \epsilon$): **there is no error term** $\epsilon$ at the end of the equation.
 
-**TODOs for this section:**
+  * In OLS, $\epsilon$ captures random noise around the mean.
+  * In Logistic Regression, the randomness is inherent in the **Bernoulli distribution** of $Y$ itself. Once we know $\pi_i$ (the probability), the randomness comes from the "coin flip" of whether the event actually happens or not. We do not add an extra error term to the log-odds equation.
 
-* Write down the full logistic regression equation for your chosen predictors.
-* Decide whether categorical variables should be included (dummy-coded).
-* Check multicollinearity before finalizing model.
+### Counting the Parameters
 
----
+If we fit a model using `credit_score` and `income` to predict default, we are estimating **3 parameters**:
+
+1.  $\beta_0$: The intercept.
+2.  $\beta_1$: The coefficient for `credit_score`.
+3.  $\beta_2$: The coefficient for `income`.
+
+Generally, if we have $k$ regressors, we estimate $k+1$ parameters.
+
+-----
 
 ::: {.panel-tabset}
 
 ## R Code
 
-```{.r}
-# Fit base model
+```r
+# Fit the full model
+# We use family = binomial to indicate Y ~ Bernoulli(pi)
 logit_model <- glm(defaulted ~ credit_score + income + married + owns_home,
                    data = BLR, family = binomial)
 summary(logit_model)
@@ -1158,10 +1297,12 @@ summary(logit_model)
 
 ## Python Code
 
-```{.python}
+```python
 import statsmodels.api as sm
 
-X = df[['credit_score','income','married','owns_home']]
+# Define Regressors (X) and Outcome (y)
+# Ensure categorical variables are encoded (if not done in wrangling step)
+X = df[['credit_score','income','married_Yes','owns_home_Yes']] 
 X = sm.add_constant(X)
 y = df['defaulted']
 
@@ -1171,57 +1312,47 @@ print(logit_model.summary())
 
 :::
 
----
+-----
 
 ## Estimation
 
-Once the model is specified, we need to estimate its parameters. Unlike OLS, which minimizes squared errors, logistic regression uses **Maximum Likelihood Estimation (MLE)**.
+Under a model with $k$ regressors, the coefficients $\beta_0,\beta_1,\ldots,\beta_k$ are unknown and must be estimated from the data.
 
-### Maximum Likelihood Estimation
+### Maximum Likelihood Estimation (MLE)
 
-MLE finds the coefficients that maximize the probability of observing the data we actually have. Intuitively, the model adjusts coefficients until the predicted probabilities align as closely as possible with observed defaults.
+Because our outcome $Y_i$ follows a Bernoulli distribution with probability $\pi_i$, we cannot use "Least Squares." Instead, we use **Maximum Likelihood Estimation**.
 
-### Fitting the Model in Practice
+We seek the values of $\beta$ that maximize the likelihood of observing the data we actually collected. The likelihood function is:
 
-In practice, estimation is done using iterative numerical algorithms (e.g., Newton-Raphson). Software (R, Python) handles this behind the scenes, but it’s important to understand that coefficients are chosen to maximize the likelihood, not minimize error.
+$$
+L(\boldsymbol\beta)=\prod_{i=1}^n \pi_i^{y_i}(1-\pi_i)^{1-y_i}
+$$
+Where $\pi_i$ is connected to our regressors via the inverse-logit:
 
-For our loan dataset, fitting the model gives us coefficients for credit score, income, and other predictors. These are the estimates we’ll later test and interpret.
+$$\pi_i=\frac{e^{\beta_0 + \dots + \beta_k X_{ki}}}{1+e^{\beta_0 + \dots + \beta_k X_{ki}}}
+$$
+The computer solves this using an iterative algorithm (Newton-Raphson) to find the $\hat{\beta}$ values that make the observed defaults most probable.
 
-**TODOs for this section:**
+-----
 
-* Report log-likelihood value for the fitted model.
-* Show convergence message (iteration process).
-* Provide estimated coefficients with standard errors.
+## Estimation
 
----
+Under a model with $k$ regressors, the coefficients $\beta_0,\beta_1,\ldots,\beta_k$ are unknown and must be estimated from the data.
 
-::: {.panel-tabset}
+### Maximum Likelihood Estimation (MLE)
 
-## R Code
+Because our outcome $Y_i$ follows a Bernoulli distribution with probability $\pi_i$, we cannot use "Least Squares." Instead, we use **Maximum Likelihood Estimation**.
 
-```{.r}
-# Logistic regression fit
-logit_model <- glm(defaulted ~ credit_score + income,
-                   data = BLR, family = binomial)
+We seek the values of $\beta$ that maximize the likelihood of observing the data we actually collected. The likelihood function is:
 
-summary(logit_model) # shows estimates, SE, z, p-values, log-likelihood
-```
+$$
+L(\boldsymbol\beta)=\prod_{i=1}^n \pi_i^{y_i}(1-\pi_i)^{1-y_i}
+$$Where $\pi_i$ is connected to our regressors via the inverse-logit:
 
-## Python Code
+$$\\pi\_i=\\frac{e^{\\beta\_0 + \\dots + \\beta\_k X\_{ki}}}{1+e^{\\beta\_0 + \\dots + \\beta\_k X\_{ki}}}
+$$The computer solves this using an iterative algorithm (Newton-Raphson) to find the $\hat{\beta}$ values that make the observed defaults most probable.
 
-```{.python}
-X = sm.add_constant(df[['credit_score','income']])
-y = df['defaulted']
-
-logit_model = sm.Logit(y, X).fit()
-print(logit_model.summary())  # includes estimates, SE, z, p-values, log-likelihood
-```
-
-:::
-
-
-
----
+-----
 
 ## Inference
 
