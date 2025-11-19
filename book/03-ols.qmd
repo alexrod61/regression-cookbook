@@ -1536,7 +1536,7 @@ Missing debt/scholarships could *bias the coefficients* (for instance overstatin
 ### Problem 1 {.unnumbered}
 
 In this problem, you will investigate a dataset of surveyed students taking a programming course with a final exam at the end.
-Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they previously took, how many hours they spent studying for the final, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, `hours_studied` and `exam_score` respectively. Below is a full breakdown of the variables:
+Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they took, how many hours they spent studying for the final, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, `hours_studied` and `exam_score` respectively. Below is a full breakdown of the variables:
 
 | **Variable Name** | **Description** |
 |-------------------|-----------------|
@@ -1547,7 +1547,11 @@ Each student in this dataset was asked for their current grade out of 100, how m
 
 For future iterations of the course, you are curious to know if it is possible to understand how well a student will do on the final given these three factors.
 
-To answer this, the questions below will guide you through an OLS analysis on this data.
+To answer this, the questions below will guide you through an OLS analysis on this data. Specifically, by the end of these questions, you will be able to answer the following concrete questions:
+1. How does a 5% increase in a particular variable (one of `current_grade`, `prior_courses`, `hours_studied`) affect the `exam_score`?
+2. Inference: How does `hours_studied` infulence `exam_score`, holding other variables constant?
+3. Prediction: Given a particular set of predictor values, what is the expected `exam_score`?
+Dive in to see how you can answer these questions using OLS regression!
 
 ### A. Data Wrangling and Exploratory Data Analysis {.unnumbered}
 1. Read in the data from `problem-1-data.csv`, checking for any missing entries. 
@@ -1706,28 +1710,42 @@ plt.show()
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-# B.1 Fit initial model
-model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
-summary(model1)
+# C.1 Durbin-Watson Test (Independence)
 
-# B.2 Report R² and coefficients
-cat(sprintf("\nR-squared: %.3f\n", summary(model1)$r.squared))
-cat("Coefficients:\n")
-print(coef(model1))
+dw <- dwtest(model1)
+print(dw$statistic)
 
-# B.3 Residuals vs Fitted
-ggplot(data = NULL, aes(x = fitted(model1), y = resid(model1))) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "loess", se = FALSE, color = "blue") +
-  labs(x = "Fitted values", y = "Residuals", title = "Residuals vs Fitted") +
-  theme_minimal()
+# C.2 Breusch-Pagan Test (Homoscedasticity)
 
-# B.4 Q-Q plot
-ggplot(data = NULL, aes(sample = resid(model1))) +
-  stat_qq(alpha = 0.6) +
-  stat_qq_line(color = "red") +
-  labs(title = "Q-Q Plot of Residuals") +
-  theme_minimal()
+bp <- bptest(model1)
+print(bp$statistic)
+print(bp$p.value)
+
+# C.3 Residuals vs Observation Index
+
+# Create data frame for index plotting
+
+df_diag <- data.frame(
+resid = residuals(model1),
+index = 1:length(residuals(model1)),
+cooks = cooks.distance(model1)
+)
+
+ggplot(df_diag, aes(x = index, y = resid)) +
+geom_point(alpha = 0.7) +
+geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+labs(title = "Residual Plot vs. Observation Index",
+x = "Observation Index", y = "Residuals") +
+theme_minimal()
+
+# C.4 Cook's Distance
+
+ggplot(df_diag, aes(x = index, y = cooks)) +
+geom_segment(aes(xend = index, yend = 0)) + 
+geom_point() +
+geom_hline(yintercept = 0.5, color = "red", linetype = "dashed") +
+labs(title = "Cook's Distance", x = "Observation Index", y = "Cook's Distance") +
+theme_minimal()
 
 ```
 
@@ -1736,10 +1754,23 @@ ggplot(data = NULL, aes(sample = resid(model1))) +
 ```{python}
 import statsmodels.stats.api as sms
 # C.1 Perform the Durbin-Watson test...
-dw_stat = durbin_watson(residuals)
+dw_stat = durbin_watson(model1.resid)
 print(f"Durbin-Watson statistic: {dw_stat:.4f}")
- 
+
 # C.2 Perform the Breusch-Pagan test...
+
+from statsmodels.stats.diagnostic import het_breuschpagan
+
+# Perform Breusch-Pagan test
+bp_test = het_breuschpagan(model1.resid, model1.model.exog)
+
+# Unpack results
+bp_stat, bp_pvalue, empty, empty = bp_test
+
+print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
+print(f"P-value: {bp_pvalue:.4f}")
+
+
 # bp_test = sms.het_breuschpagan(residuals, model.model.exog)
 # labels = ['LM Statistic', 'LM-Test p-value', 'F-Statistic', 'F-Test p-value']
 # bp_results = dict(zip(labels, bp_test))
@@ -1775,7 +1806,7 @@ plt.show()
 
 
 
-### C. Data Modelling - Improvements {.unnumbered}
+### D. Data Modelling - Improvements {.unnumbered}
 1. Should `prior_courses` be converted to another variable type? If so, why and which one? If you answered yes, try converting it and re-fit. Do you notice any improvements?
 2. Create `log_hours_studied`, the log of `hours_studied`. Re-fit the OLS using this predictor instead. Does $R^2$ improve? 
 > Hint: the true data generation process used `log(hours_studied)`!
@@ -1786,7 +1817,7 @@ plt.show()
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-# C.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
+# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df <- df %>% mutate(prior_courses_category = factor(prior_courses))
 
 model2 <- lm(exam_score ~ current_grade + prior_courses_category + hours_studied, data = df)
@@ -1794,7 +1825,7 @@ cat("Model 2:\n")
 summary(model2)
 cat("##########################################################\n")
 
-# C.2 Log transform hours_studied and fit model
+# D.2 Log transform hours_studied and fit model
 df <- df %>% mutate(log_hours = log(hours_studied))
 
 model3 <- lm(exam_score ~ current_grade + prior_courses + log_hours, data = df)
@@ -1802,7 +1833,7 @@ cat("Model 3:\n")
 summary(model3)
 cat("##########################################################\n")
 
-# C.3 Add interaction term
+# D.3 Add interaction term
 model4 <- lm(exam_score ~ current_grade * prior_courses + hours_studied, data = df)
 cat("Model 4:\n")
 summary(model4)
@@ -1812,7 +1843,7 @@ summary(model4)
 ## Python Code
 
 ```{python}
-# C.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
+# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df["prior_courses_category"] = df['prior_courses'].astype('category')
 model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
              data=df.dropna()).fit()
@@ -1820,7 +1851,7 @@ print(model2.summary())
 print("##########################################################")
 
 
-# C.2 Log transform hours_studied
+# D.2 Log transform hours_studied
 df['log_hours'] = np.log(df['hours_studied'])
 model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
              data=df.dropna()).fit()
@@ -1828,7 +1859,7 @@ print(model3.summary())
 print("##########################################################")
 
 
-# C.3 Add interaction term
+# D.3 Add interaction term
 model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
              data=df.dropna()).fit()
 print(model4.summary())
@@ -1836,17 +1867,19 @@ print(model4.summary())
 </details>
 :::
 
-### D. Final Evaluation {.unnumbered}
+### E. Final Evaluation {.unnumbered}
 1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
 2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
 3. Why might having taken more `prior_courses` show diminishing returns in `exam_score`?
+4. Inference: Based on your final model, describe the relationship between `hours_studied` and `exam_score`. Namely, if a student increases their study time by 10%, how does their expected exam score change?
+5. Prediction: Suppose a student has a current grade of 82, has taken 2 prior programming courses, and studied for 12.5 hours. Based on your final model, what is the predicted exam score of this student?
 
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
 ## R Code
 ```{r}
-# D.1 Compare models
+# E.1 Compare models
 # Create a comparison table of R² and RMSE
 models <- list(
   Initial = model1,
@@ -1865,21 +1898,56 @@ results <- tibble(
 results %>% arrange(desc(R_squared)) %>% print()
 
 
-# D.2 Interpretation of final model (model3)
+# E.2 Interpretation of final model (model3)
 # Interpretation: effect of a 5% increase in current_grade
 coef <- coef(model3)["current_grade"]
 effect <- 0.05 * coef
 
 cat(sprintf("\nA 5%% increase in current_grade increases exam_score by %.5f points\n", effect))
 
-# D.3 Diminishing returns explanation
+# E.3 Diminishing returns explanation
 cat("\nDiminishing returns explanation:\n")
 cat("Example: students might feel overconfident having taken more courses.\n")
+
+
+# E.4 Inference: Effect of hours_studied
+
+# Since Model 3 uses log(hours_studied), this is a Level-Log interpretation.
+
+# A 10% increase in X is associated with a (beta / 100) change in Y.
+# Delta Y = beta * ln(1 + 0.10)
+
+coef_log_hours <- coef(model3)["log_hours"]
+effect_hours <- coef_log_hours * log(1.10)
+
+cat("\nA 10% increase in study time is associated with an exam_score increase of:\n")
+print(effect_hours)
+
+# E.5 Prediction
+
+# Define the new student profile
+
+new_student <- data.frame(
+current_grade = 82,
+prior_courses = 2,
+hours_studied = 12.5
+)
+
+# Note: model3 was trained on a dataframe with a 'log_hours' column.
+# We must create that column in the new data to predict successfully.
+new_student <- new_student %>%
+mutate(log_hours = log(hours_studied))
+
+predicted_score <- predict(model3, newdata = new_student)
+
+cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
+
+
 ```
 
 ## Python Code
 ```{python}
-# D.1 Compare models
+# E.1 Compare models
 models = {
     'Initial': model1,
     'Categorical': model2,
@@ -1894,31 +1962,45 @@ results = pd.DataFrame({
 })
 print(results.sort_values('R-squared', ascending=False))
 
-# D.2 Interpretation of final model (model3)
+# E.2 Interpretation of final model (model3)
 final_model = model3
 coef = final_model.params['current_grade']
 print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
 
-# D.3 Diminishing returns explanation
+# E.3 Diminishing returns explanation
 print("\nDiminishing returns explanation:")
 print("Example: students might feel overconfident having taken more courses.")
+
+
+# E.4 Inference: Effect of hours_studied (10% increase)
+# Interpretation of Level-Log model: Delta Y = beta * ln(1.10)
+coef_log_hours = final_model.params['log_hours']
+effect_hours = coef_log_hours * np.log(1.10)
+
+print("\nA 10% increase in study time is associated with an exam_score increase of:")
+print(effect_hours)
+
+# E.5 Prediction
+# Create a DataFrame for the new student
+new_student = pd.DataFrame({
+    'current_grade': [82],
+    'prior_courses': [2],
+    'hours_studied': [12.5]
+})
+
+# We must add the log_hours feature as used in model3 training
+new_student['log_hours'] = np.log(new_student['hours_studied'])
+
+# Predict
+prediction = final_model.predict(new_student)
+print("\nPredicted exam score for the student:")
+print(prediction[0])
 ```
 
 </details>
 
+ 
 
-
-
-{{< include ../learning_objectives/lo-ch-03.qmd >}}
-
-::: {.Warning}
-::::{.Warning-header}
-Fun fact!
-::::
-::::{.Warning-container}
-**Zestylicious!** That mouth-puckering, lemon-squirted, totally tangy kick!
-::::
-:::
 
 ::: {#fig-ols-regression}
 ```{mermaid}
