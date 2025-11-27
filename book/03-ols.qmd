@@ -179,6 +179,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
+import statsmodels.stats.api as sms
 
 # Sample data
 np.random.seed(42)
@@ -630,7 +631,7 @@ Although random sampling is generally preferred, since it helps ensure the train
 
 By following these steps, checking for missing values, encoding categorical variables, handling outliers, and splitting the data, we ensure that our dataset is clean, well-organized, and ready for regression analysis using OLS.
 
-It's important to note, however, that these are just a few of the many techniques available during the data wrangling stage. Depending on the dataset and the specific goals of your analysis, you might also consider additional strategies such as feature scaling, normalization, advanced feature engineering, handling duplicate records, or addressing imbalanced data. Each of these techniques comes with its own set of solutions, and the optimal approach will depend on the unique challenges and objectives of your case.
+It is important to note, however, that these are just a few of the many techniques available during the data wrangling stage. Depending on the dataset and the specific goals of your analysis, you might also consider additional strategies such as feature scaling, normalization, advanced feature engineering, handling duplicate records, or addressing imbalanced data. Each of these techniques comes with its own set of solutions, and the optimal approach will depend on the unique challenges and objectives of your case.
 
 ## Exploratory Data Analysis (EDA)
 
@@ -1044,6 +1045,8 @@ These estimates provide an initial understanding of the direction and magnitude 
 
 ## Goodness of Fit
 
+
+
 After estimating the regression coefficients, the next step is to assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation ensures that the model is not only statistically valid but also generalizes well to unseen data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are violated, model estimates may be biased, leading to misleading conclusions.
 
 ### Checking Model Assumptions
@@ -1123,9 +1126,13 @@ If the test suggests autocorrelation, a possible solution is to use time-series 
 
 #### Homoscedasticity (Constant Variance of Errors)
 
+
+
 OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
 
 To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.
+
+
 
 ::: {.panel-tabset}
 ## R Code
@@ -1145,22 +1152,28 @@ exog = ols_model.model.exog  # independent variables (with intercept)
 bp_test = het_breuschpagan(residuals, exog)
 
 # Unpack results
-bp_stat, bp_pvalue, _, _ = bp_test
+bp_stat, bp_pvalue, empty, empty = bp_test
 
 print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
 print(f"P-value: {bp_pvalue:.4f}")
 ```
 :::
 
+
+
 Since the p-value (0.1563) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
 
 If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
+
+
 
 #### Normality of Residuals
 
 For valid hypothesis testing and confidence interval estimation, OLS assumes that residuals follow a normal distribution. If residuals deviate significantly from normality, statistical inference may be unreliable, particularly for small sample sizes.
 
 A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
+
+
 
 ::: {.panel-tabset}
 ## R Code
@@ -1179,12 +1192,14 @@ residuals = ols_model.resid
 
 # Q-Q plot of residuals
 plt.figure(figsize=(6, 4))
-_ = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
+empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
 plt.title("Q-Q Plot of Residuals")
 plt.tight_layout()
 plt.show()
 ```
 :::
+
+
 
 The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.
 
@@ -1288,11 +1303,17 @@ plt.show()
 ```
 :::
 
+
+
 In the plot above, all observations have Cook’s Distance values well below the 0.5 threshold. This indicates that no individual data point has an undue influence on the model’s estimates. 
 
 If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
 
+
+
 ## Results
+
+
 
 After validating the goodness of fit, we now assess how well the model performs in both predictive analysis and inferential analysis. This step involves using the trained model to generate predictions on unseen data and evaluating how well it generalizes beyond the training set. Additionally, we analyze the estimated regression coefficients to draw meaningful conclusions about student financial behaviors.
 
@@ -1381,6 +1402,9 @@ In this case, the model’s performance metrics are encouraging. With a MAE of 1
 
 Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in `Net_Money` for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.
 
+
+
+
 #### Insights from Regression Coefficients
 
 Here are a few insights that we can extract from the regression model result:
@@ -1396,20 +1420,590 @@ These findings suggest that students can improve their financial position throug
 
 The final step in our data science workflow is storytelling, where we translate our analytical findings into actionable insights. This stage ensures that our results are clearly understood by both technical and non-technical audiences. Effective storytelling involves summarizing insights, using visuals for clarity, and making data-driven recommendations.
 
+## Practice Problems
+
+In this final section, you can test your understanding with the following conceptual interactive exercises, and then proceed to work through an inferential analysis of a simple dataset.
+
+::: {.quiz}
+
+### Conceptual Questions
+
+1. Why does OLS minimize the sum of *squared* residuals instead of just the sum of residuals? What problem would arise if we used absolute errors?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Squaring residuals ensures errors don’t cancel out, and penalizes large errors more. Absolute errors lack *differentiability* for optimization.
+</details>
+
+2. In the house price example (Figure 3.1), if Line A has an SSE of 83 and Line B has an SSE of 3972, which line would OLS choose? Why?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Line A, as lower SSE implies a better fit. OLS minimizes SSE.
+</details>
+
+3. Could a regression line ever have an SSE of zero? What would that imply about the data?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Yes, if all points lie exactly on the line. This would indicate a perfect fit with no noise, which is highly unlikely with real data.
+</details>
+
+4. In the student finance dataset, EDA reveals a strong correlation between `Monthly_Earnings` and `Net_Money`. Can we conclude that large monthly earnings lead to the students have greater net money?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+No, since Correlation $\neq$ causation. Omitted variables may link earnings to savings.
+</details>
+
+5. If a histogram of `Net_Money` showed extreme right skewness, how could this violate OLS assumptions? What transformation could be done to address this?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Right skew violates normality, a log transformation could help resolve this.
+</details>
+
+6. Why did we convert binary variables (such as `Has_Job`) to factors in R? What could happen if they were left as numeric 1s and 0s?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Factors ensure correct interpretation as categories (not continuous variables). Numeric 0/1 could work but increases risks of misspecification.
+</details>
+
+7. The regression equation includes `Living_Situation` as a categorical predictor. How would the coefficient for `Living_Situation=2` be interpreted compared to the *baseline* category?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Compared to baseline, `Living_Situation=2` predicts $107.92 higher Net_Money, holding other variables constant.
+</details>
+
+8. The coefficient for `Drinks_Alcohol` is −$139.96. How would you explain this in simple terms to a university administrator advocating for alcohol-free campuses?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+We could say something along the lines of: "Students who drink alcohol average $140 fewer savings. Policies reducing drinking may improve students' financial well-being."
+</details>
+
+9. If `Monthly_Allowance` had been measured in hundreds of dollars (6.58 instead of 658.99), how would the coefficient of `Monthly_Allowance` change?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The coefficient simply scales from 1.52 to 152.
+</details>
+
+10. The Breusch-Pagan test for heteroscedasticity returns a p-value of 0.16. What does this imply about the residuals?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+p > 0.05 implies no heteroscedasticity.
+</details>
+
+11. In the Q-Q p plot shown in 3.9.1, if the residuals deviated sharply from the red line at the tails, what would this suggest? How might you address it?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+This would suggest non-normally distributed tails. You could consider transformations (such as logging) or robust regression techniques.
+</details>
+
+12. The model’s $R^2$ is 0.89. What might a high $R^2$ indicate? Is a higher $R^2$ always better?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+A high $R^2$ may hide overfitting or omitted variables. It is important to also check residuals for the full picture.
+</details>
+
+13. The coefficient for `Financially_Dependent` is −$488.10. Propose a few real-world mechanisms that could explain this relationship.
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+(1) Dependent students earn less; (2) Dependents may have stricter budgets
+</details>
+
+14. If you suspected that the effect of `Monthly_Earnings` on `Net_Money` differs for students who `Cook_at_Home`, how would you modify the regression equation?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Add a term: `Monthly_Earnings * Cooks_at_Home`. This would allow slope differences.
+</details>
+
+15. The dataset lacks variables like "student debt" or "scholarships." How might this lead to *omitted variable bias*?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Missing debt/scholarships could *bias the coefficients* (for instance overstating job impact).
+</details>
 
 
+### Coding Question 
 
+### Problem 1 {.unnumbered}
 
-{{< include ../learning_objectives/lo-ch-03.qmd >}}
+In this problem, you will investigate a dataset of surveyed students taking a programming course with a final exam at the end.
+Each student in this dataset was asked for their current grade out of 100, how many previous programming courses they took, how many hours they spent studying for the final, and how much they scored on the final exam out of 30, all stored as variables `current_grade`, `prior_courses`, `hours_studied` and `exam_score` respectively. Below is a full breakdown of the variables:
 
-::: {.Warning}
-::::{.Warning-header}
-Fun fact!
-::::
-::::{.Warning-container}
-**Zestylicious!** That mouth-puckering, lemon-squirted, totally tangy kick!
-::::
+| **Variable Name** | **Description** |
+|-------------------|-----------------|
+| **current_grade** | The current average of the student in the course. Float from 0 to 100 (e.g. 87.9, 50.18, etc.).|
+| **prior_courses** | The number of prior courses the student took. Integer (e.g. 0, 4, etc.).|
+| **hours_studied** | The number of hours that the student spent studying for the final exam. Float (e.g. 10.7, 3.4, etc.).|
+| **exam_score**    | The score that the student received on their final exam. Float from 0 to 30 (e.g. 27.5, 29.1, etc.).|
+
+For future iterations of the course, you are curious to know if it is possible to understand how well a student will do on the final given these three factors.
+
+To answer this, the questions below will guide you through an OLS analysis on this data. Specifically, by the end of these questions, you will be able to answer the following concrete questions:
+1. How does a 5% increase in a particular variable (one of `current_grade`, `prior_courses`, `hours_studied`) affect the `exam_score`?
+2. Inference: How does `hours_studied` infulence `exam_score`, holding other variables constant?
+3. Prediction: Given a particular set of predictor values, what is the expected `exam_score`?
+Dive in to see how you can answer these questions using OLS regression!
+
+### A. Data Wrangling and Exploratory Data Analysis {.unnumbered}
+1. Read in the data from `problem-1-data.csv`, checking for any missing entries. 
+2. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
+3. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## R Code
+```{r}
+# Load required libraries
+library(readr)
+library(ggplot2)
+library(tidyverse)
+
+# Read data
+df <- read_csv("./03-ols_files/simulations/problem-1-data.csv")
+
+# A.1 Check for missing entries
+cat("Missing values:\n")
+print(colSums(is.na(df)))
+
+# A.2 Plot histograms (using ggplot2)
+# Pivot the data longer so we can facet
+df_long <- df %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
+
+ggplot(df_long, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.5) +
+  facet_wrap(~ variable, scales = "free", nrow = 1) +
+  theme_minimal() +
+  ggtitle("Distribution of each variable")
+
+# A.3 Plot relationships with outcome
+predictors <- c("current_grade", "prior_courses", "hours_studied")
+
+for (pred in predictors) {
+  p <- ggplot(df, aes(x = .data[[pred]], y = exam_score)) +
+    geom_point(alpha = 0.6) +
+    ggtitle(paste("exam_score vs", pred)) +
+    theme_minimal()
+  print(p)
+}
+```
+
+## Python Code
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from scipy import stats
+
+# Read data
+# point this to the data location
+df = pd.read_csv("./03-ols_files/simulations/problem-1-data.csv") 
+
+# A.1 Check for missing entries
+print("Missing values:\n", df.isnull().sum())
+
+# A.2 Plot histograms
+fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
+for i, col in enumerate(df.columns):
+    axes[i].hist(df[col], bins=30, alpha=0.5)
+    axes[i].set_title(f'Distribution of {col}')
+plt.tight_layout()
+plt.show()
+
+# A.3 Plot relationships with outcome
+fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
+predictors = ['current_grade', 'prior_courses', 'hours_studied']
+for i, pred in enumerate(predictors):
+    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
+    axes[i].set_title(f'exam_score vs {pred}')
+plt.tight_layout()
+plt.show()
+```
+
 :::
+
+</details>
+
+### B. Data Modelling {.unnumbered}
+1. Fit a multiple linear regression model predicting `exam_score` using the other variables. Display a statistics summary table.
+2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they would not? We will revisit this. 
+3. Plot residuals against the fitted values. Is heteroscedasticity present?
+4. Create a Q-Q plot of the residuals. Are they normally distributed?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+# B.1 Fit initial model
+model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
+summary(model1)
+
+# B.2 Report R² and coefficients
+cat(sprintf("\nR-squared: %.3f\n", summary(model1)$r.squared))
+cat("Coefficients:\n")
+print(coef(model1))
+
+# B.3 Residuals vs Fitted
+ggplot(data = NULL, aes(x = fitted(model1), y = resid(model1))) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE, color = "blue") +
+  labs(x = "Fitted values", y = "Residuals", title = "Residuals vs Fitted") +
+  theme_minimal()
+
+# B.4 Q-Q plot
+ggplot(data = NULL, aes(sample = resid(model1))) +
+  stat_qq(alpha = 0.6) +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Residuals") +
+  theme_minimal()
+
+```
+
+## Python Code
+
+```{python}
+# B.1 Fit initial model
+model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
+print(model1.summary())
+
+# B.2 Report R² and coefficients
+print(f"\nR-squared: {model1.rsquared:.3f}")
+print("Coefficients:\n", model1.params)
+
+# B.3 Residuals vs fitted
+sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.title('Residuals vs Fitted')
+plt.show()
+
+# B.4 Q-Q plot
+sm.qqplot(model1.resid, line='45')
+plt.title('Q-Q Plot of Residuals')
+plt.show()
+```
+</details>
+:::
+
+### C. Goodness of Fit {.unnumbered}
+1. Perform the Durbin-Watson test to check for autocorrelation in the residuals. What does the test statistic tell you about the independence of errors assumption?
+2. Test for Homoscedasticity: You already plotted residuals against fitted values. Perform the Breusch-Pagan test to formally assess homoscedasticity. What does the p-value of the test indicate about the model?
+3. Identify Outliers: Create a plot of the residuals against the observation index. Does this plot reveal any obvious outliers or problematic patterns?
+4. Check for Influential Points: Calculate and plot the Cook's Distance for each observation. Are there any data points that have a disproportionately large influence on the model's coefficients?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+# C.1 Durbin-Watson Test (Independence)
+
+dw <- dwtest(model1)
+print(dw$statistic)
+
+# C.2 Breusch-Pagan Test (Homoscedasticity)
+
+bp <- bptest(model1)
+print(bp$statistic)
+print(bp$p.value)
+
+# C.3 Residuals vs Observation Index
+
+# Create data frame for index plotting
+
+df_diag <- data.frame(
+resid = residuals(model1),
+index = 1:length(residuals(model1)),
+cooks = cooks.distance(model1)
+)
+
+ggplot(df_diag, aes(x = index, y = resid)) +
+geom_point(alpha = 0.7) +
+geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+labs(title = "Residual Plot vs. Observation Index",
+x = "Observation Index", y = "Residuals") +
+theme_minimal()
+
+# C.4 Cook's Distance
+
+ggplot(df_diag, aes(x = index, y = cooks)) +
+geom_segment(aes(xend = index, yend = 0)) + 
+geom_point() +
+geom_hline(yintercept = 0.5, color = "red", linetype = "dashed") +
+labs(title = "Cook's Distance", x = "Observation Index", y = "Cook's Distance") +
+theme_minimal()
+
+```
+
+## Python Code
+
+```{python}
+import statsmodels.stats.api as sms
+# C.1 Perform the Durbin-Watson test...
+dw_stat = durbin_watson(model1.resid)
+print(f"Durbin-Watson statistic: {dw_stat:.4f}")
+
+# C.2 Perform the Breusch-Pagan test...
+
+from statsmodels.stats.diagnostic import het_breuschpagan
+
+# Perform Breusch-Pagan test
+bp_test = het_breuschpagan(model1.resid, model1.model.exog)
+
+# Unpack results
+bp_stat, bp_pvalue, empty, empty = bp_test
+
+print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
+print(f"P-value: {bp_pvalue:.4f}")
+
+
+# bp_test = sms.het_breuschpagan(residuals, model.model.exog)
+# labels = ['LM Statistic', 'LM-Test p-value', 'F-Statistic', 'F-Test p-value']
+# bp_results = dict(zip(labels, bp_test))
+# print(f"Breusch-Pagan test p-value: {bp_results['LM-Test p-value']:.4f}")
+# 
+# C.3 Plot the residuals against the observation index...
+plt.figure(figsize=(6, 4))
+plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Residual Plot vs. Observation Index")
+plt.xlabel("Observation Index")
+plt.ylabel("Residuals")
+plt.tight_layout()
+plt.show()
+
+# C.4 Calculate and plot Cook's Distance...
+influence = model.get_influence()
+cooks_d = influence.cooks_distance[0]
+
+plt.figure(figsize=(6, 4))
+# use_line_collection=True is for compatibility
+plt.stem(np.arange(len(cooks_d)), cooks_d, markerfmt=",")
+plt.axhline(y=0.5, color='red', linestyle='--', label='Threshold (0.5)')
+plt.title("Cook's Distance")
+plt.xlabel("Observation Index")
+plt.ylabel("Cook's Distance")
+plt.legend()
+plt.tight_layout()
+plt.show()
+```
+</details>
+:::
+
+
+
+### D. Data Modelling - Improvements {.unnumbered}
+1. Should `prior_courses` be converted to another variable type? If so, why and which one? If you answered yes, try converting it and re-fit. Do you notice any improvements?
+2. Create `log_hours_studied`, the log of `hours_studied`. Re-fit the OLS using this predictor instead. Does $R^2$ improve? 
+> Hint: the true data generation process used `log(hours_studied)`!
+3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
+df <- df %>% mutate(prior_courses_category = factor(prior_courses))
+
+model2 <- lm(exam_score ~ current_grade + prior_courses_category + hours_studied, data = df)
+cat("Model 2:\n")
+summary(model2)
+cat("##########################################################\n")
+
+# D.2 Log transform hours_studied and fit model
+df <- df %>% mutate(log_hours = log(hours_studied))
+
+model3 <- lm(exam_score ~ current_grade + prior_courses + log_hours, data = df)
+cat("Model 3:\n")
+summary(model3)
+cat("##########################################################\n")
+
+# D.3 Add interaction term
+model4 <- lm(exam_score ~ current_grade * prior_courses + hours_studied, data = df)
+cat("Model 4:\n")
+summary(model4)
+
+```
+
+## Python Code
+
+```{python}
+# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
+df["prior_courses_category"] = df['prior_courses'].astype('category')
+model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
+             data=df.dropna()).fit()
+print(model2.summary())
+print("##########################################################")
+
+
+# D.2 Log transform hours_studied
+df['log_hours'] = np.log(df['hours_studied'])
+model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
+             data=df.dropna()).fit()
+print(model3.summary())
+print("##########################################################")
+
+
+# D.3 Add interaction term
+model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
+             data=df.dropna()).fit()
+print(model4.summary())
+```
+</details>
+:::
+
+### E. Final Evaluation {.unnumbered}
+1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
+2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
+3. Why might having taken more `prior_courses` show diminishing returns in `exam_score`?
+4. Inference: Based on your final model, describe the relationship between `hours_studied` and `exam_score`. Namely, if a student increases their study time by 10%, how does their expected exam score change?
+5. Prediction: Suppose a student has a current grade of 82, has taken 2 prior programming courses, and studied for 12.5 hours. Based on your final model, what is the predicted exam score of this student?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+# E.1 Compare models
+# Create a comparison table of R² and RMSE
+models <- list(
+  Initial = model1,
+  Categorical = model2,
+  Log_Transform = model3,
+  Interaction = model4
+)
+
+results <- tibble(
+  Model = names(models),
+  R_squared = sapply(models, function(m) summary(m)$r.squared),
+  RMSE = sapply(models, function(m) sqrt(mean(resid(m)^2)))
+)
+
+# Show models sorted by R-squared
+results %>% arrange(desc(R_squared)) %>% print()
+
+
+# E.2 Interpretation of final model (model3)
+# Interpretation: effect of a 5% increase in current_grade
+coef <- coef(model3)["current_grade"]
+effect <- 0.05 * coef
+
+cat(sprintf("\nA 5%% increase in current_grade increases exam_score by %.5f points\n", effect))
+
+# E.3 Diminishing returns explanation
+cat("\nDiminishing returns explanation:\n")
+cat("Example: students might feel overconfident having taken more courses.\n")
+
+
+# E.4 Inference: Effect of hours_studied
+
+# Since Model 3 uses log(hours_studied), this is a Level-Log interpretation.
+
+# A 10% increase in X is associated with a (beta / 100) change in Y.
+# Delta Y = beta * ln(1 + 0.10)
+
+coef_log_hours <- coef(model3)["log_hours"]
+effect_hours <- coef_log_hours * log(1.10)
+
+cat("\nA 10% increase in study time is associated with an exam_score increase of:\n")
+print(effect_hours)
+
+# E.5 Prediction
+
+# Define the new student profile
+
+new_student <- data.frame(
+current_grade = 82,
+prior_courses = 2,
+hours_studied = 12.5
+)
+
+# Note: model3 was trained on a dataframe with a 'log_hours' column.
+# We must create that column in the new data to predict successfully.
+new_student <- new_student %>%
+mutate(log_hours = log(hours_studied))
+
+predicted_score <- predict(model3, newdata = new_student)
+
+cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
+
+
+```
+
+## Python Code
+```{python}
+# E.1 Compare models
+models = {
+    'Initial': model1,
+    'Categorical': model2,
+    'Log Transform': model3,
+    'Interaction': model4
+}
+
+results = pd.DataFrame({
+    'Model': models.keys(),
+    'R-squared': [m.rsquared for m in models.values()],
+    'RMSE': [np.sqrt(m.mse_resid) for m in models.values()]
+})
+print(results.sort_values('R-squared', ascending=False))
+
+# E.2 Interpretation of final model (model3)
+final_model = model3
+coef = final_model.params['current_grade']
+print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
+
+# E.3 Diminishing returns explanation
+print("\nDiminishing returns explanation:")
+print("Example: students might feel overconfident having taken more courses.")
+
+
+# E.4 Inference: Effect of hours_studied (10% increase)
+# Interpretation of Level-Log model: Delta Y = beta * ln(1.10)
+coef_log_hours = final_model.params['log_hours']
+effect_hours = coef_log_hours * np.log(1.10)
+
+print("\nA 10% increase in study time is associated with an exam_score increase of:")
+print(effect_hours)
+
+# E.5 Prediction
+# Create a DataFrame for the new student
+new_student = pd.DataFrame({
+    'current_grade': [82],
+    'prior_courses': [2],
+    'hours_studied': [12.5]
+})
+
+# We must add the log_hours feature as used in model3 training
+new_student['log_hours'] = np.log(new_student['hours_studied'])
+
+# Predict
+prediction = final_model.predict(new_student)
+print("\nPredicted exam score for the student:")
+print(prediction[0])
+```
+
+</details>
+
+ 
+
 
 ::: {#fig-ols-regression}
 ```{mermaid}
