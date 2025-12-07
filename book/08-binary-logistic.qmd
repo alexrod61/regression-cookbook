@@ -142,19 +142,35 @@ library(lmtest)        # Tests for linear/nonlinear models (e.g., likelihood rat
 library(reticulate)    # R ↔ Python interoperability 
 
 # Use your existing conda environment
-use_condaenv("regression-cookbook-py", required = TRUE)
+use_condaenv("regression-cookbook-py", required = FALSE)
 
 # ---- Set random seeds (reproducibility) ----
 set.seed(1234)         # Fix R's random number generator
-reticulate::py_run_string("import numpy as np; np.random.seed(1234)")  # Fix Python's RNG
+# reticulate::py_run_string("import numpy as np; np.random.seed(1234)")  # Fix Python's RNG
 
 
-# ---- Load dataset ----
+# ---- Load dataset (temporary override) ----
+
+use_local_BLR <- TRUE  # set to FALSE once package is updated
+
+if (use_local_BLR) {
+  # Read your new CSV (adjust path if you put it in data/)
+  BLR <- readr::read_csv("BLR_new.csv", show_col_types = FALSE)
+} else {
+  # Original behaviour: use dataset from cookbook package
+  data("Logistic_Regression")
+  BLR <- Logistic_Regression
+}
+
+data <- BLR  # keep this for compatibility with later examples
+
+
+# ---- Load dataset ---- OLD CODE ----
 # Load the built-in example dataset "Logistic_Regression" from the cookbook package.
 # This dataset will be used consistently across all examples in this chapter.
-data("Logistic_Regression")
-BLR <- Logistic_Regression   # Assign dataset to BLR (shorter, convenient name)
-data <- BLR                  # Duplicate assignment for compatibility with examples
+#data("Logistic_Regression")
+#BLR <- Logistic_Regression   # Assign dataset to BLR (shorter, convenient name)
+#data <- BLR                  # Duplicate assignment for compatibility with examples
 
 # ---- Setup Python dependencies ----
 # Ensure Python has the required libraries for logistic regression analysis.
@@ -223,32 +239,38 @@ blr_data <- BLR %>%
 Below is a sample of this dataset:
 
 | **credit_score** | **income** | **education_years** | **married** | **owns_home** | **age** | **defaulted** | **successes** | **trials** |
-|-------:|-------:|-------:|-------:|-------:|-------:|-------:|-------:|-------:|
-| 787 | 118911 | 17 | 0 | 0 | 47 | 0 | 9 | 10 |
-| 441 | 53122 | 13 | 0 | 1 | 50 | 1 | 2 | 10 |
-| 407 | 39174 | 10 | 1 | 0 | 50 | 1 | 5 | 10 |
-| 812 | 148982 | 12 | 1 | 1 | 32 | 0 | 8 | 10 |
-| 825 | 154293 | 16 | 1 | 0 | 41 | 0 | 7 | 10 |
-| 729 | 111562 | 15 | 1 | 0 | 64 | 0 | 7 | 10 |
-| 700 | 70000 | 15 | 0 | 1 | 46 | 0 | 8 | 10 |
-| 451 | 40311 | 12 | 0 | 1 | 59 | 1 | 4 | 10 |
-| 404 | 45944 | 13 | 0 | 0 | 53 | 1 | 4 | 10 |
-| 374 | 43167 | 11 | 0 | 0 | 34 | 1 | 4 | 10 |
+|-----------------:|-----------:|--------------------:|------------:|--------------:|--------:|--------------:|--------------:|-----------:|
+| 850 | 154100 | 16 | 0 | 1 | 56 | 0 | 7 | 10 |
+| 606 | 34100  | 13 | 1 | 0 | 31 | 0 | 7 | 10 |
+| 846 | 73000  | 17 | 0 | 0 | 50 | 0 | 7 | 10 |
+| 702 | 41300  | 13 | 0 | 0 | 41 | 1 | 5 | 10 |
+| 843 | 50800  | 16 | 1 | 1 | 45 | 0 | 7 | 10 |
+| 610 | 33400  | 12 | 0 | 0 | 25 | 1 | 3 | 10 |
+| 572 | 24600  | 11 | 0 | 0 | 28 | 1 | 3 | 10 |
+| 795 | 57700  | 16 | 1 | 1 | 40 | 0 | 7 | 10 |
+| 796 | 37100  | 13 | 1 | 0 | 50 | 0 | 8 | 10 |
+| 690 | 72300  | 14 | 0 | 0 | 38 | 0 | 8 | 10 |
+
 
 Now, let’s narrow in on the key variables of interest for this section.
 
+<div style="width: 40%; margin-left: 0;">
+
 | **credit_score** | **defaulted** |
-|------------------|---------------|
-| 787              | 0             |
-| 441              | 1             |
-| 407              | 1             |
-| 812              | 0             |
-| 825              | 0             |
-| 729              | 0             |
-| 700              | 0             |
-| 451              | 1             |
-| 404              | 1             |
-| 374              | 1             |
+|-----------------:|--------------:|
+| 850 | 0 |
+| 606 | 0 |
+| 846 | 0 |
+| 702 | 1 |
+| 843 | 0 |
+| 610 | 1 |
+| 572 | 1 |
+| 795 | 0 |
+| 796 | 0 |
+| 690 | 0 |
+
+</div>
+
 
 This dataset allows us to examine whether a student defaulted on a loan (`defaulted = 1`) based on their `credit_score`. It’s a classic binary outcome: a "yes" or "no" event.
 
@@ -271,7 +293,7 @@ $$
 
 To see this issue in action, let’s try fitting an OLS regression model using our binary outcome and a continuous predictor. While OLS is designed to minimize squared error, it doesn't account for the discrete nature of the response — which means it can return predicted probabilities below 0 or above 1. In the example below, we use a customer's credit score to predict the probability of default, and you’ll see how the linear model fails to respect the fundamental constraints of probability.
 
-![OLS fails to constrain predictions between 0 and 1, despite binary outcomes.](img/ols-failure-credit-score2.png){#fig-ols-failure-binary width="90%"}
+![OLS fails to constrain predictions between 0 and 1, despite binary outcomes.](img/ols-failure-credit-score3.svg){#fig-ols-failure-binary width="90%"}
 
 These limitations make OLS unsuitable for binary classification tasks.\
 To properly model binary outcomes, we need a method that:
@@ -382,16 +404,37 @@ ols_model <- lm(defaulted_num ~ credit_score, data = blr_data)
 # Add predictions
 blr_data$predicted_ols <- predict(ols_model, newdata = blr_data)
 
+# Find region where OLS predictions are < 0
+neg_region <- blr_data %>% filter(predicted_ols < 0)
+
+if (nrow(neg_region) > 0) {
+  x_min_neg <- min(neg_region$credit_score, na.rm = TRUE)
+  x_max_neg <- max(neg_region$credit_score, na.rm = TRUE)
+  x_mid_neg <- (x_min_neg + x_max_neg) / 2
+} else {
+  # fallback (shouldn't happen with current data)
+  x_min_neg <- min(blr_data$credit_score)
+  x_max_neg <- x_min_neg + 50
+  x_mid_neg <- (x_min_neg + x_max_neg) / 2
+}
+
 # Create the plot showing OLS problems
 ggplot(blr_data, aes(x = credit_score, y = defaulted_num)) +
-  geom_jitter(height = 0.03, width = 0, alpha = 0.3, color = "black", size = 1.5) +
+  geom_jitter(height = 0.03, width = 0, alpha = 0.3,
+              color = "black", size = 1.5) +
   geom_line(aes(y = predicted_ols), color = "#E74C3C", linewidth = 1.3) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.8) +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "gray50", linewidth = 0.8) +
-  annotate("rect", xmin = 300, xmax = 450, ymin = -Inf, ymax = 0, 
+  geom_hline(yintercept = 0, linetype = "dashed",
+             color = "gray50", linewidth = 0.8) +
+  geom_hline(yintercept = 1, linetype = "dashed",
+             color = "gray50", linewidth = 0.8) +
+  # highlight region where predicted probability < 0
+  annotate("rect",
+           xmin = x_min_neg, xmax = x_max_neg,
+           ymin = -Inf, ymax = 0,
            fill = "#E74C3C", alpha = 0.1) +
-  annotate("text", x = 375, y = -0.15, 
-           label = "Impossible:\nProbability < 0", 
+  annotate("text",
+           x = x_mid_neg, y = -0.15,
+           label = "Impossible:\nProbability < 0",
            size = 3.5, color = "#E74C3C", fontface = "bold") +
   coord_cartesian(ylim = c(-0.3, 1.2)) +
   labs(
@@ -415,7 +458,6 @@ ggplot(blr_data, aes(x = credit_score, y = defaulted_num)) +
 #| message: false
 #| warning: false
 
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
@@ -430,34 +472,47 @@ X = sm.add_constant(df['credit_score'])
 ols_model = sm.OLS(df['defaulted_num'], X).fit()
 df['predicted_ols'] = ols_model.predict(X)
 
+# Region where predictions are < 0
+neg_mask = df['predicted_ols'] < 0
+if neg_mask.any():
+    x_min_neg = df.loc[neg_mask, 'credit_score'].min()
+    x_max_neg = df.loc[neg_mask, 'credit_score'].max()
+    x_mid_neg = 0.5 * (x_min_neg + x_max_neg)
+else:
+    # fallback (shouldn't happen with current data)
+    x_min_neg = df['credit_score'].min()
+    x_max_neg = x_min_neg + 50
+    x_mid_neg = 0.5 * (x_min_neg + x_max_neg)
+
 # Create the plot
 fig, ax = plt.subplots(figsize=(8, 5))
 
 # Actual binary outcomes (jittered)
 np.random.seed(42)
 jitter = np.random.normal(0, 0.03, size=len(df))
-ax.scatter(df['credit_score'], df['defaulted_num'] + jitter, 
+ax.scatter(df['credit_score'], df['defaulted_num'] + jitter,
            alpha=0.3, color='black', s=20, label='Actual Defaults')
 
 # OLS fitted line
-ax.plot(df['credit_score'], df['predicted_ols'], 
+ax.plot(df['credit_score'], df['predicted_ols'],
         color='#E74C3C', linewidth=2, label='OLS Fit')
 
 # Reference lines
 ax.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.7)
 ax.axhline(y=1, color='gray', linestyle='--', linewidth=1, alpha=0.7)
 
-# Highlight impossible region
-ax.add_patch(Rectangle((300, -0.3), 150, 0.3, 
+# Highlight impossible region (P < 0)
+ax.add_patch(Rectangle((x_min_neg, -0.3),
+                       x_max_neg - x_min_neg, 0.3,
                        facecolor='#E74C3C', alpha=0.1, edgecolor='none'))
-ax.text(375, -0.15, 'Impossible:\nProbability < 0', 
-        ha='center', va='center', fontsize=10, 
+ax.text(x_mid_neg, -0.15, 'Impossible:\nProbability < 0',
+        ha='center', va='center', fontsize=10,
         color='#E74C3C', fontweight='bold')
 
 ax.set_ylim(-0.3, 1.2)
 ax.set_xlabel('Credit Score', fontsize=11)
 ax.set_ylabel('Predicted Probability of Default', fontsize=11)
-ax.set_title('Why OLS Fails for Binary Outcomes', 
+ax.set_title('Why OLS Fails for Binary Outcomes',
              fontsize=14, fontweight='bold', pad=15)
 ax.legend(loc='upper right')
 ax.grid(True, alpha=0.3)
@@ -541,7 +596,7 @@ In **OLS (Linear Regression)**, the slope is constant ($\beta_1$). In **Logistic
 
 The following plot illustrates this behavior. Notice how the linear model (red dashed line) marches blindly past 0 and 1, while the logistic model (blue solid line) respects the boundaries and shows the characteristic "S" shape.
 
-![The Sigmoid 'S-Curve' vs. Linear Fit. The logistic model (blue solid line) respects the \[0,1\] probability bounds and captures the non-linear "diminishing returns" at the extremes, whereas the linear model (red dashed line) extends indefinitely.](img/logistic-sigmoid.png){#fig-logistic-sigmoid width="90%"}
+![The Sigmoid 'S-Curve' vs. Linear Fit. The logistic model (blue solid line) respects the \[0,1\] probability bounds and captures the non-linear "diminishing returns" at the extremes, whereas the linear model (red dashed line) extends indefinitely.](img/logistic-sigmoid.svg){#fig-logistic-sigmoid width="90%"}
 
 ::: panel-tabset
 ## R Code
@@ -549,33 +604,52 @@ The following plot illustrates this behavior. Notice how the linear model (red d
 ``` r
 # Logistic vs Linear fit demo
 set.seed(1)
-x <- seq(-4, 4, length.out = 200)
-eta <- -1 + 1.2 * x                  # linear predictor (log-odds)
-pi  <- 1 / (1 + exp(-eta))           # sigmoid (probability)
+# Grid of linear predictor values (η)
+eta <- seq(-4, 4, length.out = 400)
 
-# A naive linear "probability" for comparison
-# Rescaled to make the visual comparison clear
-p_lin <- scales::rescale(eta, to = c(-0.4, 1.4))
+# Logistic sigmoid: π(η)
+pi  <- 1 / (1 + exp(-eta))
 
-df <- data.frame(x = x, sigmoid = pi, linear = p_lin)
+# Naive linear "probability" for comparison
+# passes through (0, 0.5) with moderate slope
+p_lin <- 0.5 + 0.25 * eta
 
-ggplot(df, aes(x = x)) +
-  # The Sigmoid Curve
-  geom_line(aes(y = sigmoid), linewidth = 1.2, color = "#2C3E50") +
-  # The Naive Linear Line
-  geom_line(aes(y = linear), linetype = "dashed", color = "#E74C3C") +
-  # Visual guide for the "Steep Middle"
-  geom_segment(aes(x = 0.8, y = 0.2, xend = 0.8, yend = 0.8), 
-               arrow = arrow(length = unit(0.2, "cm")), color = "gray50", size = 0.1) +
-  annotate("text", x = 1.5, y = 0.5, label = "Steepest change\nat p ~ 0.5", 
+df <- data.frame(
+  eta    = eta,
+  sigmoid = pi,
+  linear  = p_lin
+)
+
+library(ggplot2)
+
+ggplot(df, aes(x = eta)) +
+  # Logistic S-curve
+  geom_line(aes(y = sigmoid), linewidth = 1.4, color = "steelblue") +
+  # Naive linear line
+  geom_line(aes(y = linear), linewidth = 1.1, linetype = "dashed",
+            color = "#E74C3C") +
+  # Vertical marker for steepest change near π ≈ 0.5
+  geom_segment(aes(x = 0, xend = 0,
+                   y = plogis(-0.7), yend = plogis(0.7)),
+               colour = "gray40", linewidth = 0.7) +
+  annotate("text", x = 0.7, y = 0.55,
+           label = "Steepest change\nat π ≈ 0.5",
            size = 3.5, hjust = 0, color = "gray30") +
-  coord_cartesian(ylim = c(-0.1, 1.1)) +
-  labs(x = "Linear predictor (η = β0 + β1 X)",
-       y = "Probability (π)",
-       title = "The Sigmoid 'S-Curve' vs. Linear Fit",
-       subtitle = "Logistic regression captures diminishing returns at the extremes",
-       caption = "Blue: Logistic Sigmoid (Valid Probabilities). Red: Naive Linear (Violates Bounds).") +
-  theme_minimal(base_size = 12)
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.25)) +
+  labs(
+    x = "Linear predictor (η = β0 + β1 X)",
+    y = "Probability (π)",
+    title = "The Sigmoid 'S-Curve' vs. Linear Fit",
+    subtitle = "Logistic regression captures diminishing returns at the extremes",
+    caption = "Blue: Logistic Sigmoid (Valid Probabilities). Red: Naive Linear (Violates Bounds)."
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11, colour = "gray40")
+  )
+
 ```
 
 ## Python Code
@@ -583,36 +657,42 @@ ggplot(df, aes(x = x)) +
 ``` python
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.special import expit  # logistic / sigmoid
 
 np.random.seed(1)
-x = np.linspace(-4, 4, 200)
-eta = -1 + 1.2 * x
-pi = 1 / (1 + np.exp(-eta))  # logistic sigmoid
 
-# Linear "probability" rescaled for comparison
-p_lin = (eta - eta.min()) / (eta.max() - eta.min()) * (1.8) - 0.4
+# Grid of linear predictor values (η)
+eta = np.linspace(-4, 4, 400)
+
+# Logistic sigmoid π(η)
+pi = expit(eta)
+
+# Naive linear "probability" (same as R: 0.5 + 0.25η)
+p_lin = 0.5 + 0.25 * eta
 
 plt.figure(figsize=(8, 5))
 
-# Plot Sigmoid
-plt.plot(x, pi, label="Logistic Sigmoid (Valid $\pi$)", linewidth=2.5, color="#2C3E50")
+# Logistic S-curve
+plt.plot(eta, pi, label="Logistic Sigmoid (Valid $\pi$)",
+         linewidth=2.0, color="steelblue")
 
-# Plot Naive Linear
-plt.plot(x, p_lin, "--", label="Naive Linear (Violates Bounds)", color="#E74C3C")
+# Naive linear line
+plt.plot(eta, p_lin, "--", label="Naive Linear (Violates Bounds)",
+         linewidth=1.5, color="#E74C3C")
 
-# Annotate the "Steep Middle"
-plt.annotate('Steepest change\nat $\pi \\approx 0.5$', xy=(0.83, 0.5), xytext=(2, 0.45),
-             arrowprops=dict(facecolor='black', arrowstyle='->', alpha=0.5),
-             fontsize=10, color="#555555")
+# Vertical marker around steepest change near π ≈ 0.5
+y_lo, y_hi = expit(-0.7), expit(0.7)
+plt.plot([0, 0], [y_lo, y_hi], color="gray40", linewidth=1.0)
+plt.text(0.7, 0.55, "Steepest change\nat $\pi \\approx 0.5$",
+         fontsize=10, color="gray30", ha="left", va="center")
 
-plt.ylim(-0.1, 1.1)
-plt.axhline(0, color='grey', lw=0.5, ls=':')
-plt.axhline(1, color='grey', lw=0.5, ls=':')
-plt.xlabel("Linear predictor ($\eta = \\beta_0 + \\beta_1 X$)")
-plt.ylabel("Probability ($\pi$)")
+plt.ylim(0, 1)
+plt.yticks(np.arange(0, 1.01, 0.25))
+plt.xlabel(r"Linear predictor ($\eta = \beta_0 + \beta_1 X$)")
+plt.ylabel(r"Probability ($\pi$)")
 plt.title("The Sigmoid 'S-Curve' vs. Linear Fit")
-plt.legend(loc='upper left')
 plt.grid(True, alpha=0.3)
+plt.legend(loc="lower right")
 plt.tight_layout()
 plt.show()
 ```
@@ -1333,21 +1413,15 @@ After estimating a logistic regression model, we often want to know whether pred
 
 ### Wald Tests
 
-The **Wald test** checks whether an individual coefficient is significantly different from zero. For example, we can test whether `credit_score` has a nonzero effect on the odds of default. The test statistic is the ratio of the estimated coefficient to its standard error.
+The **Wald test** checks whether an individual coefficient is significantly different from zero. For example, we can test whether `credit_score` has a nonzero effect on the odds of default. The test statistic is the ratio of the estimated coefficient to its standard error. In our loan-default example, the model summary below reports Wald tests for both `credit_score` and `income`.
 
 ### Likelihood Ratio Tests
 
-We can also compare **nested models** (e.g., model with `credit_score` only vs. model with `credit_score + income`) using the **likelihood ratio (LR) test**. This evaluates whether adding predictors significantly improves model fit.
+We can also compare **nested models** (e.g., model with `credit_score` only vs. model with `credit_score + income`) using the **likelihood ratio (LR) test**. This evaluates whether adding predictors significantly improves model fit. The R and Python output below show an LR test comparing a model with only `credit_score` to a model with both `credit_score` and `income`.
 
 ### Confidence Intervals
 
 Finally, we often report **confidence intervals for odds ratios**. For example, if the odds ratio for credit score is 0.99 with a 95% CI \[0.98, 0.995\], we can say with confidence that higher credit scores reduce the odds of default.
-
-**TODOs for this section:**
-
--   Wald test output for credit score and income.
--   Likelihood ratio test comparing one- vs. two-predictor models.
--   Confidence intervals for odds ratios, reported in plain language.
 
 ------------------------------------------------------------------------
 
@@ -1533,29 +1607,46 @@ The statistical tests above help us answer a fundamental question: **Are our pre
 
 #### Wald Tests: Individual Predictor Significance
 
-The model summary shows that **credit score is highly significant** (p < 0.001), with a coefficient of approximately -0.0065. This tells us that for each 1-point increase in credit score, the log-odds of default decrease by 0.0065, holding income constant. The small p-value gives us strong evidence that this relationship is real, not due to random variation.
+The model summary shows that **both credit score and income are highly significant** (p < 0.001).
 
-In contrast, **income shows weaker evidence** of an independent effect (p ≈ 0.08-0.15, depending on sample). While the coefficient is negative (suggesting higher income reduces default risk), the effect is not statistically significant at the conventional 0.05 level when credit score is already in the model. This suggests that income may not add much predictive power beyond what credit score already captures.
+- The coefficient for **credit score** is approximately **−0.0149**.  
+  This means that for each 1-point increase in credit score, the log-odds of default decrease by about 0.015, holding income constant.  
+  On the odds scale this corresponds to an odds ratio of about **0.985** per point, i.e., **roughly a 1.5% reduction in the odds of default for each extra credit-score point**.
+
+- The coefficient for **income** is about **−2.9 × 10⁻⁵** per dollar.  
+  On a more interpretable scale, a **\$10,000 increase in income** changes the log-odds by about −0.29, giving an odds ratio of about **0.75**.  
+  In other words, **each additional \$10,000 of income reduces the odds of default by roughly 25%, holding credit score fixed.**
+
+The very small p-values for both predictors give strong evidence that these relationships are real, not artifacts of random variation.
+
 
 #### Likelihood Ratio Test: Is the Full Model Better?
 
-The likelihood ratio test compares our two-predictor model (credit score + income) against a simpler model with credit score alone. The test yields a chi-squared statistic of approximately 2.68 with 1 degree of freedom (p ≈ 0.10). 
+The likelihood ratio test compares our two-predictor model (credit score + income) against a simpler model with credit score alone. The test yields a chi-squared statistic of about **54.8** on 1 degree of freedom (p ≈ **1.3 × 10⁻¹³**).
 
-**Interpretation:** The p-value above 0.05 indicates that adding income does **not** significantly improve model fit beyond credit score alone. This aligns with our AIC/BIC results from the Goodness of Fit section, which also favored the simpler model.
+**Interpretation:** The tiny p-value indicates that adding income **does** significantly improve model fit beyond credit score alone. In other words, even after accounting for credit score, income still provides extra information about default risk.
 
 #### Confidence Intervals for Odds Ratios
 
-The 95% confidence interval for the credit score odds ratio is approximately [0.987, 0.996]. Because this interval excludes 1.0, we can be confident that credit score has a genuine protective effect against default.
+The 95% confidence interval for the **credit score** odds ratio is approximately **[0.983, 0.988]** per 1-point increase. Because this interval lies entirely below 1.0, we can be confident that higher credit scores have a genuine protective effect.
 
-**Plain language translation:** We are 95% confident that each 1-point increase in credit score reduces the odds of default by between 0.4% and 1.3%. Scaled to a more meaningful 50-point increase, this corresponds to roughly a 20-50% reduction in default odds.
+Scaling to a more meaningful change:
 
-The confidence interval for income, however, likely spans across 1.0 (e.g., [0.999, 1.001] per dollar), indicating we cannot confidently say whether income has a positive, negative, or null effect once credit score is accounted for.
+- A **50-point increase** in credit score multiplies the odds of default by about  
+  **0.47**, with a 95% CI roughly **[0.42, 0.53]**.  
+  So we are 95% confident that increasing a borrower’s credit score by 50 points **cuts their odds of default by about half.**
+
+For **income**, a \$10,000 increase corresponds to an odds ratio of about **0.75**, with a 95% CI roughly **[0.69, 0.82]**. Again, the interval lies entirely below 1.0, indicating a clear protective effect of higher income on default risk.
+
 
 #### Practical Implications
 
-These results suggest a **parsimonious model focused on credit score** may be preferable to a more complex model that includes income. From a lender's perspective, this is good news: credit score alone provides sufficient information to assess default risk, simplifying the approval process without sacrificing predictive accuracy.
+These results suggest that **both credit score and income play important roles** in predicting default, with credit score exerting the larger effect. From a lender’s perspective:
 
-However, we should interpret this finding cautiously. Income and credit score are likely correlated (higher income often leads to better credit scores), so income's apparent lack of significance may reflect multicollinearity rather than true irrelevance. In a different dataset or with different borrower characteristics, income might play a more important independent role.
+- Credit score provides a strong, easily interpretable signal: borrowers with higher scores are much less likely to default.
+- Income adds meaningful additional information: among borrowers with the same credit score, those with higher incomes still have substantially lower default risk.
+
+In practice, a lender might prefer to include both variables in their risk model to balance predictive performance with interpretability.
 
 
 ------------------------------------------------------------------------
@@ -1568,13 +1659,14 @@ Once we’ve established that predictors matter, the next step is to **interpret
 
 Logistic regression coefficients are expressed in **log-odds units**. To make them interpretable, we exponentiate them to obtain **odds ratios**.
 
--   Example: If the coefficient for credit score is -0.01, the odds ratio is about 0.99.
--   Interpretation: each 1-point increase in credit score reduces the odds of default by about 1%.
+- In our loan-default model, the estimated coefficient for **credit score** is about **−0.0149**, which corresponds to an odds ratio of roughly **0.985** per 1-point increase.  
+  That means **each extra point in credit score reduces the odds of default by about 1.5%.**
 
 Scaling makes interpretation clearer:
 
--   A **50-point increase** in credit score reduces the odds of default by roughly 40%.
--   For income, if the odds ratio is 1.00001, it means that each additional dollar increases odds only slightly — so we might instead interpret per **\$10,000 increase**.
+- A **50-point increase** in credit score multiplies the odds of default by about **0.47**, i.e., it **roughly cuts the odds of default in half.**
+- For **income**, the coefficient per dollar is very small, but over a **\$10,000 increase** it corresponds to an odds ratio of about **0.75**.  
+  So **each extra \$10,000 of income lowers the odds of default by about 25%.**
 
 ### Pitfalls in Interpretation
 
@@ -1587,19 +1679,17 @@ Clear communication requires translating odds ratios back into **probability cha
 
 ### Example from Loan Default Dataset
 
-Suppose our model finds:
+In our fitted model (see the odds-ratio table), we estimate that:
 
--   OR for credit score = 0.99 → each point decrease in odds of default by 1%.
--   OR for income = 0.95 per \$10,000 → higher income slightly reduces default risk.
+- A **50-point increase in credit score** multiplies the odds of default by about **0.47**  
+  (roughly a **53% reduction** in the odds of default).
+- A **\$10,000 increase in income** multiplies the odds of default by about **0.75**  
+  (about a **25% reduction** in the odds), holding credit score constant.
 
-We can then present this in plain English:
+We can present this in plain English:
 
-> “A borrower with a credit score of 700 has about a 10% chance of default, but with a score of 600, their probability rises to nearly 30%, holding income constant.”
-
-**TODOs for this section:**
-
--   Report odds ratios with 95% CI for credit score and income.
--   Translate coefficients into real-world terms (per 50-point change in credit score, per \$10k change in income).
+> “Compared to an otherwise similar borrower with a credit score 50 points lower, a higher-score borrower has **about half the odds of default**.  
+> Likewise, borrowers who earn \$10,000 more per year have **roughly 25% lower odds of default**, even after accounting for credit score.”
 
 ------------------------------------------------------------------------
 
@@ -1607,18 +1697,14 @@ We can then present this in plain English:
 ## R Code
 
 ``` r
-# Logistic regression
-logit_model <- glm(defaulted ~ credit_score + income,
-                   data = BLR, family = binomial)
+# Logistic regression 
+logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial) 
 
-# Odds ratios and CI
-odds_ratios <- exp(cbind(OR = coef(logit_model), confint(logit_model)))
-odds_ratios
+# Odds ratios and CI 
+odds_ratios <- exp(cbind(OR = coef(logit_model), confint(logit_model))) odds_ratios 
 
-# Example: probability at credit_score = 600 vs 700
-new_data <- data.frame(credit_score = c(600, 700),
-                       income = mean(BLR$income))
-predict(logit_model, newdata = new_data, type = "response")
+# Example: probability at credit_score = 600 vs 700 
+new_data <- data.frame(credit_score = c(600, 700), income = mean(BLR$income)) predict(logit_model, newdata = new_data, type = "response")
 ```
 
 ## Python Code
@@ -1811,7 +1897,14 @@ plt.show()
 
 :::
 
-**Interpretation:** The plot reveals the nonlinear relationship between credit score and default probability. A borrower with a score of 400 faces roughly a 70% chance of default, while someone with a 700 score has only about a 5% chance. Notice how the curve is steepest in the middle (around 500-600), where small improvements in credit score lead to large reductions in default risk. At the extremes (very low or very high scores), additional changes have diminishing marginal effects.
+**Interpretation:** The plot reveals the nonlinear relationship between credit score and default probability. 
+In our fitted model, a borrower with a credit score of **400** has an estimated default probability of about 
+**98%**, whereas a borrower with a score of **700** has a default probability of only about **25%**. 
+
+Notice how the curve is steepest in the middle of the credit-score range: in that region, relatively small improvements 
+in credit score translate into large reductions in default risk. At the extremes (very low or very high scores), additional 
+changes in credit score have diminishing marginal effects on the predicted probability.
+
 
 ------------------------------------------------------------------------
 
@@ -1836,52 +1929,59 @@ To judge prediction quality, we use metrics such as:
 
 For our loan dataset, we might find that the model predicts non-defaults very well (high specificity) but misses some defaults (lower sensitivity). This trade-off is a central theme in logistic regression applications.
 
-**TODOs for this section:**
-
--   Insert confusion matrix for the loan dataset at threshold 0.5.
--   Add ROC curve and report AUC.
--   Discuss trade-offs between sensitivity and specificity with an example.
+In the code below, we compute a confusion matrix at a 0.5 threshold and plot the ROC curve with its AUC for our loan default model.
 
 ------------------------------------------------------------------------
 
 ::: panel-tabset
 ## R Code
 
-``` r
+```r
 # Logistic regression model
 logit_model <- glm(defaulted ~ credit_score + income,
                    data = BLR, family = binomial)
 
-# Predictions
-BLR$pred_prob <- predict(logit_model, type = "response")
-BLR$pred_class <- ifelse(BLR$pred_prob > 0.5, 1, 0)
-
-# Confusion matrix
+library(dplyr)
 library(yardstick)
-# Create predictions dataframe
-pred_class <- ifelse(pred_prob > 0.5, 1, 0)
+library(ggplot2)
 
-results <- tibble(
-  truth = factor(BLR$defaulted, levels = c("0", "1")),
-  predicted = factor(pred_class, levels = c("0", "1"))
-)
+# Add predicted probabilities and classes to BLR
+BLR <- BLR %>%
+  mutate(
+    pred_prob  = predict(logit_model, type = "response"),
+    pred_class = if_else(pred_prob >= 0.5, 1, 0)
+  )
 
-# Confusion matrix
-cm <- conf_mat(results, truth = truth, estimate = predicted)
-print(cm)
+# Build results tibble for yardstick
+results <- BLR %>%
+  transmute(
+    truth     = factor(defaulted, levels = c(0, 1)),
+    predicted = factor(pred_class, levels = c(0, 1)),
+    pred_prob = pred_prob
+  )
 
-# Get summary
-summary(cm)
+# -----------------------------
+# 1. CONFUSION MATRIX & METRICS
+# -----------------------------
+cm <- conf_mat(results, truth, predicted)
+cm          # 2x2 confusion matrix
 
-# Or get specific metrics
-accuracy(results, truth = truth, estimate = predicted)
-sensitivity(results, truth = truth, estimate = predicted)
-specificity(results, truth = truth, estimate = predicted)
+# Accuracy, sensitivity, specificity, precision, F1
+metrics <- metric_set(accuracy, sens, spec, precision, f_meas)
+metrics(results, truth, predicted)
 
-# Or all at once
-metrics <- metric_set(accuracy, sensitivity, specificity, precision, f_meas)
-all_metrics <- metrics(results, truth = truth, estimate = predicted)
-print(all_metrics)
+# -----------------------------
+# 2. ROC CURVE & AUC
+# -----------------------------
+roc_df  <- roc_curve(results, truth, pred_prob)
+roc_auc <- roc_auc(results, truth, pred_prob)
+roc_auc  # prints the AUC value
+
+autoplot(roc_df) +
+  labs(
+    title = "ROC Curve for Loan Default Model",
+    subtitle = "Area under the curve (AUC) summarizes performance across thresholds"
+  )
 ```
 
 ## Python Code
@@ -1918,6 +2018,126 @@ plt.show()
 ```
 :::
 
+::: panel-tabset
+## R Output
+
+```{r}
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+library(dplyr)
+library(yardstick)
+
+# 1. Fit the logistic regression model
+
+logit_model <- glm(defaulted ~ credit_score + income,
+data = BLR, family = binomial)
+
+# 2. Add predicted probabilities and classes
+
+BLR_tmp <- BLR %>%
+mutate(
+pred_prob  = predict(logit_model, type = "response"),
+pred_class = if_else(pred_prob >= 0.5, 1, 0)
+)
+
+# 3. Build results tibble for yardstick
+
+results <- BLR_tmp %>%
+transmute(
+truth     = factor(defaulted, levels = c(0, 1)),
+predicted = factor(pred_class, levels = c(0, 1)),
+pred_prob = pred_prob
+)
+
+# -----------------------------
+
+# A. CONFUSION MATRIX
+
+# -----------------------------
+
+cm <- conf_mat(results, truth, predicted)
+cm   # prints 2x2 confusion matrix
+
+# -----------------------------
+
+# B. KEY METRICS (no `metrics()` call)
+
+# -----------------------------
+
+acc   <- accuracy(results, truth, predicted)
+sens_ <- sens(results, truth, predicted)
+spec_ <- spec(results, truth, predicted)
+prec_ <- precision(results, truth, predicted)
+f1    <- f_meas(results, truth, predicted)
+
+bind_rows(acc, sens_, spec_, prec_, f1)
+
+# -----------------------------
+
+# C. ROC AUC
+
+# -----------------------------
+
+roc_auc(results, truth, pred_prob)
+```
+
+## Python Output 
+```{python}
+#| eval: true
+#| echo: false
+#| message: false
+#| warning: false
+
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from sklearn.metrics import (
+confusion_matrix,
+classification_report,
+roc_curve,
+auc
+)
+
+# 1. Prepare data
+
+df = r.BLR.copy()
+df["defaulted"] = df["defaulted"].astype(int)
+
+X = sm.add_constant(df[["credit_score", "income"]])
+y = df["defaulted"]
+
+# 2. Fit logistic regression
+
+logit_model = sm.Logit(y, X).fit(disp=0)
+
+# 3. Predictions
+
+df["pred_prob"] = logit_model.predict(X)
+df["pred_class"] = (df["pred_prob"] >= 0.5).astype(int)
+
+# 4. ROC and AUC
+
+fpr, tpr, thresholds = roc_curve(y, df["pred_prob"])
+roc_auc = auc(fpr, tpr)
+
+# -----------------------------
+
+# OUTPUTS
+
+# -----------------------------
+
+print("Confusion matrix (threshold 0.5):")
+print(confusion_matrix(y, df["pred_class"]))
+
+print("\nClassification report:")
+print(classification_report(y, df["pred_class"]))
+
+print(f"\nAUC: {roc_auc:.3f}")
+```
+:::
+
 ------------------------------------------------------------------------
 
 ## Goodness of Fit & Model Selection
@@ -1941,14 +2161,17 @@ Another approach is to use **information criteria** such as:
 
 Both balance fit and complexity: lower AIC or BIC means a better trade-off. AIC tends to favor more complex models; BIC penalizes complexity more heavily.
 
-For the loan default dataset, we might find that adding `income` improves fit according to AIC but not BIC, suggesting we need to decide between **predictive accuracy** and **parsimony**.
+For the loan default dataset, the diagnostics tell a clear story. 
+The model with **credit score + income** (Model 2) fits substantially better than the 
+credit-score-only model (Model 1): the likelihood ratio test is highly significant, 
+and both AIC and BIC are lower for Model 2. 
 
-**TODOs for this section:**
+Adding **education_years** (Model 3) yields only a very small additional improvement in fit. 
+AIC changes little and BIC actually prefers the simpler two-predictor model, since it penalizes 
+extra parameters more heavily. In practice, we would typically choose Model 2 as a good balance 
+between **predictive performance** and **parsimony**.
 
--   Report pseudo R² for the loan model.
--   Compare single-predictor vs. two-predictor models with deviance test.
--   Report AIC and BIC values.
--   Provide plain-language interpretation (e.g., “Adding income slightly improves model fit”).
+
 
 ------------------------------------------------------------------------
 
@@ -2079,6 +2302,8 @@ import pandas as pd
 import statsmodels.api as sm
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats import chi2
+
 
 # Prepare data
 df = r.BLR.copy()
@@ -2553,6 +2778,18 @@ if len(influential_idx) > 0:
     print(f"Number of influential points: {len(influential_idx)}")
     print(f"Indices: {influential_idx}")
 ```
+
+### Interpreting the Diagnostics for the Loan Default Model
+
+For our loan default dataset, the diagnostics suggest that the logistic model with
+**credit score and income** is reasonably well specified:
+
+- The **deviance residual plots** show most points clustered between about −2 and +2, with no obvious pattern as a function of predicted probability or the linear predictor. This suggests that the model is not systematically over- or under-predicting in any particular region.
+- In the **binned residual plot**, most bins lie close to the horizontal line at 0 and within the uncertainty band. That indicates the model is **well calibrated**: where it predicts, say, a 20–30% default probability, the observed default rate is roughly in that range.
+- The **Cook’s distance / influence plots** highlight a small number of observations with slightly higher influence, but no single point dominates the fit. These cases are worth inspecting (e.g., unusually low credit score but high income), yet they do not invalidate the overall model.
+
+Overall, these diagnostics give us confidence that the logistic regression model is capturing
+the main structure in the data and that its predictions are **trustworthy for most borrowers**.
 
 
 :::
