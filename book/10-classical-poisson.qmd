@@ -1342,7 +1342,7 @@ $\frac{\hat{\lambda}_{\mathrm{D}} }{\hat{\lambda}_{\mathrm{L}}} = e^{\hat{\beta}
 
 ### Prediction using test data
 
-Let's now predict on the test set. Besides the residual deviance discussed in [Goodness of fit](#goodness), the model performance can also be measured by Kullback-Leibler (KL) divergence, which is defined as
+Let us now predict on the test set. Besides the residual deviance discussed in [Goodness of fit](#goodness), the model performance can also be measured by Kullback-Leibler (KL) divergence, which is defined as
 $$
 D_{\mathrm{KL}}(\hat{y_i} \Vert \hat{\lambda}_i) = y_i \log\left(\frac{\hat{y_i}}{\hat{\lambda}_i} \right) - y_i + \hat{\lambda}_i.
 $$
@@ -1417,3 +1417,838 @@ Poisson residual deviance equals 2 times the KL divergence of Poisson distributi
 ## Storytelling
 
 The data case explores the relationship between satellite size, i.e., the number of male horseshoe crabs around the female horseshoe breeding nests, and several phenotypic characteristis of the female horseshoe crabs. The graphical display suggests that there is a dependence between satellite sizes and female horseshoe crab widths. The Poisson regression modelling suggests that widths is significantely related to satellite size and the dark color is significantly different to the medium light color of the female horseshoe size, given constant confoudning variables at the 5\% significance level.
+
+
+
+
+## Practice Problems
+
+In this final section, you can test your understanding with the following conceptual interactive exercises, and then proceed to work through an inferential analysis of a simple dataset.
+
+::: {.quiz}
+
+### Conceptual Questions
+
+1. What makes Poisson regression appropriate for modelling the number of satellites per crab?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The response variable (number of satellites) is a non-negative integer, shows right skewness, and represents event counts for a fixed unit (one crab), all of which make Poisson regression appropriate.
+</details>
+
+2. What is the key assumption made about the distribution of the response by a classical Poisson regression model?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Equidispersion: The conditional distribution of the *response given the covariates* follows a Poisson distribution with mean equal to variance.
+</details>
+
+3. Why do we use the log function in Poisson regression?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The log function (technically the log link) ensures that the predicted mean of the response variable is always positive, which is necessary since counts cannot be negative.
+</details>
+
+4. In the univariate model, what does a positive coefficient on carapace width mean?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Larger female crabs are expected to attract more satellite males, *holding all other variables constant*.
+</details>
+
+5. What can the incidence rate ratio (IRR) tell us in the context of carapace width for this dataset?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The IRR indicates the multiplicative change in the expected number of satellites for each one-unit increase in carapace width, *holding other variables constant*.
+</details>
+
+6. In this chapter, why did we use binning (with grouped means) before fitting to a Poisson model?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Binning helps to visualize the relationship between carapace width and satellite size, by highlighting trends in the mean response of the data, to assess whether a log-linear trend is plausible.
+</details>
+
+7. What does residual deviance measure in a Poisson regression model?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+How far the fitted model is from the saturated model (perfect fit) -- lower values indicate a better fit.
+</details>
+
+8. How do we assess the goodness-of-fit of a Poisson regression model?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Use the residual deviance, and its associated p-value from a chi-squared test to assess goodness-of-fit: A high p-value indicates a good fit, while a low p-value indicates a lack-of-fit.
+</details>
+
+9. What does overdispersion mean? Why is it a problem for Poisson regression?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+Overdispersion occurs when the variance of the response variable exceeds its mean. This violates the equidispersion assumption, which can lead to underestimated standard errors and overstated significance of predictors.
+</details>
+
+10. How can we diagnoze overdispersion in the horseshoe crab dataset?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+We can compare the residual deviance to the degrees of freedom. If the ratio is significantly greater than 1, this indicates overdispersion.
+</details>
+
+11. Why are categorical predictors, such as color, included as indicator variables in Poisson regression?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+They allow the model to estimate separate effects for each category relative to a baseline category, which allows for the analysis of how different levels of the categorical variable influence the response.
+</details>
+
+12. Why do we interpret on the response scale (exponentiated coefficients) rather than the log scale in Poisson regression?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+This is simply more intuitive, as it tells us the multiplicative effect on the expected count of the response variable for a one-unit change in the predictor. 
+</details>
+
+13. How do we interpret the coefficient for a categorical variable in Poisson regression?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+The coefficient (exponentiated!) represents the change in the expected count of the response variable when moving from the baseline category to the category represented by the coefficient (holding other variables constant).
+</details>
+
+
+### Coding Question 
+
+### Problem 1 {.unnumbered}
+
+In this problem, you are given a set of 700 individuals with different demographic and socioeconomic characteristics, along with their reported number of annual doctor visits. Your task will be to perform a full poisson regression analysis following a similar structure to this chapter. The variables involved are:
+
+| **Variable Name** | **Description** |
+|-------------------|-----------------|
+| **doctor_visits** | The number of visits in the past year (0-20+)|
+| **age** | Age in years |
+| **income** | Annual income in USD |
+| **education_years** |  Total years of education |
+| **married** |  Married or not (0 or 1)|
+| **urban** | Urban residence or not (0 or 1)|
+| **insurance** | Health insurance or not (0 or 1)|
+
+By the end of these questions, you will be able to describe how age, insurance and socioeconomic factors affect the number of doctor visits individuals need. You will determine whether the Poisson model is appropriate, and which predictors matter most in answering this problem.
+
+### A. Data Wrangling and Exploratory Data Analysis {.unnumbered}
+
+Let us check if `doctor_visists` meets the assumptions for a classical Poisson model:
+
+1. Check if it is a non-negative integer.
+
+2. Examine its distribution, computing the mean and variance.
+
+3. Is equidispersion (Var $\approx$ Mean) plausible here?
+
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(tidyverse)
+library(MASS)
+library(broom)
+library(dplyr)
+library(zoo)
+library(DHARMa)
+
+select <- dplyr::select
+
+## setwd("/home/michael/coding/stats-textbook/regression-cookbook") 
+
+load("./data/poisson_regression.rda")
+df <- poisson_regression  
+
+# Convert to categorical 
+df <- df %>%
+  mutate(
+    married   = factor(married),
+    urban     = factor(urban),
+    insurance = factor(insurance)
+  )
+
+############################################################
+# A. Poisson Regression Assumptions
+############################################################
+
+summary(df$doctor_visits)
+mean_val <- mean(df$doctor_visits)
+var_val  <- var(df$doctor_visits)
+c(mean = mean_val, variance = var_val)
+table(df$doctor_visits)
+
+cat("Mean =", mean_val, "Variance =", var_val, "\n")
+```
+
+## Python Code
+```{python}
+############################################################
+# Imports
+############################################################
+
+import pyreadr
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from scipy.stats import chi2
+
+sns.set(style="whitegrid")
+
+############################################################
+# Load data (RDA)
+############################################################
+
+result = pyreadr.read_r("./data/poisson_regression.rda")
+df = result["poisson_regression"]
+
+# Convert categorical variables
+for col in ["married", "urban", "insurance"]:
+    df[col] = df[col].astype("category")
+
+############################################################
+# A. Poisson Regression Assumptions
+############################################################
+
+print(df["doctor_visits"].describe())
+
+mean_val = df["doctor_visits"].mean()
+var_val  = df["doctor_visits"].var()
+
+print({"mean": mean_val, "variance": var_val})
+print(df["doctor_visits"].value_counts().sort_index())
+```
+
+:::
+We see that the distribution is right-skewed, with many small counts and a few larger values; the sample mean and variance are of similar magnitude, suggesting that equidispersion is plausible here.
+</details>
+
+
+
+
+
+### B. A Graphical Look {.unnumbered}
+
+1. Create a scatterplot of `doctor_visits` vs `age`, adding an offset to the points with jitter for visibility.
+
+2. Comment on the (1) skewness, (2) heteroskedasticity and (3) whether the variability increases with the mean, relating this to your observation in question A3.
+
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# B. A Graphical Look
+############################################################
+
+# Jitter scatter with marginal histograms
+p_scatter <- ggplot(df, aes(x = age, y = doctor_visits)) +
+  geom_jitter(alpha = 0.3, width = 0.2, height = 0.2) +
+  labs(title = "Doctor Visits vs Age")
+
+p_hist_x <- ggplot(df, aes(x = age)) + geom_histogram(bins = 30)
+p_hist_y <- ggplot(df, aes(x = doctor_visits)) + geom_histogram(bins = 30)
+
+print(p_scatter)
+print(p_hist_x)
+print(p_hist_y)
+```
+
+## Python Code
+
+```{python}
+############################################################
+# B. A Graphical Look
+############################################################
+
+plt.figure(figsize=(6,4))
+plt.scatter(df["age"], df["doctor_visits"], alpha=0.3)
+plt.xlabel("Age")
+plt.ylabel("Doctor Visits")
+plt.title("Doctor Visits vs Age")
+plt.show()
+
+plt.figure(figsize=(6,4))
+plt.hist(df["age"], bins=30)
+plt.title("Age Distribution")
+plt.show()
+
+plt.figure(figsize=(6,4))
+plt.hist(df["doctor_visits"], bins=30)
+plt.title("Doctor Visits Distribution")
+plt.show()
+```
+</details>
+The distribution of `doctor_visits` is right-skewed, the spread increases with age, and the variability appears larger at higher mean values. This is consistent with the Poisson mean–variance relationship noted in A3.
+:::
+
+
+
+
+### C. Data Wrangling {.unnumbered}
+Now, prepare the data for modelling:
+
+1. Convert all appropriate variables to factors. Report the number of levels in each factor to verify this is working.
+
+2. Drop any missing observations.
+
+3. Produce a summary table of all variables.
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# C. Data Wrangling
+############################################################
+
+summary(df)
+lapply(df[c("married","urban","insurance")], table)
+```
+
+## Python Code
+
+```{python}
+############################################################
+# C. Data Wrangling
+############################################################
+
+print(df.describe(include="all"))
+
+for col in ["married", "urban", "insurance"]:
+    print(f"\n{col} counts:")
+    print(df[col].value_counts())
+```
+</details>
+:::
+The variables `married`, `urban`, and `insurance` are categorical with a small number of discrete levels, and can thus be treated as factors.
+
+
+
+
+### D. Exploratory Data Analysis {.unnumbered}
+
+Following the horsehsoe crab example closely:
+
+1. Bin `age` into 10 equally-sized groups, and compute the mean `age` and `doctor_visits` of each.
+
+2. Overlay the bin means on the scatterplot produced in question B1.
+
+3. Comment on the trend: How does doctor visitation vary with age? Does this trend (if any) appear linear? 
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# D. Exploratory Data Analysis
+############################################################
+
+df_binned <- df %>%
+  mutate(age_bin = ntile(age, 10)) %>%
+  group_by(age_bin) %>%
+  summarize(
+    mean_age = mean(age),
+    mean_visits = mean(doctor_visits),
+    .groups = "drop"
+  )
+
+ggplot(df, aes(x = age, y = doctor_visits)) +
+  geom_jitter(alpha = 0.25) +
+  geom_point(data = df_binned, aes(x = mean_age, y = mean_visits),
+             color = "red", size = 3) +
+  geom_line(data = df_binned, aes(x = mean_age, y = mean_visits),
+            color = "red") +
+  labs(title = "Binned Mean Doctor Visits vs Age")
+```
+
+## Python Code
+
+```{python}
+############################################################
+# D. Exploratory Data Analysis (Binning)
+############################################################
+
+df["age_bin"] = pd.qcut(df["age"], 10, labels=False)
+
+df_binned = (
+    df.groupby("age_bin")
+      .agg(mean_age=("age", "mean"),
+           mean_visits=("doctor_visits", "mean"))
+      .reset_index()
+)
+
+plt.figure(figsize=(6,4))
+plt.scatter(df["age"], df["doctor_visits"], alpha=0.25)
+plt.plot(df_binned["mean_age"], df_binned["mean_visits"],
+         color="red", marker="o")
+plt.title("Binned Mean Doctor Visits vs Age")
+plt.xlabel("Age")
+plt.ylabel("Doctor Visits")
+plt.show()
+```
+</details>
+:::
+The number of doctor visits tend to increase with age on average---the binned means show a smooth upward trend that is not strictly linear on the response scale.
+
+
+
+
+
+### E. Simple Data Modelling & Estimation {.unnumbered}
+
+We will model the expected number of visits of some individual $i$ as $\log(\lambda_i) = \beta_0 + \beta_1  X_{i,\text{age}}$.
+
+1. Fit the univariate Poisson regression above.
+
+2. Print a coefficient table.
+
+3. Compute and display $\text{IRR}(\text{exp}(\beta_1))$.
+
+4. Compute and display the 95% confidence interval for $\beta_1$. 
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# E. Simple Data Modelling & Estimation
+############################################################
+
+mod_uni <- glm(doctor_visits ~ age, family = poisson(), data = df)
+summary(mod_uni)
+
+tidy(mod_uni, conf.int = TRUE) %>%
+  mutate(IRR = exp(estimate),
+         IRR_low = exp(conf.low),
+         IRR_high = exp(conf.high))
+```
+
+## Python Code
+
+```{python}
+############################################################
+# E. Simple Poisson Regression
+############################################################
+
+mod_uni = smf.glm(
+    "doctor_visits ~ age",
+    data=df,
+    family=sm.families.Poisson()
+).fit()
+
+print(mod_uni.summary())
+
+# IRRs + confidence intervals
+uni_params = mod_uni.params
+uni_ci = mod_uni.conf_int()
+
+uni_results = pd.DataFrame({
+    "estimate": uni_params,
+    "conf_low": uni_ci[0],
+    "conf_high": uni_ci[1],
+    "IRR": np.exp(uni_params),
+    "IRR_low": np.exp(uni_ci[0]),
+    "IRR_high": np.exp(uni_ci[1])
+})
+
+print(uni_results)
+```
+</details>
+:::
+The IRR is the multiplicative change in the expected number of doctor visits associated with a one-year increase in age. The 95% confidence interval for $\beta_1$ does not include zero, indicating a *statistically significant* association between age and doctor visits.
+
+
+
+### F. Goodness of Fit {.unnumbered}
+
+Using your univariate model from question E:
+
+1. Report the residual deviance and the degrees of freedom.
+
+2. Compute a chi-square goodness-of-fit test.
+
+3. Compute the Pearson dispersion statistic.
+
+4. Is this an overdispersion or underdispersion, and how do you know?
+
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# F. Goodness of Fit
+############################################################
+
+res_dev  <- deviance(mod_uni)
+df_res   <- df.residual(mod_uni)
+gof_pval <- 1 - pchisq(res_dev, df_res)
+
+pearson_X2 <- sum(residuals(mod_uni, type = "pearson")^2)
+dispersion <- pearson_X2 / df_res
+
+cat("Residual deviance =", res_dev, "df =", df_res, "GOF p-value =", gof_pval, "\n")
+cat("Pearson X2 =", pearson_X2, "Dispersion =", dispersion, "\n")
+```
+
+## Python Code
+
+```{python}
+############################################################
+# F. Goodness of Fit
+############################################################
+
+res_dev = mod_uni.deviance
+df_res  = mod_uni.df_resid
+gof_pval = 1 - chi2.cdf(res_dev, df_res)
+
+pearson_X2 = np.sum(mod_uni.resid_pearson**2)
+dispersion = pearson_X2 / df_res
+
+print(f"Residual deviance = {res_dev:.3f}")
+print(f"df = {df_res}")
+print(f"GOF p-value = {gof_pval:.4f}")
+print(f"Pearson X2 = {pearson_X2:.3f}")
+print(f"Dispersion = {dispersion:.3f}")
+```
+</details>
+:::
+The dispersion statistic is greater than 1, indicating mild *overdispersion* relative to the Poisson assumption.
+
+
+
+
+
+### G. Inference {.unnumbered}
+
+1. Perform the Wald test for $\beta_1$.
+
+2. Determine the 95% confidence interval for the IRR computed in question E3.
+
+3. Explain how the estimated coefficient $\hat{\beta}_1$ affects the relationship between age and the expected number of doctor visits. In particular:
+   
+   (a) Describe how the expected number of doctor visits changes as age increases.
+   
+   (b) Is the relationship linear, exponential, or something else? Explain your reasoning.
+   
+   (c) Do equal increases in age lead to multiplicative or additive changes in the expected number of visits? Why?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# G. Inference
+############################################################
+
+coef_uni <- tidy(mod_uni, conf.int = TRUE)
+coef_uni
+
+cat("IRR for age =", exp(coef(mod_uni)["age"]), "\n")
+```
+The estimated coefficient $\hat{\beta}_1$ is included in the model through the log link function,
+$$
+\log(\lambda_i) = \beta_0 + \beta_1 \,\text{age}_i.
+$$
+This implies that the expected number of doctor visits satisfies
+$$
+\lambda_i = \exp(\beta_0)\exp(\beta_1 \,\text{age}_i).
+$$
+
+As age increases, the expected number of doctor visits increases **multiplicatively** rather than additively: Each one-year increase in age multiplies the expected number of visits by a constant factor equal to the incidence rate ratio (IRR), i.e. $\exp(\hat{\beta}_1)$.
+
+Therefore, the relationship between age and expected doctor visits is **exponential in the response scale** and **linear in the log scale**. Equal increases in age produce proportionally equal changes in the expected count (a feature of all Poisson regression models).
+
+## Python Code
+
+```{python}
+############################################################
+# G. Inference
+############################################################
+
+print("IRR for age =", np.exp(mod_uni.params["age"]))
+```
+
+
+
+</details>
+The estimated coefficient $\hat{\beta}_1$ is included in the model through the log link function,
+$$
+\log(\lambda_i) = \beta_0 + \beta_1 \,\text{age}_i.
+$$
+This implies that the expected number of doctor visits satisfies
+$$
+\lambda_i = \exp(\beta_0)\exp(\beta_1 \,\text{age}_i).
+$$
+
+As age increases, the expected number of doctor visits increases **multiplicatively** rather than additively: Each one-year increase in age multiplies the expected number of visits by a constant factor equal to the incidence rate ratio (IRR), i.e. $\exp(\hat{\beta}_1)$.
+
+Therefore, the relationship between age and expected doctor visits is **exponential in the response scale** and **linear in the log scale**. Equal increases in age produce proportionally equal changes in the expected count (a feature of all Poisson regression models).
+:::
+
+
+
+### H. Multivariate Poisson Regression {.unnumbered}
+
+Now, extend the model to:
+$$\log(\lambda_i) = \beta_0 + \sum_{j}\beta_i X_{i,j},$$
+where $j$ runs over `age`, `income`, 
+`education_years`, 
+`married`, 
+`urban`, 
+and `insurance`. 
+
+1. Fit the multivariable model above.
+
+2. Compute the IRRs and 95% confidence intervals.
+
+3. Interpret the effect of insurance (insured or not).
+
+4. Which predictors are the most significant? How do you know?
+
+5. Fit another model with `age * insurance`, and perform a likelihood-ratio test vs the additive model above.
+
+6. Based on the result, does insurance modify the effect of age?
+
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# H. Multivariate Poisson Regression
+############################################################
+
+form_multi <- doctor_visits ~ age + income + education_years +
+  married + urban + insurance
+
+mod_multi <- glm(form_multi, family = poisson(), data = df)
+summary(mod_multi)
+
+tidy(mod_multi, conf.int = TRUE) %>%
+  mutate(IRR = exp(estimate),
+         IRR_low = exp(conf.low),
+         IRR_high = exp(conf.high))
+
+# Interaction: age * insurance
+mod_int <- glm(doctor_visits ~ age * insurance + income + education_years +
+                 married + urban, family = poisson(), data = df)
+
+anova(mod_multi, mod_int, test = "Chisq")
+```
+
+## Python Code
+
+```{python}
+############################################################
+# H. Multivariate Poisson Regression
+############################################################
+
+formula_multi = (
+    "doctor_visits ~ age + income + education_years "
+    "+ married + urban + insurance"
+)
+
+mod_multi = smf.glm(
+    formula_multi,
+    data=df,
+    family=sm.families.Poisson()
+).fit()
+
+print(mod_multi.summary())
+
+multi_params = mod_multi.params
+multi_ci = mod_multi.conf_int()
+
+multi_results = pd.DataFrame({
+    "estimate": multi_params,
+    "conf_low": multi_ci[0],
+    "conf_high": multi_ci[1],
+    "IRR": np.exp(multi_params),
+    "IRR_low": np.exp(multi_ci[0]),
+    "IRR_high": np.exp(multi_ci[1])
+})
+
+print(multi_results)
+
+# Interaction model
+mod_int = smf.glm(
+    "doctor_visits ~ age * insurance + income + education_years + married + urban",
+    data=df,
+    family=sm.families.Poisson()
+).fit()
+
+lr_stat = 2 * (mod_int.llf - mod_multi.llf)
+df_diff = mod_int.df_model - mod_multi.df_model
+p_lr = 1 - chi2.cdf(lr_stat, df_diff)
+
+print("LR test statistic =", lr_stat)
+print("df =", df_diff)
+print("p-value =", p_lr)
+```
+</details>
+:::
+Holding all other variables constant, insured individuals are expected to have about 14.6% more doctor visits than uninsured individuals (IRR ≈ 1.15). The 95% confidence interval for the IRR does not include 1, indicating this effect is **statistically significant**.
+
+The most statistically significant predictors are `age`, `education_years`, `married`, `urban`, and `insurance`, as their confidence intervals for the IRR do not include 1. Among these, `age` shows the most precise and consistent effect. `education_years` also shows a clear positive association with `doctor_visits`. `income` has a very small effect size despite being statistically significant.
+
+
+### I. Prediction & KL Divergence {.unnumbered}
+
+Using the multivariate model from question H:
+
+1. Predict the expected number of doctor visits for a grid of age values, from 20 to 80.
+
+2. Plot predicted visits for insured and uninsured groups, including 95% confidence interval bands.
+
+3. Compute the KL divergence. How does this value reflect the model fit?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+::: {.panel-tabset}
+## R Code
+```{r}
+############################################################
+# I. Prediction & KL Divergence
+############################################################
+
+# Prediction grid for ages
+age_grid <- seq(min(df$age), max(df$age), length.out = 100)
+newdata <- expand.grid(
+  age = age_grid,
+  income = mean(df$income),
+  education_years = mean(df$education_years),
+  married = levels(df$married)[1],
+  urban = levels(df$urban)[1],
+  insurance = levels(df$insurance)
+)
+
+pred_link <- predict(mod_multi, newdata, type = "link", se.fit = TRUE)
+
+newdata$fit <- exp(pred_link$fit)
+newdata$lower95 <- exp(pred_link$fit - 1.96 * pred_link$se.fit)
+newdata$upper95 <- exp(pred_link$fit + 1.96 * pred_link$se.fit)
+
+ggplot(newdata, aes(x = age, y = fit, color = insurance)) +
+  geom_line(linewidth = 1) +
+  geom_ribbon(aes(ymin = lower95, ymax = upper95, fill = insurance),
+              alpha = 0.15, color = NA) +
+  labs(y = "Predicted Doctor Visits", title = "Predicted Visits by Age and Insurance")
+
+# KL Divergence
+lambda_hat <- fitted(mod_multi)
+y <- df$doctor_visits
+KL_i <- ifelse(y == 0,
+               -y + lambda_hat,
+               y * log(y / lambda_hat) - y + lambda_hat)
+KL_avg <- mean(KL_i)
+
+cat("Average KL divergence =", KL_avg, "\n")
+```
+
+## Python Code
+
+```{python}
+############################################################
+# I. Prediction & KL Divergence
+############################################################
+
+age_grid = np.linspace(df["age"].min(), df["age"].max(), 100)
+
+newdata = pd.DataFrame({
+    "age": np.repeat(age_grid, df["insurance"].cat.categories.size),
+    "income": df["income"].mean(),
+    "education_years": df["education_years"].mean(),
+    "married": df["married"].cat.categories[0],
+    "urban": df["urban"].cat.categories[0],
+    "insurance": np.tile(df["insurance"].cat.categories, 100)
+})
+
+# Ensure categories match
+for col in ["married", "urban", "insurance"]:
+    newdata[col] = newdata[col].astype("category")
+    newdata[col] = newdata[col].cat.set_categories(df[col].cat.categories)
+
+pred = mod_multi.get_prediction(newdata)
+pred_summary = pred.summary_frame()
+
+newdata["fit"] = np.exp(pred_summary["mean"])
+newdata["lower95"] = np.exp(pred_summary["mean_ci_lower"])
+newdata["upper95"] = np.exp(pred_summary["mean_ci_upper"])
+
+plt.figure(figsize=(7,5))
+sns.lineplot(data=newdata, x="age", y="fit", hue="insurance")
+plt.fill_between(
+    newdata["age"],
+    newdata["lower95"],
+    newdata["upper95"],
+    alpha=0.15
+)
+plt.ylabel("Predicted Doctor Visits")
+plt.title("Predicted Visits by Age and Insurance")
+plt.show()
+
+# KL divergence
+lambda_hat = mod_multi.fittedvalues.values
+y = df["doctor_visits"].values
+
+KL_i = np.where(
+    y == 0,
+    -y + lambda_hat,
+    y * np.log(y / lambda_hat) - y + lambda_hat
+)
+
+KL_avg = KL_i.mean()
+print("Average KL divergence =", KL_avg)
+```
+</details>
+:::
+A smaller average KL divergence indicates that the fitted Poisson model produces predicted counts that are close to the observed data, reflecting better model fit.
+
+
+### J. Storytelling {.unnumbered}
+
+The goal of this analysis was to understand how individual characteristics are associated with the expected number of doctor visits.
+
+1. Summarize the main findings of the Poisson regression analysis. Which variables are most strongly associated with doctor visitation, and in what direction?
+
+2. How do age, insurance status, and education jointly shape expected doctor visits? Describe the relationship in substantive terms rather than model coefficients.
+
+3. Assess whether the classical Poisson model appears to be an appropriate choice for this dataset. What evidence supports or weakens this conclusion?
+
+4. Based on the fitted model, what broad conclusions can be drawn about patterns of healthcare use in this population?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+The Poisson regression analysis shows that doctor visitation increases systematically with age, education, insurance coverage, marital status, and urban residence. Within these, age and education show strong and precise positive associations, while having insurance coverage is associated with an increase in expected visits (vs being uninsured).
+
+Older individuals and those with higher levels of education tend to visit doctors more frequently, and insured individuals have higher expected doctor use across all ages. Insurance primarily shifts the overall level of doctor visits upward rather than changing how visits increase with age.
+
+The classical Poisson model appears reasonably appropriate for this dataset. The outcome variable is a non-negative count, the mean–variance relationship is approximately consistent with Poisson assumptions, and goodness-of-fit diagnostics show only mild overdispersion. Alternative models could be considered, but there is no strong evidence that the Poisson model is fundamentally misspecified.
+
+Overall, the results suggest that healthcare use in this population is strongly patterned by age and socioeconomic factors, with insurance coverage playing an important role in increasing access to healthcare care. The model provides a coherent and interpretable summary of how these factors relate to doctor visitation rates.
+</details>
