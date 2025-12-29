@@ -1637,7 +1637,7 @@ plt.show()
 ```
 
 :::
-
+`current_grade` appears roughly uniform over its range, with no strong skew or extreme outliers. `prior_courses` is discrete and right-skewed, with most students having taken 0–2 prior courses and very few above 4. `hours_studied` is relatively uniform. `exam_score` is unimodal and left-skewed, with most scores concentrated between roughly 60 and 90. Now for the relationships with `exam_score`: `exam_score` vs `current_grade` shows a fairly weak positive trend, with a lot of noise. `exam_score` vs `prior_courses` shows strong variation at low integers, and no strong monotonic trend. This suggests a weak or nonlinear effect, and motivates categorical treatment. `exam_score` vs `hours_studied` is strongly increasing but clearly nonlinear, with diminishing returns at high study times. This is potentially consistent with a log-linear effect rather than a linear one.
 </details>
 
 ### B. Data Modelling {.unnumbered}
@@ -1701,6 +1701,9 @@ plt.show()
 ```
 </details>
 :::
+The coefficients do not entirely match intuition---`prior_courses` comes out negative in the linear model. A plausible explanation could be a selection bias: students who took more prior courses may be doing so because they struggled previously, leading to lower exam scores. Or, `pior_courses` is a poor linear proxy.
+
+Heteroscedasticity appears present in the residuals vs fitted plot and the Breusch-Pagan test, which shown non-constant variance. The Q-Q plot shows residuals which deviate from a normal distribution.
 
 ### C. Goodness of Fit {.unnumbered}
 1. Perform the Durbin-Watson test to check for autocorrelation in the residuals. What does the test statistic tell you about the independence of errors assumption?
@@ -1806,6 +1809,7 @@ plt.show()
 ```
 </details>
 :::
+The Durbin-Watson test produces a value of 1.79, close to 2, meaning there is no strong evidence of autocorrelation (errors are approximately independent). The p-value of the Breusch-Pagan test is essentially 0, and thus we reject homoscedasticity: residual variance changes with fitted values. Looking at the residuals vs observation index, there is no obvious time/order pattern implied here. Using Cook's Distance plot, there are no point that appear to have disproportionately large influence on the fitted coefficients.
 
 
 
@@ -1869,6 +1873,7 @@ print(model4.summary())
 ```
 </details>
 :::
+`prior_courses` should be converted to categorical, because it is discrete and its relationship with exam_score isn't clearly linear. We see that this gives a small improvement in the fit ($R^2$ increases). Following the log-transform of `hours_studied`, $R^2$ improves and reaches 0.973. This is consistent with diminishing returns in studying. The `current_grade * prior_courses` interaction is not very significant, having a p-value of 0.830. There is therefore no evidence of  a dependence of `current_grade` on `prior_courses` here.
 
 ### E. Final Evaluation {.unnumbered}
 1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
@@ -1909,9 +1914,7 @@ effect <- 0.05 * coef
 cat(sprintf("\nA 5%% increase in current_grade increases exam_score by %.5f points\n", effect))
 
 # E.3 Diminishing returns explanation
-cat("\nDiminishing returns explanation:\n")
-cat("Example: students might feel overconfident having taken more courses.\n")
-
+# see below!
 
 # E.4 Inference: Effect of hours_studied
 
@@ -1944,9 +1947,13 @@ mutate(log_hours = log(hours_studied))
 predicted_score <- predict(model3, newdata = new_student)
 
 cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
-
-
 ```
+1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
+
+3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
+   - Students who have taken many prior courses may be repeating courses due to past struggles, indicating a negative selection bias.
+   - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
+   - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
 
 ## Python Code
 ```{python}
@@ -1971,8 +1978,7 @@ coef = final_model.params['current_grade']
 print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
 
 # E.3 Diminishing returns explanation
-print("\nDiminishing returns explanation:")
-print("Example: students might feel overconfident having taken more courses.")
+# see below!
 
 
 # E.4 Inference: Effect of hours_studied (10% increase)
@@ -1999,8 +2005,14 @@ prediction = final_model.predict(new_student)
 print("\nPredicted exam score for the student:")
 print(prediction[0])
 ```
+1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
 
+3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
+   - Students who have taken many prior courses may be repeating courses due to past struggles, indicating a negative selection bias.
+   - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
+   - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
 </details>
+
 
  
 
