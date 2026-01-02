@@ -56,9 +56,9 @@ seaborn <- import("seaborn")
 scipy <- import("scipy")
 
 # Load data in R
-data <- beta_data
+data <- Beta
 
-py$data <- r_to_py(beta_data)
+py$data <- r_to_py(Beta)
 ```
 
 ::: {.LO}
@@ -73,9 +73,116 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-Imagine you are studying the conversion rate of a website. For each page, you record the proportion of visitors who complete a purchase. Some pages convert only a small fraction of visitors, while others perform much better. Your goal is to understand how features such as page load time, device type, or traffic source affect this conversion rate. The outcome you are modeling is numerical and continuous, but it also has clear limits. A conversion rate can never be less than zero and can never be greater than one. Standard linear regression is not well suited for this situation. It can produce predictions outside this range and assumes that the amount of variability is the same for all pages. Problems like this, where the response represents a proportion between zero and one, require a regression method that respects both the scale of the data and how the variability changes across observations. This is exactly where Beta regression comes to shine.
+Many real world problems involve modeling proportions. A common example is a website conversion rate, where each page is associated with a value between zero and one that represents the fraction of visitors who complete a purchase. Some pages convert only a small share of visitors, while others perform much better. Although these values are numerical and continuous, they are also restricted to a fixed range. A suitable model must respect these limits and reflect the fact that variability often changes depending on the average level of the proportion.
 
+Traditional linear regression is not well suited for this type of data. It can produce predictions outside the valid range and assumes that variability is constant across all observations. Problems like this call for a regression approach that is designed specifically for proportion outcomes. This is exactly where Beta regression comes to shine.
 
+## What is Beta Regression
+
+Beta regression is a regression model designed for situations where the response variable is a proportion that takes values on the open interval between zero and one. Instead of modeling the response directly as a straight line, Beta regression assumes that the response follows a Beta distribution. This distribution is defined only on the zero to one interval and is flexible enough to represent many different shapes.
+
+Because of this flexibility, Beta regression is well suited for data such as conversion rates, completion rates, coverage percentages, or any outcome that represents a fraction of a whole. The model naturally respects the bounds of the data and avoids unrealistic predictions.
+
+## The Beta Distribution
+
+The Beta distribution is a continuous probability distribution defined on the interval between zero and one. A key feature of this distribution is its flexibility. Depending on its parameter values, it can take many shapes, including symmetric, left skewed, or right skewed forms, as well as distributions that place more mass near the boundaries.
+
+```{python beta-distribution}
+#| echo: false
+#| message: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import beta
+
+# Create values between 0 and 1
+x = np.linspace(0.001, 0.999, 500)
+
+# Different (alpha, beta) combinations
+parameters = [
+    (0.5, 0.5),
+    (2, 2),
+    (2, 5),
+    (5, 2),
+    (1, 3),
+    (3, 1),
+]
+
+# Plot Beta distributions
+plt.figure(figsize=(9, 5))
+
+for a, b in parameters:
+    y = beta.pdf(x, a, b)
+    plt.plot(x, y, label=f"alpha = {a}, beta = {b}")
+
+plt.title("Examples of Beta Distributions on (0, 1)")
+plt.xlabel("Proportion")
+plt.ylabel("Density")
+plt.xlim(0, 1);   # Suppress additional output
+plt.legend(frameon=False)
+plt.tight_layout()
+plt.show()
+```
+
+The figure above shows several examples of Beta distributions with different parameter choices. Although the shapes vary widely, all distributions remain within the zero to one range, making the Beta distribution a natural choice for modeling proportion data.
+
+The shape of a Beta distribution is controlled by two parameters, commonly called alpha and beta. When alpha is larger than beta, values tend to be closer to one. When beta is larger than alpha, values tend to be closer to zero. When the two parameters are similar, values cluster around the middle of the range. Together, alpha and beta also influence how spread out the data are, with smaller values producing more variability and larger values leading to tighter concentration around the average.
+
+In practice, working directly with alpha and beta is not very convenient for regression modeling. These parameters describe the shape of the distribution, but they do not directly tell us how the average proportion changes when a predictor changes. To address this, Beta regression rewrites the distribution in terms of quantities that are easier to interpret, such as the **average proportion** and **how tightly the data cluster around that average**. This reexpression allows the model to relate the average proportion to predictor variables while still ensuring that all fitted values remain between zero and one. We explore this idea in more detail in the next section.
+
+## Linking the Average Proportion to Predictors
+
+In the Gamma regression chapter, we introduced generalized linear models as a way to extend linear regression to response variables that do not follow a normal distribution. Beta regression follows the same framework and is another example of a generalized linear model, designed specifically for proportion data.
+
+As with other generalized linear models, Beta regression does not model the response directly. Instead, it models the average of the response through a transformation that allows predictor variables to be related to the outcome using a familiar linear structure. This approach is especially important for proportion data, since the average must always remain between zero and one.
+
+::: {.Tip}
+::::{.Tip-header}
+A Quick Refresh on GLMs
+::::
+::::{.Tip-container}
+Generalized linear models are built from three components.
+
+- **Random component** describes the distribution of the response variable  
+- **Systematic component** combines predictor variables through a linear predictor  
+- **Link function** connects the linear predictor to the average of the response  
+
+These three pieces work together to extend linear regression to a wide range of response types.
+::::
+:::
+
+For Beta regression, the three components of GLM take the following form.
+
+- **Random component**: The response variable is assumed to follow a Beta distribution. This choice reflects the fact that the outcome is continuous and bounded between zero and one.
+
+- **Systematic component**: Predictor variables are combined through a linear predictor. This part of the model describes how changes in the predictors are associated with changes in the average proportion.
+
+- **Link function**: The link function connects the linear predictor to the average proportion. Its role is to ensure that the modeled average remains between zero and one. A commonly used choice is the logit function, which maps proportions to the real line and is also used in logistic regression.
+
+## The Beta Regression Model
+
+Putting the three components together, the Beta regression model can be written in mathematical form.
+
+For each observation $i$, the response variable is assumed to follow a Beta distribution,
+
+$$
+Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
+$$
+Here, $\mu_i$ represents the average proportion for observation $i$, and $\phi$ is a parameter that controls how tightly the data cluster around that average. Larger values of $\phi$ correspond to less variability, while smaller values allow for more spread.
+
+The average proportion $\mu_i$ is then linked to the predictors through a linear predictor using a link function. With the logit link, this takes the form
+
+$$
+\begin{aligned}
+\text{logit}(\mu_i) &= \log\left(\frac{\mu_i}{1-\mu_i}\right) \\
+                    &= \eta_i \\
+                    &= \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip}
+\end{aligned}
+$$
+
+Here, $\beta_0$ is the intercept and represents the baseline value of the transformed average proportion when all predictors are set to zero. The remaining coefficients $\beta_1, ..., \beta_p$ describe the association between each predictor and the average proportion on the logit scale, holding all other predictors constant. A positive coefficient indicates that larger values of the predictor are associated with a higher average proportion, while a negative coefficient indicates the opposite.
+
+This formulation follows the same generalized linear model structure introduced in the Gamma regression chapter. The random component specifies the distribution of the response, the systematic component combines predictors through a linear predictor, and the link function connects the linear predictor to the average of the response. Together, these components allow Beta regression to model proportion data in a flexible and interpretable way, while ensuring that fitted values always remain between zero and one.
 
 
 
