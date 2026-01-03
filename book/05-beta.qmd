@@ -261,6 +261,151 @@ For a study examining student academic performance, data like this could reasona
 
 Each of these sources comes with trade-offs. Academic records are objective but limited to performance outcomes, while survey-based variables may be noisy but offer insight into behaviors and lifestyle factors. Recognizing these limitations helps guide both exploratory analysis and interpretation later on.
 
+### Data Wrangling
+
+Once the data has been collected, the next step is to prepare it for modeling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.
+
+For Beta regression, data wrangling typically involves:
+
+- Validating that the response variable represents a proportion.
+- Rescaling the response variable so that it lies strictly between zero and one.
+- Checking for boundary values such as exact zeros or ones.
+- Converting categorical variables into numerical formats suitable for modeling.
+- Inspecting missing values and potential inconsistencies in self-reported data.
+
+### Data Wrangling
+
+Once the data has been collected, the next step is to prepare it for modeling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.
+
+For Beta regression, data wrangling typically involves:
+
+- Validating that the response variable represents a proportion.
+- Rescaling the response variable so that it lies strictly between zero and one.
+- Checking for boundary values such as exact zeros or ones.
+- Converting categorical variables into numerical formats suitable for modeling.
+- Inspecting missing values and potential inconsistencies in self-reported data.
+
+Based on the data, there can, of course, be other things you may have to do but for now, let's walk through these steps using our student performance dataset, demonstrating each step in both R and Python.
+
+#### 1. Preparing and Validating the Response Variable
+
+In this case study, the response variable is the final course grade, recorded as a percentage. While this variable is continuous, it is currently measured on a scale from 0 to 100. Since Beta regression models proportions, the response must first be rescaled to lie between zero and one.
+
+Before rescaling, we begin by examining the distribution of final grades to confirm that the values are within a reasonable range.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+summary(data$`Final Grade (%)`)
+```
+
+## Python Code
+```{python}
+# Summary statistics for the response variable
+print(data["Final Grade (%)"].describe())
+```
+:::
+
+The summary confirms that all grades lie between 0 and 100, making them suitable for conversion to proportions. We therefore rescale the response by dividing each value by 100.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+data$final_grade_prop <- data$`Final Grade (%)` / 100
+summary(data$final_grade_prop)
+```
+
+## Python Code
+```{python}
+# Rescale grades to proportions
+data["final_grade_prop"] = data["Final Grade (%)"] / 100
+print(data["final_grade_prop"].describe())
+```
+:::
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up!
+::::
+::::{.Heads-up-container}
+At this stage, the structure of the response variable already suggests that a proportion-based model, such as Beta regression, will be a good fit. With that in mind, we perform the preprocessing needed for such a model here. In practice, this decision is often informed by exploratory analysis and may be revisited later, but introducing it now helps keep the workflow clear and focused.
+::::
+:::
+
+After rescaling, the response variable now lies on the unit interval. The next step is to check whether any values are exactly zero or one, since standard Beta regression assumes outcomes are strictly between these boundaries.
+
+#### 2. Checking for Boundary Values
+
+Beta regression requires that the response variable take values strictly between zero and one. We therefore check whether any rescaled grades are exactly equal to zero or one.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+sum(data$final_grade_prop <= 0)
+sum(data$final_grade_prop >= 1)
+```
+
+## Python Code
+```{python}
+# Check for boundary values
+print((data["final_grade_prop"] <= 0).sum())
+print((data["final_grade_prop"] >= 1).sum())
+```
+:::
+
+Shoot! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up!
+::::
+::::{.Heads-up-container}
+When proportion data includes values exactly equal to zero or one, the assumptions of standard Beta regression are violated. This situation is common in practice, especially when proportions are derived from percentages or rounded measurements. There are several principled ways to handle boundary values, each with different trade-offs.
+
+One approach is **boundary adjustment**, where values equal to zero or one are shifted slightly inward by a small amount. This method is simple, preserves the ordering of observations, and allows standard Beta regression to be applied without adding model complexity. It is often appropriate when boundary values arise from rounding or measurement limits rather than representing a fundamentally different process.
+
+A second approach, proposed by Smithson and Verkuilen (2006), **applies a systematic transformation to the response variable**. Instead of only adjusting values at the boundaries, this method gently shifts all observations so that none of them are exactly zero or one.
+
+Intuitively, the transformation treats the observed proportions as slightly uncertain and pulls extreme values a small distance toward the interior of the interval. This avoids hard cutoffs at zero and one while preserving the relative ordering of the data.
+
+Mathematically, the transformation can be written as
+$$
+x' = \frac{x (N - 1) + s}{N}
+$$
+
+where $N$ is the sample size and $s$ is a small constant between 0 and 1, often chosen as $s=0.5$.
+
+One way to think about this adjustment is that it spreads the data evenly across the open interval $(0,1)$, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant $s$ can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction.
+
+Another option is to use **zero–one–inflated Beta models**, which explicitly treat boundary values as arising from a separate process. These models are more flexible and appropriate when zeros or ones occur frequently and carry substantive meaning, but they also introduce additional parameters and complexity.
+
+Finally, boundary observations can be **excluded**, though this is generally discouraged unless there is a strong substantive justification, as it removes potentially informative data.
+::::
+:::
+
+In this case study, our goal is to focus on the core ideas of Beta regression and to keep the workflow accessible. Because the number of boundary values is small and likely driven by rounding of high grades, we proceed with a simple boundary adjustment and continue with standard Beta regression.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+epsilon <- 0.001
+data$final_grade_prop[data$final_grade_prop >= 1] <- 1 - epsilon
+data$final_grade_prop[data$final_grade_prop <= 0] <- epsilon
+
+summary(data$final_grade_prop)
+```
+
+## Python Code
+```{python}
+epsilon = 0.001
+data.loc[data["final_grade_prop"] >= 1, "final_grade_prop"] = 1 - epsilon
+data.loc[data["final_grade_prop"] <= 0, "final_grade_prop"] = epsilon
+
+print(data["final_grade_prop"].describe())
+```
+:::
+
+After this adjustment, all response values lie strictly between zero and one, making the data suitable for Beta regression.
 
 ::: {.Warning}
 ::::{.Warning-header}
