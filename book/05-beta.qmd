@@ -484,9 +484,134 @@ In addition to missing values, it is also good practice to scan for obvious inco
 ::::
 :::
 
-With these checks complete, the dataset is clean, numerically encoded, and ready for exploratory data analysis.
-
 ## Exploratory Data Analysis (EDA)
+
+With the data cleaned and prepared, we now turn to our next step in our data science workflow: exploratory data analysis (EDA). The goal of this step is not to draw final conclusions, but to develop intuition about the response variable and its relationship with key predictors.
+
+### Distribution of the Response Variable
+
+We begin by examining the distribution of the final grade, expressed as a proportion. This helps us assess whether the response is bounded, skewed, or clustered near the boundaries.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+hist(
+  data$final_grade_prop,
+  breaks = 10,
+  main = "Distribution of Final Grades",
+  xlab = "Final Grade (Proportion)",
+  col = "lightgray",
+  border = "white"
+)
+
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+
+plt.hist(
+  data["final_grade_prop"],
+  bins=10
+)
+
+plt.xlabel("Final Grade (Proportion)")
+plt.ylabel("Frequency")
+plt.title("Distribution of Final Grades")
+plt.show()
+```
+:::
+
+The histogram, once again, shows that grades are continuous and bounded between zero and one, with the overall distribution being slightly left skewed. Great to see that students are mostly doing well here!
+
+### Distribution of Predictor Variables
+
+Let’s also examine the distributions of the predictor variables. This helps us understand the range, balance, and structure of the inputs before moving on to modeling. For continuous predictors, we stick to histograms to inspect their spread and shape. For categorical predictors, bar charts are sufficient to show how observations are distributed across categories.
+
+#### Continuous Predictors
+
+We begin with the continuous predictors: hours of sleep per night and part-time work hours.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+par(mfrow = c(1, 2))
+
+x <- data$`Hours of Sleep per Night`
+br <- seq(min(x), max(x), length.out = 11)
+
+# bins 1..10, with last bin including the rightmost edge like NumPy
+bin_id <- findInterval(x, br, rightmost.closed = TRUE, all.inside = TRUE)
+
+counts_like_numpy <- tabulate(bin_id, nbins = 10)
+
+# Plot the histogram manually so the bar heights match counts_like_numpy exactly
+plot(NA,
+  xlim = range(br),
+  ylim = c(0, max(counts_like_numpy, na.rm = TRUE)),
+  main = "Hours of Sleep per Night",
+  xlab = "Hours",
+  ylab = "Frequency",
+  xaxt = "n"
+)
+axis(1)
+rect(
+  xleft   = br[-length(br)],
+  ybottom = 0,
+  xright  = br[-1],
+  ytop    = counts_like_numpy,
+  col     = "lightgray",
+  border  = "white"
+)
+
+hist(
+  data$`Part-time Work Hours`,
+  breaks = seq(
+    min(data$`Part-time Work Hours`),
+    max(data$`Part-time Work Hours`),
+    length.out = 11
+  ),
+  main = "Part-time Work Hours",
+  xlab = "Hours per Week",
+  col = "lightgray",
+  border = "white"
+)
+
+par(mfrow = c(1, 1))
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+axes[0].hist(data["Hours of Sleep per Night"], bins=10)
+axes[0].set_title("Hours of Sleep per Night")
+axes[0].set_xlabel("Hours")
+axes[0].set_ylabel("Frequency")
+
+axes[1].hist(data["Part-time Work Hours"], bins=10)
+axes[1].set_title("Part-time Work Hours")
+axes[1].set_xlabel("Hours per Week")
+
+plt.tight_layout()
+plt.show()
+
+```
+:::
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up!
+::::
+::::{.Heads-up-container}
+The R code for Hours of Sleep per Night is intentionally more detailed than usual. This alternative approach ensures that the histogram uses the same bin boundaries and bin-assignment rules as Python, so the two plots are directly comparable. In practice, R’s default hist() function is usually sufficient.
+::::
+:::
+
+Overall, both hours of sleep per night and part-time work hours appear to be approximately uniformly distributed, with no strong skewness or extreme concentration in specific ranges. This suggests that neither predictor is dominated by a narrow subset of values, which is helpful for subsequent regression modeling.
+
 
 
 ::: {.Warning}
