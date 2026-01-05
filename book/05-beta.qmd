@@ -682,6 +682,159 @@ plt.show()
 
 Overall, the categorical predictors appear to be well balanced across their respective levels. No single category overwhelmingly dominates the dataset, and each level is represented by a reasonable number of observations. This balance is desirable in a regression setting, as it ensures that comparisons between categories are supported by sufficient data and reduces the risk of unstable or highly variable coefficient estimates.
 
+### Relationships Between Predictors and the Response
+
+So far, we have examined each variable individually. While univariate visualizations are useful for understanding distributions and balance, they provide limited insight into how predictors relate to the response variable. To build intuition about these relationships, we now turn to bivariate exploratory analysis, where predictors and the response are examined together. In what follows, we explore the relationship between the response and continuous predictors, followed by the relationship between the response and categorical predictors.
+
+#### Continuous Predictors and the Response
+
+When both the predictor and the response are continuous, scatterplots are a natural and effective visualization choice. Scatterplots allow us to inspect the form of the relationship, assess potential nonlinearity, and identify unusual observations or outliers.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+par(mfrow = c(1, 2))
+
+plot(
+  data$`Hours of Sleep per Night`,
+  data$final_grade_prop,
+  xlab = "Hours of Sleep per Night",
+  ylab = "Final Grade (Proportion)",
+  main = "Sleep and Final Grade",
+  pch = 19,
+  col = "gray"
+)
+
+plot(
+  data$`Part-time Work Hours`,
+  data$final_grade_prop,
+  xlab = "Part-time Work Hours",
+  ylab = "Final Grade (Proportion)",
+  main = "Work Hours and Final Grade",
+  pch = 19,
+  col = "gray"
+)
+
+par(mfrow = c(1, 1))
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+axes[0].scatter(
+  data["Hours of Sleep per Night"],
+  data["final_grade_prop"],
+  color="gray"
+)
+axes[0].set_xlabel("Hours of Sleep per Night")
+axes[0].set_ylabel("Final Grade (Proportion)")
+axes[0].set_title("Sleep and Final Grade")
+
+axes[1].scatter(
+  data["Part-time Work Hours"],
+  data["final_grade_prop"],
+  color="gray"
+)
+axes[1].set_xlabel("Part-time Work Hours")
+axes[1].set_ylabel("Final Grade (Proportion)")
+axes[1].set_title("Work Hours and Final Grade")
+
+plt.tight_layout()
+plt.show()
+```
+:::
+
+At first glance, the scatterplots do not reveal a strong or obvious relationship between either continuous predictor and the final grade proportion. The points are widely dispersed, and no clear linear trend is immediately apparent. This suggests that, on their own, hours of sleep per night and part-time work hours may not have a simple or direct association with student performance.
+
+However, this observation should be treated as hypothesis-generating rather than conclusive. Scatterplots reflect raw, unadjusted relationships and do not account for the influence of other variables in the dataset. It is therefore possible that these predictors matter only in combination with other factors, or that their effects become apparent after controlling for confounding variables in a regression model.
+
+#### Categorical Predictors and the Response
+
+When the predictor is categorical and the response is continuous, scatterplots are no longer appropriate. Instead, we compare the distribution of the response across groups defined by the categorical variable. Boxplots are a convenient choice because they summarize the center, spread, and potential outliers of the response within each category.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+#| fig.height: 10
+#| fig.width: 8
+par(mfrow = c(3, 3), mar = c(7, 4, 3, 1))
+
+categorical_vars <- c(
+  "Café Location",
+  "Study Time",
+  "Year in School",
+  "Hobbies",
+  "Primary Sport",
+  "Living Arrangement",
+  "Study Group Participation",
+  "Has a Tutor"
+)
+
+for (v in categorical_vars) {
+  boxplot(
+    data$final_grade_prop ~ data[[v]],
+    main = v,
+    ylab = "Final Grade (Proportion)",
+    xlab = v,
+    col = "lightgray",
+    las = 2
+  )
+}
+
+par(mfrow = c(1, 1))
+
+```
+
+From the plots, we observe that study time is the only predictor with a clearly visible positive association with final grade. This finding is largely unsurprising and aligns well with common intuition: students who devote more time to studying tend to perform better academically.
+
+At the same time, it is somewhat unexpected that the remaining categorical variables show little evidence of a strong marginal relationship with the response. Factors such as tutoring status, study group participation, living arrangement, or extracurricular interests might reasonably be expected to influence academic performance, yet no clear or consistent differences emerge when these variables are examined in isolation.
+
+These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modeling is conducted, where the effects of multiple predictors can be assessed simultaneously.
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+
+categorical_vars = [
+  "Café Location",
+  "Study Time",
+  "Year in School",
+  "Hobbies",
+  "Primary Sport",
+  "Living Arrangement",
+  "Study Group Participation",
+  "Has a Tutor"
+]
+
+fig, axes = plt.subplots(3, 3, figsize=(12, 9))
+axes = axes.flatten()
+
+for i, var in enumerate(categorical_vars):
+  data.boxplot(
+    column="final_grade_prop",
+    by=var,
+    ax=axes[i],
+    grid=False
+  )
+  axes[i].set_title(var)
+  axes[i].set_xlabel("")
+  axes[i].set_ylabel("Final Grade (Proportion)")
+
+# Turn off unused panel
+
+for j in range(len(categorical_vars), len(axes)):
+  axes[j].axis("off")
+
+plt.suptitle("")
+plt.tight_layout()
+plt.show()
+```
+:::
+
+
 
 ::: {.Warning}
 ::::{.Warning-header}
