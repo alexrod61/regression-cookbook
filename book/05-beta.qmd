@@ -834,6 +834,76 @@ At the same time, it is somewhat unexpected that the remaining categorical varia
 
 These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modeling is conducted, where the effects of multiple predictors can be assessed simultaneously.
 
+## Data Modeling
+
+After exploring the data and developing initial intuition through EDA, we now turn to the modeling stage. The purpose of this step is to formalize the relationships we observed and assess how different academic and lifestyle factors are associated with students’ final grades when considered jointly.
+
+### Choosing a Suitable Regression Model
+
+The choice of regression model should follow directly from what we have learned about the response variable and from the goals of the analysis.
+
+In this case, the response variable, `final_grade_prop`, represents a student’s final grade expressed as a proportion. After preprocessing, all values lie strictly between zero and one. The EDA also showed that grades are not symmetrically distributed and tend to cluster toward higher values, with variability that appears to depend on the average grade level.
+
+Equally important, our goal is not to predict future grades as accurately as possible, but to understand how study habits, lifestyle factors, and forms of academic support are associated with students’ performance.
+
+Taken together, these considerations point toward Beta regression as an appropriate modeling choice. Beta regression is designed specifically for proportion data and naturally respects the bounds of the response. It allows the mean of the response to depend on predictors while accommodating heteroskedasticity, which is common in proportional outcomes.
+
+By contrast, Ordinary Least Squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.
+
+### Defining Modeling Parameters
+
+With the modeling framework selected, the next step is to specify which variables to include. In this case study, we include all available predictors to capture a broad and realistic picture of student life.
+
+The predictors reflect multiple dimensions of a student’s experience, including time allocation (such as study time, sleep, and part-time work hours), academic context (such as year in school), and sources of support (such as tutoring and study group participation), as well as several categorical variables describing personal routines and preferences.
+
+Including the full set of predictors allows us to examine the association between each factor and the average final grade while holding other variables constant. This multivariable perspective is especially important given that most predictors showed weak marginal relationships during EDA but may still play a role once considered together.
+
+### Setting Up the Modeling Equation
+
+Using Beta regression with a logit link, we model the average final grade proportion as a function of the predictors.
+
+For each student $i$, the response is assumed to follow a Beta distribution,
+
+$$
+Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
+$$
+
+
+where $\mu_i$ denotes the average grade proportion and $\phi$ controls how concentrated grades are around that average.
+
+The average proportion is linked to the predictors through the linear predictor:
+
+<div style="overflow-x: auto; white-space: nowrap;">
+$$
+\begin{aligned}
+\text{logit}(\mu_i) &= \beta_0 \\
+&\quad + \beta_1 \times \text{part\_time\_work\_hours}_i \\
+&\quad + \beta_2 \times \text{hours\_of\_sleep}_i \\
+&\quad + \text{(terms for Study Time)} \\
+&\quad + \text{(terms for Café Location)} \\
+&\quad + \text{(terms for Year in School)} \\
+&\quad + \text{(terms for Hobbies)} \\
+&\quad + \text{(terms for Primary Sport)} \\
+&\quad + \text{(terms for Living Arrangement)} \\
+&\quad + \text{(terms for Study Group Participation)} \\
+&\quad + \text{(terms for Has a Tutor)}
+\end{aligned}
+$$
+</div>
+
+The logit link maps the average grade proportion to the real line, allowing predictors to enter the model in a familiar linear form. Once the linear predictor is computed, we can return to the original grade scale using the inverse-logit transformation,
+
+$$
+\mu_i = \frac{\exp(\eta_i)}{1 + \exp(\eta_i)}
+$$
+
+where $\eta_i$ represents the linear combination of predictors.
+
+Under this model, each coefficient describes how a predictor is associated with changes in the average final grade, on the logit scale, holding all other variables constant. Positive coefficients correspond to higher expected grades, while negative coefficients correspond to lower expected grades.
+
+With the model structure defined, we are now ready to estimate the model parameters and examine how these academic and lifestyle factors relate to student performance in practice.
+
+
 
 ::: {.Warning}
 ::::{.Warning-header}
