@@ -34,6 +34,7 @@ library(tidyverse)
 library(car)
 library(lmtest)
 library(fastDummies)
+library(betareg)
 
 # Setting up Python dependencies
 library(reticulate)
@@ -406,22 +407,22 @@ As a quick refresh, one-hot encoding represents each category as a binary indica
 ```{r}
 # Convert categorical variables to factors
 categorical_vars <- c(
-"Café Location",
-"Study Time",
-"Year in School",
-"Hobbies",
-"Primary Sport",
-"Living Arrangement",
-"Study Group Participation",
-"Has a Tutor"
+  "Café Location",
+  "Study Time",
+  "Year in School",
+  "Hobbies",
+  "Primary Sport",
+  "Living Arrangement",
+  "Study Group Participation",
+  "Has a Tutor"
 )
 
 data[categorical_vars] <- lapply(data[categorical_vars], as.factor)
 
 # Create design matrix with dummy variables
 design_matrix <- model.matrix(
-final_grade_prop ~ .,
-data = data
+  final_grade_prop ~ .,
+  data = data
 )
 
 head(design_matrix)
@@ -431,22 +432,31 @@ head(design_matrix)
 ```{python}
 import pandas as pd
 
-# One-hot encode categorical variables
 categorical_vars = [
-"Café Location",
-"Study Time",
-"Year in School",
-"Hobbies",
-"Primary Sport",
-"Living Arrangement",
-"Study Group Participation",
-"Has a Tutor"
+  "Café Location",
+  "Study Time",
+  "Year in School",
+  "Hobbies",
+  "Primary Sport",
+  "Living Arrangement",
+  "Study Group Participation",
+  "Has a Tutor"
 ]
 
+# Force Study Time category order so "<1 hour" is the reference
+study_time_order = ["<1 hour", "1-3 hours", "3-5 hours", "5+ hours"]
+
+data["Study Time"] = pd.Categorical(
+    data["Study Time"],
+    categories=study_time_order,
+    ordered=True
+)
+
+# One-hot encode
 data_encoded = pd.get_dummies(
-data,
-columns=categorical_vars,
-drop_first=True
+    data,
+    columns=categorical_vars,
+    drop_first=True
 )
 
 data_encoded.head()
@@ -902,6 +912,79 @@ where $\eta_i$ represents the linear combination of predictors.
 Under this model, each coefficient describes how a predictor is associated with changes in the average final grade, on the logit scale, holding all other variables constant. Positive coefficients correspond to higher expected grades, while negative coefficients correspond to lower expected grades.
 
 With the model structure defined, we are now ready to estimate the model parameters and examine how these academic and lifestyle factors relate to student performance in practice.
+
+## Estimation
+
+With the model structure clearly defined, we now move on to estimation. In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.
+
+::: {.Tip}
+::::{.Tip-header}
+How Beta Regression Is Fit
+:::
+::::{.Tip-container}
+Like Gamma regression, Beta regression is typically estimated using maximum likelihood estimation (MLE). Rather than minimizing squared errors, MLE finds the parameter values that make the observed proportions most likely under the assumed Beta distribution. This approach naturally accounts for the bounded nature of the response and the relationship between the mean and variability.
+:::
+:::
+
+### Fitting the Model
+
+In R, Beta regression can be fit using the `betareg()` function, which is designed specifically for proportion outcomes. In Python, Beta regression is available through `statsmodels`, allowing us to specify the same link function and modeling structure.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+# Load required library
+library(betareg)
+
+# Fit Beta regression model with logit link
+beta_model <- betareg(
+  final_grade_prop ~
+  `Part-time Work Hours` +
+  `Hours of Sleep per Night` +
+  `Study Time` +
+  `Café Location` +
+  `Year in School` +
+  Hobbies +
+  `Primary Sport` +
+  `Living Arrangement` +
+  `Study Group Participation` +
+  `Has a Tutor`,
+  data = data,
+  link = "logit"
+)
+
+# Display model summary
+summary(beta_model)
+```
+
+## Python Code
+```{python}
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+# Fit Beta regression model using logit link
+beta_model = smf.glm(
+  formula="""
+  final_grade_prop ~
+  Q("Part-time Work Hours") +
+  Q("Hours of Sleep per Night") +
+  Q("Study Time") +
+  Q("Café Location") +
+  Q("Year in School") +
+  Hobbies +
+  Q("Primary Sport") +
+  Q("Living Arrangement") +
+  Q("Study Group Participation") +
+  Q("Has a Tutor")
+  """,
+  data=data,
+  family=sm.families.Binomial(link=sm.families.links.logit())
+).fit()
+
+# Display model summary
+print(beta_model.summary())
+```
+:::
 
 
 
