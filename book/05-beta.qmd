@@ -301,6 +301,10 @@ The summary confirms that all grades lie between 0 and 100, making them suitable
 ## R Code
 ```{r}
 data$final_grade_prop <- data$`Final Grade (%)` / 100
+
+# Drop original percentage column
+data$`Final Grade (%)` <- NULL
+
 summary(data$final_grade_prop)
 ```
 
@@ -308,6 +312,10 @@ summary(data$final_grade_prop)
 ```{python}
 # Rescale grades to proportions
 data["final_grade_prop"] = data["Final Grade (%)"] / 100
+
+# Drop original percentage column
+data = data.drop(columns=["Final Grade (%)"])
+
 print(data["final_grade_prop"].describe())
 ```
 :::
@@ -443,11 +451,15 @@ categorical_vars = [
   "Has a Tutor"
 ]
 
-# Force Study Time category order so "<1 hour" is the reference
+s = data["Study Time"].astype("string")
+
+# Replace en dash/em dash/minus with normal hyphen
+s = s.str.replace(r"[–—−]", "-", regex=True).str.strip()
+
 study_time_order = ["<1 hour", "1-3 hours", "3-5 hours", "5+ hours"]
 
 data["Study Time"] = pd.Categorical(
-    data["Study Time"],
+    s,
     categories=study_time_order,
     ordered=True
 )
@@ -456,7 +468,8 @@ data["Study Time"] = pd.Categorical(
 data_encoded = pd.get_dummies(
     data,
     columns=categorical_vars,
-    drop_first=True
+    drop_first=True,
+    dtype=float  # or dtype=int
 )
 
 data_encoded.head()
@@ -932,25 +945,13 @@ In R, Beta regression can be fit using the `betareg()` function, which is design
 
 ::: {.panel-tabset}
 ## R Code
-```{r}
-# Load required library
+```{r r-fit}
 library(betareg)
 
 # Fit Beta regression model with logit link
 beta_model <- betareg(
-  final_grade_prop ~
-  `Part-time Work Hours` +
-  `Hours of Sleep per Night` +
-  `Study Time` +
-  `Café Location` +
-  `Year in School` +
-  Hobbies +
-  `Primary Sport` +
-  `Living Arrangement` +
-  `Study Group Participation` +
-  `Has a Tutor`,
-  data = data,
-  link = "logit"
+  final_grade_prop ~ .,
+  data = data
 )
 
 # Display model summary
@@ -958,31 +959,17 @@ summary(beta_model)
 ```
 
 ## Python Code
-```{python}
+```{python py-fit}
 import statsmodels.api as sm
-import statsmodels.formula.api as smf
+from statsmodels.othermod.betareg import BetaModel
 
-# Fit Beta regression model using logit link
-beta_model = smf.glm(
-  formula="""
-  final_grade_prop ~
-  Q("Part-time Work Hours") +
-  Q("Hours of Sleep per Night") +
-  Q("Study Time") +
-  Q("Café Location") +
-  Q("Year in School") +
-  Hobbies +
-  Q("Primary Sport") +
-  Q("Living Arrangement") +
-  Q("Study Group Participation") +
-  Q("Has a Tutor")
-  """,
-  data=data,
-  family=sm.families.Binomial(link=sm.families.links.logit())
-).fit()
+y = data_encoded["final_grade_prop"].astype(float)
 
-# Display model summary
-print(beta_model.summary())
+X = data_encoded.drop(columns=["final_grade_prop"])
+X = sm.add_constant(X, has_constant="add") 
+
+fit_py = BetaModel(y, X).fit()
+print(fit_py.summary())
 ```
 :::
 
