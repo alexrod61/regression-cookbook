@@ -973,6 +973,139 @@ print(fit_py.summary())
 ```
 :::
 
+### Interpreting the Coefficients
+
+Based on the output, the (partially shown) fitted equation is:
+
+<div style="overflow-x: auto; white-space: nowrap;">
+$$
+\begin{aligned}
+\text{logit}(\mu_i) &= 0.665 \\
+&\quad + -0.0008 \times \text{part_time_work_hours}_i \\
+&\quad + -0.0145 \times \text{hours_of_sleep}_i \\
+&\quad + \text{(terms for Study Time)} \\
+&\quad + \text{(terms for Café Location)} \\
+&\quad + \text{(terms for Year in School)} \\
+&\quad + \text{(terms for Hobbies)} \\
+&\quad + \text{(terms for Primary Sport)} \\
+&\quad + \text{(terms for Living Arrangement)} \\
+&\quad + \text{(terms for Study Group Participation)} \\
+&\quad + \text{(terms for Has a Tutor)}
+\end{aligned}
+$$
+</div>
+
+While we can interpret the numbers given here, but before that, we should always check goodness of fit first. If the goodness of fit is bad, then the interpretation of these numbers could be meaningless.
+
+## Goodness of Fit
+
+Assessing goodness of fit for Beta regression is conceptually similar to other generalized linear models, but there are a few important differences compared to ordinary least squares regression.
+
+### Log-likelihood, AIC, and BIC
+
+Because Beta regression is fit using maximum likelihood, overall model fit is commonly assessed using:
+
+- Log-likelihood
+- Akaike Information Criterion (AIC)
+- Bayesian Information Criterion (BIC)
+
+Higher log-likelihood values indicate a better fit, while lower AIC and BIC values suggest a preferable balance between model fit and model complexity. These metrics are especially useful when comparing multiple Beta regression models fitted to the same response variable. In our fitted model, the log-likelihood is 1474.7, the AIC is −2903, and the BIC is −2791. Although we do not compare multiple models here, these metrics become especially informative when evaluating alternative model specifications.
+
+### Pseudo-$R^2$
+
+When using R’s `betareg()`, the model summary reports a pseudo-$R^2$ value. This quantity is defined as:
+
+$$
+R^{2}_{\text{pseudo}} = 1 - \frac{\ell(\text{null model})}{\ell(\text{fitted model})}
+$$
+
+where $\ell(\cdot)$ denotes the log-likelihood. This measure quantifies how much the fitted model improves upon an intercept-only model. From the R output, the pseudo-$R^2$ for our model is 0.6014, indicating an improvement over the null model.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Notes on pseudo-$R^2$
+::::
+::::{.Heads-up-container}
+When interpreting pseudo-$R^2$, it is important to keep the following points in mind:
+
+- This pseudo-$R^2$ is not directly comparable to the $R^2$ from linear regression.
+- Values tend to be lower and should be interpreted relatively, not absolutely.
+- The pseudo-$R^2$ is most useful for comparing competing models, rather than judging fit in isolation.
+
+In contrast, Python’s `statsmodels.BetaModel` does not report a pseudo-$R^2$ by default, even though the same quantity could be computed manually from the log-likelihoods. This reflects a design choice rather than a difference in the underlying statistical model.
+::::
+:::
+
+### Precision Parameter
+
+Beta regression models not only the mean of the response but also its dispersion through a precision parameter, commonly denoted by $\phi$. As a result, assessing goodness of fit involves evaluating not only how well the model captures the mean structure, but also whether it represents the variability in the data reasonably. Under the standard mean–precision parameterization, the conditional variance of the response is given by:
+
+$$
+\mathrm{Var}(Y_i \mid X_i) = \dfrac{\mu_i (1 - \mu_i)}{1 + \phi}
+$$
+
+Larger values of $\phi$ indicate that observations are more tightly concentrated around the fitted mean, while smaller values correspond to greater variability. A poorly estimated precision parameter may suggest that the model does not fully capture the dispersion in the response, even if the fitted means appear reasonable.
+
+In R’s `betareg()`, the precision parameter is estimated directly. In this example, the fitted model reports:
+
+$$
+\hat{\phi}=43.98
+$$
+
+In contrast, Python’s `statsmodels.BetaModel` reports the precision parameter on a transformed (log) scale. The reported value of 3.78 corresponds to:
+
+$$
+\exp(3.78) = 43.98
+$$
+
+which aligns closely with the estimate obtained from `betareg()`. Thus, although the numerical values appear different, both implementations are estimating the same underlying precision parameter, and the fitted models are consistent.
+
+Once the precision parameter $\phi$ has been estimated, we can substitute it into the conditional variance formula to assess whether the implied variability is reasonable for the observed data. In practice, the precision parameter is best interpreted alongside residual diagnostics rather than judged by an absolute threshold.
+​
+### Residual Diagnostics
+
+As with other generalized linear models, residual diagnostics help us check whether a Beta regression model is capturing the main patterns in the data. In this section, we focus on Pearson residuals, which compare the observed values to the fitted mean values on a standardized scale.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+library(betareg)
+
+# Extract fitted means and residuals
+mu_hat <- fitted(beta_model)
+r_pearson <- residuals(beta_model, type = "pearson")
+
+plot(mu_hat, r_pearson,
+     xlab = "Fitted mean (mu_hat)",
+     ylab = "Pearson residual",
+     main = "Pearson residuals vs fitted")
+abline(h = 0, lty = 2)
+
+```
+
+## Python Code
+```{python}
+import matplotlib.pyplot as plt
+
+mu_hat = fit_py.fittedvalues
+pearson_resid = fit_py.resid_pearson
+
+plt.scatter(mu_hat, pearson_resid)
+plt.axhline(0, linestyle="--")
+plt.xlabel("Fitted mean")
+plt.ylabel("Pearson residual")
+plt.title("Pearson residuals vs fitted")
+plt.show()
+```
+:::
+
+The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over- or under-prediction. The vertical banding reflects groups of observations with similar fitted means, often arising from categorical predictors. While residual variability increases slightly for fitted means close to one, this behavior is expected for Beta regression due to the bounded nature of the response. Overall, the diagnostics suggest that the model provides an adequate fit to the data.
+
+
+
+
+
+
 
 
 ::: {.Warning}
