@@ -176,7 +176,7 @@ reticulate::py_require(c(
 py$data <- reticulate::r_to_py(BLR)
 ```
 
-::::: LO
+:::: LO
 ::: LO-header
 **Learning Objectives**
 :::
@@ -184,14 +184,15 @@ py$data <- reticulate::r_to_py(BLR)
 ::: LO-container
 By the end of this chapter, you will be able to:
 
--   Explain how **Binary Logistic Regression** models the probability of a binary outcome using **log-odds**.\
--   Describe why **Ordinary Least Squares** is not appropriate for binary outcomes, and how the **logistic function** addresses this.\
--   Fit a binary logistic regression model in both `R` and `Python`.\
--   Interpret **log-odds**, **odds ratios**, and **predicted probabilities** in real-world contexts.\
--   Evaluate model fit using metrics such as **accuracy**, **confusion matrices**, and **ROC curves**.\
--   Identify when binary logistic regression is the **appropriate tool**, and understand its **limitations**.\
+-   Explain how **Binary Logistic Regression** models the probability of a binary outcome using **log-odds**.
+-   Describe why **Ordinary Least Squares** is not appropriate for binary outcomes, and how the **logistic function** addresses this.
+-   Fit a binary logistic regression model in both `R` and `Python`.
+-   Interpret **log-odds**, **odds ratios**, and **predicted probabilities** in real-world contexts.
+-   Evaluate model fit using metrics such as **accuracy**, **confusion matrices**, and **ROC curves**.
+-   Identify when binary logistic regression is the **appropriate tool**, and understand its **limitations**.
 :::
-:::::
+::::
+
 
 ## Introduction
 
@@ -216,6 +217,8 @@ In this chapter, we’ll see how logistic regression:
 To understand the need for logistic regression, consider applying Ordinary Least Squares (OLS) to a **binary outcome**.
 
 Suppose we are trying to predict whether a student **defaulted** on a loan (`1`) or **did not default** (`0`) using a continuous predictor like `credit_score`.
+
+In this chapter we use the **BLR (Binary Logistic Regression)** dataset, which contains student-level information such as **credit score**, **income**, and other demographic/financial variables. Our outcome of interest is **`defaulted`**, a binary indicator where `1` means the student defaulted on a loan and `0` means they did not. We’ll start with a single predictor (`credit_score`) to illustrate the core ideas, then later extend to multiple predictors.
 
 Before diving into the technical reasons why OLS is inappropriate for binary outcomes, let’s look at a simplified version of the dataset we’ll use throughout this chapter:
 
@@ -285,8 +288,8 @@ To see this issue in action, let’s try fitting an OLS regression model using o
 
 ![OLS fails to constrain predictions between 0 and 1, despite binary outcomes.](img/ols-failure-credit-score3.svg){#fig-ols-failure-binary width="90%"}
 
-These limitations make OLS unsuitable for binary classification tasks.\
-To properly model binary outcomes, we need a method that:
+These limitations make OLS unsuitable for **modeling a binary outcome as a probability**. \
+To properly model the **probability of the event** (here, default), we need a method that:
 
 -   Produces predictions strictly between 0 and 1,
 -   Accounts for the fact that the variance depends on the mean, and
@@ -394,19 +397,22 @@ ols_model <- lm(defaulted_num ~ credit_score, data = blr_data)
 # Add predictions
 blr_data$predicted_ols <- predict(ols_model, newdata = blr_data)
 
-# Find region where OLS predictions are < 0
+# Find regions where OLS predictions are impossible (<0 or >1)
 neg_region <- blr_data %>% filter(predicted_ols < 0)
+pos_region <- blr_data %>% filter(predicted_ols > 1)
 
 if (nrow(neg_region) > 0) {
   x_min_neg <- min(neg_region$credit_score, na.rm = TRUE)
   x_max_neg <- max(neg_region$credit_score, na.rm = TRUE)
   x_mid_neg <- (x_min_neg + x_max_neg) / 2
-} else {
-  # fallback (shouldn't happen with current data)
-  x_min_neg <- min(blr_data$credit_score)
-  x_max_neg <- x_min_neg + 50
-  x_mid_neg <- (x_min_neg + x_max_neg) / 2
 }
+
+if (nrow(pos_region) > 0) {
+  x_min_pos <- min(pos_region$credit_score, na.rm = TRUE)
+  x_max_pos <- max(pos_region$credit_score, na.rm = TRUE)
+  x_mid_pos <- (x_min_pos + x_max_pos) / 2
+}
+
 
 # Create the plot showing OLS problems
 ggplot(blr_data, aes(x = credit_score, y = defaulted_num)) +
@@ -417,15 +423,22 @@ ggplot(blr_data, aes(x = credit_score, y = defaulted_num)) +
              color = "gray50", linewidth = 0.8) +
   geom_hline(yintercept = 1, linetype = "dashed",
              color = "gray50", linewidth = 0.8) +
-  # highlight region where predicted probability < 0
-  annotate("rect",
-           xmin = x_min_neg, xmax = x_max_neg,
-           ymin = -Inf, ymax = 0,
-           fill = "#E74C3C", alpha = 0.1) +
-  annotate("text",
-           x = x_mid_neg, y = -0.15,
-           label = "Impossible:\nProbability < 0",
-           size = 3.5, color = "#E74C3C", fontface = "bold") +
+  # highlight regions where predicted probability is impossible
+  {if (nrow(neg_region) > 0) annotate("rect",
+    xmin = x_min_neg, xmax = x_max_neg, ymin = -Inf, ymax = 0,
+    fill = "#E74C3C", alpha = 0.10)} +
+  {if (nrow(neg_region) > 0) annotate("text",
+    x = x_mid_neg, y = -0.15,
+    label = "Impossible:\nP < 0",
+    size = 3.5, color = "#E74C3C", fontface = "bold")} +
+  {if (nrow(pos_region) > 0) annotate("rect",
+    xmin = x_min_pos, xmax = x_max_pos, ymin = 1, ymax = Inf,
+    fill = "#E74C3C", alpha = 0.10)} +
+  {if (nrow(pos_region) > 0) annotate("text",
+    x = x_mid_pos, y = 1.10,
+    label = "Impossible:\nP > 1",
+    size = 3.5, color = "#E74C3C", fontface = "bold")} +
+
   coord_cartesian(ylim = c(-0.3, 1.2)) +
   labs(
     title = "Why OLS Fails for Binary Outcomes",
@@ -462,17 +475,12 @@ X = sm.add_constant(df['credit_score'])
 ols_model = sm.OLS(df['defaulted_num'], X).fit()
 df['predicted_ols'] = ols_model.predict(X)
 
-# Region where predictions are < 0
+# Sort by credit score so the fitted line is drawn correctly
+df = df.sort_values('credit_score').reset_index(drop=True)
+
+# Identify impossible prediction regions
 neg_mask = df['predicted_ols'] < 0
-if neg_mask.any():
-    x_min_neg = df.loc[neg_mask, 'credit_score'].min()
-    x_max_neg = df.loc[neg_mask, 'credit_score'].max()
-    x_mid_neg = 0.5 * (x_min_neg + x_max_neg)
-else:
-    # fallback (shouldn't happen with current data)
-    x_min_neg = df['credit_score'].min()
-    x_max_neg = x_min_neg + 50
-    x_mid_neg = 0.5 * (x_min_neg + x_max_neg)
+pos_mask = df['predicted_ols'] > 1
 
 # Create the plot
 fig, ax = plt.subplots(figsize=(8, 5))
@@ -480,30 +488,79 @@ fig, ax = plt.subplots(figsize=(8, 5))
 # Actual binary outcomes (jittered)
 np.random.seed(42)
 jitter = np.random.normal(0, 0.03, size=len(df))
-ax.scatter(df['credit_score'], df['defaulted_num'] + jitter,
-           alpha=0.3, color='black', s=20, label='Actual Defaults')
+ax.scatter(
+    df['credit_score'],
+    df['defaulted_num'] + jitter,
+    alpha=0.3,
+    color='black',
+    s=20,
+    label='Actual Defaults'
+)
 
-# OLS fitted line
-ax.plot(df['credit_score'], df['predicted_ols'],
-        color='#E74C3C', linewidth=2, label='OLS Fit')
+# OLS fitted line (now properly ordered)
+ax.plot(
+    df['credit_score'],
+    df['predicted_ols'],
+    color='#E74C3C',
+    linewidth=2,
+    label='OLS Fit'
+)
 
 # Reference lines
 ax.axhline(y=0, color='gray', linestyle='--', linewidth=1, alpha=0.7)
 ax.axhline(y=1, color='gray', linestyle='--', linewidth=1, alpha=0.7)
 
-# Highlight impossible region (P < 0)
-ax.add_patch(Rectangle((x_min_neg, -0.3),
-                       x_max_neg - x_min_neg, 0.3,
-                       facecolor='#E74C3C', alpha=0.1, edgecolor='none'))
-ax.text(x_mid_neg, -0.15, 'Impossible:\nProbability < 0',
-        ha='center', va='center', fontsize=10,
-        color='#E74C3C', fontweight='bold')
+# Highlight impossible regions only if they exist
+ymin, ymax = -0.3, 1.2
 
-ax.set_ylim(-0.3, 1.2)
+if neg_mask.any():
+    x_min_neg = df.loc[neg_mask, 'credit_score'].min()
+    x_max_neg = df.loc[neg_mask, 'credit_score'].max()
+    x_mid_neg = 0.5 * (x_min_neg + x_max_neg)
+
+    ax.add_patch(Rectangle(
+        (x_min_neg, ymin),
+        x_max_neg - x_min_neg,
+        0 - ymin,
+        facecolor='#E74C3C',
+        alpha=0.10,
+        edgecolor='none'
+    ))
+    ax.text(
+        x_mid_neg, -0.15,
+        'Impossible:\nP < 0',
+        ha='center', va='center',
+        fontsize=10,
+        color='#E74C3C',
+        fontweight='bold'
+    )
+
+if pos_mask.any():
+    x_min_pos = df.loc[pos_mask, 'credit_score'].min()
+    x_max_pos = df.loc[pos_mask, 'credit_score'].max()
+    x_mid_pos = 0.5 * (x_min_pos + x_max_pos)
+
+    ax.add_patch(Rectangle(
+        (x_min_pos, 1.0),
+        x_max_pos - x_min_pos,
+        ymax - 1.0,
+        facecolor='#E74C3C',
+        alpha=0.10,
+        edgecolor='none'
+    ))
+    ax.text(
+        x_mid_pos, 1.08,
+        'Impossible:\nP > 1',
+        ha='center', va='center',
+        fontsize=10,
+        color='#E74C3C',
+        fontweight='bold'
+    )
+
+ax.set_ylim(ymin, ymax)
 ax.set_xlabel('Credit Score', fontsize=11)
 ax.set_ylabel('Predicted Probability of Default', fontsize=11)
-ax.set_title('Why OLS Fails for Binary Outcomes',
-             fontsize=14, fontweight='bold', pad=15)
+ax.set_title('Why OLS Fails for Binary Outcomes', fontsize=14, fontweight='bold', pad=15)
 ax.legend(loc='upper right')
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
@@ -555,7 +612,7 @@ $$
 
 This function takes our linear prediction ($\beta_0 + \beta_1 X_i$), which can range from $-\infty$ to $+\infty$, and "squashes" it into the range $(0, 1)$. This mathematical trick ensures that no matter how extreme our predictor values get, our predicted probability never exceeds 1 or drops below 0.
 
-![The Logistic Function showing the S-shape curve](img/logistic-curve.png){#fig-logistic-curve width="80%"}
+![The Logistic Function showing the S-shape curve](img/logistic-curve.svg){#fig-logistic-curve width="80%"}
 
 ### Understanding the "S" Shape
 
@@ -577,16 +634,30 @@ This idea forms the basis of **binary logistic regression**, introduced next.
 ::: callout-note
 ## Visualizing the Difference
 
-In **OLS (Linear Regression)**, the slope is constant ($\beta_1$). In **Logistic Regression**, the "slope" (rate of change in probability) changes constantly—it is steepest at $\pi = 0.5$ and approaches zero at the extremes.
+In OLS (linear regression), the slope $\,\beta_1\,$ is a **constant change in the mean response**:
+$$
+\mathbb{E}[Y \mid x+1] - \mathbb{E}[Y \mid x] = \beta_1.
+$$
+
+In logistic regression, the relationship is linear on the **log-odds (logit) scale**:
+$$
+\log\!\left(\frac{\pi(x)}{1-\pi(x)}\right)=\beta_0+\beta_1 x.
+$$
+So $\beta_1$ is still a **constant slope**—but it is constant in **log-odds**: a one-unit increase in $x$ adds $\beta_1$ to the log-odds (equivalently, it multiplies the odds by $e^{\beta_1}$), holding other predictors fixed.
+
+What *isn't* constant is the change in **probability**. The marginal effect on probability depends on $\pi(x)$:
+$$
+\frac{d\pi(x)}{dx}=\beta_1\,\pi(x)\big(1-\pi(x)\big),
+$$
+which is largest near $\pi(x)=0.5$ and shrinks as $\pi(x)$ approaches 0 or 1.
 :::
+
 
 ------------------------------------------------------------------------
 
 ### The Logistic Function and Its Shape (Code)
 
 The following plot illustrates this behavior. Notice how the linear model (red dashed line) marches blindly past 0 and 1, while the logistic model (blue solid line) respects the boundaries and shows the characteristic "S" shape.
-
-![The Sigmoid 'S-Curve' vs. Linear Fit. The logistic model (blue solid line) respects the \[0,1\] probability bounds and captures the non-linear "diminishing returns" at the extremes, whereas the linear model (red dashed line) extends indefinitely.](img/logistic-sigmoid.svg){#fig-logistic-sigmoid width="90%"}
 
 ::: panel-tabset
 ## R Code
@@ -688,118 +759,86 @@ plt.show()
 ```
 :::
 
+![The Sigmoid 'S-Curve' vs. Linear Fit. The logistic model (blue solid line) respects the \[0,1\] probability bounds and captures the non-linear "diminishing returns" at the extremes, whereas the linear model (red dashed line) extends indefinitely.](img/logistic-sigmoid.svg){#fig-logistic-sigmoid width="90%"}
+
 ------------------------------------------------------------------------
 
 ## Case Study: Understanding Financial Behaviors
 
-Statistical models are most useful when they connect to a real-world problem. Here, we’ll use binary logistic regression to study **financial behavior** — specifically, the likelihood that a student **defaults** on a loan.
+Statistical models are most useful when they connect to a real-world problem. In this case study, we use binary logistic regression to model **default risk**—the probability that a student **defaults** on a loan.
 
 ------------------------------------------------------------------------
 
-### The Dataset
+### Case Study Setup: Data + Goal
 
-We’ll use the `Logistic_Regression` dataset (packaged in `cookbook`).
+We’ll use the `Logistic_Regression` dataset (packaged in `cookbook`). The outcome is:
 
--   **Predictors**:
+- `defaulted` (binary: `1 = default`, `0 = no default`)
 
-    -   `credit_score` (numeric, higher = lower risk)
-    -   `income` (numeric, annual income in dollars)
-    -   `age` (numeric)
-    -   `loan_amount` (numeric, loan size)
-    -   `student` (categorical: yes/no)
+and we model the probability of default for each student,
+$\pi_i = P(Y_i = 1 \mid \mathbf{x}_i)$,
+using a mix of predictors such as:
 
--   **Outcome**:
+- `credit_score` (numeric; higher typically means lower risk)
+- `income` (numeric; annual income)
+- `age` (numeric)
+- `loan_amount` (numeric)
+- `student` (categorical: yes/no)
 
-    -   `defaulted` (binary: `1 = default`, `0 = no default`)
+Banks and lenders face a practical question:
 
-::: callout-note
-This is a **binary classification problem**: given a mix of continuous and categorical predictors, we want to predict whether a student defaults.
-:::
+> *Given a customer’s financial history, how risky is this loan?*
 
-------------------------------------------------------------------------
+Even though the final decision is “approve” or “deny,” the key modeling goal is to estimate a **probability of default** (risk). That probability can later be converted into a decision using a chosen threshold (e.g., “approve only if $\hat{\pi}_i < 0.10$”).
 
-### The Problem We’re Trying to Solve
+#### Why probability matters: asymmetric costs
 
-Banks and lenders routinely face a critical decision:
+Errors are not equally costly:
 
-> *Given a customer’s financial history, should we approve their loan application?*
+- **False positive:** predict default, but the customer would have paid.  
+  *Cost:* opportunity cost (lost interest).
+- **False negative:** predict safe, but the customer defaults.  
+  *Cost:* potential loss of principal (and associated costs).
 
-While this sounds like a simple "Yes" or "No" question, the reality is a complex game of **probability and risk management**.
-
-#### 1. The Balancing Act of Lending
-
-Lending is a trade-off between two competing goals:
-
--   **Maximizing Profit:** The bank wants to lend to as many people as possible to earn interest.
-
--   **Minimizing Loss:** The bank wants to avoid lending to people who will not pay the money back (default).
-
-If a bank is too strict, they reject good customers and lose profit. If they are too lenient, they lose their principal investment. The goal of **Binary Logistic Regression** here is not just to guess who defaults, but to **quantify the risk** ($\hat{\pi}_i$) so the bank can find the profitable "sweet spot."
-
-#### 2. The Asymmetry of Errors
-
-In this context, being wrong in one direction is much more expensive than being wrong in the other.
-
--   **False Positive (Type I Error):** The model predicts a customer will default, but they would have paid.
-    -   *Cost:* The bank loses the potential interest (opportunity cost).
--   **False Negative (Type II Error):** The model predicts a customer is safe, but they default.
-    -   *Cost:* The bank loses the entire loan amount.
-
-Because a False Negative is usually much costlier than a False Positive, lenders need a model that outputs a precise **probability** (e.g., "There is an 18% chance this person defaults"). This allows them to set a custom **decision threshold**—perhaps they only approve loans if the risk of default is below 10%, rather than the standard 50%.
+Because false negatives are often more expensive, we care about a calibrated probability $\hat{\pi}_i$, not just a yes/no label.
 
 ------------------------------------------------------------------------
 
-### Study Design
+### Study Design and Data Prep
 
--   **Predictor types**: both **continuous** (income, age, credit_score, loan_amount) and **categorical** (student status).
+Before fitting the model, we set up the analysis and prepare the data.
 
--   **Outcome**: binary (defaulted).
+#### Study design (high-level)
 
--   **Sample size**: dataset includes a few hundred observations (enough to illustrate the method).
+- **Predictors:** a mix of continuous and categorical variables.
+- **Outcome:** binary (`defaulted`).
+- **Assumptions / modelling requirements:**
+  - **Independence:** observations are (approximately) independent.
+  - **Linearity in the log-odds:** predictors relate linearly to the log-odds of default.
+  - **No perfect multicollinearity (identifiability):** predictors must not be perfectly redundant (e.g., one column is an exact linear combination of others), so coefficients are uniquely estimable.
 
--   **Assumptions**:
+#### Data preparation steps
 
-    -   Observations are independent.
-    -   Predictors have a linear relationship with the **log-odds** of default.
-    -   No perfect collinearity among predictors.
+We’ll do three practical steps that help ensure fair evaluation and stable estimation:
 
-------------------------------------------------------------------------
+1. **Check class balance.** If defaults are rare, accuracy alone can be misleading.
+2. **Split into training/testing sets** to evaluate generalization and reduce overfitting.
+3. **Stratify the split** so the default rate is similar in both sets.
 
-### Applying Study Design to Our Case Study
+#### Influential points and outliers
 
-Before we fit the model, we must prepare the data. In predictive modeling, this involves three critical steps: **splitting**, **checking for imbalance**, and **handling outliers**.
+All regression-style models can be influenced by unusual observations. In logistic regression, the most important cases are often **high-leverage points** (unusual predictor values) and situations close to **separation** (predictors almost perfectly predict the outcome), both of which can strongly affect the fitted probabilities.
 
-#### Why We Split the Data (Training vs. Testing)
+Before modeling, it’s worth checking for:
 
-A common mistake is to fit a model on all available data and then evaluate its performance on that same data. This leads to **overfitting**: the model memorizes the specific noise in the dataset rather than learning the underlying patterns.
-
-To ensure our model generalizes to new, unseen borrowers, we split the data into two sets:
-
--   **Training Set (e.g., 70%):** Used to estimate the coefficients ($\hat{\beta}$). The model "sees" this data.
--   **Testing Set (e.g., 30%):** Used *only* to evaluate performance. The model never sees this data during fitting.
-
-#### The Challenge of Class Imbalance
-
-In loan default data, "success" (paying back the loan) is much more common than "failure" (defaulting). This is known as **class imbalance**.
-
-If 95% of borrowers pay back their loans, a naive model could simply predict "No Default" for everyone and achieve **95% accuracy**. However, this model is useless to the bank because it identifies **zero** risks.
-
-To handle this during the split, we use **stratified sampling**. This ensures that the proportion of defaulters is exactly the same in both the training and testing sets, preventing the "rare" event from disappearing entirely in the test set.
-
-#### Influential Points and Outliers
-
-Logistic regression is sensitive to **outliers** (extreme values). A single borrower with an income of \$10,000,000 or an age of 110 can pull the logistic curve disproportionately, biasing the results.
-
-Before modeling, we should check for:
-
--   **Data Entry Errors:** (e.g., a credit score of 9000, which is impossible).
--   **Extreme Leverage Points:** Legitimate but extreme values that might need to be capped or investigated.
+- **Data entry errors** (impossible values).
+- **Extreme leverage points** (legitimate but unusually large/small predictor values that may disproportionately influence the fit).
 
 ------------------------------------------------------------------------
 
 ### Data Preparation in Action
 
-Below, we split the data while preserving the class balance (stratification) and encode the categorical variables.
+Below, we check the default rate and create a stratified train/test split.
 
 ::: panel-tabset
 ## R Code
@@ -871,8 +910,9 @@ $$
 Here is what the parameters entail:
 
 -   $\pi_i$: The probability that the $i$-th student defaults.
--   $\beta_0$ (**The Intercept**): The expected log-odds of default when all predictors are zero. (Often theoretical, as no one has 0 credit score).
--   $\beta_1, \dots, \beta_k$ (**The Slopes**): The change in the **log-odds** of default for a one-unit increase in the predictor, holding all other variables constant.
+-   $\beta_0$ (**The Intercept**): The log-odds of default when all predictors are zero (often outside the meaningful range of the data, so mainly a baseline reference).
+-   $\beta_1, \dots, \beta_k$ (**The Slopes**): For a one-unit increase in the **corresponding predictor** $X_j$ (e.g., `credit_score` or `income`), $\beta_j$ is the change in the **log-odds** of default, **holding all other predictors fixed**. Equivalently, the odds are multiplied by $e^{\beta_j}$.
+
 
 ### Fitting the Model
 
@@ -935,22 +975,42 @@ In the previous section, we fit a model with several predictors. To clearly demo
 
 ### The "Log-Odds" Output
 
-By default, logistic regression software outputs coefficients ($\hat{\beta}$) in **log-odds**.
+By default, logistic regression software reports coefficients $\hat{\beta}$ on the **log-odds** (logit) scale. In other words, the model is linear in the quantity
+$$
+\log\!\left(\frac{\pi_i}{1-\pi_i}\right),
+$$
+not directly in $\pi_i$. This is why the printed coefficients can feel unintuitive: a change like $\hat{\beta}=-0.004$ is a change in **log-odds**, not a direct “percent change in probability.”
 
--   **R:** The `estimate` column.
--   **Python:** The `coef` column.
+Practically:
+- In **R**, these values appear in the `estimate` column.
+- In **Python (statsmodels)**, they appear in the `coef` (or `params`) output.
 
-While mathematically necessary, log-odds are difficult for humans to visualize. (e.g., *"What does a -0.004 change in log-odds mean?"*).
+A good mental model is: **each coefficient tells you how the log-odds move when that predictor increases by one unit, holding the other predictors fixed.**
 
-### The "Odds Ratio" (OR)
+### From Log-Odds to Odds Ratios
 
-To make these numbers interpretable, we exponentiate the coefficients: $$\text{OR} = e^{\hat{\beta}}$$
+To make coefficients easier to interpret, we often exponentiate them to get **odds ratios (ORs)**:
+$$
+\text{OR}_j = e^{\hat{\beta}_j}.
+$$
+Exponentiation converts “additive changes in log-odds” into “multiplicative changes in odds.”
 
--   **If** $\text{OR} > 1$: The predictor is associated with **higher** odds of default.
--   **If** $\text{OR} < 1$: The predictor is associated with **lower** odds of default.
--   **If** $\text{OR} = 1$: No association.
+- If $\text{OR}_j > 1$, then increasing $X_j$ is associated with **higher odds** of the event ($Y=1$), holding other predictors fixed.
+- If $\text{OR}_j < 1$, then increasing $X_j$ is associated with **lower odds** of the event.
+- If $\text{OR}_j = 1$, then there is **no change in odds** associated with $X_j$ (at least in this fitted model).
 
-Below, we fit the simplified model and calculate the Odds Ratios with 95% Confidence Intervals.
+Importantly, the OR interpretation is always “per one-unit increase in the corresponding predictor.” If the unit is very small (like \$1 of income), the OR can look like 1.0000 even when the effect is real.
+
+### A Simplified Model for Interpretation
+
+To demonstrate coefficient interpretation clearly, we focus on a simplified model using two predictors: `credit_score` and `income`:
+$$
+\log\!\left(\frac{\pi_i}{1-\pi_i}\right)
+= \beta_0 + \beta_1\,\texttt{credit\_score}_i + \beta_2\,\texttt{income}_i.
+$$
+Here, $\beta_1$ is the log-odds change associated with a one-point increase in credit score (holding income fixed), and $\beta_2$ is the log-odds change associated with a one-dollar increase in income (holding credit score fixed).
+
+Below, we fit the simplified model and compute odds ratios with 95% confidence intervals.
 
 ::: panel-tabset
 ## R Code
@@ -1163,7 +1223,14 @@ To fix this, we perform **One-Hot Encoding** (or Dummy Encoding). This converts 
 -   **Original:** `student = "Yes"`
 -   **Encoded:** `student_yes = 1`
 
-**Note on Multicollinearity:** If a variable has two categories (Student: Yes/No), we only need **one** column (`is_student`). If we included both `student_yes` and `student_no`, they would be perfectly correlated, causing the math to break (the "Dummy Variable Trap").
+**Note on the “Dummy Variable Trap” (Intercept + both levels).**  
+If `student` has two categories (Yes/No), a common encoding is to create two indicators: `student_yes` and `student_no`. However, if your model includes an **intercept** (which is the default in both R and Python), you **must not** include indicators for *all* categories. Why? Because for every row,
+$$
+\text{student\_yes} + \text{student\_no} = 1,
+$$
+and the intercept column is also a column of ones. That means one column can be written as an exact linear combination of the others (perfect multicollinearity), so the design matrix is not full rank.
+
+In practice, we avoid this by choosing a **reference level** and dropping one indicator. The effect of the reference level is absorbed into the **intercept**, and the remaining coefficient(s) are interpreted *relative to that reference group*. For example, if “No” is the reference, then the coefficient on `student_yes` compares students to non-students, holding other predictors fixed.
 
 ### Splitting the Data
 
@@ -1305,47 +1372,46 @@ plt.show()
 ```
 :::
 
+### What the Correlation Plot Tells Us (and What It Doesn’t)
+
+A correlation plot is a quick way to understand which predictors move together and whether any variables might be partially redundant. Here are the main takeaways we look for:
+
+- **Redundant predictors (multicollinearity risk):** If two predictors are very strongly correlated (near $|r|=1$), they carry similar information. Including both can make coefficient estimates less stable (larger standard errors), which can make interpretation harder even if predictions remain decent.
+- **Expected directions and plausibility:** Some relationships should match intuition (e.g., higher `credit_score` typically associated with lower default risk). If a relationship looks surprising, it can be a sign to double-check coding, units, or data quality.
+- **Model-building guidance (not a rule):** Correlation is not a “keep/drop” rule by itself. Logistic regression uses *conditional* relationships (each coefficient is “holding others fixed”), so a variable can have weak marginal correlation and still be important once other predictors are included.
+
+Finally, remember that correlation does **not** establish causality, and it does not capture non-linear relationships. We use this plot as a diagnostic for feature relationships and potential modeling issues—not as a conclusion about what “causes” default.
+
+
 ------------------------------------------------------------------------
 
 ## Data Modelling
 
-With EDA complete, we’re ready to formally specify our logistic regression model.
+With EDA complete, we’re ready to specify a logistic regression model. The outcome is binary (`defaulted` $\in \{0,1\}$), so instead of predicting $Y_i$ directly, we model the probability of default $\pi_i = P(Y_i=1\mid \mathbf{x}_i)$.
 
-### Choosing a Logistic Regression Model
+### Model setup: distribution + link
 
-The response variable is binary: `defaulted` $\in \{0,1\}$. Logistic regression is appropriate because it models the probability of the event occurring ($\pi_i$) rather than the raw outcome.
-
-### Defining the Probability Distribution
-
-Unlike linear regression, we do not model $Y_i$ directly. Instead, we assume that the outcome follows a **Bernoulli distribution**:
-
+In logistic regression we assume:
 $$
-Y_i \sim \text{Bernoulli}(\pi_i)
-$$ where $\pi_i$ is the probability that the $i$-th customer defaults.
-
-### Setting Up the Logistic Regression Equation
-
-We link the regressors to the probability $\pi_i$ using the logit function:
-
-$$\log\left(\frac{\pi_i}{1 - \pi_i}\right) = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \dots + \beta_k X_{ki}
+Y_i \sim \text{Bernoulli}(\pi_i),
 $$
+meaning each observation is a “yes/no” outcome with success probability $\pi_i$.
 
-### The Missing Error Term ($\epsilon$)
+We connect predictors to $\pi_i$ through the **logit link**:
+$$
+\log\!\left(\frac{\pi_i}{1-\pi_i}\right)
+= \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \dots + \beta_k X_{ki}.
+$$
+This expresses a linear model for the **log-odds**, which guarantees the implied probabilities stay in $(0,1)$.
 
-You may notice a key difference here compared to OLS equations ($Y = \beta X + \epsilon$): **there is no error term** $\epsilon$ at the end of the equation.
+A common point of confusion is the missing error term $\epsilon$. In OLS, the error term represents noise around a continuous mean. In logistic regression, randomness is already built into the Bernoulli outcome: even if two people have the same predicted probability $\pi_i$, the realized outcome can differ because $Y_i$ is a probabilistic “coin flip” with probability $\pi_i$.
 
--   In OLS, $\epsilon$ captures random noise around the mean.
--   In Logistic Regression, the randomness is inherent in the **Bernoulli distribution** of $Y$ itself. Once we know $\pi_i$ (the probability), the randomness comes from the "coin flip" of whether the event actually happens or not. We do not add an extra error term to the log-odds equation.
+### Parameters and interpretation scope
 
-### Counting the Parameters
+If we fit a model with $k$ predictors (regressors), we estimate $k+1$ parameters: one intercept $\beta_0$ and one coefficient for each predictor. Each coefficient $\beta_j$ describes the change in **log-odds** associated with a one-unit increase in its corresponding predictor $X_j$, **holding the other predictors fixed**.
 
-If we fit a model using `credit_score` and `income` to predict default, we are estimating **3 parameters**:
+Below, we fit a multivariable model and inspect the output in both R and Python.
 
-1.  $\beta_0$: The intercept.
-2.  $\beta_1$: The coefficient for `credit_score`.
-3.  $\beta_2$: The coefficient for `income`.
-
-Generally, if we have $k$ regressors, we estimate $k+1$ parameters.
 
 ------------------------------------------------------------------------
 
