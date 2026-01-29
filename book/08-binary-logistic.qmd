@@ -1027,9 +1027,14 @@ fit_simple <- glm(
   family = binomial(link = "logit")
 )
 
-# We use broom::tidy to easily extract coefficients and convert them
+# We use broom::tidy to easily extract coefficients
 library(broom)
-coef_table <- tidy(fit_simple, conf.int = TRUE, conf.level = 0.95)
+coef_table <- tidy(fit_simple)
+
+# Calculate Wald confidence intervals (more stable than profile likelihood)
+ci <- confint.default(fit_simple, level = 0.95)
+coef_table$conf.low <- ci[, 1]
+coef_table$conf.high <- ci[, 2]
 
 # Calculate Odds Ratios (OR) by exponentiating estimates and CIs
 coef_table$odds_ratio <- exp(coef_table$estimate)
@@ -1557,8 +1562,11 @@ summary(logit_model)
 # ===================================
 # 2. ODDS RATIOS WITH CONFIDENCE INTERVALS
 # ===================================
-# Calculate odds ratios and confidence intervals
-coef_table <- tidy(logit_model, conf.int = TRUE, conf.level = 0.95)
+# Calculate odds ratios and confidence intervals (using Wald CIs)
+coef_table <- tidy(logit_model)
+ci <- confint.default(logit_model, level = 0.95)
+coef_table$conf.low <- ci[, 1]
+coef_table$conf.high <- ci[, 2]
 coef_table <- coef_table %>%
   mutate(
     odds_ratio = exp(estimate),
@@ -3021,8 +3029,12 @@ library(dplyr)
 logit_model <- glm(defaulted ~ credit_score + income,
                    data = BLR, family = binomial)
 
-# Create comprehensive summary table
-coef_summary <- tidy(logit_model, conf.int = TRUE, conf.level = 0.95) %>%
+# Create comprehensive summary table (using Wald CIs for stability)
+coef_summary <- tidy(logit_model)
+ci <- confint.default(logit_model, level = 0.95)
+coef_summary$conf.low <- ci[, 1]
+coef_summary$conf.high <- ci[, 2]
+coef_summary <- coef_summary %>%
   mutate(
     odds_ratio = exp(estimate),
     or_lower = exp(conf.low),
