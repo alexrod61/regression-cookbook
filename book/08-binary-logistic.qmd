@@ -1450,16 +1450,33 @@ Under a model with $k$ regressors, the coefficients $\beta_0,\beta_1,\ldots,\bet
 
 ### Maximum Likelihood Estimation (MLE)
 
-Because our outcome $Y_i$ follows a Bernoulli distribution with probability $\pi_i$, we cannot use Least Squares. Instead, we use **Maximum Likelihood Estimation**.
+Because each outcome $Y_i$ is Bernoulli with success probability $\pi_i$, least squares is not the natural fitting criterion. Instead, we estimate $\boldsymbol\beta$ using **maximum likelihood**.
 
-We seek the values of $\beta$ that maximize the likelihood of observing the data we actually collected. The likelihood function is:
+Assuming the observations are conditionally independent given the predictors, the likelihood of the observed data is
 
 $$
-L(\boldsymbol\beta)=\prod_{i=1}^n \pi_i^{y_i}(1-\pi_i)^{1-y_i}
-$$ Where $\pi_i$ is connected to our regressors via the inverse-logit:
+L(\boldsymbol\beta)=\prod_{i=1}^n \pi_i^{y_i}(1-\pi_i)^{1-y_i},
+$$
 
-$$\pi_i=\frac{e^{\beta_0 + \dots + \beta_k X_{ki}}}{1+e^{\beta_0 + \dots + \beta_k X_{ki}}}
-$$ The computer solves this using an iterative algorithm (Newton-Raphson) to find the $\hat{\beta}$ values that make the observed defaults most probable.
+where $\pi_i$ is linked to the predictors through the logistic model
+
+$$
+\pi_i=\frac{1}{1+\exp\!\left(-(\beta_0+\beta_1X_{1i}+\cdots+\beta_kX_{ki})\right)}.
+$$
+
+Plugging this expression for $\pi_i$ into $L(\boldsymbol\beta)$ gives a likelihood written entirely in terms of $\boldsymbol\beta$. It is usually easier to work with the **log-likelihood**:
+
+$$
+\ell(\boldsymbol\beta)=\log L(\boldsymbol\beta)
+=\sum_{i=1}^n\Big[y_i\log(\pi_i) + (1-y_i)\log(1-\pi_i)\Big].
+$$
+
+The **maximum likelihood estimate** $\hat{\boldsymbol\beta}$ is the value of $\boldsymbol\beta$ that maximizes $\ell(\boldsymbol\beta)$.
+
+::: {.callout-note}
+In practice, software computes $\hat{\boldsymbol\beta}$ using an iterative method. In R, `glm(..., family = binomial)` fits logistic regression via **IRLS/IWLS** (Iteratively Reweighted Least Squares), which repeatedly solves a weighted least-squares problem until the coefficients converge. (This procedure is closely related to Newton-style optimization of the log-likelihood, but you don’t need those details to use the model.)
+:::
+
 
 ------------------------------------------------------------------------
 
@@ -1484,57 +1501,72 @@ Finally, we often report **confidence intervals for odds ratios**. For example, 
 ::: panel-tabset
 ## R Code
 
-``` r
-# Logistic regression
-logit_model <- glm(defaulted ~ credit_score + income,
-                   data = BLR, family = binomial)
+```r
+# --- Fit models ---
+model_simple <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
+model_full   <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
-# Wald test results are included in summary
-summary(logit_model)
+# --- 1) Wald tests (in summary output) ---
+summary(model_full)
 
-# Confidence intervals for odds ratios
-exp(cbind(OR = coef(logit_model), confint(logit_model)))
+# --- 2) Odds ratios + 95% CI ---
+# Option A (profile likelihood CI; default in confint)
+or_ci <- exp(cbind(OR = coef(model_full), confint(model_full)))
+or_ci
 
-# Likelihood ratio test for nested models
-model1 <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
-anova(model1, logit_model, test = "Chisq")
+# Option B (Wald-style CI using standard errors; matches summary more closely)
+or_ci_wald <- exp(cbind(OR = coef(model_full), confint.default(model_full)))
+or_ci_wald
+
+# --- 3) Likelihood ratio test (nested models) ---
+anova(model_simple, model_full, test = "Chisq")
 ```
 
 ## Python Code
 
 ``` python
-import statsmodels.api as sm
+import pandas as pd
 import numpy as np
+import statsmodels.api as sm
 from scipy.stats import chi2
 
-df = r.data['BLR'].copy()
-df['defaulted'] = df['defaulted'].astype(int)
+# --- Prepare data ---
+df = r.BLR.copy()
+df["defaulted"] = df["defaulted"].astype(int)
 
-# Full model
-X_full = sm.add_constant(df[['credit_score','income']])
-y = df['defaulted']
-model_full = sm.Logit(y, X_full).fit()
+# --- Fit models ---
+X_simple = sm.add_constant(df[["credit_score"]])
+X_full   = sm.add_constant(df[["credit_score", "income"]])
+y = df["defaulted"]
 
-# Wald test (coeff / SE)
-wald_stats = (model_full.params / model_full.bse)**2
-print("Wald test chi2 values:\n", wald_stats)
+model_simple = sm.Logit(y, X_simple).fit(disp=0)
+model_full   = sm.Logit(y, X_full).fit(disp=0)
 
-# Confidence intervals for odds ratios
-conf = model_full.conf_int()
-odds_ratios = np.exp(model_full.params)
-conf_exp = np.exp(conf)
-print("Odds Ratios:\n", pd.DataFrame({"OR": odds_ratios,
-                                      "2.5%": conf_exp[0],
-                                      "97.5%": conf_exp[1]}))
+# --- 1) Wald tests (in model summary) ---
+print(model_full.summary())
 
-# Likelihood ratio test vs simpler model
-X_simple = sm.add_constant(df[['credit_score']])
-model_simple = sm.Logit(y, X_simple).fit()
+# --- 2) Odds ratios + 95% CI ---
+params = model_full.params
+conf   = model_full.conf_int()
+conf.columns = ["Lower", "Upper"]
 
+or_table = pd.DataFrame({
+    "Log-Odds (β)": params,
+    "OR": np.exp(params),
+    "OR 2.5%": np.exp(conf["Lower"]),
+    "OR 97.5%": np.exp(conf["Upper"]),
+    "p-value": model_full.pvalues
+})
+print("\nOdds ratios with 95% CI:")
+print(or_table.round(4))
+
+# --- 3) Likelihood ratio test (nested models) ---
 LR_stat = 2 * (model_full.llf - model_simple.llf)
-df_diff = model_full.df_model - model_simple.df_model
+df_diff = int(model_full.df_model - model_simple.df_model)
 p_value = chi2.sf(LR_stat, df_diff)
-print(f"LR Test: chi2={LR_stat:.2f}, df={df_diff}, p={p_value:.4f}")
+
+print("\nLikelihood Ratio Test: simple vs full")
+print(f"LR = {LR_stat:.4f}, df = {df_diff}, p = {p_value:.4g}")
 ```
 :::
 
@@ -1542,210 +1574,167 @@ print(f"LR Test: chi2={LR_stat:.2f}, df={df_diff}, p={p_value:.4f}")
 ::: panel-tabset
 ## R Output
 ```{r}
-library(lmtest)
 library(broom)
+library(dplyr)
+library(lmtest)
 
-# Fit the logistic regression model
-logit_model <- glm(defaulted ~ credit_score + income,
-                   data = BLR, family = binomial)
-
-# ===================================
-# 1. WALD TESTS (from model summary)
-# ===================================
-summary(logit_model)
+# --- Fit models ---
+model_simple <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
+model_full   <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
 # ===================================
-# 2. ODDS RATIOS WITH CONFIDENCE INTERVALS
+# 1) WALD TESTS (from model summary)
 # ===================================
-# Calculate odds ratios and confidence intervals
-coef_table <- tidy(logit_model, conf.int = TRUE, conf.level = 0.95)
-coef_table <- coef_table %>%
+summary(model_full)
+
+# ===================================
+# 2) ODDS RATIOS WITH 95% CI
+# ===================================
+
+# Table version using broom (Wald-style CI based on standard errors)
+coef_table <- tidy(model_full, conf.int = TRUE, conf.level = 0.95) %>%
   mutate(
     odds_ratio = exp(estimate),
-    or_lower = exp(conf.low),
-    or_upper = exp(conf.high)
+    or_lower   = exp(conf.low),
+    or_upper   = exp(conf.high)
   )
 
-# Display formatted table
 knitr::kable(
   coef_table %>% 
     select(term, estimate, std.error, p.value, odds_ratio, or_lower, or_upper),
   digits = 4,
-  col.names = c("Term", "Log-Odds (β)", "SE", "p-value", 
+  col.names = c("Term", "Log-Odds (β)", "SE", "p-value",
                 "Odds Ratio", "OR 2.5%", "OR 97.5%"),
-  caption = "Logistic Regression Coefficients with Odds Ratios"
+  caption = "Logistic regression coefficients with odds ratios (Wald 95% CI)"
 )
 
-# ===================================
-# 3. LIKELIHOOD RATIO TEST
-# ===================================
-# Compare nested models
-model_simple <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
-model_full <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
+# If you prefer profile likelihood CI, use:
+# exp(cbind(OR = coef(model_full), confint(model_full)))
 
-# LR test
-lr_test <- anova(model_simple, model_full, test = "Chisq")
-print(lr_test)
+# ===================================
+# 3) LIKELIHOOD RATIO TEST
+# ===================================
+anova(model_simple, model_full, test = "Chisq")
 
-# Alternative: using lmtest package
+# Optional: same LR test via lmtest
 lrtest(model_simple, model_full)
 ```
 ## Python Output
 
 ```{python}
 import pandas as pd
-import statsmodels.api as sm
 import numpy as np
+import statsmodels.api as sm
 from scipy.stats import chi2
 
-# Prepare data
+# --- Prepare data ---
 df = r.BLR.copy()
-df['defaulted'] = df['defaulted'].astype(int)
+df["defaulted"] = df["defaulted"].astype(int)
 
-# Fit the logistic regression model
-X = sm.add_constant(df[['credit_score', 'income']])
-y = df['defaulted']
-logit_model = sm.Logit(y, X).fit()
+# --- Fit models ---
+X_simple = sm.add_constant(df[["credit_score"]])
+X_full   = sm.add_constant(df[["credit_score", "income"]])
+y = df["defaulted"]
 
-# ===================================
-# 1. MODEL SUMMARY (includes Wald tests)
-# ===================================
-print(logit_model.summary())
+model_simple = sm.Logit(y, X_simple).fit(disp=0)
+model_full   = sm.Logit(y, X_full).fit(disp=0)
 
 # ===================================
-# 2. ODDS RATIOS WITH CONFIDENCE INTERVALS
+# 1) MODEL SUMMARY (includes Wald tests)
 # ===================================
-# Extract parameters and confidence intervals
-params = logit_model.params
-conf = logit_model.conf_int()
-conf.columns = ['Lower', 'Upper']
+print(model_full.summary())
 
-# Calculate odds ratios
-odds_ratios = pd.DataFrame({
-    'Log-Odds (β)': params,
-    'OR': np.exp(params),
-    'OR Lower 95%': np.exp(conf['Lower']),
-    'OR Upper 95%': np.exp(conf['Upper']),
-    'p-value': logit_model.pvalues
+# ===================================
+# 2) ODDS RATIOS WITH 95% CI
+# ===================================
+params = model_full.params
+conf   = model_full.conf_int()
+conf.columns = ["Lower", "Upper"]
+
+or_table = pd.DataFrame({
+    "Log-Odds (β)": params,
+    "OR": np.exp(params),
+    "OR 2.5%": np.exp(conf["Lower"]),
+    "OR 97.5%": np.exp(conf["Upper"]),
+    "p-value": model_full.pvalues
 })
 
-print("\nOdds Ratios with 95% Confidence Intervals:")
-print(odds_ratios.round(4))
+print("\nOdds ratios with 95% CI:")
+print(or_table.round(4))
 
 # ===================================
-# 3. LIKELIHOOD RATIO TEST
+# 3) LIKELIHOOD RATIO TEST
 # ===================================
-# Fit simpler model for comparison
-X_simple = sm.add_constant(df[['credit_score']])
-model_simple = sm.Logit(y, X_simple).fit(disp=0)
-
-# Calculate LR statistic
-LR_stat = 2 * (logit_model.llf - model_simple.llf)
-df_diff = logit_model.df_model - model_simple.df_model
+LR_stat = 2 * (model_full.llf - model_simple.llf)
+df_diff = int(model_full.df_model - model_simple.df_model)
 p_value = chi2.sf(LR_stat, df_diff)
 
-print("\n" + "="*50)
-print("Likelihood Ratio Test: Simple vs Full Model")
-print("="*50)
-print(f"LR Statistic: {LR_stat:.4f}")
-print(f"Degrees of Freedom: {df_diff}")
-print(f"p-value: {p_value:.4f}")
-print(f"Decision: {'Reject H0' if p_value < 0.05 else 'Fail to reject H0'}")
-print(f"Interpretation: Income {'significantly' if p_value < 0.05 else 'does not'} improve model fit")
+print("\nLikelihood Ratio Test: simple vs full")
+print(f"LR = {LR_stat:.4f}, df = {df_diff}, p = {p_value:.4g}")
 ```
 :::
 
 ---
 
-### Interpreting the Inference Results
+### Interpreting the results in our example
 
-The statistical tests above help us answer a fundamental question: **Are our predictors truly associated with default risk, or could the observed patterns have occurred by chance?**
+From the model summary, each predictor has an estimated coefficient $\hat\beta_j$ (log-odds scale), a standard error, and a Wald p-value. The odds-ratio table converts the same information to a more interpretable scale via $\exp(\hat\beta_j)$.
 
-#### Wald Tests: Individual Predictor Significance
+To interpret a coefficient, always state the comparison **holding the other predictors fixed**. For example:
 
-The model summary shows that **both credit score and income are highly significant** (p < 0.001).
+- If the odds ratio for `credit_score` is below 1, then higher credit scores are associated with *lower* odds of default.
+- For `income`, it is usually best to rescale (e.g., per \$10,000) so the odds ratio corresponds to a meaningful change.
 
-- The coefficient for **credit score** is approximately **−0.0149**.  
-  This means that for each 1-point increase in credit score, the log-odds of default decrease by about 0.015, holding income constant.  
-  On the odds scale this corresponds to an odds ratio of about **0.985** per point, i.e., **roughly a 1.5% reduction in the odds of default for each extra credit-score point**.
+Finally, the likelihood ratio test compares the two models directly: if the LR p-value is small, the additional predictor(s) provide evidence of improved fit beyond the simpler model.
 
-- The coefficient for **income** is about **−2.9 × 10⁻⁵** per dollar.  
-  On a more interpretable scale, a **\$10,000 increase in income** changes the log-odds by about −0.29, giving an odds ratio of about **0.75**.  
-  In other words, **each additional \$10,000 of income reduces the odds of default by roughly 25%, holding credit score fixed.**
-
-The very small p-values for both predictors give strong evidence that these relationships are real, not artifacts of random variation.
-
-
-#### Likelihood Ratio Test: Is the Full Model Better?
-
-The likelihood ratio test compares our two-predictor model (credit score + income) against a simpler model with credit score alone. The test yields a chi-squared statistic of about **54.8** on 1 degree of freedom (p ≈ **1.3 × 10⁻¹³**).
-
-**Interpretation:** The tiny p-value indicates that adding income **does** significantly improve model fit beyond credit score alone. In other words, even after accounting for credit score, income still provides extra information about default risk.
-
-#### Confidence Intervals for Odds Ratios
-
-The 95% confidence interval for the **credit score** odds ratio is approximately **[0.983, 0.988]** per 1-point increase. Because this interval lies entirely below 1.0, we can be confident that higher credit scores have a genuine protective effect.
-
-Scaling to a more meaningful change:
-
-- A **50-point increase** in credit score multiplies the odds of default by about  
-  **0.47**, with a 95% CI roughly **[0.42, 0.53]**.  
-  So we are 95% confident that increasing a borrower’s credit score by 50 points **cuts their odds of default by about half.**
-
-For **income**, a \$10,000 increase corresponds to an odds ratio of about **0.75**, with a 95% CI roughly **[0.69, 0.82]**. Again, the interval lies entirely below 1.0, indicating a clear protective effect of higher income on default risk.
-
-
-#### Practical Implications
-
-These results suggest that **both credit score and income play important roles** in predicting default, with credit score exerting the larger effect. From a lender’s perspective:
-
-- Credit score provides a strong, easily interpretable signal: borrowers with higher scores are much less likely to default.
-- Income adds meaningful additional information: among borrowers with the same credit score, those with higher incomes still have substantially lower default risk.
-
-In practice, a lender might prefer to include both variables in their risk model to balance predictive performance with interpretability.
 
 
 ------------------------------------------------------------------------
 
 ## Coefficient Interpretation
 
-Once we’ve established that predictors matter, the next step is to **interpret the coefficients** in a meaningful way.
+Once we’ve established that predictors matter, the next step is to interpret **what the coefficients mean**.
 
-### Odds Ratios and Their Meaning
+Logistic regression coefficients live on the **log-odds** scale. That scale is convenient for estimation, but not very intuitive—so we usually interpret effects using **odds ratios** and **predicted probabilities**.
 
-Logistic regression coefficients are expressed in **log-odds units**. To make them interpretable, we exponentiate them to obtain **odds ratios**.
+### Odds ratios and their meaning
 
-- In our loan-default model, the estimated coefficient for **credit score** is about **−0.0149**, which corresponds to an odds ratio of roughly **0.985** per 1-point increase.  
-  That means **each extra point in credit score reduces the odds of default by about 1.5%.**
+If the fitted model is
 
-Scaling makes interpretation clearer:
+$$
+\log\!\left(\frac{\pi_i}{1-\pi_i}\right)=\beta_0+\beta_1X_{1i}+\cdots+\beta_kX_{ki},
+$$
 
-- A **50-point increase** in credit score multiplies the odds of default by about **0.47**, i.e., it **roughly cuts the odds of default in half.**
-- For **income**, the coefficient per dollar is very small, but over a **\$10,000 increase** it corresponds to an odds ratio of about **0.75**.  
-  So **each extra \$10,000 of income lowers the odds of default by about 25%.**
+then a one-unit increase in \(X_j\) (holding all other predictors fixed) changes the log-odds by \(\beta_j\). Exponentiating converts that change into an **odds ratio**:
 
-### Pitfalls in Interpretation
+$$
+\text{OR}_j = e^{\beta_j}.
+$$
 
-It’s important to remember that odds ratios are **multiplicative**, not additive. This means the effect on probability depends on the baseline. For example:
+- If \(\text{OR}_j = 1\), there is no association.
+- If \(\text{OR}_j < 1\), higher values of \(X_j\) are associated with **lower odds** of the outcome.
+- If \(\text{OR}_j > 1\), higher values of \(X_j\) are associated with **higher odds** of the outcome.
 
--   Going from a 40% chance of default to 30% is a big shift,
--   But the same odds ratio may translate into a much smaller change if the baseline probability is already low (e.g., from 5% to 4%).
+For changes larger than one unit, the odds ratio scales multiplicatively:
 
-Clear communication requires translating odds ratios back into **probability changes** for meaningful scenarios.
+$$
+\text{OR for a } \Delta\text{-unit increase} = e^{\beta_j \Delta}.
+$$
 
-### Example from Loan Default Dataset
+This is why it’s often better to interpret effects using meaningful units (e.g., *50 credit-score points* or *\$10,000 of income*) rather than “per 1 unit”.
 
-In our fitted model (see the odds-ratio table), we estimate that:
+### Pitfalls in interpretation
 
-- A **50-point increase in credit score** multiplies the odds of default by about **0.47**  
-  (roughly a **53% reduction** in the odds of default).
-- A **\$10,000 increase in income** multiplies the odds of default by about **0.75**  
-  (about a **25% reduction** in the odds), holding credit score constant.
+Odds ratios describe changes in **odds**, not changes in **probability**. The same odds ratio can correspond to a large probability change in one part of the predictor range and a small change in another.
 
-We can present this in plain English:
+So, when communicating results, a good pattern is:
 
-> “Compared to an otherwise similar borrower with a credit score 50 points lower, a higher-score borrower has **about half the odds of default**.  
-> Likewise, borrowers who earn \$10,000 more per year have **roughly 25% lower odds of default**, even after accounting for credit score.”
+1) report the odds ratio (direction + multiplicative size), and  
+2) translate it into predicted probabilities for a concrete scenario (e.g., a borrower with credit score 600 vs 700, holding income fixed).
+
+### Example: translating odds ratios into predicted probabilities
+
+In the code below, we compute odds ratios for meaningful changes (e.g., +50 credit-score points, +\$10,000 income) and then compute predicted probabilities for two borrower profiles that differ only in credit score.
 
 ------------------------------------------------------------------------
 
@@ -1753,35 +1742,77 @@ We can present this in plain English:
 ## R Code
 
 ``` r
-# Logistic regression 
-logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial) 
+# Fit model
+logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
-# Odds ratios and CI 
-odds_ratios <- exp(cbind(OR = coef(logit_model), confint(logit_model))) odds_ratios 
+# Odds ratios (per 1 unit) with 95% CI
+# If you want Wald-style CI (matches summary SEs), use confint.default()
+or_ci <- exp(cbind(OR = coef(logit_model), confint.default(logit_model)))
+or_ci
 
-# Example: probability at credit_score = 600 vs 700 
-new_data <- data.frame(credit_score = c(600, 700), income = mean(BLR$income)) predict(logit_model, newdata = new_data, type = "response")
+# Odds ratios for meaningful changes
+b_cs <- coef(logit_model)["credit_score"]
+b_inc <- coef(logit_model)["income"]
+
+OR_50pts  <- exp(b_cs * 50)
+OR_10kinc <- exp(b_inc * 10000)
+
+OR_50pts
+OR_10kinc
+
+# Example: predicted probability at credit_score = 600 vs 700
+# holding income fixed at its mean
+new_data <- data.frame(
+  credit_score = c(600, 700),
+  income = mean(BLR$income, na.rm = TRUE)
+)
+
+predict(logit_model, newdata = new_data, type = "response")
 ```
 
 ## Python Code
 
 ``` python
-# Odds ratios
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+
+df = r.BLR.copy()
+df["defaulted"] = df["defaulted"].astype(int)
+
+X = sm.add_constant(df[["credit_score", "income"]])
+y = df["defaulted"]
+model_full = sm.Logit(y, X).fit(disp=0)
+
+# Odds ratios (per 1 unit) with 95% CI
 params = model_full.params
 conf = model_full.conf_int()
-odds_ratios = np.exp(params)
-conf_exp = np.exp(conf)
-print(pd.DataFrame({"OR": odds_ratios,
-                    "2.5%": conf_exp[0],
-                    "97.5%": conf_exp[1]}))
+conf.columns = ["Lower", "Upper"]
 
-# Example: probability at 600 vs 700 credit score
+or_table = pd.DataFrame({
+    "OR": np.exp(params),
+    "OR 2.5%": np.exp(conf["Lower"]),
+    "OR 97.5%": np.exp(conf["Upper"])
+})
+print(or_table.round(4))
+
+# Odds ratios for meaningful changes
+b_cs  = params["credit_score"]
+b_inc = params["income"]
+
+OR_50pts  = np.exp(b_cs * 50)
+OR_10kinc = np.exp(b_inc * 10000)
+
+print("\nOR for +50 credit-score points:", OR_50pts)
+print("OR for +$10,000 income:", OR_10kinc)
+
+# Example: predicted probability at credit_score = 600 vs 700 (income fixed at mean)
 test_data = pd.DataFrame({
     "const": 1,
     "credit_score": [600, 700],
-    "income": [df['income'].mean(), df['income'].mean()]
+    "income": [df["income"].mean(), df["income"].mean()]
 })
-print(model_full.predict(test_data))
+print("\nPredicted probabilities:", model_full.predict(test_data).values)
 ```
 :::
 
@@ -1794,172 +1825,119 @@ To make these odds ratios more concrete, we can plot predicted probabilities acr
 ## R Code
 ```{r}
 #| label: fig-prob-curve-credit
-#| fig-cap: "Predicted Probability of Default by Credit Score"
+#| fig-cap: "Predicted probability of default by credit score (simple logistic model)."
 #| fig-width: 8
 #| fig-height: 5
 
-# Fit simple model with credit score only for clear visualization
+library(ggplot2)
+library(scales)
+
 model_simple <- glm(defaulted ~ credit_score, data = BLR, family = binomial)
 
-# Create sequence of credit scores for prediction
-credit_seq <- seq(min(BLR$credit_score), max(BLR$credit_score), length.out = 200)
+credit_seq <- seq(min(BLR$credit_score, na.rm=TRUE),
+                  max(BLR$credit_score, na.rm=TRUE),
+                  length.out = 200)
+
 pred_df <- data.frame(credit_score = credit_seq)
 
-# Get predicted probabilities with confidence intervals
-pred_df$prob <- predict(model_simple, newdata = pred_df, type = "response")
-
-# Calculate confidence intervals on the linear predictor scale, then transform
+# predictions + approximate 95% CI via linear predictor SE
 pred_link <- predict(model_simple, newdata = pred_df, type = "link", se.fit = TRUE)
+pred_df$prob  <- plogis(pred_link$fit)
 pred_df$lower <- plogis(pred_link$fit - 1.96 * pred_link$se.fit)
 pred_df$upper <- plogis(pred_link$fit + 1.96 * pred_link$se.fit)
 
-# Add reference lines for key credit scores
-ref_scores <- c(400, 500, 600, 700, 800)
-ref_probs <- predict(model_simple, 
-                     newdata = data.frame(credit_score = ref_scores),
-                     type = "response")
+# choose reference scores that are inside the observed range
+ref_scores <- quantile(BLR$credit_score, probs = c(0.1, 0.5, 0.9), na.rm=TRUE)
+ref_df <- data.frame(credit_score = as.numeric(ref_scores))
+ref_df$prob <- predict(model_simple, newdata = ref_df, type = "response")
 
-# Create the plot
+# ensure defaulted is numeric 0/1 for plotting points
+y_points <- as.integer(as.character(BLR$defaulted))
+
 ggplot(pred_df, aes(x = credit_score, y = prob)) +
-  # Confidence interval ribbon
-  geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#3498db", alpha = 0.2) +
-  # Predicted probability curve
-  geom_line(color = "#2C3E50", linewidth = 1.5) +
-  # Actual data points (jittered for visibility)
-  geom_jitter(data = BLR, 
-              aes(x = credit_score, y = as.numeric(as.character(defaulted))),
-              height = 0.02, alpha = 0.2, size = 0.8, color = "gray30") +
-  # Reference lines for key credit scores
-  geom_segment(data = data.frame(x = ref_scores, y = ref_probs),
-               aes(x = x, xend = x, y = 0, yend = y),
-               linetype = "dotted", color = "#E74C3C", alpha = 0.6) +
-  geom_point(data = data.frame(x = ref_scores, y = ref_probs),
-             aes(x = x, y = y), color = "#E74C3C", size = 3) +
-  # Annotations for key points
-  annotate("text", x = 400, y = ref_probs[1] + 0.08, 
-           label = sprintf("Score 400\nP(default) = %.1f%%", ref_probs[1]*100),
-           size = 3, color = "#E74C3C", fontface = "bold") +
-  annotate("text", x = 700, y = ref_probs[4] - 0.08, 
-           label = sprintf("Score 700\nP(default) = %.1f%%", ref_probs[4]*100),
-           size = 3, color = "#E74C3C", fontface = "bold") +
-  # Labels and theme
-  labs(
-    title = "The S-Curve: How Credit Score Affects Default Probability",
-    subtitle = "Shaded area shows 95% confidence interval",
-    x = "Credit Score",
-    y = "Predicted Probability of Default"
-  ) +
-  scale_y_continuous(labels = scales::percent_format(), limits = c(0, 1)) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
-    plot.subtitle = element_text(hjust = 0.5, size = 10, color = "gray40")
-  )
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line(linewidth = 1.2) +
+  geom_jitter(data = BLR,
+              aes(x = credit_score, y = y_points),
+              height = 0.03, alpha = 0.15, size = 0.8) +
+  geom_point(data = ref_df, aes(x = credit_score, y = prob), size = 2.5) +
+  labs(x = "Credit Score", y = "Predicted Probability of Default") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  theme_minimal(base_size = 12)
 ```
 
 ## Python Code
 ```{python}
 
 #| label: fig-prob-curve-credit-py
-#| fig-cap: "Predicted Probability of Default by Credit Score (Python)"
+#| fig-cap: "Predicted probability of default by credit score (simple logistic model)."
 #| fig-width: 8
 #| fig-height: 5
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from scipy.special import expit
 
-# Prepare data
 df = r.BLR.copy()
-df['defaulted'] = df['defaulted'].astype(int)
+df["defaulted"] = df["defaulted"].astype(int)
 
-# Fit simple model with credit score only
-X_simple = sm.add_constant(df[['credit_score']])
-y = df['defaulted']
+X_simple = sm.add_constant(df[["credit_score"]])
+y = df["defaulted"]
 model_simple = sm.Logit(y, X_simple).fit(disp=0)
 
-# Create sequence for prediction
-credit_seq = np.linspace(df['credit_score'].min(), df['credit_score'].max(), 200)
-pred_df = pd.DataFrame({'const': 1, 'credit_score': credit_seq})
+credit_seq = np.linspace(df["credit_score"].min(), df["credit_score"].max(), 200)
+pred_df = pd.DataFrame({"const": 1, "credit_score": credit_seq})
 
-# Get predictions (probabilities directly)
+# prob predictions
 pred_probs = model_simple.predict(pred_df)
 
-# Calculate confidence intervals manually
-# Get linear predictor (log-odds) and its standard error
+# CI on logit scale -> prob scale
 pred_logit = model_simple.predict(pred_df, linear=True)
-
-# Get variance-covariance matrix and calculate SE
-X_pred = pred_df.values
-vcov = model_simple.cov_params()
+X_pred = pred_df[["const", "credit_score"]].values
+vcov = model_simple.cov_params().values
 se_logit = np.sqrt(np.diag(X_pred @ vcov @ X_pred.T))
 
-# Transform to probability scale using inverse logit
 lower_ci = expit(pred_logit - 1.96 * se_logit)
 upper_ci = expit(pred_logit + 1.96 * se_logit)
 
-# Create the plot
 fig, ax = plt.subplots(figsize=(8, 5))
+ax.fill_between(credit_seq, lower_ci, upper_ci, alpha=0.2, label="95% CI")
+ax.plot(credit_seq, pred_probs, linewidth=2, label="Predicted probability")
 
-# Confidence interval
-ax.fill_between(credit_seq, lower_ci, upper_ci,
-                alpha=0.2, color='#3498db', label='95% CI')
+# light jitter for points
+rng = np.random.default_rng(42)
+jitter = rng.normal(0, 0.02, size=len(df))
+ax.scatter(df["credit_score"], df["defaulted"] + jitter, alpha=0.15, s=10)
 
-# Predicted probability curve
-ax.plot(credit_seq, pred_probs, color='#2C3E50', linewidth=2.5, 
-        label='Predicted Probability')
-
-# Actual data points (jittered)
-np.random.seed(42)
-jitter = np.random.normal(0, 0.02, size=len(df))
-ax.scatter(df['credit_score'], df['defaulted'] + jitter, 
-           alpha=0.2, s=10, color='gray', label='Actual Data')
-
-# Reference points for key credit scores
-ref_scores = np.array([400, 500, 600, 700, 800])
-ref_df = pd.DataFrame({'const': 1, 'credit_score': ref_scores})
+# reference scores at quantiles (always in range)
+ref_scores = np.quantile(df["credit_score"], [0.1, 0.5, 0.9])
+ref_df = pd.DataFrame({"const": 1, "credit_score": ref_scores})
 ref_probs = model_simple.predict(ref_df)
 
-# Add reference lines
-for score, prob in zip(ref_scores, ref_probs):
-    ax.plot([score, score], [0, prob], ':', color='#E74C3C', alpha=0.6, linewidth=1)
-    ax.plot(score, prob, 'o', color='#E74C3C', markersize=8)
-
-# Annotations for extreme points
-ax.text(400, ref_probs[0] + 0.08, 
-        f'Score 400\nP(default) = {ref_probs[0]*100:.1f}%',
-        ha='center', fontsize=9, color='#E74C3C', fontweight='bold')
-ax.text(700, ref_probs[3] - 0.08, 
-        f'Score 700\nP(default) = {ref_probs[3]*100:.1f}%',
-        ha='center', fontsize=9, color='#E74C3C', fontweight='bold')
-
-# Labels and styling
-ax.set_xlabel('Credit Score', fontsize=11)
-ax.set_ylabel('Predicted Probability of Default', fontsize=11)
-ax.set_title('The S-Curve: How Credit Score Affects Default Probability', 
-             fontsize=14, fontweight='bold', pad=15)
-ax.text(0.5, 1.02, 'Shaded area shows 95% confidence interval',
-        transform=ax.transAxes, ha='center', fontsize=9, color='gray')
+ax.scatter(ref_scores, ref_probs, s=50)
+ax.set_xlabel("Credit Score")
+ax.set_ylabel("Predicted Probability of Default")
 ax.set_ylim(0, 1)
-ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
-ax.legend(loc='upper right', framealpha=0.9)
+ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f"{y:.0%}"))
+ax.legend()
 ax.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()
+
+print("Reference points (credit score -> predicted probability):")
+for s, p in zip(ref_scores, ref_probs):
+    print(f"{s:.0f} -> {p:.3f}")
 
 ```
 
 :::
 
-**Interpretation:** The plot reveals the nonlinear relationship between credit score and default probability. 
-In our fitted model, a borrower with a credit score of **400** has an estimated default probability of about 
-**98%**, whereas a borrower with a score of **700** has a default probability of only about **25%**. 
+**Interpretation:** The curve is steepest in the middle of the credit-score range, meaning the same improvement in credit score produces a larger probability change there than at the extremes.
 
-Notice how the curve is steepest in the middle of the credit-score range: in that region, relatively small improvements 
-in credit score translate into large reductions in default risk. At the extremes (very low or very high scores), additional 
-changes in credit score have diminishing marginal effects on the predicted probability.
+To make this concrete, the code prints predicted probabilities at a few credit-score reference points (chosen from the observed distribution), which you can report directly without hard-coding numbers into the text.
+
 
 
 ------------------------------------------------------------------------
@@ -1993,79 +1971,74 @@ In the code below, we compute a confusion matrix at a 0.5 threshold and plot the
 ## R Code
 
 ```r
-# Logistic regression model
-logit_model <- glm(defaulted ~ credit_score + income,
-                   data = BLR, family = binomial)
+# Fit logistic regression model
+logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
 library(dplyr)
 library(yardstick)
 library(ggplot2)
 
-# Add predicted probabilities and classes to BLR
-BLR <- BLR %>%
+# Choose a classification threshold
+threshold <- 0.5
+
+# Add predicted probabilities + predicted class (do NOT overwrite BLR)
+pred_tbl <- BLR %>%
   mutate(
     pred_prob  = predict(logit_model, type = "response"),
-    pred_class = if_else(pred_prob >= 0.5, 1, 0)
-  )
-
-# Build results tibble for yardstick
-results <- BLR %>%
+    pred_class = if_else(pred_prob >= threshold, 1, 0)
+  ) %>%
   transmute(
     truth     = factor(defaulted, levels = c(0, 1)),
     predicted = factor(pred_class, levels = c(0, 1)),
     pred_prob = pred_prob
   )
 
-# -----------------------------
-# 1. CONFUSION MATRIX & METRICS
-# -----------------------------
-cm <- conf_mat(results, truth, predicted)
-cm          # 2x2 confusion matrix
+# Confusion matrix + key metrics
+conf_mat(pred_tbl, truth, predicted)
 
-# Accuracy, sensitivity, specificity, precision, F1
-metrics <- metric_set(accuracy, sens, spec, precision, f_meas)
-metrics(results, truth, predicted)
+metric_set(accuracy, sens, spec, precision, f_meas)(pred_tbl, truth, predicted)
 
-# -----------------------------
-# 2. ROC CURVE & AUC
-# -----------------------------
-roc_df  <- roc_curve(results, truth, pred_prob)
-roc_auc <- roc_auc(results, truth, pred_prob)
-roc_auc  # prints the AUC value
-
-autoplot(roc_df) +
-  labs(
-    title = "ROC Curve for Loan Default Model",
-    subtitle = "Area under the curve (AUC) summarizes performance across thresholds"
-  )
+# ROC curve + AUC
+roc_df  <- roc_curve(pred_tbl, truth, pred_prob)
+roc_auc(pred_tbl, truth, pred_prob)
+autoplot(roc_df)
 ```
 
 ## Python Code
 
 ``` python
-from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
-import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 import statsmodels.api as sm
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
 
-df = r.data['BLR'].copy()
-df['defaulted'] = df['defaulted'].astype(int)
+# Prepare data
+df = r.BLR.copy()
+df["defaulted"] = df["defaulted"].astype(int)
 
-X = sm.add_constant(df[['credit_score','income']])
-y = df['defaulted']
-logit_model = sm.Logit(y, X).fit()
-df['pred_prob'] = logit_model.predict(X)
-df['pred_class'] = (df['pred_prob'] > 0.5).astype(int)
+# Fit logistic regression
+X = sm.add_constant(df[["credit_score", "income"]])
+y = df["defaulted"]
+logit_model = sm.Logit(y, X).fit(disp=0)
 
-# Confusion matrix & metrics
-print(confusion_matrix(y, df['pred_class']))
-print(classification_report(y, df['pred_class']))
+# Choose a classification threshold
+threshold = 0.5
 
-# ROC curve
-fpr, tpr, thresholds = roc_curve(y, df['pred_prob'])
+# Predicted probabilities + classes
+df["pred_prob"] = logit_model.predict(X)
+df["pred_class"] = (df["pred_prob"] >= threshold).astype(int)
+
+# Confusion matrix + report
+print(confusion_matrix(y, df["pred_class"]))
+print(classification_report(y, df["pred_class"], digits=3))
+
+# ROC curve + AUC
+fpr, tpr, _ = roc_curve(y, df["pred_prob"])
 roc_auc = auc(fpr, tpr)
 
-plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.2f}")
-plt.plot([0,1], [0,1], linestyle="--", color="grey")
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}")
+plt.plot([0, 1], [0, 1], linestyle="--")
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("ROC Curve for Loan Default Model")
@@ -2085,59 +2058,48 @@ plt.show()
 
 library(dplyr)
 library(yardstick)
+library(ggplot2)
 
-# 1. Fit the logistic regression model
+# Fit logistic regression model
+logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
-logit_model <- glm(defaulted ~ credit_score + income,
-data = BLR, family = binomial)
+# Threshold (change to 0.3 to see trade-off)
+threshold <- 0.5
 
-# 2. Add predicted probabilities and classes
+# Predictions table
+pred_tbl <- BLR %>%
+  mutate(
+    pred_prob  = predict(logit_model, type = "response"),
+    pred_class = if_else(pred_prob >= threshold, 1, 0)
+  ) %>%
+  transmute(
+    truth     = factor(defaulted, levels = c(0, 1)),
+    predicted = factor(pred_class, levels = c(0, 1)),
+    pred_prob = pred_prob
+  )
 
-BLR_tmp <- BLR %>%
-mutate(
-pred_prob  = predict(logit_model, type = "response"),
-pred_class = if_else(pred_prob >= 0.5, 1, 0)
-)
+cat("Threshold:", threshold, "\n\n")
 
-# 3. Build results tibble for yardstick
+# A) Confusion matrix
+conf_mat(pred_tbl, truth, predicted)
 
-results <- BLR_tmp %>%
-transmute(
-truth     = factor(defaulted, levels = c(0, 1)),
-predicted = factor(pred_class, levels = c(0, 1)),
-pred_prob = pred_prob
-)
+# B) Metrics
+metric_set(accuracy, sens, spec, precision, f_meas)(pred_tbl, truth, predicted)
 
-# -----------------------------
+# C) ROC + AUC
+roc_df <- roc_curve(pred_tbl, truth, pred_prob)
+auc_val <- roc_auc(pred_tbl, truth, pred_prob)
 
-# A. CONFUSION MATRIX
+cat("\nAUC:\n")
+auc_val
 
-# -----------------------------
-
-cm <- conf_mat(results, truth, predicted)
-cm   # prints 2x2 confusion matrix
-
-# -----------------------------
-
-# B. KEY METRICS (no `metrics()` call)
-
-# -----------------------------
-
-acc   <- accuracy(results, truth, predicted)
-sens_ <- sens(results, truth, predicted)
-spec_ <- spec(results, truth, predicted)
-prec_ <- precision(results, truth, predicted)
-f1    <- f_meas(results, truth, predicted)
-
-bind_rows(acc, sens_, spec_, prec_, f1)
-
-# -----------------------------
-
-# C. ROC AUC
-
-# -----------------------------
-
-roc_auc(results, truth, pred_prob)
+autoplot(roc_df) +
+  labs(
+    title = "ROC Curve for Loan Default Model",
+    subtitle = paste0("AUC = ", round(auc_val$.estimate, 3)),
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  )
 ```
 
 ## Python Output 
@@ -2147,50 +2109,50 @@ roc_auc(results, truth, pred_prob)
 #| message: false
 #| warning: false
 
-import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 import statsmodels.api as sm
-from sklearn.metrics import (
-confusion_matrix,
-classification_report,
-roc_curve,
-auc
-)
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc
 
-# 1. Prepare data
-
+# Prepare data
 df = r.BLR.copy()
 df["defaulted"] = df["defaulted"].astype(int)
 
+# Fit logistic regression
 X = sm.add_constant(df[["credit_score", "income"]])
 y = df["defaulted"]
-
-# 2. Fit logistic regression
-
 logit_model = sm.Logit(y, X).fit(disp=0)
 
-# 3. Predictions
+# Threshold (change to 0.3 to see trade-off)
+threshold = 0.5
 
+# Predictions
 df["pred_prob"] = logit_model.predict(X)
-df["pred_class"] = (df["pred_prob"] >= 0.5).astype(int)
+df["pred_class"] = (df["pred_prob"] >= threshold).astype(int)
 
-# 4. ROC and AUC
+print(f"Threshold: {threshold}\n")
 
-fpr, tpr, thresholds = roc_curve(y, df["pred_prob"])
-roc_auc = auc(fpr, tpr)
-
-# -----------------------------
-
-# OUTPUTS
-
-# -----------------------------
-
-print("Confusion matrix (threshold 0.5):")
+# A) Confusion matrix + report
+print("Confusion matrix:")
 print(confusion_matrix(y, df["pred_class"]))
 
 print("\nClassification report:")
-print(classification_report(y, df["pred_class"]))
+print(classification_report(y, df["pred_class"], digits=3))
+
+# B) ROC + AUC
+fpr, tpr, _ = roc_curve(y, df["pred_prob"])
+roc_auc = auc(fpr, tpr)
 
 print(f"\nAUC: {roc_auc:.3f}")
+
+plt.plot(fpr, tpr, label=f"AUC = {roc_auc:.3f}")
+plt.plot([0, 1], [0, 1], linestyle="--")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve for Loan Default Model")
+plt.legend()
+plt.show()
 ```
 :::
 
