@@ -2051,55 +2051,33 @@ plt.show()
 ## R Output
 
 ```{r}
-#| eval: true
-#| echo: false
-#| message: false
-#| warning: false
-
 library(dplyr)
 library(yardstick)
-library(ggplot2)
 
-# Fit logistic regression model
+# Fit
 logit_model <- glm(defaulted ~ credit_score + income, data = BLR, family = binomial)
 
-# Threshold (change to 0.3 to see trade-off)
 threshold <- 0.5
 
-# Predictions table
 pred_tbl <- BLR %>%
   mutate(
     pred_prob  = predict(logit_model, type = "response"),
-    pred_class = if_else(pred_prob >= threshold, 1, 0)
+    pred_class = if_else(pred_prob >= threshold, 1, 0),
+    truth      = factor(defaulted, levels = c(0, 1)),
+    predicted  = factor(pred_class, levels = c(0, 1))
   ) %>%
-  transmute(
-    truth     = factor(defaulted, levels = c(0, 1)),
-    predicted = factor(pred_class, levels = c(0, 1)),
-    pred_prob = pred_prob
-  )
+  select(truth, predicted, pred_prob)
 
-cat("Threshold:", threshold, "\n\n")
+# Confusion matrix
+pred_tbl %>% conf_mat(truth, predicted)
 
-# A) Confusion matrix
-conf_mat(pred_tbl, truth, predicted)
+# Metrics (note the ~ syntax)
+pred_tbl %>%
+  metric_set(accuracy, sens, spec, precision, f_meas)(truth = truth, estimate = predicted)
 
-# B) Metrics
-metric_set(accuracy, sens, spec, precision, f_meas)(pred_tbl, truth, predicted)
-
-# C) ROC + AUC
-roc_df <- roc_curve(pred_tbl, truth, pred_prob)
-auc_val <- roc_auc(pred_tbl, truth, pred_prob)
-
-cat("\nAUC:\n")
-auc_val
-
-autoplot(roc_df) +
-  labs(
-    title = "ROC Curve for Loan Default Model",
-    subtitle = paste0("AUC = ", round(auc_val$.estimate, 3)),
-    x = "False Positive Rate",
-    y = "True Positive Rate"
-  )
+# ROC + AUC (uses probabilities)
+pred_tbl %>% roc_auc(truth, pred_prob)
+pred_tbl %>% roc_curve(truth, pred_prob)
 ```
 
 ## Python Output 
