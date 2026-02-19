@@ -128,7 +128,7 @@ Please ensure contributions maintain bilingual `R` + `Python` parity and reprodu
 
 ## Authors
 
-[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), and [Ben Chen](https://github.com/phchen5).
+[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), [Ben Chen](https://github.com/phchen5], and [Payman Nickchi](https://pnickchi.github.io/).
 
 For questions or feedback, open an issue on [GitHub](https://github.com/alexrod61/regression-cookbook/issues).
 
@@ -150,17 +150,17 @@ We gratefully acknowledge this funding, which enables the creation, maintenance,
 
 If you use this material in teaching or research, please cite it as:
 
-> Rodríguez-Arelis, G. A., Tai, A., & Chen, B. (2025). *The Regression Cookbook*. University of British Columbia / OER Fund. https://alexrod61.github.io/regression-cookbook/
+> Rodríguez-Arelis, G. A., Tai, A., Chen, B., & Nickchi, P. (2026). *The Regression Cookbook*. University of British Columbia / OER Fund. https://alexrod61.github.io/regression-cookbook/
 
 Here is a BibTeX entry you can use:
 
 ```bash
 @book{regressioncookbook,
   title     = {The Regression Cookbook},
-  author    = {Rodríguez-Arelis, G. Alexi and Tai, Andy and Chen, Ben},
+  author    = {Rodríguez-Arelis, G. Alexi and Tai, Andy and Chen, Ben and Nickchi, Payman},
   year      = {2025},
   url       = {https://alexrod61.github.io/regression-cookbook/},
-  note      = {Open-access bilingual (R + Python) textbook},
+  note      = {Open-access bilingual (R and Python) textbook},
   publisher = {University of British Columbia / OER Fund}
 }
 ```
