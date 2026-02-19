@@ -176,7 +176,7 @@ $$
 then the odds of the event $Y=1$ given the predictors is:
 
 $$
-\frac{P(Y = 1 \quad | \quad X_1, ..., X_k)}{P(Y = 0 \quad | \quad X_1, ..., X_k)} = \frac{p}{1-p}
+\frac{P(Y = 1 \mid X_1, ..., X_k)}{P(Y = 0 \mid X_1, ..., X_k)} = \frac{p}{1-p}
 $$
 
 and the logit is defined as the logarithm of these odds, i.e. $log(\frac{p}{1-p})$. In logistic regression modeling we assume that this log-odds is a linear function of the predictors:
@@ -187,7 +187,7 @@ $$
 
 This idea and formulation is the basis for extending logistic regression modeling for an outcome with two categories to ordinal outcomes where there are more than two categories and the order matters as well. In the ordinal case, instead of modeling the **log-odds of a single binary event**, we model **the cumulative logits** which compare the probability of being at or below a given category to the probability of being above that category. 
 
-**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y = 1 \quad | \quad X_1, ..., X_k)$ the conditioning is on all explanatory variables. Instead of repeatedly writing all predictors, we define:  
+**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y = 1 \mid X_1, ..., X_k)$ the conditioning is on all explanatory variables. Instead of repeatedly writing all predictors, we define:  
 
 $$
 \underline{X} = (X_1,...,X_k)
@@ -196,7 +196,7 @@ $$
 and write;
 
 $$
-P(Y = 1 \quad | \quad \underline{X})
+P(Y = 1 \mid \underline{X})
 $$
 
 This notation simplifies expressions and improves readability. Let's continue!
@@ -204,15 +204,15 @@ This notation simplifies expressions and improves readability. Let's continue!
 Imagine your ordered response variable have $J$ different categories where $J \ge 3$. We start with the category ordering by formally defining the **logits of cumulative probabilities** as follows. Let:
 
 $$
-P(Y \leq j \quad | \quad \underline{X}) = p_1(\underline{X}) + p_2(\underline{X}) + \ldots + p_j(\underline{X}) \quad \quad j = 1, 2, \ldots, J-1
+P(Y \leq j \mid \underline{X}) = p_1(\underline{X}) + p_2(\underline{X}) + \ldots + p_j(\underline{X}) \quad \quad j = 1, 2, \ldots, J-1
 $$
 
 be the cumulative probability. The **logits of cumulative probabilities** are defined as:
 
 $$
 \begin{aligned}
-&\text{logit}(P(Y \leq j \quad | \quad \underline{X})) = \log( \frac{P(Y \leq j \quad | \quad \underline{X})}{ 1 - P(Y \leq j \quad | \quad \underline{X})} ) \\
-&= \log( \frac{P(Y = 1 \quad | \quad \underline{X}) + P(Y = 2 \quad | \quad \underline{X}) + \ldots + P(Y = j \quad | \quad \underline{X})}{ P(Y = j+1 \quad | \quad \underline{X}) + P(Y = j+2 \quad | \quad \underline{X}) + \ldots + P(Y = J \quad | \quad \underline{X}) } )
+&\text{logit}(P(Y \leq j \mid \underline{X})) = \log( \frac{P(Y \leq j \mid \underline{X})}{ 1 - P(Y \leq j \mid \underline{X})} ) \\
+&= \log( \frac{P(Y = 1 \mid \underline{X}) + P(Y = 2 \mid \underline{X}) + \ldots + P(Y = j \mid \underline{X})}{ P(Y = j+1 \mid \underline{X}) + P(Y = j+2 \mid \underline{X}) + \ldots + P(Y = J \mid \underline{X}) } )
 \end{aligned}
 $$
 
@@ -223,11 +223,115 @@ The proportional odds model assumes that the effect of each explanatory variable
 
 ### The Proportional Odds Modeling
 
+Up until now we established that for an ordinal response variable with $J$ ordered categories, we defined the cumulative logits as:
+
+$$
+\text{logit}(P(Y \le j \mid \underline{X})) = \frac{ P(Y \le j \mid \underline{X}) }{ P(Y \ge j+1 \mid \underline{X}) }
+$$
+
+for all values of $j = 1, 2, \ldots, J-1$. This means that for an outcome with $J$ categories, we have $J-1$ cumulative logits. A natural question now arises: **how should these cumulative logits depend on the explanatory variables?** The proportional odds model assumes that each cumulative logit is a linear function of the predictors, with the important restriction that the regression coefficients are the same across all cumulative logits. The model is written as:
+
+$$
+\text{logit}( P(Y \le j \mid \underline{X}) ) = \alpha_j + \beta_1 X_1 + \beta_2 X_2 + ... + \beta_k X_k
+$$
+
+for all values of $j = 1, 2, \ldots, J-1$. Note that in this formula:
+
+- $\alpha_j$ is a category-specific intercept and depends on the category $j$,
+- $\beta_1, ..., \beta_k$ are regression coefficients that do not depend on $j$. 
+
+The essential assumption is that the effect of each explanatory variable on the log-odds is constant across all cumulative splits of the response variable. That is, the slope parameters remain the same whether we compare:
+
+- category 1 versus higher categories  
+- categories 1–2 versus higher categories  
+- $\vdots$  
+- categories 1 through $J-1$ versus higher categories
+
+and in a more mathematical framework, that is:
+
+- $P(Y \le 1 \mid \underline{X})$ versus $P(Y > 1 \mid \underline{X})$
+- $P(Y \le 2 \mid \underline{X})$ versus $P(Y > 2 \mid \underline{X})$
+- $\vdots$
+- $P(Y \le J-1 \mid \underline{X})$ versus $P(Y > J-1 \mid \underline{X})$
+
+
+This property of coefficients across cumulative logits is known as **the proportional odds assumption**.
+
 
 ### The Non-proportional Odds Modeling
 
+While the proportional odds model assumes that the effect of each predictor is the same across all cumulative logits, this assumption may not always hold in practice. When the effect of one or more explanatory variables varies across the cumulative splits of the ordinal response, we use a non-proportional odds model.
 
-### Data Modeling
+Formally speaking, the non-proportional odds model allows the regression coefficients to depend on the cumulative category $j$ as shown below:
+
+$$
+\text{logit}( P(Y \le j \mid \underline{X}) ) = \alpha_j + \beta_{1j} X_1 + \beta_{2j} X_2 + \ldots + \beta_{kj} X_k
+$$
+
+In this model:
+
+- $\alpha_j$ is the category-specific intercept (the same as before),
+- $\beta_{1j}, \beta_{2j}, \ldots , \beta_{kj}$ are category-specific regression coefficients, meaning that the effect of each explanatory variable can differ across cumulative logits.
+
+At the first glance this seems to be a great flexibility for modeling but this flexibility comes at a cost: **the number of parameters increases with the number of cumulative splits**, making the model more complex and potentially harder to interpret. However, it provides a more accurate representation when the proportional odds assumption is not valid. We will discuss how to assess these assumptions later in this chapter.
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Borrowed from DSCI 562 lecture notes written by Alexi
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+
+x_grid <- seq(-0.5, 3, length.out = 1200)
+a_vals <- c("k = 4" = 10, "k = 3" = 6.3, "k = 2" = 5.5, "k = 1" = 4)
+
+df <- map_dfr(names(a_vals), \(nm) {
+  a <- a_vals[[nm]]
+  tibble(
+    x = x_grid,
+    y = plogis(a - 12 * x),
+    curve = nm
+  )
+}) |>
+  mutate(curve = factor(curve, levels = names(a_vals)))
+
+eq_df <- tibble(
+  curve = factor(names(a_vals), levels = names(a_vals)),
+  x = 3.1,
+  y = c(0.95, 0.70, 0.45, 0.15),
+  lab = c(
+    "P(Y <= 4 ~ '|' ~ X)==frac(e^{10-12*x},1+e^{10-12*x})",
+    "P(Y <= 3 ~ '|' ~ X)==frac(e^{6.3-12*x},1+e^{6.3-12*x})",
+    "P(Y <= 2 ~ '|' ~ X)==frac(e^{5.5-12*x},1+e^{5.5-12*x})",
+    "P(Y <= 1 ~ '|' ~ X)==frac(e^{4-12*x},1+e^{4-12*x})"
+  )
+)
+
+cb_pal <- c(
+  "k = 4" = "#0072B2",
+  "k = 3" = "#D55E00",
+  "k = 2" = "#009E73",
+  "k = 1" = "#CC79A7"
+)
+
+ggplot(df, aes(x, y, color = curve)) +
+  geom_line(linewidth = 1.1) +
+  geom_text(
+    data = eq_df,
+    aes(x = x, y = y, label = lab, color = curve),
+    hjust = 1, vjust = 0.5, parse = TRUE,
+    size = 7.5,         
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = cb_pal) +
+  coord_cartesian(xlim = c(-0.5, 3), ylim = c(0, 1.05)) +
+  labs(x = "x", y = "Cumulative Probability") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 24),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 21)
+  )
+```
 
 
 ## Estimation
