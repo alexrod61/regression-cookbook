@@ -347,7 +347,7 @@ EDA plays a critical role in uncovering patterns, detecting anomalies, and gener
 
 ![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-fear-expression-6230192/).](img/curious.png){width="250"}
 
-Generalizing findings to a larger population requires formal statistical inference, which takes into account **sampling variability**, **model uncertainty**, and the **precision of estimates**. This is particularly important in regression analysis, where extending patterns observed in a sample to the wider population needs rigorous modelling assumptions, estimation procedures, and a quantification of uncertainty (e.g., through confidence intervals). Treating EDA findings as if they were inferential conclusions can lead to misleading interpretations throughout our data science workflow.
+Generalizing findings to a larger population requires formal statistical inference, which takes into account **sampling variability**, **model uncertainty**, and the **precision of estimates**. This is particularly important in regression analysis, where extending patterns observed in a sample to the wider population needs rigorous modelling assumptions, estimation procedures, and a quantification of uncertainty. Treating EDA findings as if they were inferential conclusions can lead to misleading interpretations throughout our data science workflow.
 ::::
 :::
 
@@ -1143,8 +1143,8 @@ $$
 
 Having set up the coding starting point for this estimation, we need to use the corresponding fitting functions to find $\hat{\beta}_0$, $\hat{\beta}_1$, $\hat{\beta}_2$, $\hat{\beta}_3$, $\hat{\beta}_4$, $\hat{\beta}_5$, $\hat{\sigma}^2$ via OLS regression (as we already decided in the data modelling stage). Therefore, let us the following function and libraries:
 
-- `R`: We fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. It first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. The `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `training_OLS_model`, contains the estimated parameters (column `estimate`) and related statistics (which will be explained in the **results** stage via the **testing set**). The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
-- `Python`: This code fits and summarizes the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels], [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
+- `R`: We fit an OLS model via the `lm()` function with the response `sale_price` and four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The resulting model object, stored in `training_OLS_model`, contains the estimated parameters and related statistics (which will be explained in the **results stage** via the **testing set**). The output shows the systematic component used (i.e., `formula`) along with the **estimated regression parameters** $\hat{\beta}_0, \hat{\beta}_1, \dots, \hat{\beta}_5$.
+- `Python`: This code fits the same OLS model using the [{statsmodels}](https://www.statsmodels.org/stable/index.html) [@statsmodels] library. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `training_data`. The `.fit()` method estimates the regression coefficients and computes related statistics. Then, we print the **estimated regression parameters** $\hat{\beta}_0, \hat{\beta}_1, \dots, \hat{\beta}_5$.
 
 ::: {.panel-tabset}
 
@@ -1152,9 +1152,6 @@ Having set up the coding starting point for this estimation, we need to use the 
 
 ```{r}
 #| message: false
-# Loading libraries
-library(tidyverse)
-library(broom)
 # To import R-generated datasets to Python environment
 library(reticulate)
 
@@ -1164,10 +1161,7 @@ training_OLS_model <- lm(
     school_distance + neighbourhood,
   data = training_data
 )
-
-# Displaying the tidy table
-tidy(training_OLS_model) |>
-  mutate_if(is.numeric, round, 2)
+training_OLS_model
 ```
 
 ## **`Python`**
@@ -1185,18 +1179,7 @@ training_OLS_model = smf.ols(
     formula="sale_price ~ bedrooms + sqft + school_distance + neighbourhood",
     data=training_data
 ).fit()
-
-# Creating a tidy summary table
-training_OLS_tidy = pd.DataFrame({
-    "term": training_OLS_model.params.index,
-    "estimate": np.round(training_OLS_model.params.values, 2),
-    "std_error": np.round(training_OLS_model.bse.values, 2),
-    "t_value": np.round(training_OLS_model.tvalues.values, 2),
-    "p_value": np.round(training_OLS_model.pvalues.values, 2)
-})
-
-# Displaying the tidy table
-print(training_OLS_tidy)
+training_OLS_model.params
 ```
 
 :::
@@ -1214,24 +1197,464 @@ Since the **inferential inquiry** in this example aims to understand the **stati
 
 ### Goodness of Fit {#sec-ds-workflow-goodness-of-fit}
 
+Once we have estimated our regression model on the training data, we move into goodness of fit. Think of this stage as **quality control** for the model we just trained: we check whether the fitted model behaves the way our **data modelling stage** said it should. That matters because every model we write down is an **abstraction of reality**: a simplified story about how the observed data could plausibly be generated in the population or system we care about. In regression analysis, that story is encoded by a specific modelling choice like OLS (or a GLM, for instance), together with its **parametrization** and **distributional assumptions**. Goodness-of-fit checks help us answer a practical question: 
+
+> **Is this modelling story compatible with what we actually see in the data and enough that we can trust the inferences and predictions we plan to report?**
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-feedback-to-learn-3699331/).](img/thumbs-up-down.png){width="500"}
+
+In statistical terms, goodness of fit implies to execute a **stress testing** of our fitted model against the assumptions we set up in the data modelling stage. That said, this testing does not usually boil down to a single plot or hypothesis testing. In fact, it comes as a **bundle of checks** that prove whether our fitted model is suitable for the class of inquiry we are dealing:
+
+- **Inferential goodness of fit:** Here, our stress-testing focuses on whether the fitted model's assumptions are plausible enough to support **trustworthy claims about association**. In regression, this matters because our **hypothesis tests** (i.e., *is this coefficient statistically different from zero?*) and **confidence intervals (CIs)** only work as advertised if the model's distributional assumptions are roughly true. If key assumptions are notably violated (for example, in OLS: non-constant residual variance, clear residual structure suggesting dependence or missing structure, or a small number of influential observations dominating the fit), then the model-based standard errors (SEs) can be biased upward or downward. That distortion propagates directly to $p$-values and CIs, so we may end up declaring **evidence of association** (or missing it) for the wrong reason: our uncertainty calculations are miscalibrated. In practice, inferential goodness-of-fit checks are about protecting the reliability of uncertainty statements so that when we report an association, we can defend not only the point estimate, but also the uncertainty attached to it.
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on causal inference!
+::::
+::::{.Tip-container}
+Even when a regression coefficient is statistically different from zero, that statement is still about **association** under the corrresponding model. If our goal is a **causal claim**, we woul need additional assumptions justified by the study design (e.g., identification, confounding control, and how the data were collected). Goodness-of-fit diagnostics help with the regression model’s validity, but they do not, by themselves, turn association into causation. For deeper information about causal inference, you can consult the book by @hernan2024.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/question.png){width="230"}
+::::
+:::
+
+- **Predictive goodness of fit:** Here, our stress-testing asks whether the model's predictive behaviour is stable beyond the training sample. The key idea is diagnostic: we are checking for warning signs like **overfitting**, **data leakage**, or **systematic prediction failures**. Predictive goodness-of-fit checks help us decide whether the current modelling choice is adequate for generalization, or whether we should revisit the data modelling stage (adding or removing features, feature transformations, feature interactions, or even a different model class) before we move on to presenting results as dictated by our data science workflow.
+
 ::: {#fig-ds-workflow-goodness-of-fit}
 ![](img/goodness-of-fit.png){width="1000"} 
 
 *Goodness-of-fit* stage from the data science workflow in @fig-ds-workflow. This stage is directly preceded by *estimation* and followed by *results*. If necessary, the *goodness-of-fit* stage could retake the process to *data modelling* and then to *estimation*.
 :::
 
+A helpful way to think about goodness of fit is how the data science workflow shows it in @fig-ds-workflow-goodness-of-fit. Righ after our data modelling and estimation stages, we perform the model diagnostics via the corresponding **estimated regression model** on the **training set**. With the results of these model diagnostics, we must face the question on *whether this estimated model fulfils our data data assumptions*. If the answer is *no*, then we must go back to the **data modelling stage** and redefine our regression strategy. Otherwise, we can proceed to the **results stage**. Roughly speaking, the goodness of fit is our **formal gate** between having a fitted model and being allowed to use it confidently either for inferential or predictive purposes.
+
+Note that a practical and general process to run the model diagnostics, depicted in @fig-ds-workflow-goodness-of-fit, is as follows:
+
+1. **Confirm the workflow flavour (i.e., inferential or predictive).** Decide what will
+drive decisions to move on to the results stage or go back to the data modelling stage: trustworthy uncertainty for interpretation (inferential) and/or generalization to new cases (predictive). Often, we check both, but one will dominate how strict we are about modelling revisions.
+2.  **Diagnose the systematic component (i.e., the signal provided by the regression parameters and features).** We need to confirm whether our fitted model is capturing the main pattern the modelling stage promised:
+
+    - **For OLS and GLMs:** We must look for any structure the systematic component might have missed such as nonlinearity, interactions, or missing explanatory variables.
+    - **For survival models:** We must check whether key structural assumptions (e.g., proportional hazards if using Cox regression as in @sec-semiparametric-survival) are suitable for our survival data.
+
+3. **Diagnose the stochastic structure (i.e., the random component).** Here, we check whether the random component actually behaves the way we set up our distributional assumptions:
+
+    - **For OLS:** We must check for normality, constant variance, and lack of patterns in the observed residuals.
+    - **For GLMs:** We need to check the relationship between the mean and variance of our response (i.e., check for equidispersion, overdispersion or underdispersion), and whether the chose distribution family and link function are suitable for our observed data and fitted model.
+    - **For survival models:** We have to check for censoring patterns and model-specific residual diagnostics.
+
+4. **Check for leverage and influential data points.** Identify whether any subset of observations are driving the model fitting. This is a **stability check** of whether the results would change if these observations were not present.
+5. **Evaluate predictive behaviour (as a diagnostic).** If prediction is part of our inquiries, we can use the **in-sample predictions** (coming from the training set along with the fitted model) to check the corresponding performance. According to our type of response, we might use the following metrics:
+
+    - **Continuous:** $R^2$ and adjusted $R^2$.
+    - **Binary or Count:** Deviance.
+    - **Survival:** Time-dependent calibration/discrimination tools appropriate to censoring.
+
+6. **Decide, then iterate like the diagram in @fig-ds-workflow-goodness-of-fit says.** If the above diagnostics point to a real mismatch, we must go back to the data modelling stage and make the corresponding revisions in regards to **specification** (i.e., adjustments on features, interactions, transformations, etc.), revise the **distributional family/link** (as in the case of GLMs), revise the survival model **structure** or revise the **uncertainty approach** (e.g., robust SEs when appropriate). Only when we have passed our diagnostics, then we can proceed to the results stage.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on what the goal of goodness of fit entails!
+::::
+::::{.Heads-up-container}
+In many different practical cases, it is possible to have a fitted model with a **good predictive performance** while being a really poor tool for interpretataion and inference. Conversely, any given model can be a **reasonable inferential tool** while having a weak predictive performance. Having said all this, we always have to balance out our goodness-of-fit judgment depending on our main inquiries.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-pixel-cells-pedagogy-3699345/).](img/argument.png){width="300"}
+::::
+:::
+
+#### Example: Goodness-of-Fit Checks for the OLS Housing Model
+
+We will now proceed to stress test the our `training_OLS_model` for our housing case.
+
+![Image by [*Stefan*](https://pixabay.com/users/io-images-1096650/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=4941338) via [*Pixabay*](https://pixabay.com/vectors/list-done-check-ticked-off-6229425/).](img/checklist.png){width=50%}
+
+In this OLS scenario, we will run a bundle of checks that are representative of what we will do throughout the book:
+
+- **Mean structure:** residuals vs fitted values (do we see curvature or systematic patterns?).
+- **Noise structure:** heteroskedasticity checks and a QQ-plot (is the uncertainty story plausible?).
+- **Influence:** are a few observations disproportionately driving the fitted model?
+- **Predictive performance:** testing-set error metrics (how well do we generalize?).
+
+As in @sec-ds-workflow-eda, we are not providing the code to generate all of the EDA output directly (though you can find the `R` source [here](https://github.com/alexrod61/regression-cookbook/blob/main/book/01-intro.qmd)). Nevertheless, subsequent chapters will include both `R` and `Python` code snippets to generate the corresponding goodness-of-fit graphical insights.
+
+```{r}
+#| label: fig-housing-training-residuals-vs-fitted
+#| fig-cap: "Housing OLS diagnostic plot of residuals versus fitted values (via training set)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+# Loading library
+library(broom)
+
+# Extracting residuals from fitted model
+aug_training <- augment(training_OLS_model)
+
+# Plotting
+residuals_vs_fitted_training <- ggplot(aug_training, aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.7) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(
+    x = "\n Fitted Values (CAD)",
+    y = "Residuals (CAD)\n"
+  ) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(xlim = c(0, 450000), ylim = c(-101000, 75000)) +
+  scale_x_continuous(labels = label_dollar(), breaks = seq(0, 500000, by = 50000)) +
+  scale_y_continuous(labels = label_dollar(), breaks = seq(-200000, 75000, by = 50000))
+
+residuals_vs_fitted_training
+```
+
+```{r}
+#| label: fig-housing-training-qq-plot
+#| fig-cap: "Housing OLS diagnostic QQ-plot of standardized residuals (via training set)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+# Plotting
+QQ_plot_training <- ggplot(aug_training, aes(sample = .std.resid)) +
+  stat_qq(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  stat_qq_line(linewidth = 1, color = "red") +
+  labs(
+    x = "\n Theoretical Quantiles",
+    y = "Sample Quantiles\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  )
+
+QQ_plot_training
+```
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Loading library
+library(lmtest)
+
+# Running Breusch-Pagan test
+bptest(training_OLS_model)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+# Importing function
+from statsmodels.stats.diagnostic import het_breuschpagan
+
+# Extracting residuals and design matrix from the fitted model
+residuals = training_OLS_model.resid
+exog = training_OLS_model.model.exog
+
+# Running Breusch-Pagan test
+bp_test = het_breuschpagan(residuals, exog)
+
+# Unpacking results
+bp_stat, bp_pvalue, empty, empty = bp_test
+
+print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
+print(f"P-value: {bp_pvalue:.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Running Durbin-Watson test
+dwtest(training_OLS_model)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+# Importing function
+from statsmodels.stats.stattools import durbin_watson
+
+# Running Durbin-Watson test
+print("Durbin–Watson:", durbin_watson(training_OLS_model.resid))
+```
+
+:::
+
+```{python}
+#| echo: false
+def car_like_gvif(result):
+    """
+    Compute VIF/GVIF like car::vif() for a statsmodels formula OLS result.
+
+    Returns a DataFrame with columns:
+      - GVIF
+      - Df
+      - GVIF^(1/(2*Df))
+    For 1-df terms, GVIF equals the usual VIF and the scaled value is sqrt(VIF).
+    """
+    # Getting design info (only available for formula models)
+    design_info = getattr(result.model.data, "design_info", None)
+    if design_info is None:
+        raise ValueError("This requires a formula-based statsmodels fit (via smf.ols).")
+
+    X = np.asarray(result.model.exog)
+    names = list(result.model.exog_names)
+
+    # Dropping intercept/const if present (car::vif excludes it)
+    drop = {"Intercept", "const"}
+    keep_idx = [i for i, n in enumerate(names) if n not in drop]
+    X = X[:, keep_idx]
+    names_kept = [names[i] for i in keep_idx]
+
+    # Standardizing columns to form the predictors' correlation matrix
+    Xs = X - X.mean(axis=0)
+    s = Xs.std(axis=0, ddof=1)
+    Xs = Xs / s
+
+    R = np.corrcoef(Xs, rowvar=False)
+
+    # erm -> column slices from patsy
+    # design_info.term_name_slices maps term name to slice of columns in original exog
+    term_slices = design_info.term_name_slices
+
+    # Mapping original column index -> kept column index (after dropping intercept)
+    orig_to_kept = {orig_i: kept_pos for kept_pos, orig_i in enumerate(keep_idx)}
+
+    rows = []
+    for term_name, sl in term_slices.items():
+        # Skipping intercept term
+        if term_name in drop:
+            continue
+
+        # Original indices for this term
+        term_orig = list(range(sl.start, sl.stop))
+
+        # Translating to kept indices (some terms might be dropped if they were intercept)
+        term_idx = [orig_to_kept[i] for i in term_orig if i in orig_to_kept]
+        if len(term_idx) == 0:
+            continue
+
+        other_idx = [i for i in range(R.shape[0]) if i not in term_idx]
+
+        R11 = R[np.ix_(term_idx, term_idx)]
+        if len(other_idx) == 0:
+            # Only one term in model; GVIF undefined, set to 1
+            gvif = 1.0
+        else:
+            R22 = R[np.ix_(other_idx, other_idx)]
+            R12 = R[np.ix_(term_idx, other_idx)]
+
+            # Schur complement: R11|others = R11 - R12 R22^{-1} R21
+            # Using pinv for numerical stability
+            R22_inv = np.linalg.pinv(R22)
+            R11_cond = R11 - R12 @ R22_inv @ R12.T
+
+            # GVIF = det(R11) / det(R11_cond)
+            # Using log-determinants for stability
+            s1, logdet1 = np.linalg.slogdet(R11)
+            s2, logdet2 = np.linalg.slogdet(R11_cond)
+
+            if s1 <= 0 or s2 <= 0:
+                # Fallback if numerical issues
+                gvif = np.nan
+            else:
+                gvif = float(np.exp(logdet1 - logdet2))
+
+        df = len(term_idx)
+        gvif_scaled = gvif ** (1 / (2 * df)) if np.isfinite(gvif) else np.nan
+
+        rows.append((term_name, gvif, df, gvif_scaled))
+
+    out = pd.DataFrame(rows, columns=["term", "GVIF", "Df", "GVIF^(1/(2*Df))"])
+    out = out.set_index("term")
+    return out
+```
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Loading library
+library(car)
+
+# Obtaining VIFs per explanatory variable
+vif(training_OLS_model)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+gvif_table = car_like_gvif(training_OLS_model)
+print(gvif_table)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Loading library
+library(car)
+
+# Obtaining VIFs per explanatory variable
+vif(training_OLS_model)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+gvif_table = car_like_gvif(training_OLS_model)
+print(gvif_table)
+```
+
+:::
+
+```{r}
+#| label: fig-housing-cooks-distance-plot
+#| fig-cap: "Housing OLS diagnostic Cook's distance plot (via training set)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+# Data wrangling
+aug_training <- aug_training |>
+  mutate(row_id = row_number())
+
+# Plotting
+cooks_distance_plot_training <- ggplot(aug_training, aes(x = row_id, y = .cooksd)) +
+  geom_col(fill = "#0073C2FF", color = "#0073C2FF") +
+  labs(
+    x = "\n Observation Index",
+    y = "Cook's Distance\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(0, 0.035)) +
+  scale_y_continuous(breaks = seq(0, 0.035, by = 0.005))
+
+cooks_distance_plot_training
+```
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Obtaining metrics
+summary(training_OLS_model)$r.squared
+summary(training_OLS_model)$adj.r.squared
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+# Obtaining metrics
+print(f"R^2:      {training_OLS_model.rsquared:.4f}")
+print(f"Adj. R^2: {training_OLS_model.rsquared_adj:.4f}")
+```
+
+:::
+
+
 ### Results {#sec-ds-workflow-results}
-
-<!--
-and **standard errors**. Note that standard errors are essential for inferential inquiries, as they are used in **hypothesis testing**. Additionally, these standard errors can be utilized in a later workflow stage to calculate **confidence intervals (CIs)** for our **statistically significant** estimated regression parameters. CIs provide a measure of uncertainty associated with the estimations derived from the sampled data. For a refresher on statistical inference, please refer to @sec-basics-inf.
-
--->
 
 ::: {#fig-ds-workflow-results}
 ![](img/results.png){width="1000"}
 
 *Results* stage from the data science workflow in @fig-ds-workflow. This stage is directly followed by *storytelling* and preceded by *goodness of fit*.
 :::
+
+
+- `R`: Now, we fit and summarize an OLS model using the [{tidyverse}](https://www.tidyverse.org) and [{broom}](https://broom.tidymodels.org/reference/broom.html) [@broom] packages. We first loads the two libraries, which provide tools for data manipulation and for converting model outputs into tidy data frames, respectively. Again, the `lm()` function then fits the OLS regression model for the response `sale_price` from four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `testing_data`. The resulting model object, stored in `testing_OLS_model`, contains the estimated parameters (column `estimate`) and related statistics. The `tidy()` function from [{broom}](https://broom.tidymodels.org/reference/broom.html) transforms this model output into a neat, tabular format. Finally, `mutate_if()` rounds all numeric columns in this tidy summary to two decimal places, producing a clean, readable table of regression results.
+- `Python`: This code fits and summarizes the same above OLS model using functions from the [{statsmodels}](https://www.statsmodels.org/stable/index.html), [{pandas}](https://pypi.org/project/pandas/), and [{numpy}](https://pypi.org/project/numpy/) libraries. It begins by specifying and fitting this OLS model through `smf.ols()`, which regresses `sale_price` based on four explanatory variables: `bedrooms`, `sqft`, `school_distance`, and `neighbourhood` via the `testing_data`. Then, the `.fit()` method estimates the regression coefficients and computes related statistics. Next, a tidy summary table is created using `pd.DataFrame()`, which organizes the model output into a clear format. Each numeric value is rounded to two decimal places with `np.round()` for readability. Finally, the code prints this table, providing a concise, easy-to-read summary of the regression model.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| message: false
+# Loading libraries
+library(tidyverse)
+library(broom)
+
+# Fitting the OLS model
+testing_OLS_model <- lm(
+  formula = sale_price ~ bedrooms + sqft +
+    school_distance + neighbourhood,
+  data = testing_data
+)
+
+# Displaying the tidy table
+tidy(testing_OLS_model) |>
+  mutate_if(is.numeric, round, 2)
+```
+
+## **`Python`**
+
+```{python}
+#| message: false
+# Importing R-generated training set via R library reticulate
+testing_data = r.testing_data
+
+# Fitting the OLS model
+testing_OLS_model = smf.ols(
+    formula="sale_price ~ bedrooms + sqft + school_distance + neighbourhood",
+    data=testing_data
+).fit()
+
+# Creating a tidy summary table
+testing_OLS_tidy = pd.DataFrame({
+    "term": testing_OLS_model.params.index,
+    "estimate": np.round(testing_OLS_model.params.values, 2),
+    "std_error": np.round(testing_OLS_model.bse.values, 2),
+    "t_value": np.round(testing_OLS_model.tvalues.values, 2),
+    "p_value": np.round(testing_OLS_model.pvalues.values, 2)
+})
+
+# Displaying the tidy table
+print(testing_OLS_tidy)
+```
+
+:::
+
+
 
 ### Storytelling {#sec-ds-workflow-storytelling}
 
@@ -1433,7 +1856,7 @@ Question 1.3
 ::::{.Question-container}
 **Open-ended Question**
 
-A hospital analytics team fits an OLS regression to study the **association** between a discharge checklist indicator ($x_{\text{checklist}}$) and patients' length of stay $Y$, while adjusting for age ($x_{\text{age}}$), baseline severity ($x_{\text{severity}}$), and admitting service ($x_{\text{admitting}}$). They plan to report the **estimated checklist coefficient** $\hat{\beta}_{\text{checklist}}$ as an adjusted association, along with a **standard error** and a **95% CI**.
+A hospital analytics team fits an OLS regression to study the **association** between a discharge checklist indicator ($x_{\text{checklist}}$) and patients' length of stay $Y$, while adjusting for age ($x_{\text{age}}$), baseline severity ($x_{\text{severity}}$), and admitting service ($x_{\text{admitting}}$). They plan to report the **estimated checklist coefficient** $\hat{\beta}_{\text{checklist}}$ as an adjusted association, along with a **SE** and a **95% CI**.
 
 Why do we care about checking assumptions after fitting an OLS model and before making inferences? Give two reasons **in three to five sentences**.
 ::::
@@ -1450,7 +1873,7 @@ Answer 1.3
 
 **Answer:** 
 
-**Even for association**, OLS inference assumes the fitted model has captured the systematic part of $Y$, conditioned an all the features, **well enough** that the remaining residuals do not show obvious structure (e.g., strong curvature, changing spread, or a few extreme points driving the fit up or down). First, if assumptions like constant variance or independence fail, the usual OLS standard errors (and, therefore, the 95% CI for $\hat{\beta}_{\text{checklist}}$) can be **misleading**, so we might overstate or understate how precisely we have estimated the association. Second, model diagnostics help detect **misspecification**: residual patterns can indicate missing terms (interactions, nonlinearities) or influential observations, meaning the reported "*adjusted association*" may be an artifact of a poor model rather than a stable summary of the data. Assumption checking is how we keep the reported association and its uncertainty defensible.
+**Even for association**, OLS inference assumes the fitted model has captured the systematic part of $Y$, conditioned an all the features, **well enough** that the remaining residuals do not show obvious structure (e.g., strong curvature, changing spread, or a few extreme points driving the fit up or down). First, if assumptions like constant variance or independence fail, the usual OLS SEs (and, therefore, the 95% CI for $\hat{\beta}_{\text{checklist}}$) can be **misleading**, so we might overstate or understate how precisely we have estimated the association. Second, model diagnostics help detect **misspecification**: residual patterns can indicate missing terms (interactions, nonlinearities) or influential observations, meaning the reported "*adjusted association*" may be an artifact of a poor model rather than a stable summary of the data. Assumption checking is how we keep the reported association and its uncertainty defensible.
 </details>
 ::::
 :::
@@ -1576,7 +1999,7 @@ Question
 ::::{.Question-container}
 **True or False** 
 
-> Two different regression models can yield similar response predictions $\hat{y}$ but lead to different uncertainty metrics on their estimated parameters (e.g., different standard errors or confidence intervals).
+> Two different regression models can yield similar response predictions $\hat{y}$ but lead to different uncertainty metrics on their estimated parameters (e.g., different SEs or confidence intervals).
 ::::
 :::
 
@@ -1758,7 +2181,7 @@ A hospital quality improvement team is trying to reduce the average recovery tim
 
 > "*Regression analysis is only for prediction. If we want to understand what's driving longer recoveries, regression won’t help.*"
 
-**In four to six sentences**, how would you respond to the manager? Explain whether regression can be useful for **interpretation** in addition to prediction, and describe what a regression model can tell us about recovery time $Y$ as a function of $k$ patient and treatment features, i.e., $\mathbf{x} = (x_1, \dots, x_k)^\top$. In your answer, state what **regression coefficients** mean under the model, and how you would **communicate uncertainty** about those relationships (e.g., standard errors, confidence intervals, etc.).
+**In four to six sentences**, how would you respond to the manager? Explain whether regression can be useful for **interpretation** in addition to prediction, and describe what a regression model can tell us about recovery time $Y$ as a function of $k$ patient and treatment features, i.e., $\mathbf{x} = (x_1, \dots, x_k)^\top$. In your answer, state what **regression coefficients** mean under the model, and how you would **communicate uncertainty** about those relationships (e.g., SEs, confidence intervals, etc.).
 ::::
 :::
 
@@ -1777,7 +2200,7 @@ Regression is not only for prediction; it can also be a tool for **interpretatio
 
 $$Y \mid \mathbf{x},$$
 
-a given **regression coefficient** would explain how the expected (average) recovery time changes when one feature increases by one unit, holding the other variables fixed, under the assumptions of the model. That can help the hospital identify which factors (e.g., age, comorbidities, anesthesia type, post-op protocol, etc.) are associated with longer recoveries and where to focus quality-improvement efforts. That said, **model estimation uncertainty matters too**: standard errors and confidence intervals communicate how precise those estimated associations are and whether the data support a meaningful relationship. Prediction and interpretation are different goals, but **regression often supports both in a single and coherent framework**.
+a given **regression coefficient** would explain how the expected (average) recovery time changes when one feature increases by one unit, holding the other variables fixed, under the assumptions of the model. That can help the hospital identify which factors (e.g., age, comorbidities, anesthesia type, post-op protocol, etc.) are associated with longer recoveries and where to focus quality-improvement efforts. That said, **model estimation uncertainty matters too**: SEs and confidence intervals communicate how precise those estimated associations are and whether the data support a meaningful relationship. Prediction and interpretation are different goals, but **regression often supports both in a single and coherent framework**.
 
 </details>
 ::::
