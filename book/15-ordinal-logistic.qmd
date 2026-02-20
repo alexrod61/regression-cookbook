@@ -79,6 +79,13 @@ mindmap
 
 
 
+```{r setup-r, include=FALSE}
+# Load required libraries
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+```
+
+
+
 ::: {.LO}
 ::::{.LO-header}
 Learning Objectives
@@ -276,10 +283,11 @@ In this model:
 At the first glance this seems to be a great flexibility for modeling but this flexibility comes at a cost: **the number of parameters increases with the number of cumulative splits**, making the model more complex and potentially harder to interpret. However, it provides a more accurate representation when the proportional odds assumption is not valid. We will discuss how to assess these assumptions later in this chapter.
 
 
+To help us understand the differences in assumption visually, we have the following plot. The figure below visualizes four cumulative probabilities $P(Y <= 1 \mid X)$, $P(Y <= 2 \mid X)$, $P(Y <= 3 \mid X)$, and $P(Y <= 4 \mid X)$ on the y-axis plotted as a logistic curve against one explanatory variable $X$. Notice that all curves have the same slope (same amount of steepness) but different intercepts. This parallel structure shows the proportional odds assumption: the effect of $X$ on the log-odds scale (which is the coefficient of $X$) is the same across all cumulative logits. In other words, increasing $X$ shifts each cumulative logit by the same amount regardless of which categorical group $j$ we consider. Note that the intercepts in this model are $\alpha_1 = 4$, $\alpha_2 = 5.5$, $\alpha_3 = 6.3$, $\alpha_4 = 10$. The coefficient which measures the effect of $X$ on log-odds is $\beta=12$ and the same for all cumulative probabilities. Thus, the visual parallelism in this plot provides an intuitive way to understand what proportional odds means geometrically
+
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 # Borrowed from DSCI 562 lecture notes written by Alexi
-library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
-
 x_grid <- seq(-0.5, 3, length.out = 1200)
 a_vals <- c("k = 4" = 10, "k = 3" = 6.3, "k = 2" = 5.5, "k = 1" = 4)
 
@@ -319,6 +327,70 @@ ggplot(df, aes(x, y, color = curve)) +
     aes(x = x, y = y, label = lab, color = curve),
     hjust = 1, vjust = 0.5, parse = TRUE,
     size = 7.5,         
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = cb_pal) +
+  coord_cartesian(xlim = c(-0.5, 3), ylim = c(0, 1.05)) +
+  labs(x = "x", y = "Cumulative Probability") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 24),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 21)
+  )
+```
+
+
+If the proportional odds assumption were violated, these curves would no longer be parallel on the logit scale; instead, their slopes would differ, indicating that the effect of $X$ changes depending on which cumulative split of the ordinal outcome is being modeled. The following figure is an example of proportional odds assumption being violated:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Non-proportional odds visualization
+
+x_grid <- seq(-0.5, 3, length.out = 1200)
+
+# Different intercepts and coefficients
+param_vals <- tribble(
+  ~curve,   ~a,   ~b,
+  "k = 4",  10,  -12,
+  "k = 3",  6.3,  -9,
+  "k = 2",  5.5,  -6,
+  "k = 1",  4,    -3
+)
+
+df_np <- param_vals |>
+  mutate(data = map2(a, b, ~tibble(
+    x = x_grid,
+    y = plogis(.x + .y * x_grid)
+  ))) |>
+  unnest(data) |>
+  mutate(curve = factor(curve, levels = param_vals$curve))
+
+eq_df_np <- param_vals |>
+  mutate(
+    x = 3.1,
+    y = c(0.95, 0.70, 0.45, 0.15),
+    lab = paste0(
+      "P(Y <= ", 4:1, " ~ '|' ~ X)==",
+      "frac(e^{", a, ifelse(b >= 0, "+", ""), b, "*x},",
+      "1+e^{", a, ifelse(b >= 0, "+", ""), b, "*x})"
+    )
+  )
+
+cb_pal <- c(
+  "k = 4" = "#0072B2",
+  "k = 3" = "#D55E00",
+  "k = 2" = "#009E73",
+  "k = 1" = "#CC79A7"
+)
+
+ggplot(df_np, aes(x, y, color = curve)) +
+  geom_line(linewidth = 1.1) +
+  geom_text(
+    data = eq_df_np,
+    aes(x = x, y = y, label = lab, color = curve),
+    hjust = 1, vjust = 0.5, parse = TRUE,
+    size = 7.5,
     show.legend = FALSE
   ) +
   scale_color_manual(values = cb_pal) +
