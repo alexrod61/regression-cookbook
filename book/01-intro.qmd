@@ -343,7 +343,7 @@ Once we have generated these plots and statistics, they should be displayed in a
 Heads-up on the use of EDA to deliver inferential conclusions!
 ::::
 ::::{.Heads-up-container}
-EDA plays a critical role in uncovering patterns, detecting anomalies, and generating hypotheses. However, it is important to emphasize that the results of EDA **should not be generalized beyond the specific sample data being analyzed**. EDA is inherently descriptive and focused on the sample, and it is not intended to support inferential claims about larger populations. The insights gained from EDA are contingent on the specific sample and may not accurately reflect systematic relationships within the broader population. Nevertheless, EDA can provide valuable information to inform our modelling decisions.
+EDA plays a critical role in uncovering patterns, detecting anomalies, and generating hypotheses. However, it is important to emphasize that the results of EDA **should not be generalized beyond the specific sample data being analyzed**. EDA is inherently descriptive and focused on the observed sample, and it is not intended to support inferential claims about larger populations. The insights gained from EDA are contingent on the observed sample and may not accurately reflect systematic relationships within the broader population. Nevertheless, EDA can provide valuable information to inform our modelling decisions.
 
 ![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-fear-expression-6230192/).](img/curious.png){width="250"}
 
@@ -470,8 +470,8 @@ The `housing_data` mentioned above is not an actual dataset; it is a simulated o
 
 Now, we will randomly split the sampled data into training and testing sets for both **inferential** and **predictive inquiries**. Specifically, 20% of the data will be allocated to the training set, while the remaining 80% will serve as the testing set. For the predictive analysis, we will not create a validation set because our chosen modelling strategy (to be discussed in @sec-ds-workflow-modelling) does not require it. The below codes do the following:
 
-- `R`: This code executes an 80/20 random split of the `housing_data` dataset using the [{rsample}](https://rsample.tidymodels.org/) package [@rsample]. The `set.seed()` function ensures reproducibility, while `initial_split()` partitions the data into training and testing subsets. The resulting split object is then passed to `training()` and `testing()` to extract the corresponding datasets. A sanity check follows, where `dim()` and `nrow()` are used to inspect the shapes of each subset and to compute their observed proportions, confirming that the split aligns with the intended allocation.
-- `Python`: This code performs an analogous 80/20 partition of `housing_data` using `train_test_split()` from [{scikit-learn}](https://scikit-learn.org/stable/) [@scikit-learn], with `random_state` ensuring reproducibility. The function returns the training and testing subsets directly. A subsequent sanity check uses `.shape` and `len()` to inspect the size of each subset and to verify the observed proportions of the split, ensuring that the partitioning matches the expected configuration before proceeding with further modelling steps. Note that we also use the [{numpy}](https://pypi.org/project/numpy/) library [@numpy].
+- `R`: The code in @lst-housing-data-splitting-r executes an 80/20 random split of the `housing_data` dataset using the [{rsample}](https://rsample.tidymodels.org/) package [@rsample]. The `set.seed()` function ensures reproducibility, while `initial_split()` partitions the data into training and testing subsets. The resulting split object is then passed to `training()` and `testing()` to extract the corresponding datasets. A sanity check follows, where `dim()` and `nrow()` are used to inspect the shapes of each subset and to compute their observed proportions, confirming that the split aligns with the intended allocation.
+- `Python`: The code in @lst-housing-data-splitting-py performs an analogous 80/20 partition of `housing_data` using `train_test_split()` from [{scikit-learn}](https://scikit-learn.org/stable/) [@scikit-learn], with `random_state` ensuring reproducibility. The function returns the training and testing subsets directly. A subsequent sanity check uses `.shape` and `len()` to inspect the size of each subset and to verify the observed proportions of the split, ensuring that the partitioning matches the expected configuration before proceeding with further modelling steps. Note that we also use the [{numpy}](https://pypi.org/project/numpy/) library [@numpy].
 
 ::::: Heads-up
 ::: Heads-up-header
@@ -486,75 +486,13 @@ It turns out that both the [{rsample}](https://rsample.tidymodels.org) package i
 
 ::: {.panel-tabset}
 
-## **`R` Code**
-
-``` {.r}
-# Loading library
-library(rsample)
-
-# Seed for reproducibility
-set.seed(123)
-
-# Randomly splitting into training and testing sets
-housing_data_splitting <- initial_split(housing_data,
-  prop = 0.2
-)
-
-# Assigning data points to training and testing sets
-training_data <- training(housing_data_splitting)
-testing_data <- testing(housing_data_splitting)
-
-# Dimension check
-cat("Training shape:", dim(training_data), "\n")
-cat("Testing shape:", dim(testing_data), "\n\n")
-
-# Proportion check
-n_total <- nrow(housing_data)
-n_train <- nrow(training_data)
-n_test  <- nrow(testing_data)
-cat("Training proportion:", round(n_train / n_total, 3), "\n")
-cat("Testing proportion:",  round(n_test  / n_total, 3), "\n")
-```
-
-## **`Python` Code**
-
-``` {.python}
-# Importing libraries
-from sklearn.model_selection import train_test_split
-import numpy as np
-
-# Seed for reproducibility
-random_state = 123
-
-# Randomly splitting into training and testing sets
-training_data, testing_data = train_test_split(
-    housing_data,
-    test_size=0.8,
-    random_state=random_state
-)
-
-# Dimension check
-print("Training shape:", training_data.shape)
-print("Testing shape:", testing_data.shape, "\n")
-
-# Proportion check
-n_total = len(housing_data)
-n_train = len(training_data)
-n_test  = len(testing_data)
-print("Training proportion:", round(n_train/n_total, 3))
-print("Testing proportion:",  round(n_test/n_total, 3))
-```
-
-:::
-
-::: {.panel-tabset}
-
-## **`R` Output**
+## **`R`**
 
 ```{r}
-#| echo: false
+#| echo: true
+#| lst-label: lst-housing-data-splitting-r
+#| lst-cap: "Code to randomly split housing data into training and testing sets."
 #| message: false
-
 # Loading library
 library(rsample)
 
@@ -570,24 +508,26 @@ housing_data_splitting <- initial_split(housing_data,
 training_data <- training(housing_data_splitting)
 testing_data <- testing(housing_data_splitting)
 
-# Dimension check
-cat("Training shape:", dim(training_data), "\n")
-cat("Testing shape:", dim(testing_data), "\n\n")
-
-# Proportion check
+# Sanity checks
 n_total <- nrow(housing_data)
 n_train <- nrow(training_data)
-n_test  <- nrow(testing_data)
-cat("Training proportion:", round(n_train / n_total, 3), "\n")
-cat("Testing proportion:",  round(n_test  / n_total, 3), "\n")
+n_test <- nrow(testing_data)
+cat(sprintf(
+  "Training shape: %d %d\nTesting shape:  %d %d\n\nTraining proportion: %.3f\nTesting proportion:  %.3f\n",
+  nrow(training_data), ncol(training_data),
+  nrow(testing_data),  ncol(testing_data),
+  n_train / n_total,
+  n_test / n_total
+))
 ```
 
-## **`Python` Output**
+## **`Python`**
 
 ```{python}
-#| echo: false
+#| echo: true
+#| lst-label: lst-housing-data-splitting-py
+#| lst-cap: "Code to randomly split housing data into training and testing sets."
 #| message: false
-
 # Importing libraries
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -602,16 +542,17 @@ training_data, testing_data = train_test_split(
     random_state=random_state
 )
 
-# Dimension check
-print("Training shape:", training_data.shape)
-print("Testing shape:", testing_data.shape, "\n")
-
-# Proportion check
+# Sanity checks
 n_total = len(housing_data)
 n_train = len(training_data)
 n_test  = len(testing_data)
-print("Training proportion:", round(n_train/n_total, 3))
-print("Testing proportion:",  round(n_test/n_total, 3))
+
+print(
+    f"Training shape: {training_data.shape}\n"
+    f"Testing shape:  {testing_data.shape}\n\n"
+    f"Training proportion: {n_train/n_total:.3f}\n"
+    f"Testing proportion:  {n_test/n_total:.3f}"
+)
 ```
 
 :::
@@ -1151,6 +1092,8 @@ Having set up the coding starting point for this estimation, we need to use the 
 ## **`R`**
 
 ```{r}
+#| lst-label: lst-ols-housing-training-r
+#| lst-cap: "Code to fit an Ordinary Least-squares (OLS) regression model on training housing data."
 #| message: false
 # To import R-generated datasets to Python environment
 library(reticulate)
@@ -1167,6 +1110,8 @@ training_OLS_model
 ## **`Python`**
 
 ```{python}
+#| lst-label: lst-ols-housing-training-py
+#| lst-cap: "Code to fit an Ordinary Least-squares (OLS) regression model on training housing data."
 #| message: false
 # Importing libraries
 import statsmodels.formula.api as smf
@@ -1197,7 +1142,7 @@ Since the **inferential inquiry** in this example aims to understand the **stati
 
 ### Goodness of Fit {#sec-ds-workflow-goodness-of-fit}
 
-Once we have estimated our regression model on the training data, we move into goodness of fit. Think of this stage as **quality control** for the model we just trained: we check whether the fitted model behaves the way our **data modelling stage** said it should. That matters because every model we write down is an **abstraction of reality**: a simplified story about how the observed data could plausibly be generated in the population or system we care about. In regression analysis, that story is encoded by a specific modelling choice like OLS (or a GLM, for instance), together with its **parametrization** and **distributional assumptions**. Goodness-of-fit checks help us answer a practical question: 
+Once we have estimated our regression model on the training data, we move into goodness of fit. Think of this stage as **quality control** for the model we just trained: we check whether the fitted model behaves the way our **data modelling stage** said it should. That matters because every model we write down is an **abstraction of reality**: a simplified story about how the observed data could plausibly be generated in the population or system we care about. In regression analysis, that story is encoded by a specific modelling choice like OLS (or a GLM, for instance), together with its **parametrization** and **distributional assumptions**. Goodness-of-fit checks help us answer a practical question:
 
 > **Is this modelling story compatible with what we actually see in the data and enough that we can trust the inferences and predictions we plan to report?**
 
@@ -1246,7 +1191,7 @@ drive decisions to move on to the results stage or go back to the data modelling
 4. **Check for leverage and influential data points.** Identify whether any subset of observations are driving the model fitting. This is a **stability check** of whether the results would change if these observations were not present.
 5. **Evaluate predictive behaviour (as a diagnostic).** If prediction is part of our inquiries, we can use the **in-sample predictions** (coming from the training set along with the fitted model) to check the corresponding performance. According to our type of response, we might use the following metrics:
 
-    - **Continuous:** $R^2$ and adjusted $R^2$.
+    - **Continuous:** $R^2$ and adjusted $R^2$ for OLS or deviance in GLMs.
     - **Binary or Count:** Deviance.
     - **Survival:** Time-dependent calibration/discrimination tools appropriate to censoring.
 
@@ -1265,18 +1210,138 @@ In many different practical cases, it is possible to have a fitted model with a 
 
 #### Example: Goodness-of-Fit Checks for the OLS Housing Model
 
-We will now proceed to stress test the our `training_OLS_model` for our housing case.
+We will now proceed to stress-test our `training_OLS_model` for the housing case. That said, before running diagnostics, let us keep our modelling story front and centre. Recall that in this housing example we had the following **inferential** and **predictive** inquiries, respectively:
+
+> **How does the number of bedrooms affect the price of a house, once we account for other factors?**
+
+> **What would be the predicted price of a house with 3,500 square feet and 3 bedrooms located on a block where the closest school is at 2.5 km?**
 
 ![Image by [*Stefan*](https://pixabay.com/users/io-images-1096650/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=4941338) via [*Pixabay*](https://pixabay.com/vectors/list-done-check-ticked-off-6229425/).](img/checklist.png){width=50%}
 
-In this OLS scenario, we will run a bundle of checks that are representative of what we will do throughout the book:
+In our housing example, via @eq-housing-OLS, we assumed an OLS regression of the form
 
-- **Mean structure:** residuals vs fitted values (do we see curvature or systematic patterns?).
-- **Noise structure:** heteroskedasticity checks and a QQ-plot (is the uncertainty story plausible?).
-- **Influence:** are a few observations disproportionately driving the fitted model?
-- **Predictive performance:** testing-set error metrics (how well do we generalize?).
+$$
+Y_i = \underbrace{\beta_0 + \beta_1 x_{i, 1} + \beta_2 x_{i, 2} + \beta_3 x_{i, 3} + \beta_4 x_{i, 4} + \beta_5 x_{i, 5}}_{\text{Systematic Component}} + \underbrace{\varepsilon_i,}_{\text{Random Component}}
+$$
 
-As in @sec-ds-workflow-eda, we are not providing the code to generate all of the EDA output directly (though you can find the `R` source [here](https://github.com/alexrod61/regression-cookbook/blob/main/book/01-intro.qmd)). Nevertheless, subsequent chapters will include both `R` and `Python` code snippets to generate the corresponding goodness-of-fit graphical insights.
+together with the following **key assumptions** on the random component:
+
+- **Mean zero:** This means that 
+$$
+\mathbb{E}(\varepsilon_i) = 0,
+$$
+so the systematic component truly represents the conditional mean as in @eq-expected-housing.
+- **Constant variance (homoscedasticity):** This means that 
+$$
+\text{Var}(\varepsilon_i) = \sigma^2,
+$$ 
+so the noise level is stable across the range of **fitted values**.
+
+::: {#Definition-fitted-value .definition}
+::::{.definition-header}
+Definition of fitted value
+::::
+::::{.definition-container}
+In a regression model, the fitted value for the $i$th observation is the model's estimate of the conditional mean of the response variable given the $k$ observed regressors. After estimating the model parameters from the training data, we plug the $i$th row of regressor values into the fitted systematic component to obtain
+
+$$
+\hat{y}_i = \widehat{\mathbb{E}}\left(Y_i \mid x_{i,1}, \ldots , x_{i,k}\right).
+$$
+::::
+:::
+
+- **Normality (a requirement for our inferential inquiry):** This means that
+$$
+\varepsilon_i \sim \text{Normal}(0,\sigma^2),
+$$ 
+which supports the usual $t$-tests and confidence intervals in the classical OLS toolkit.
+- **Independence:** This means that
+$$
+\varepsilon_i \perp\!\!\!\perp \varepsilon_k \text{ for } i\neq k,
+$$ 
+so we are not unintentionally treating correlated information as if it were multiple independent observations.
+
+Goodness of fit will be where we check whether these above assumptions are reasonable enough for the two goals we stated in our study design: **association-focused inference** and **prediction**. Importantly, these checks are not about proving the model is "*true*" (no statistical model is!), but about verifying that the fitted `training_OLS_model` is **reliable enough** that we can trust what we plan to do next:
+
+- For our **inferential** inquiry, since we want to determine association, model diagnostics will help us assess whether standard errors, confidence intervals, and hypothesis tests are likely to be meaningful in our next workflow stage.
+- For our **predictive** inquiry, which requires forecasting sale prices for unobserved houses, diagnostics will help us assess whether the OLS model is stable, not overly sensitive to a few observations, and not simply fitting noise.
+
+To make this workflow stage repeatable, we will run a small set of diagnostic tools, each of which targets a specific part of the OLS story:
+
+- **Residuals versus fitted values** asks
+
+> Is the mean structure (depicted by the systematic component in @eq-housing-OLS) plausible, or did we miss a pattern (e.g., regressor interactions, changing spread, etc.)?
+
+::: {#Definition-residual .definition}
+::::{.definition-header}
+Definition of residual
+::::
+::::{.definition-container}
+A residual is the difference between the observed response variable and its fitted value from the model. For the $i$th observation, the residual is
+
+$$
+e_i = y_i - \hat{y}_i,
+$$
+
+where $y_i$ is the observed response variable and $\hat{y}_i$ is the fitted value.
+
+Residuals measure the part of the response variable that the fitted model did not explain through its systematic component. Many goodness-of-fit diagnostics are built by inspecting whether these residuals behave like the model's assumed "*random noise*."
+::::
+:::
+
+- **QQ-plot of standardized residuals** asks: 
+
+> Do residuals look roughly normal (especially in the tails), or are there heavy tails/outliers that can distort inference?
+
+- **Shapiro–Wilk test** asks
+
+> Is there formal statistical evidence that the residuals deviate from normality?
+
+- **Breusch–Pagan test** asks
+
+> Is the variance roughly constant, or does it change systematically across fitted values (i.e., we have heteroscedasticity)?
+
+- **Durbin–Watson test** asks
+
+> Are residuals plausibly independent, or do they show autocorrelation that would undermine our standard errors?
+
+- **Variance inflation factors (VIFs)** ask
+
+> Are predictors strongly collinear, making coefficient uncertainty large and interpretation unstable?
+
+- **Cook’s distance** asks
+
+> Is the fitted model overly driven by a small number of influential observations?
+
+- **$R^2$ and adjusted $R^2$** evaluate in-sample predictive behaviour.
+
+@tbl-housing-diagnostics-summary summarizes these tools and where they appear in our demo before showing the corresponding plots, tests, and metrics.
+
+| **Diagnostic** | **Purpose** | **Type** | **Cross-reference** |
+|---|---|---|---|
+| **Residuals versus fitted plot** | Checks whether the **mean structure** looks plausible  and flags changing spread/outliers. | Graphical insight | @fig-housing-training-residuals-vs-fitted |
+| **QQ-plot of standardized residuals** | Checks whether residuals look **approximately Normal** for classical OLS inference. | Graphical insight | @fig-housing-training-qq-plot |
+| **Shapiro–Wilk normality test** | Formal test that flags **departures from normality** in residuals. | Hypothesis testing | @lst-housing-shapiro-wilk-r and @lst-housing-shapiro-wilk-py |
+| **Studentized Breusch–Pagan test** | Test for **heteroscedasticity** (non-constant residual variance). | Hypothesis testing | @lst-housing-breusch-breusch-r and @lst-housing-breusch-breusch-py |
+| **Durbin–Watson test**| Test for **autocorrelation** in residuals. | Hypothesis testing | @lst-housing-durbin-watson-r and @lst-housing-durbin-watson-py |
+| **Variance inflation factors (VIFs)** | Flags **multicollinearity**, which can inflate standard errors and destabilize coefficient interpretation. | Standalone metrics | @lst-housing-vif-r and @lst-housing-vif-py |
+| **Cook’s distance plot** | Flags **influential observations** that can disproportionately affect coefficient estimates. | Graphical insight | @fig-housing-cooks-distance-plot |
+| $R^2$ and adjusted $R^2$ | Summarizes **in-sample predictive behaviour**; adjusted version penalizes for extra predictors. | Standalone metric | @lst-housing-rsq-adj-rsq-r and @lst-housing-rsq-adj-rsq-py |
+
+: Table summarizing the model diagnostics used in our OLS goodness-of-fit demo. {#tbl-housing-diagnostics-summary .striped .hover}
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on what a "*good fit*" entails!
+::::
+::::{.Heads-up-container}
+It is possible for a model to have **excellent predictive performance** while being a poor tool for interpretation (for example, if collinearity makes coefficients unstable). Conversely, a model can be a **reasonable inferential summary** while being a weak predictor (for example, if it explains average trends but misses important nonlinearities). Always judge goodness of fit relative to the inquiry you are answering!
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-pressure-6230208/).](img/surprise.png){width="475"}
+::::
+:::
+
+Note that, as in @sec-ds-workflow-eda, we are not providing the code to generate all of the plotting output directly (though you can find the `R` source [here](https://github.com/alexrod61/regression-cookbook/blob/main/book/01-intro.qmd)). However, subsequent chapters will include both `R` and `Python` code snippets to generate graphical insights on goodness of fit.
 
 ```{r}
 #| label: fig-housing-training-residuals-vs-fitted
@@ -1347,6 +1412,52 @@ QQ_plot_training
 ## **`R`**
 
 ```{r}
+#| lst-label: lst-housing-shapiro-wilk-r
+#| lst-cap: "Code to run a Shapiro–Wilk normality test on residuals."
+#| message: false
+# Extracting residuals from training model
+training_residuals <- residuals(training_OLS_model)
+
+# Running Shapiro–Wilk test
+training_OLS_model_shapiro <- shapiro.test(training_residuals)
+
+# Displaying outputs
+tidy(training_OLS_model_shapiro) |>
+  mutate_if(is.numeric, round, 2)
+```
+
+## **`Python`**
+
+```{python}
+#| lst-label: lst-housing-shapiro-wilk-py
+#| lst-cap: "Code to run a Shapiro–Wilk normality test on residuals."
+#| message: false
+# Importing function
+from scipy.stats import shapiro
+
+# Extracting residuals
+training_residuals = training_OLS_model.resid
+
+# Running Shapiro–Wilk test
+training_OLS_model_shapiro = shapiro(training_residuals)
+
+# Displaying outputs
+training_OLS_model_shapiro = pd.DataFrame({
+    "W Statistic": [round(training_OLS_model_shapiro.statistic, 2)],
+    "p-value": [round(training_OLS_model_shapiro.pvalue, 2)]
+})
+training_OLS_model_shapiro
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| lst-label: lst-housing-breusch-breusch-r
+#| lst-cap: "Code to run a studentized Breusch-Pagan test for heteroscedasticity on residuals."
 #| message: false
 # Loading library
 library(lmtest)
@@ -1358,6 +1469,8 @@ bptest(training_OLS_model)
 ## **`Python`**
 
 ```{python}
+#| lst-label: lst-housing-breusch-breusch-py
+#| lst-cap: "Code to run a studentized Breusch-Pagan test for heteroscedasticity on residuals."
 #| message: false
 # Importing function
 from statsmodels.stats.diagnostic import het_breuschpagan
@@ -1372,8 +1485,9 @@ bp_test = het_breuschpagan(residuals, exog)
 # Unpacking results
 bp_stat, bp_pvalue, empty, empty = bp_test
 
-print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
-print(f"P-value: {bp_pvalue:.4f}")
+print(f"Breusch-Pagan test statistic: {bp_stat:.3f}",
+      f"P-value: {bp_pvalue:.4f}",
+      sep="\n")
 ```
 
 :::
@@ -1383,14 +1497,17 @@ print(f"P-value: {bp_pvalue:.4f}")
 ## **`R`**
 
 ```{r}
+#| lst-label: lst-housing-durbin-watson-r
+#| lst-cap: "Code to run a Durbin-Watson test for autocorrelation on residuals."
 #| message: false
-# Running Durbin-Watson test
 dwtest(training_OLS_model)
 ```
 
 ## **`Python`**
 
 ```{python}
+#| lst-label: lst-housing-durbin-watson-py
+#| lst-cap: "Code to run a Durbin-Watson test for autocorrelation on residuals."
 #| message: false
 # Importing function
 from statsmodels.stats.stattools import durbin_watson
@@ -1496,6 +1613,8 @@ def car_like_gvif(result):
 ## **`R`**
 
 ```{r}
+#| lst-label: lst-housing-vif-r
+#| lst-cap: "Code to obtain variance inflation factors (VIFs) to detect regressor multicollinearity."
 #| message: false
 # Loading library
 library(car)
@@ -1507,29 +1626,8 @@ vif(training_OLS_model)
 ## **`Python`**
 
 ```{python}
-#| message: false
-gvif_table = car_like_gvif(training_OLS_model)
-print(gvif_table)
-```
-
-:::
-
-::: {.panel-tabset}
-
-## **`R`**
-
-```{r}
-#| message: false
-# Loading library
-library(car)
-
-# Obtaining VIFs per explanatory variable
-vif(training_OLS_model)
-```
-
-## **`Python`**
-
-```{python}
+#| lst-label: lst-housing-vif-py
+#| lst-cap: "Code to obtain variance inflation factors (VIFs) to detect regressor multicollinearity."
 #| message: false
 gvif_table = car_like_gvif(training_OLS_model)
 print(gvif_table)
@@ -1574,23 +1672,31 @@ cooks_distance_plot_training
 ## **`R`**
 
 ```{r}
+#| lst-label: lst-housing-rsq-adj-rsq-r
+#| lst-cap: "Code to obtain R squared and adjusted R squared."
 #| message: false
-# Obtaining metrics
-summary(training_OLS_model)$r.squared
-summary(training_OLS_model)$adj.r.squared
+cat(
+  sprintf(
+    "R^2:      %.4f\nAdj. R^2: %.4f\n",
+    summary(training_OLS_model)$r.squared,
+    summary(training_OLS_model)$adj.r.squared
+  )
+)
 ```
 
 ## **`Python`**
 
 ```{python}
+#| lst-label: lst-housing-rsq-adj-rsq-py
+#| lst-cap: "Code to obtain R squared and adjusted R squared."
 #| message: false
-# Obtaining metrics
-print(f"R^2:      {training_OLS_model.rsquared:.4f}")
-print(f"Adj. R^2: {training_OLS_model.rsquared_adj:.4f}")
+print(
+    f"R^2: {training_OLS_model.rsquared:.4f}\n"
+    f"Adj. R^2: {training_OLS_model.rsquared_adj:.4f}"
+)
 ```
 
 :::
-
 
 ### Results {#sec-ds-workflow-results}
 
@@ -2164,7 +2270,7 @@ Answer
 
 **Rationale:** 
 
-Regression analysis is fundamentally about **how the response $Y$ behaves given a set of $k$ explanatory variables**: the mean (or another statistic) of $Y$ changes as $\mathbf{x}$ changes, and we model that relationship through $Y \mid \mathbf{X}$. Modelling $Y$ alone (as in option A) ignores explanatory variables; modelling $\mathbf{X} \mid y$ (as in option C) flips the analysis direction; and option D is merely univariate modelling of explanatory variables
+Regression analysis is fundamentally about **how the response $Y$ behaves given a set of $k$ explanatory variables**: the mean (or another statistic) of $Y$ changes as $\mathbf{x}$ changes, and we model that relationship through $Y \mid \mathbf{X}$. Modelling $Y$ alone (as in option A) ignores explanatory variables; modelling $\mathbf{X} \mid y$ (as in option C) flips the analysis direction; and option D is merely univariate modelling of explanatory variables.
 
 </details>
 ::::
