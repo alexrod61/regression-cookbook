@@ -158,7 +158,7 @@ Here is a BibTeX entry you can use:
 @book{regressioncookbook,
   title     = {The Regression Cookbook},
   author    = {Rodríguez-Arelis, G. Alexi and Tai, Andy and Chen, Ben and Nickchi, Payman},
-  year      = {2025},
+  year      = {2026},
   url       = {https://alexrod61.github.io/regression-cookbook/},
   note      = {Open-access bilingual (R and Python) textbook},
   publisher = {University of British Columbia / OER Fund}
