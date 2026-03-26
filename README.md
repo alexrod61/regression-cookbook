@@ -128,7 +128,7 @@ Please ensure contributions maintain bilingual `R` + `Python` parity and reprodu
 
 ## Authors
 
-[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), [Ben Chen](https://github.com/phchen5], and [Payman Nickchi](https://pnickchi.github.io/).
+[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), [Ben Chen](https://github.com/phchen5), and [Payman Nickchi](https://pnickchi.github.io/).
 
 For questions or feedback, open an issue on [GitHub](https://github.com/alexrod61/regression-cookbook/issues).
 
