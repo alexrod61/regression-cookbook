@@ -82,9 +82,26 @@ mindmap
 ```{r setup-r, include=FALSE}
 # Load required libraries
 library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(ggplot2)
 ```
 
-
+```{python setup-py, include=FALSE}
+import numpy as np
+import pandas as pd
+from plotnine import *
+from statsmodels.formula.api import glm, ols, mnlogit
+from statsmodels.genmod.families import Poisson
+from matplotlib import pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error, classification_report
+import scipy.stats as stats
+import seaborn as sns
+import matplotlib.gridspec as gridspec
+from matplotlib.ticker import PercentFormatter
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, log_loss, accuracy_score, recall_score, f1_score
+from sklearn.utils import resample
+import statsmodels.api as sm
+```
 
 ::: {.LO}
 ::::{.LO-header}
@@ -157,18 +174,445 @@ In all these examples, the ordering is essential. Treating these outcomes as nom
 
 ## Case Study
 
-- TBD
+We will explore a dataset containing some factors that might influence the decision of college juniors to apply to graduate school. This dataset provides a classic example of an ordinal response, such that the categories are ordered in the response variable. We explore two primary research questions based on this dataset.
 
+- How are a student's GPA and parental education status **associated** with their likelihood of applying to graduate school?
+- Can we accurately **predict** a student's likelihood of applying to graduate school based on their GPA and parental education status?
+
+These questions correspond to two distinct **statistical objectives**:
+- **Inference**: Estimate the association between explanatory variables—specifically continuous GPA and binary parental education status—and the cumulative odds of a student belonging to a higher "likelihood" category.
+- **Prediction**: Develop a classification model that classifies individuals into their most likely ordinal category for the decision to apply to graduate school: `unlikely`, `somewhat likely`, or `very likely`.
 
 ## Data Collection and Wrangling
 
-- TBD
+The dataset contains the following variables:
 
+- `decision`: how likely the student will apply to graduate school, **a discrete and ordinal response with three increasing categories** (`unlikely`, `somewhat likely`, and `very likely`).
+- `parent_ed`: whether at least one parent has a graduate degree, **a discrete and binary explanatory variable** (`Yes` and `No`).
+- `GPA`: the student's current GPA, **a continuous explanatory variable**.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+college_data <- read_csv("data/college_data.csv", show_col_types = FALSE)
+cat("There are", nrow(college_data), "observations and", ncol(college_data), "variables in the dataset.")
+print(college_data)
+```
+
+## Python Code
+
+```{.python}
+url = "https://github.com/alexrod61/regression-cookbook/blob/main/book/data/college_data.csv
+college_data = pd.read_csv(url)
+print(f"There are {college_data.shape[0]} observations and {college_data.shape[1]} variables in the dataset.")
+print(college_data)
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+college_data <- read_csv("data/college_data.csv", show_col_types = FALSE)
+cat("There are", nrow(college_data), "observations and", ncol(college_data), "variables in the dataset.")
+print(college_data)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+url = "https://github.com/alexrod61/regression-cookbook/blob/main/book/data/college_data.csv
+college_data = pd.read_csv(url)
+print(f"There are {college_data.shape[0]} observations and {college_data.shape[1]} variables in the dataset.")
+print(college_data)
+```
+
+:::
+
+In this example, variable `decision` will be our response of interest. Let's set it up as an **ordered factor** via the `as.ordered()` function.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Factorize the response variable and print its levels
+college_data$decision <- as.ordered(college_data$decision)
+college_data$decision <- fct_relevel(
+  college_data$decision,
+  c("unlikely", "somewhat likely", "very likely")
+)
+levels(college_data$decision)
+```
+
+## Python Code
+
+```{.python}
+# Factorize the response variable and print its levels
+ordered_categories = ["unlikely", "somewhat likely", "very likely"]
+college_data['decision'] = pd.Categorical(
+    college_data['decision'],
+    categories=ordered_categories,
+    ordered=True
+)
+print(college_data['decision'].cat.categories.tolist())
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+college_data$decision <- as.ordered(college_data$decision)
+college_data$decision <- fct_relevel(
+  college_data$decision,
+  c("unlikely", "somewhat likely", "very likely")
+)
+levels(college_data$decision)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+ordered_categories = ["unlikely", "somewhat likely", "very likely"]
+college_data['decision'] = pd.Categorical(
+    college_data['decision'],
+    categories=ordered_categories,
+    ordered=True
+)
+print(college_data['decision'].cat.categories.tolist())
+```
+
+:::
 
 ## Exploratory Data Analysis
 
-- TBD
+To visualize the relationship between `decision` and `GPA`, we will use the following side-by-side plots:
 
+- **Boxplots.**
+- **Violin plots.**
+
+To visualize the relationship between `decision` and `parent_ed`, we will use stacked bar charts. Each bar will show the percentages (depicted on the $y$-axis) of college students falling on each ordered category of `decision` with the categories found in `parent_ed` on the $x$-axis. This class of bars will allow us to compare both levels of `parent_ed` in terms of the categories of `decision`. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+college_data_side_boxplots <- college_data |>
+  ggplot(aes(decision, GPA)) +
+  geom_boxplot(aes(fill = decision)) +
+  labs(y = "GPA", x = "Decision to Apply to Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette="BuPu")
+
+college_data_side_violin <- college_data |>
+  ggplot(aes(decision, GPA)) +
+  geom_violin(aes(fill = decision)) +
+  labs(y = "GPA", x = "Decision to Apply to Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, colour = "red", geom = "point",
+    shape = 18, size = 5
+  ) +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette="BuPu")
+
+# Data wrangling
+college_data_prop_summary <- as.data.frame(xtabs(
+  ~ parent_ed +
+    decision,
+  college_data
+) / rowSums(xtabs(
+  ~ parent_ed + decision,
+  college_data
+)), responseName = "prop")
+
+college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
+  x = parent_ed,
+  y = prop, fill = decision
+)) +
+  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
+    position = position_stack(vjust = 0.5), colour = "firebrick3", fontface = "bold", size = 6
+  ) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(y = "Percent", x = "Parent Education Status", fill = "") +
+  ggtitle("Stacked Bar Charts") +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text.x = element_text(size = 17, angle = 0),
+    axis.text.y = element_text(size = 17, angle = 0),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 18, margin = margin(r = 1, unit = "cm")),
+    legend.title = element_text(size = 17, face = "bold")
+  ) +
+  guides(fill = guide_legend(title = "Decision")) +
+  scale_fill_brewer(palette = "Blues")
+
+plot_grid(college_data_side_boxplots, college_data_side_violin, nrow = 1)
+college_data_stacked_bars
+```
+
+## Python Code
+
+```{.py}
+# ── 1. Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=college_data, x='decision', y='GPA', hue='decision',
+            palette='BuPu', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=19, fontweight='bold')
+axes[0].set_xlabel('Decision to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GPA', fontsize=17)
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=college_data, x='decision', y='GPA', hue='decision',
+               palette='BuPu', ax=axes[1], legend=False)
+means = college_data.groupby('decision')['GPA'].mean()
+for i, (cat, mean_val) in enumerate(means.items()):
+    axes[1].plot(i, mean_val, 'o', color='red', markersize=5, zorder=5)
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=19, fontweight='bold')
+axes[1].set_xlabel('Decision to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GPA', fontsize=17)
+
+plt.tight_layout()
+plt.show()
+
+# ── 2. Stacked Bar Chart ──────────────────────────────────────────────────────
+
+# Data wrangling — equivalent to xtabs + prop.table
+prop_summary = (
+    college_data.groupby(['parent_ed', 'decision'])
+    .size()
+    .groupby(level=0)
+    .apply(lambda x: x / x.sum())
+    .reset_index(name='prop')
+)
+
+# Pivot for stacked bar
+pivot = prop_summary.pivot(index='parent_ed', columns='decision', values='prop').fillna(0)
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 6))
+colors = sns.color_palette('Blues', n_colors=len(pivot.columns))
+pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7,
+           edgecolor='black')
+
+# Add percentage labels
+for bar_group in ax.containers:
+    for bar in bar_group:
+        h = bar.get_height()
+        if h >= 0.05:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + h / 2,
+                f'{h:.0%}',
+                ha='center', va='center',
+                color='firebrick', fontweight='bold', fontsize=6
+            )
+
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+ax.set_title('Stacked Bar Charts', fontsize=19, fontweight='bold')
+ax.set_xlabel('Parent Education Status', fontsize=18)
+ax.set_ylabel('Percent', fontsize=17)
+ax.tick_params(axis='x', labelrotation=0, labelsize=17)
+ax.tick_params(axis='y', labelsize=17)
+ax.legend(title='Decision', fontsize=18, title_fontsize=17,
+          bbox_to_anchor=(1.01, 1), loc='upper left')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+college_data_side_boxplots <- college_data |>
+  ggplot(aes(decision, GPA)) +
+  geom_boxplot(aes(fill = decision)) +
+  labs(y = "GPA", x = "Decision to Apply to Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette="BuPu")
+
+college_data_side_violin <- college_data |>
+  ggplot(aes(decision, GPA)) +
+  geom_violin(aes(fill = decision)) +
+  labs(y = "GPA", x = "Decision to Apply to Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, colour = "red", geom = "point",
+    shape = 18, size = 5
+  ) +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_brewer(palette="BuPu")
+
+# Data wrangling
+college_data_prop_summary <- as.data.frame(xtabs(
+  ~ parent_ed +
+    decision,
+  college_data
+) / rowSums(xtabs(
+  ~ parent_ed + decision,
+  college_data
+)), responseName = "prop")
+
+college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
+  x = parent_ed,
+  y = prop, fill = decision
+)) +
+  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
+    position = position_stack(vjust = 0.5), colour = "firebrick3", fontface = "bold", size = 6
+  ) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(y = "Percent", x = "Parent Education Status", fill = "") +
+  ggtitle("Stacked Bar Charts") +
+  theme(
+    plot.title = element_text(size = 19, face = "bold"),
+    axis.text.x = element_text(size = 17, angle = 0),
+    axis.text.y = element_text(size = 17, angle = 0),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 18, margin = margin(r = 1, unit = "cm")),
+    legend.title = element_text(size = 17, face = "bold")
+  ) +
+  guides(fill = guide_legend(title = "Decision")) +
+  scale_fill_brewer(palette = "Blues")
+
+plot_grid(college_data_side_boxplots, college_data_side_violin, nrow = 1)
+college_data_stacked_bars
+```
+
+## Python Output
+
+```{py}
+#| echo: false
+#| message: false
+#| warning: false
+# ── 1. Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=college_data, x='decision', y='GPA', hue='decision',
+            palette='BuPu', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=19, fontweight='bold')
+axes[0].set_xlabel('Decision to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GPA', fontsize=17)
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=college_data, x='decision', y='GPA', hue='decision',
+               palette='BuPu', ax=axes[1], legend=False)
+means = college_data.groupby('decision')['GPA'].mean()
+for i, (cat, mean_val) in enumerate(means.items()):
+    axes[1].plot(i, mean_val, 'o', color='red', markersize=5, zorder=5)
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=19, fontweight='bold')
+axes[1].set_xlabel('Decision to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GPA', fontsize=17)
+
+plt.tight_layout()
+plt.show()
+
+# ── 2. Stacked Bar Chart ──────────────────────────────────────────────────────
+
+# Data wrangling — equivalent to xtabs + prop.table
+prop_summary = (
+    college_data.groupby(['parent_ed', 'decision'])
+    .size()
+    .groupby(level=0)
+    .apply(lambda x: x / x.sum())
+    .reset_index(name='prop')
+)
+
+# Pivot for stacked bar
+pivot = prop_summary.pivot(index='parent_ed', columns='decision', values='prop').fillna(0)
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 6))
+colors = sns.color_palette('Blues', n_colors=len(pivot.columns))
+pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7,
+           edgecolor='black')
+
+# Add percentage labels
+for bar_group in ax.containers:
+    for bar in bar_group:
+        h = bar.get_height()
+        if h >= 0.05:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + h / 2,
+                f'{h:.0%}',
+                ha='center', va='center',
+                color='firebrick', fontweight='bold', fontsize=6
+            )
+
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+ax.set_title('Stacked Bar Charts', fontsize=19, fontweight='bold')
+ax.set_xlabel('Parent Education Status', fontsize=18)
+ax.set_ylabel('Percent', fontsize=17)
+ax.tick_params(axis='x', labelrotation=0, labelsize=17)
+ax.tick_params(axis='y', labelsize=17)
+ax.legend(title='Decision', fontsize=18, title_fontsize=17,
+          bbox_to_anchor=(1.01, 1), loc='upper left')
+plt.tight_layout()
+plt.show()
+```
+:::
+
+Box and violin plots, along with stacked bar charts, illustrate how academic performance and parental education background relate to a student's intent to apply to graduate school.
+
+- Students who are `very likely` to apply tend to have the highest GPAs on average, with a median GPA visibly higher than those in the `unlikely` or `somewhat likely` categories.
+- The mean GPA, represented by the red diamonds in the violin plots, shows a consistent upward trend as the level of intent increases, suggesting a positive association between academic achievement and graduate school aspirations. 
+- While there is considerable overlap in the GPA distributions of the `unlikely` and `somewhat likely` groups, the `very likely` group shows a distinct shift toward the higher end of the GPA scale.
+- Among students whose parents do not have a graduate degree, a clear majority (59%) report being `unlikely` to apply. In contrast, for students with at least one parent holding a graduate degree, the proportion of those `unlikely` to apply drops significantly to 32%. Notably, the proportion of students who are `very likely` to apply nearly triples—from 8% to 21%—when at least one parent has a graduate degree, indicating that parental academic background may influence a student's own educational goals.
 
 ## Data Modeling
 
