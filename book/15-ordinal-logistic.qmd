@@ -153,9 +153,9 @@ The following are the assumptions that we need to be aware of before fitting thi
 
 - Independent observations: The observations should be independent and the dependent variable should consist of mutually exclusive and exhaustive ordered categories.
 
-- Proportional odds assumption: The relationship between each predictor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
+- Proportional odds assumption: The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
 
-- When the proportional odds assumption is violated, a non-proportional odds model may be considered that allows for some predictors to vary across thresholds.
+- When the proportional odds assumption is violated, a non-proportional odds model may be considered that allows for some regressors to vary across thresholds.
 
 
 ### Use Cases of Ordinal Logistic Regression
@@ -1085,7 +1085,7 @@ The full Newton–Raphson/IRLS procedure is:
 
 ### Fitting the Proportional Odds Model
 
-We now fit the proportional odds model to the college dataset using `likelihood_to_apply` as the ordinal response with four levels (`Low < Medium < High < Very High`) and `GPA`, `GRE_score`, and `field_of_study` as predictors. In R we use `polr()` from the `MASS` package; in Python we use `OrderedModel` from `statsmodels`.
+We now fit the proportional odds model to the college dataset using `likelihood_to_apply` as the ordinal response with four levels (`Low < Medium < High < Very High`) and `GPA`, `GRE_score`, and `field_of_study` as regressors. In R, we use `polr()` from the `MASS` package; in Python, we use `OrderedModel` from `statsmodels`.
 
 ::: {.panel-tabset}
 
@@ -1188,9 +1188,9 @@ print(ordinal_result.summary())
 
 :::
 
-The output reports two blocks of estimates. The first block contains the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ — one per predictor — along with their standard errors and $t$-values. The second block contains the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
+The output reports two blocks of estimates. The first block contains the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ — one per regressor — along with their standard errors and $t$-values. The second block contains the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
 
-In the case study model with predictors $X_{\texttt{GPA}}$, $X_{\texttt{GRE}}$, and the field-of-study dummy variables $Z_{\texttt{field}}$, the fitted proportional odds model can be written as:
+In the case study model with regressors $X_{\texttt{GPA}}$, $X_{\texttt{GRE}}$, and the `field-of-study` dummy variables $Z_{\texttt{field}}$, the fitted proportional odds model can be written as:
 
 $$
 \text{logit}\!\left(P(Y \le j \mid \underline{X})\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, X_{\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, X_{\texttt{GRE}} + \hat{\beta}_{\texttt{field}}\, Z_{\texttt{field}}\right), \quad j = 1, 2, 3,
@@ -1200,13 +1200,13 @@ where each $\hat{\alpha}_j$ is read from the thresholds block of the output and 
 
 ### Fitting the Non-Proportional Odds Model
 
-When the proportional odds assumption is violated for one or more predictors, we relax the shared-slope constraint and allow each cumulative logit to have its own set of regression coefficients. Recall the non-proportional odds model introduced in the Data Modeling section:
+When the proportional odds assumption is violated for one or more regressors, we relax the shared-slope constraint and allow each cumulative logit to have its own set of regression coefficients. Recall the non-proportional odds model introduced in the Data Modeling section:
 
 $$
 \text{logit}( P(Y \le j \mid \underline{X}) ) = \alpha_j - (\beta_{1j} X_1 + \beta_{2j} X_2 + \ldots + \beta_{Kj} X_K), \quad j = 1, \ldots, J-1,
 $$
 
-where every slope $\beta_{kj}$ now depends on the cumulative split $j$. The total number of parameters grows from $(J-1) + K$ in the proportional odds model to $(J-1) \times (1 + K)$ in the fully non-proportional model — one intercept and $K$ slopes for each of the $J-1$ cumulative logits. For our case study with $J = 4$ categories and $K$ predictors this is a substantial increase, which is why the non-proportional model should only be preferred when the data clearly support it.
+where every slope $\beta_{kj}$ now depends on the cumulative split $j$. The total number of parameters grows from $(J-1) + K$ in the proportional odds model to $(J-1) \times (1 + K)$ in the fully non-proportional model — one intercept and $K$ slopes for each of the $J-1$ cumulative logits. For our case study with $J = 4$ categories and $K$ regressors, this is a substantial increase, which is why the non-proportional model should only be preferred when the data clearly support it.
 
 **Log-likelihood under non-proportional odds.** The likelihood has the same multinomial form as before:
 
@@ -1222,7 +1222,7 @@ $$
 
 The parameter matrix $\boldsymbol{B} = [\boldsymbol{\beta}_1 \mid \ldots \mid \boldsymbol{\beta}_{J-1}]$ replaces the single shared vector $\boldsymbol{\beta}$. Newton–Raphson proceeds identically to the proportional odds case, but the score and Hessian are now computed with respect to all $(J-1)(K+1)$ free parameters. Because the cumulative logits are no longer coupled through a single $\boldsymbol{\beta}$, the Hessian has a more favourable block structure — in principle, each cumulative logit can be optimized independently — though software typically optimizes all parameters jointly.
 
-**A practical middle ground: the partial proportional odds model.** In many applications, the proportional odds assumption holds for some predictors but not others. Rather than defaulting to either extreme, a **partial proportional odds model** constrains the slopes for well-behaved predictors to be shared across cutpoints, while freeing the slopes for predictors that violate the assumption. This is the most common approach in practice and is supported by the `VGAM` package in R via the `vglm()` function with the `cumulative` family.
+**A practical middle ground: the partial proportional odds model.** In many applications, the proportional odds assumption holds for some regressors but not others. Rather than defaulting to either extreme, a **partial proportional odds model** constrains the slopes for well-behaved regressors to be shared across cutpoints, while freeing the slopes for regressors that violate the assumption. This is the most common approach in practice and is supported by the `VGAM` package in R via the `vglm()` function with the `cumulative` family.
 
 In R we fit the fully non-proportional model using `vglm()` from the `VGAM` package. Setting `parallel = FALSE` removes the proportional odds constraint entirely. Setting `parallel = TRUE` would recover the proportional odds model, and passing a named logical vector (e.g. `parallel = c(GPA = TRUE, GRE_score = FALSE)`) fits the partial proportional odds model.
 
@@ -1330,15 +1330,15 @@ for j, label in enumerate(cutpoints):
 
 :::
 
-The R output from `vglm()` displays a separate row of coefficient estimates for each predictor at each of the $J-1$ cumulative logits. If the proportional odds assumption held perfectly, these slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are an informal signal that the assumption may be violated. The "curves approach" introduced next provides a complementary visual way to assess this.
+The R output from `vglm()` displays a separate row of coefficient estimates for each regressor at each of the $J-1$ cumulative logits. If the proportional odds assumption held perfectly, these slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are an informal signal that the assumption may be violated. The "curves approach" introduced next provides a complementary visual way to assess this.
 
 ### Checking the Proportional Odds Assumption
 
-In the Data Modeling section, we introduced a geometric approach to understand the proportional odds assumption: when the assumption holds, the $J-1$ cumulative probability curves plotted against a continuous predictor are **parallel** on the logit scale (same slope, shifting intercepts). When the assumption is violated, the curves cross or fan out, reflecting different slopes at different cutpoints.
+In the Data Modeling section, we introduced a geometric approach to understand the proportional odds assumption: when the assumption holds, the $J-1$ cumulative probability curves plotted against a continuous regressor are **parallel** on the logit scale (same slope, shifting intercepts). When the assumption is violated, the curves cross or fan out, reflecting different slopes at different cutpoints.
 
-We now apply this approach directly to the fitted models on the college data. For each continuous predictor (`GPA` and `GRE_score`), we plot the $J-1 = 3$ estimated cumulative probability curves — $\hat{P}(Y \le j \mid X)$ for $j = 1, 2, 3$ — while holding all other predictors at their sample means or reference levels. Under the proportional odds model the curves are constrained to be parallel by construction. Under the non-proportional odds model they are free to differ in slope at each cutpoint.
+We now apply this approach directly to the fitted models on the college data. For each continuous regressor (`GPA` and `GRE_score`), we plot the $J-1 = 3$ estimated cumulative probability curves — $\hat{P}(Y \le j \mid X)$ for $j = 1, 2, 3$ — while holding all other regressors at their sample means or reference levels. Under the proportional odds model the curves are constrained to be parallel by construction. Under the non-proportional odds model they are free to differ in slope at each cutpoint.
 
-Comparing the two sets of curves side-by-side gives a direct visual test: if the non-proportional curves look nearly as parallel as the proportional ones, the simpler proportional odds model is adequate. If the non-proportional curves diverge noticeably from one another, the proportional odds assumption is questionable for that predictor.
+Comparing the two sets of curves side-by-side gives a direct visual test: if the non-proportional curves look nearly as parallel as the proportional ones, the simpler proportional odds model is adequate. If the non-proportional curves diverge noticeably from one another, the proportional odds assumption is questionable for that regressor.
 
 ::: {.panel-tabset}
 
@@ -2005,7 +2005,7 @@ print(f"\nOmnibus: chi2({2*len(cols)}) = {omnibus:.3f},  p = {chi2.sf(omnibus, 2
 
 :::
 
-The Brant–Wald test results are clear-cut. GPA satisfies the proportional odds assumption ($\chi^2(2) = 0.37$, $p = 0.832$), as do all four field-of-study dummies (all $p > 0.24$). **GRE score, however, strongly violates it** ($\chi^2(2) = 91.47$, $p < 0.001$): its per-cutpoint slopes grow steadily from $-0.05$ at the `Low|Medium` split to $-0.15$ at `Medium|High` and $-0.28$ at `High|Very High`, confirming the EDA finding that GRE mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. The omnibus test ($\chi^2(12) = 98.90$, $p < 0.001$) is driven entirely by GRE. Because the violation is confined to a single predictor, a **partial proportional odds model** — which frees only GRE's slope across cutpoints while keeping all other slopes shared — is the appropriate remedy.
+According to the Brant–Wald test results, `GPA` satisfies the proportional odds assumption ($\chi^2(2) = 0.37$, $p = 0.832$), as do all four `field-of-study` dummy variables (all $p > 0.24$). **GRE score, however, strongly violates it** ($\chi^2(2) = 91.47$, $p < 0.001$): its per-cutpoint slopes grow steadily from $-0.05$ at the `Low|Medium` split to $-0.15$ at `Medium|High` and $-0.28$ at `High|Very High`, confirming the EDA finding that `GRE` mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. The omnibus test ($\chi^2(12) = 98.90$, $p < 0.001$) is driven entirely by `GRE`. As the violation of proportional odds assumption is confined to a single regressor, a **partial proportional odds model** — which frees only GRE's slope across cutpoints while keeping all other slopes shared — is the appropriate approach.
 
 ### Fitting the Partial Proportional Odds Model
 
@@ -2175,7 +2175,7 @@ for nm, b in zip(field_names, b_field):
 
 ### Interpreting the Partial Proportional Odds Coefficients
 
-The partial proportional odds model yields the following estimated coefficients. The sign convention is the same as before: a positive $\hat{\beta}$ corresponds to higher values of that predictor being associated with higher ordinal categories.
+The partial proportional odds model yields the following estimated coefficients. The sign convention is the same as before: a positive $\hat{\beta}$ corresponds to higher values of that regressor being associated with higher ordinal categories.
 
 **GPA (`GPA`) — shared slope.** GPA retains a single slope across all three cumulative splits ($\hat{\beta}_{\texttt{GPA}} = 3.87$, $z = 16.23$, $p < 0.001$, OR = 47.80, 95% CI: 29.97, 76.25). The interpretation is unchanged from the proportional odds model:
 
@@ -2189,7 +2189,7 @@ The partial proportional odds model yields the following estimated coefficients.
 | `Medium\|High` ($j=2$) | 0.155 | 1.167 | (1.138, 1.198) | 2.168 |
 | `High\|Very High` ($j=3$) | 0.277 | 1.319 | (1.275, 1.364) | 3.994 |
 
-The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.045 times higher odds of being above `Low` — a modest effect. But at the `High|Very High` split, the same one-point increase is associated with 1.319 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is even starker: a 5-point GRE advantage multiplies the odds by only 1.25 at the lowest split, but by nearly 4.0 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform predictor across the full range.
+The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.045 times higher odds of being above `Low` — a modest effect. But at the `High|Very High` split, the same one-point increase is associated with 1.319 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is even starker: a 5-point GRE advantage multiplies the odds by only 1.25 at the lowest split, but by nearly 4.0 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform regressor across the full range.
 
 **Field of Study (`field_of_study`) — shared slopes.** The field-of-study coefficients are nearly identical to those from the proportional odds model. Only **Business** is statistically significant ($\hat{\beta}_{\texttt{Business}} = 0.45$, $z = 2.04$, $p = 0.041$, OR = 1.57, 95% CI: 1.02, 2.43):
 
