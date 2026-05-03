@@ -188,7 +188,7 @@ These questions correspond to two distinct **statistical objectives**:
 The dataset contains the following variables:
 
 - `decision`: how likely the student will apply to graduate school, **a discrete and ordinal response with three increasing categories** (`unlikely`, `somewhat likely`, and `very likely`).
-- `parent_ed`: whether at least one parent has a graduate degree, **a discrete and binary explanatory variable** (`Yes` and `No`).
+- `field_of_study`: whether at least one parent has a graduate degree, **a discrete and binary explanatory variable** (`Yes` and `No`).
 - `GPA`: the student's current GPA, **a continuous explanatory variable**.
 
 ::: {.panel-tabset}
@@ -247,12 +247,12 @@ In this example, the variable `decision` will be our response of interest. Let's
 
 ```{.r}
 # Factorize the response variable and print its levels
-college_data$decision <- as.ordered(college_data$decision)
-college_data$decision <- fct_relevel(
-  college_data$decision,
+college_data$likelihood_to_apply <- as.ordered(college_data$likelihood_to_apply)
+college_data$likelihood_to_apply <- fct_relevel(
+  college_data$likelihood_to_apply,
   c("unlikely", "somewhat likely", "very likely")
 )
-levels(college_data$decision)
+levels(college_data$likelihood_to_apply)
 ```
 
 ## Python Code
@@ -278,12 +278,12 @@ print(college_data['decision'].cat.categories.tolist())
 #| echo: false
 #| message: false
 #| warning: false
-college_data$decision <- as.ordered(college_data$decision)
-college_data$decision <- fct_relevel(
-  college_data$decision,
+college_data$likelihood_to_apply <- as.ordered(college_data$likelihood_to_apply)
+college_data$likelihood_to_apply <- fct_relevel(
+  college_data$likelihood_to_apply,
   c("unlikely", "somewhat likely", "very likely")
 )
-levels(college_data$decision)
+levels(college_data$likelihood_to_apply)
 ```
 
 ## Python Output
@@ -310,7 +310,7 @@ To visualize the relationship between `decision` and `GPA`, we will use the foll
 - **Boxplots.**
 - **Violin plots.**
 
-To visualize the relationship between `decision` and `parent_ed`, we will use stacked bar charts. Each bar will show the percentages (depicted on the $y$-axis) of college students falling on each ordered category of `decision` with the categories found in `parent_ed` on the $x$-axis. This class of bars will allow us to compare both levels of `parent_ed` in terms of the categories of `decision`. 
+To visualize the relationship between `decision` and `field_of_study`, we will use stacked bar charts. Each bar will show the percentages (depicted on the $y$-axis) of college students falling on each ordered category of `decision` with the categories found in `field_of_study` on the $x$-axis. This class of bars will allow us to compare both levels of `field_of_study` in terms of the categories of `decision`. 
 
 ::: {.panel-tabset}
 
@@ -318,8 +318,8 @@ To visualize the relationship between `decision` and `parent_ed`, we will use st
 
 ```{.r}
 college_data_side_boxplots <- college_data |>
-  ggplot(aes(decision, GPA)) +
-  geom_boxplot(aes(fill = decision)) +
+  ggplot(aes(likelihood_to_apply, GPA)) +
+  geom_boxplot(aes(fill = likelihood_to_apply)) +
   labs(y = "GPA", x = "Decision to Apply to Graduate School") +
   ggtitle("Side-by-Side Boxplots") +
   theme(
@@ -331,9 +331,9 @@ college_data_side_boxplots <- college_data |>
   scale_fill_brewer(palette="BuPu")
 
 college_data_side_violin <- college_data |>
-  ggplot(aes(decision, GPA)) +
-  geom_violin(aes(fill = decision)) +
-  labs(y = "GPA", x = "Decision to Apply to Graduate School") +
+  ggplot(aes(likelihood_to_apply, GPA)) +
+  geom_violin(aes(fill = likelihood_to_apply)) +
+  labs(y = "GPA", x = "Likelihood to Apply to Graduate School") +
   ggtitle("Side-by-Side Violin Plots") +
   stat_summary(
     fun = mean, colour = "red", geom = "point",
@@ -349,16 +349,16 @@ college_data_side_violin <- college_data |>
 
 # Data wrangling
 college_data_prop_summary <- as.data.frame(xtabs(
-  ~ parent_ed +
+  ~ field_of_study +
     decision,
   college_data
 ) / rowSums(xtabs(
-  ~ parent_ed + decision,
+  ~ field_of_study + decision,
   college_data
 )), responseName = "prop")
 
 college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
-  x = parent_ed,
+  x = field_of_study,
   y = prop, fill = decision
 )) +
   geom_bar(stat = "identity", width = 0.7, colour = "black") +
@@ -414,7 +414,7 @@ plt.show()
 
 # Data wrangling — equivalent to xtabs + prop.table
 prop_summary = (
-    college_data.groupby(['parent_ed', 'decision'])
+    college_data.groupby(['field_of_study', 'decision'])
     .size()
     .groupby(level=0)
     .apply(lambda x: x / x.sum())
@@ -422,7 +422,7 @@ prop_summary = (
 )
 
 # Pivot for stacked bar
-pivot = prop_summary.pivot(index='parent_ed', columns='decision', values='prop').fillna(0)
+pivot = prop_summary.pivot(index='field_of_study', columns='decision', values='prop').fillna(0)
 
 # Plot
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -497,16 +497,16 @@ college_data_side_violin <- college_data |>
 
 # Data wrangling
 college_data_prop_summary <- as.data.frame(xtabs(
-  ~ parent_ed +
+  ~ field_of_study +
     decision,
   college_data
 ) / rowSums(xtabs(
-  ~ parent_ed + decision,
+  ~ field_of_study + decision,
   college_data
 )), responseName = "prop")
 
 college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
-  x = parent_ed,
+  x = field_of_study,
   y = prop, fill = decision
 )) +
   geom_bar(stat = "identity", width = 0.7, colour = "black") +
@@ -565,7 +565,7 @@ plt.show()
 
 # Data wrangling — equivalent to xtabs + prop.table
 prop_summary = (
-    college_data.groupby(['parent_ed', 'decision'])
+    college_data.groupby(['field_of_study', 'decision'])
     .size()
     .groupby(level=0)
     .apply(lambda x: x / x.sum())
@@ -573,7 +573,7 @@ prop_summary = (
 )
 
 # Pivot for stacked bar
-pivot = prop_summary.pivot(index='parent_ed', columns='decision', values='prop').fillna(0)
+pivot = prop_summary.pivot(index='field_of_study', columns='decision', values='prop').fillna(0)
 
 # Plot
 fig, ax = plt.subplots(figsize=(10, 6))
