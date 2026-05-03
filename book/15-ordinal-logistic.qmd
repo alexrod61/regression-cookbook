@@ -999,6 +999,655 @@ ggplot(df_np, aes(x, y, color = curve)) +
 
 ## Estimation
 
+We now turn to the question of how the parameters of the ordinal logistic regression model are estimated from data. We summarise the key estimation steps in mathematical terms below, working with one observation at a time before generalizing to the full sample.
+
+Recall that the proportional odds model for an ordinal response $Y$ with $J$ ordered categories and $K$ predictors is:
+
+$$
+\text{logit}(P(Y \le j \mid \underline{X})) = \alpha_j - (\beta_1 X_1 + \beta_2 X_2 + \ldots + \beta_K X_K), \quad j = 1, \ldots, J-1,
+$$
+
+where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts (also called **thresholds** or **cutpoints**) and $\beta_1, \ldots, \beta_K$ are the shared slope coefficients. Note the sign convention: the predictor terms are subtracted from the intercept so that a positive $\beta_k$ corresponds to higher values of $X_k$ shifting probability mass toward higher categories. This sign convention is standard in R's `MASS::polr` and in most textbooks, and it means $\alpha_j$ increases with $j$ to preserve the ordering of cumulative probabilities.
+
+The total number of parameters to estimate is $(J - 1) + K$: one threshold per cumulative split, plus one slope per predictor.
+
+### Category Probabilities from the Cumulative Model
+
+From the cumulative probabilities $P(Y \le j \mid \underline{X})$, we recover the **category-specific probabilities** by differencing:
+
+$$
+p_j(\underline{X}) = P(Y = j \mid \underline{X}) = P(Y \le j \mid \underline{X}) - P(Y \le j-1 \mid \underline{X}),
+$$
+
+where by convention $P(Y \le 0 \mid \underline{X}) = 0$ and $P(Y \le J \mid \underline{X}) = 1$. Substituting the logistic cumulative probability $F(\cdot) = \frac{e^{(\cdot)}}{1 + e^{(\cdot)}}$, this gives:
+
+$$
+p_j(\underline{X}) = \frac{e^{\alpha_j - \boldsymbol{\beta}^\top \underline{X}}}{1 + e^{\alpha_j - \boldsymbol{\beta}^\top \underline{X}}} - \frac{e^{\alpha_{j-1} - \boldsymbol{\beta}^\top \underline{X}}}{1 + e^{\alpha_{j-1} - \boldsymbol{\beta}^\top \underline{X}}}.
+$$
+
+These category probabilities are guaranteed to be non-negative (because $\alpha_j > \alpha_{j-1}$ ensures each difference is positive) and sum to one across $j = 1, \ldots, J$.
+
+### The Log-Likelihood Function
+
+Let $y_{i,j} = 1$ if the $i$th individual falls in category $j$, and $y_{i,j} = 0$ otherwise. The likelihood function for the ordinal logistic regression model is:
+
+$$
+\mathcal{L}(\boldsymbol{\alpha}, \boldsymbol{\beta} \mid y) = \prod_{i=1}^n \prod_{j=1}^J p_j(\underline{X}_i)^{y_{i,j}},
+$$
+
+where $\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_{J-1})^\top$ is the vector of thresholds and $\boldsymbol{\beta} = (\beta_1, \ldots, \beta_K)^\top$ is the vector of shared slopes. This is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
+
+Taking the logarithm yields the log-likelihood:
+
+$$
+\ell(\boldsymbol{\alpha}, \boldsymbol{\beta}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_j(\underline{X}_i).
+$$
+
+There is no closed-form solution for $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$ that maximizes $\ell$, so we rely on iterative numerical optimization, typically the **Newton–Raphson** method.
+
+### The Newton–Raphson Method
+
+Let $\boldsymbol{\theta} = (\alpha_1, \ldots, \alpha_{J-1}, \beta_1, \ldots, \beta_K)^\top \in \mathbb{R}^{(J-1)+K}$ collect all parameters. The Newton–Raphson procedure iterates using the score function and Hessian matrix of the log-likelihood.
+
+**Score function.** The partial derivative of the log-likelihood with respect to each threshold $\alpha_j$ is:
+
+$$
+\frac{\partial \ell}{\partial \alpha_j} = \sum_{i=1}^n \left[ \frac{y_{i,j}}{p_j(\underline{X}_i)} - \frac{y_{i,j+1}}{p_{j+1}(\underline{X}_i)} \right] f(\alpha_j - \boldsymbol{\beta}^\top \underline{X}_i),
+$$
+
+where $f(\cdot) = F(\cdot)(1 - F(\cdot))$ is the logistic density. The partial derivative with respect to each shared slope $\beta_k$ is:
+
+$$
+\frac{\partial \ell}{\partial \beta_k} = -\sum_{i=1}^n X_{i,k} \sum_{j=1}^{J} y_{i,j} \left[ \frac{f(\alpha_j - \boldsymbol{\beta}^\top \underline{X}_i)}{p_j(\underline{X}_i)} - \frac{f(\alpha_{j-1} - \boldsymbol{\beta}^\top \underline{X}_i)}{p_j(\underline{X}_i)} \right].
+$$
+
+The key difference from the multinomial case is that the slopes $\beta_k$ appear in **all** $J-1$ cumulative logits simultaneously, so their score components aggregate information across every cumulative split.
+
+**Hessian matrix.** The Hessian $H(\boldsymbol{\theta})$ consists of second-order partial derivatives of $\ell$. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+K) \times (J-1+K)$ matrix — unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically.
+
+**Iteration.** The Newton–Raphson update at step $t$ is:
+
+$$
+\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \left[ H\!\left(\boldsymbol{\theta}^{(t)}\right) \right]^{-1} S\!\left(\boldsymbol{\theta}^{(t)}\right),
+$$
+
+where $S(\boldsymbol{\theta})$ is the stacked score vector. The algorithm is initialized at $\boldsymbol{\theta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeats until changes in $\ell$ or $\boldsymbol{\theta}$ fall below a convergence tolerance.
+
+The full Newton–Raphson/IRLS procedure is:
+
+1. Initialize $\boldsymbol{\theta}^{(0)} = \mathbf{0}$ (stacked thresholds and slopes).
+2. Repeat until convergence:
+   - Compute the linear predictors $\alpha_j - \boldsymbol{\beta}^\top \underline{X}_i$ for all $i$ and $j$.
+   - Compute cumulative probabilities $P(Y \le j \mid \underline{X}_i)$ and category probabilities $p_j(\underline{X}_i)$.
+   - Compute the log-likelihood $\ell(\boldsymbol{\theta}^{(t)})$, score $S(\boldsymbol{\theta}^{(t)})$, and Hessian $H(\boldsymbol{\theta}^{(t)})$.
+   - Update $\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - [H(\boldsymbol{\theta}^{(t)})]^{-1} S(\boldsymbol{\theta}^{(t)})$.
+   - Check convergence.
+
+### Fitting the Proportional Odds Model
+
+We now fit the proportional odds model to the college dataset using `likelihood_to_apply` as the ordinal response with four levels (`Low < Medium < High < Very High`) and `GPA`, `GRE_score`, and `field_of_study` as predictors. In R we use `polr()` from the `MASS` package; in Python we use `OrderedModel` from `statsmodels`.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(MASS)
+
+# Ensure likelihood_to_apply is an ordered factor with correct level order
+college_data$likelihood_to_apply <- factor(
+  college_data$likelihood_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+# Fit the proportional odds model
+# Note: polr() uses the sign convention logit P(Y <= j) = alpha_j - beta * X
+ordinal_fit <- polr(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  data = college_data,
+  Hess = TRUE   # return the Hessian for inference
+)
+
+summary(ordinal_fit)
+```
+
+## Python Code
+
+```{.python}
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+# Ensure likelihood_to_apply is an ordered categorical
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+college_data["likelihood_to_apply"] = pd.Categorical(
+    college_data["likelihood_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Fit the proportional odds model (logit link)
+ordinal_fit = OrderedModel(
+    college_data["likelihood_to_apply"],
+    college_data[["GPA", "GRE_score", "field_of_study"]],
+    distr="logit"
+)
+ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
+print(ordinal_result.summary())
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+
+college_data$likelihood_to_apply <- factor(
+  college_data$likelihood_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+ordinal_fit <- polr(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  data = college_data,
+  Hess = TRUE
+)
+
+summary(ordinal_fit)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+college_data["likelihood_to_apply"] = pd.Categorical(
+    college_data["likelihood_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+ordinal_fit = OrderedModel(
+    college_data["likelihood_to_apply"],
+    college_data[["GPA", "GRE_score", "field_of_study"]],
+    distr="logit"
+)
+ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
+print(ordinal_result.summary())
+```
+
+:::
+
+The output reports two blocks of estimates. The first block contains the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ — one per predictor — along with their standard errors and $t$-values. The second block contains the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
+
+In the case study model with predictors $X_{\texttt{GPA}}$, $X_{\texttt{GRE}}$, and the field-of-study dummy variables $Z_{\texttt{field}}$, the fitted proportional odds model can be written as:
+
+$$
+\text{logit}\!\left(P(Y \le j \mid \underline{X})\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, X_{\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, X_{\texttt{GRE}} + \hat{\beta}_{\texttt{field}}\, Z_{\texttt{field}}\right), \quad j = 1, 2, 3,
+$$
+
+where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ from the coefficients block.
+
+### Fitting the Non-Proportional Odds Model
+
+When the proportional odds assumption is violated for one or more predictors, we relax the shared-slope constraint and allow each cumulative logit to have its own set of regression coefficients. Recall the non-proportional odds model introduced in the Data Modeling section:
+
+$$
+\text{logit}( P(Y \le j \mid \underline{X}) ) = \alpha_j - (\beta_{1j} X_1 + \beta_{2j} X_2 + \ldots + \beta_{Kj} X_K), \quad j = 1, \ldots, J-1,
+$$
+
+where every slope $\beta_{kj}$ now depends on the cumulative split $j$. The total number of parameters grows from $(J-1) + K$ in the proportional odds model to $(J-1) \times (1 + K)$ in the fully non-proportional model — one intercept and $K$ slopes for each of the $J-1$ cumulative logits. For our case study with $J = 4$ categories and $K$ predictors this is a substantial increase, which is why the non-proportional model should only be preferred when the data clearly support it.
+
+**Log-likelihood under non-proportional odds.** The likelihood has the same multinomial form as before:
+
+$$
+\ell(\boldsymbol{\alpha}, \boldsymbol{B}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_j(\underline{X}_i),
+$$
+
+but now the category probabilities $p_j(\underline{X}_i)$ are computed from cumulative probabilities that use split-specific slopes $\boldsymbol{\beta}_j = (\beta_{1j}, \ldots, \beta_{Kj})^\top$:
+
+$$
+P(Y \le j \mid \underline{X}_i) = \frac{e^{\alpha_j - \boldsymbol{\beta}_j^\top \underline{X}_i}}{1 + e^{\alpha_j - \boldsymbol{\beta}_j^\top \underline{X}_i}}.
+$$
+
+The parameter matrix $\boldsymbol{B} = [\boldsymbol{\beta}_1 \mid \ldots \mid \boldsymbol{\beta}_{J-1}]$ replaces the single shared vector $\boldsymbol{\beta}$. Newton–Raphson proceeds identically to the proportional odds case, but the score and Hessian are now computed with respect to all $(J-1)(K+1)$ free parameters. Because the cumulative logits are no longer coupled through a single $\boldsymbol{\beta}$, the Hessian has a more favourable block structure — in principle, each cumulative logit can be optimized independently — though software typically optimizes all parameters jointly.
+
+**A practical middle ground: the partial proportional odds model.** In many applications, the proportional odds assumption holds for some predictors but not others. Rather than defaulting to either extreme, a **partial proportional odds model** constrains the slopes for well-behaved predictors to be shared across cutpoints, while freeing the slopes for predictors that violate the assumption. This is the most common approach in practice and is supported by the `VGAM` package in R via the `vglm()` function with the `cumulative` family.
+
+In R we fit the fully non-proportional model using `vglm()` from the `VGAM` package. Setting `parallel = FALSE` removes the proportional odds constraint entirely. Setting `parallel = TRUE` would recover the proportional odds model, and passing a named logical vector (e.g. `parallel = c(GPA = TRUE, GRE_score = FALSE)`) fits the partial proportional odds model.
+
+In Python, `statsmodels` does not currently provide a built-in non-proportional ordinal model. A practical approach is to reframe the $J-1$ cumulative binary splits as separate binary logistic regressions — one model per cutpoint — and fit each independently using `LogisticRegression` or `sm.Logit`.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(VGAM)
+
+# Fully non-proportional odds model (parallel = FALSE relaxes the constraint
+# for all predictors; each cumulative logit gets its own set of slopes)
+ordinal_fit_np <- vglm(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
+  data = college_data
+)
+
+summary(ordinal_fit_np)
+```
+
+## Python Code
+
+```{.python}
+# Fit J-1 = 3 separate binary logistic regressions, one per cumulative split.
+# Each models P(Y <= j) vs P(Y > j) for j = 1, 2, 3.
+
+from sklearn.linear_model import LogisticRegression
+import numpy as np
+
+cats      = ["Low", "Medium", "High", "Very High"]
+X_np      = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]],
+    drop_first=True
+).astype(float)
+y_ord     = college_data["likelihood_to_apply"].cat.codes  # 0,1,2,3
+
+cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
+np_models = {}
+
+for j, label in enumerate(cutpoints):
+    # binary target: 1 if Y <= j, 0 if Y > j
+    y_bin = (y_ord <= j).astype(int)
+    clf   = LogisticRegression(max_iter=1000, random_state=0)
+    clf.fit(X_np, y_bin)
+    np_models[label] = clf
+    coefs = dict(zip(X_np.columns, clf.coef_[0]))
+    print(f"\nCutpoint {label}  (intercept = {clf.intercept_[0]:.3f})")
+    for var, coef in coefs.items():
+        print(f"  {var}: {coef:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(VGAM)
+
+ordinal_fit_np <- vglm(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
+  data = college_data
+)
+
+summary(ordinal_fit_np)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.linear_model import LogisticRegression
+import numpy as np
+
+cats  = ["Low", "Medium", "High", "Very High"]
+X_np  = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]],
+    drop_first=True
+).astype(float)
+y_ord = college_data["likelihood_to_apply"].cat.codes
+
+cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
+np_models = {}
+
+for j, label in enumerate(cutpoints):
+    y_bin = (y_ord <= j).astype(int)
+    clf   = LogisticRegression(max_iter=1000, random_state=0)
+    clf.fit(X_np, y_bin)
+    np_models[label] = clf
+    coefs = dict(zip(X_np.columns, clf.coef_[0]))
+    print(f"\nCutpoint {label}  (intercept = {clf.intercept_[0]:.3f})")
+    for var, coef in coefs.items():
+        print(f"  {var}: {coef:.3f}")
+```
+
+:::
+
+The R output from `vglm()` displays a separate row of coefficient estimates for each predictor at each of the $J-1$ cumulative logits. If the proportional odds assumption held perfectly, these slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are an informal signal that the assumption may be violated. The "curves approach" introduced next provides a complementary visual way to assess this.
+
+### Checking the Proportional Odds Assumption
+
+In the Data Modeling section we introduced a geometric approach to understand the proportional odds assumption: when the assumption holds, the $J-1$ cumulative probability curves plotted against a continuous predictor are **parallel** on the logit scale (same slope, shifting intercepts). When the assumption is violated, the curves cross or fan out, reflecting different slopes at different cutpoints.
+
+We now apply this approach directly to the fitted models on the college data. For each continuous predictor (`GPA` and `GRE_score`), we plot the $J-1 = 3$ estimated cumulative probability curves — $\hat{P}(Y \le j \mid X)$ for $j = 1, 2, 3$ — while holding all other predictors at their sample means or reference levels. Under the proportional odds model the curves are constrained to be parallel by construction. Under the non-proportional odds model they are free to differ in slope at each cutpoint.
+
+Comparing the two sets of curves side-by-side gives a direct visual test: if the non-proportional curves look nearly as parallel as the proportional ones, the simpler proportional odds model is adequate. If the non-proportional curves diverge noticeably from one another, the proportional odds assumption is questionable for that predictor.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(MASS)
+library(VGAM)
+library(tidyverse)
+library(cowplot)
+
+# ── Helper: predicted cumulative curves for polr (proportional odds) ──────────
+pred_curves_polr <- function(fit, predictor, data, n_grid = 200) {
+  x_seq   <- seq(min(data[[predictor]]), max(data[[predictor]]), length.out = n_grid)
+  newdata <- data[rep(1, n_grid), ]
+  # Set all numeric predictors to their mean, factors to reference level
+  for (v in names(newdata)) {
+    if (is.numeric(newdata[[v]])) newdata[[v]] <- mean(data[[v]])
+    if (is.factor(newdata[[v]]))  newdata[[v]] <- levels(newdata[[v]])[1]
+  }
+  newdata[[predictor]] <- x_seq
+  probs <- predict(fit, newdata = newdata, type = "probs")
+  # Convert category probs to cumulative probs
+  cum_probs <- t(apply(probs, 1, cumsum))
+  lvls <- levels(data$likelihood_to_apply)
+  cum_probs <- cum_probs[, -ncol(cum_probs), drop = FALSE]  # drop P(Y <= J) = 1
+  colnames(cum_probs) <- paste0("P(Y \u2264 ", lvls[-length(lvls)], ")")
+  as.data.frame(cum_probs) |>
+    mutate(x = x_seq, model = "Proportional Odds") |>
+    pivot_longer(starts_with("P(Y"), names_to = "cutpoint", values_to = "prob")
+}
+
+# ── Helper: predicted cumulative curves for vglm (non-proportional odds) ──────
+pred_curves_vglm <- function(fit, predictor, data, n_grid = 200) {
+  x_seq   <- seq(min(data[[predictor]]), max(data[[predictor]]), length.out = n_grid)
+  newdata <- data[rep(1, n_grid), ]
+  for (v in names(newdata)) {
+    if (is.numeric(newdata[[v]])) newdata[[v]] <- mean(data[[v]])
+    if (is.factor(newdata[[v]]))  newdata[[v]] <- levels(newdata[[v]])[1]
+  }
+  newdata[[predictor]] <- x_seq
+  cum_probs <- predictvglm(fit, newdata = newdata, type = "response")
+  cum_probs <- t(apply(cum_probs, 1, cumsum))
+  lvls <- levels(data$likelihood_to_apply)
+  cum_probs <- cum_probs[, -ncol(cum_probs), drop = FALSE]
+  colnames(cum_probs) <- paste0("P(Y \u2264 ", lvls[-length(lvls)], ")")
+  as.data.frame(cum_probs) |>
+    mutate(x = x_seq, model = "Non-Proportional Odds") |>
+    pivot_longer(starts_with("P(Y"), names_to = "cutpoint", values_to = "prob")
+}
+
+# ── Build and combine curves for GPA ─────────────────────────────────────────
+gpa_po  <- pred_curves_polr(ordinal_fit,    "GPA", college_data)
+gpa_np  <- pred_curves_vglm(ordinal_fit_np, "GPA", college_data)
+gpa_all <- bind_rows(gpa_po, gpa_np) |>
+  mutate(model = factor(model, levels = c("Proportional Odds", "Non-Proportional Odds")))
+
+p_gpa <- ggplot(gpa_all, aes(x = x, y = prob, colour = cutpoint)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ model) +
+  labs(x = "GPA", y = "Cumulative Probability", colour = "Cutpoint",
+       title = "GPA: Proportional vs. Non-Proportional Odds") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 15, face = "bold"),
+        axis.text  = element_text(size = 13),
+        axis.title = element_text(size = 14))
+
+# ── Build and combine curves for GRE_score ───────────────────────────────────
+gre_po  <- pred_curves_polr(ordinal_fit,    "GRE_score", college_data)
+gre_np  <- pred_curves_vglm(ordinal_fit_np, "GRE_score", college_data)
+gre_all <- bind_rows(gre_po, gre_np) |>
+  mutate(model = factor(model, levels = c("Proportional Odds", "Non-Proportional Odds")))
+
+p_gre <- ggplot(gre_all, aes(x = x, y = prob, colour = cutpoint)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ model) +
+  labs(x = "GRE Score", y = "Cumulative Probability", colour = "Cutpoint",
+       title = "GRE Score: Proportional vs. Non-Proportional Odds") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 15, face = "bold"),
+        axis.text  = element_text(size = 13),
+        axis.title = element_text(size = 14))
+
+plot_grid(p_gpa, p_gre, nrow = 2)
+```
+
+## Python Code
+
+```{.python}
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+from sklearn.linear_model import LogisticRegression
+
+cats = ["Low", "Medium", "High", "Very High"]
+cutpoint_labels = ["P(Y ≤ Low)", "P(Y ≤ Medium)", "P(Y ≤ High)"]
+colors = ["#CC79A7", "#009E73", "#D55E00"]
+
+# Pre-compute mean values and dummy-encoded predictors
+X_full = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_mean = X_full.mean()
+
+def cumulative_curves_po(result, predictor_col, predictor_range, X_mean, X_full):
+    """Cumulative curves from the proportional odds OrderedModel fit."""
+    curves = []
+    for xval in predictor_range:
+        row = X_mean.copy()
+        row[predictor_col] = xval
+        p_cat = result.model.predict(result.params, exog=row.values.reshape(1, -1))[0]
+        curves.append(np.cumsum(p_cat)[:-1])  # drop P(Y <= J) = 1
+    return np.array(curves)   # shape (n_grid, J-1)
+
+def cumulative_curves_np(np_models, predictor_col, predictor_range, X_mean, X_full):
+    """Cumulative curves from the J-1 separately fitted binary logistic models."""
+    curves = []
+    for xval in predictor_range:
+        row = X_mean.copy()
+        row[predictor_col] = xval
+        cum_probs = [m.predict_proba(row.values.reshape(1, -1))[0, 1]
+                     for m in np_models.values()]
+        curves.append(cum_probs)
+    return np.array(curves)   # shape (n_grid, J-1)
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle("Proportional vs. Non-Proportional Odds: Cumulative Probability Curves",
+             fontsize=15, fontweight="bold")
+
+for row_idx, (predictor, xlabel) in enumerate([("GPA", "GPA"),
+                                                ("GRE_score", "GRE Score")]):
+    x_range = np.linspace(X_full[predictor].min(), X_full[predictor].max(), 200)
+
+    curves_po = cumulative_curves_po(ordinal_result, predictor, x_range, X_mean, X_full)
+    curves_np = cumulative_curves_np(np_models, predictor, x_range, X_mean, X_full)
+
+    for model_idx, (curves, title) in enumerate(
+        [(curves_po, "Proportional Odds"), (curves_np, "Non-Proportional Odds")]
+    ):
+        ax = axes[row_idx, model_idx]
+        for j, (label, color) in enumerate(zip(cutpoint_labels, colors)):
+            ax.plot(x_range, curves[:, j], color=color, linewidth=2, label=label)
+        ax.set_xlabel(xlabel, fontsize=13)
+        ax.set_ylabel("Cumulative Probability", fontsize=13)
+        ax.set_title(f"{xlabel}: {title}", fontsize=13, fontweight="bold")
+        ax.set_ylim(0, 1)
+        ax.legend(fontsize=11)
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+library(VGAM)
+library(tidyverse)
+library(cowplot)
+
+pred_curves_polr <- function(fit, predictor, data, n_grid = 200) {
+  x_seq   <- seq(min(data[[predictor]]), max(data[[predictor]]), length.out = n_grid)
+  newdata <- data[rep(1, n_grid), ]
+  for (v in names(newdata)) {
+    if (is.numeric(newdata[[v]])) newdata[[v]] <- mean(data[[v]])
+    if (is.factor(newdata[[v]]))  newdata[[v]] <- levels(newdata[[v]])[1]
+  }
+  newdata[[predictor]] <- x_seq
+  probs     <- predict(fit, newdata = newdata, type = "probs")
+  cum_probs <- t(apply(probs, 1, cumsum))
+  lvls      <- levels(data$likelihood_to_apply)
+  cum_probs <- cum_probs[, -ncol(cum_probs), drop = FALSE]
+  colnames(cum_probs) <- paste0("P(Y \u2264 ", lvls[-length(lvls)], ")")
+  as.data.frame(cum_probs) |>
+    mutate(x = x_seq, model = "Proportional Odds") |>
+    pivot_longer(starts_with("P(Y"), names_to = "cutpoint", values_to = "prob")
+}
+
+pred_curves_vglm <- function(fit, predictor, data, n_grid = 200) {
+  x_seq   <- seq(min(data[[predictor]]), max(data[[predictor]]), length.out = n_grid)
+  newdata <- data[rep(1, n_grid), ]
+  for (v in names(newdata)) {
+    if (is.numeric(newdata[[v]])) newdata[[v]] <- mean(data[[v]])
+    if (is.factor(newdata[[v]]))  newdata[[v]] <- levels(newdata[[v]])[1]
+  }
+  newdata[[predictor]] <- x_seq
+  cum_probs <- predictvglm(fit, newdata = newdata, type = "response")
+  cum_probs <- t(apply(cum_probs, 1, cumsum))
+  lvls      <- levels(data$likelihood_to_apply)
+  cum_probs <- cum_probs[, -ncol(cum_probs), drop = FALSE]
+  colnames(cum_probs) <- paste0("P(Y \u2264 ", lvls[-length(lvls)], ")")
+  as.data.frame(cum_probs) |>
+    mutate(x = x_seq, model = "Non-Proportional Odds") |>
+    pivot_longer(starts_with("P(Y"), names_to = "cutpoint", values_to = "prob")
+}
+
+gpa_po  <- pred_curves_polr(ordinal_fit,    "GPA", college_data)
+gpa_np  <- pred_curves_vglm(ordinal_fit_np, "GPA", college_data)
+gpa_all <- bind_rows(gpa_po, gpa_np) |>
+  mutate(model = factor(model, levels = c("Proportional Odds", "Non-Proportional Odds")))
+
+p_gpa <- ggplot(gpa_all, aes(x = x, y = prob, colour = cutpoint)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ model) +
+  labs(x = "GPA", y = "Cumulative Probability", colour = "Cutpoint",
+       title = "GPA: Proportional vs. Non-Proportional Odds") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 15, face = "bold"),
+        axis.text  = element_text(size = 13),
+        axis.title = element_text(size = 14))
+
+gre_po  <- pred_curves_polr(ordinal_fit,    "GRE_score", college_data)
+gre_np  <- pred_curves_vglm(ordinal_fit_np, "GRE_score", college_data)
+gre_all <- bind_rows(gre_po, gre_np) |>
+  mutate(model = factor(model, levels = c("Proportional Odds", "Non-Proportional Odds")))
+
+p_gre <- ggplot(gre_all, aes(x = x, y = prob, colour = cutpoint)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ model) +
+  labs(x = "GRE Score", y = "Cumulative Probability", colour = "Cutpoint",
+       title = "GRE Score: Proportional vs. Non-Proportional Odds") +
+  theme_minimal(base_size = 13) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(size = 15, face = "bold"),
+        axis.text  = element_text(size = 13),
+        axis.title = element_text(size = 14))
+
+plot_grid(p_gpa, p_gre, nrow = 2)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+import matplotlib.pyplot as plt
+
+cats = ["Low", "Medium", "High", "Very High"]
+cutpoint_labels = ["P(Y ≤ Low)", "P(Y ≤ Medium)", "P(Y ≤ High)"]
+colors = ["#CC79A7", "#009E73", "#D55E00"]
+
+X_full = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_mean = X_full.mean()
+
+def cumulative_curves_po(result, predictor_col, predictor_range, X_mean, X_full):
+    curves = []
+    for xval in predictor_range:
+        row = X_mean.copy()
+        row[predictor_col] = xval
+        p_cat = result.model.predict(result.params, exog=row.values.reshape(1, -1))[0]
+        curves.append(np.cumsum(p_cat)[:-1])
+    return np.array(curves)
+
+def cumulative_curves_np(np_models, predictor_col, predictor_range, X_mean, X_full):
+    curves = []
+    for xval in predictor_range:
+        row = X_mean.copy()
+        row[predictor_col] = xval
+        cum_probs = [m.predict_proba(row.values.reshape(1, -1))[0, 1]
+                     for m in np_models.values()]
+        curves.append(cum_probs)
+    return np.array(curves)
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+fig.suptitle("Proportional vs. Non-Proportional Odds: Cumulative Probability Curves",
+             fontsize=15, fontweight="bold")
+
+for row_idx, (predictor, xlabel) in enumerate([("GPA", "GPA"),
+                                                ("GRE_score", "GRE Score")]):
+    x_range = np.linspace(X_full[predictor].min(), X_full[predictor].max(), 200)
+    curves_po = cumulative_curves_po(ordinal_result, predictor, x_range, X_mean, X_full)
+    curves_np = cumulative_curves_np(np_models, predictor, x_range, X_mean, X_full)
+
+    for model_idx, (curves, title) in enumerate(
+        [(curves_po, "Proportional Odds"), (curves_np, "Non-Proportional Odds")]
+    ):
+        ax = axes[row_idx, model_idx]
+        for j, (label, color) in enumerate(zip(cutpoint_labels, colors)):
+            ax.plot(x_range, curves[:, j], color=color, linewidth=2, label=label)
+        ax.set_xlabel(xlabel, fontsize=13)
+        ax.set_ylabel("Cumulative Probability", fontsize=13)
+        ax.set_title(f"{xlabel}: {title}", fontsize=13, fontweight="bold")
+        ax.set_ylim(0, 1)
+        ax.legend(fontsize=11)
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+Each figure shows two panels side-by-side for a given predictor: the left panel displays the $J-1$ cumulative probability curves from the **proportional odds model**, and the right panel displays the same curves from the **non-proportional odds model**. The key question is whether the shapes of the curves in the right panel depart meaningfully from the parallel structure enforced by the left panel.
+
+- **If the non-proportional curves look approximately parallel** — similar spacing and steepness across all three cutpoints — the proportional odds assumption is visually plausible and the simpler `polr()` model is preferred. The added complexity of the non-proportional model is not supported by the data.
+- **If the non-proportional curves diverge noticeably** — crossing, fanning out, or showing different rates of change — the proportional odds assumption is questionable for that predictor. In that case, a **partial proportional odds model** (freeing only the offending predictor via `parallel = c(...)` in `vglm()`) is a principled middle ground.
 
 ## Goodness of Fit
 
