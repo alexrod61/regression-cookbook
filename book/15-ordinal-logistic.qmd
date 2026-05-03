@@ -1654,6 +1654,548 @@ Each figure shows two panels side-by-side for a given predictor: the left panel 
 
 ## Inference
 
+After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically Normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we exponentiate a coefficient (or its confidence limits) to obtain a **proportional odds ratio** — how the cumulative odds of being at or below any category threshold change for a one-unit increase in the predictor, holding other variables fixed.
+
+A key advantage of the proportional odds model compared to the multinomial model is parsimony: because the proportional odds assumption constrains each predictor to a **single shared slope** across all $J - 1$ cumulative logits, there is exactly one odds ratio to interpret per predictor rather than one per outcome category. This single number summarises the predictor's effect on the entire ordinal scale.
+
+We can determine whether a regressor is statistically associated with the cumulative log-odds through hypothesis testing for the parameters $\beta_k$. Define the Wald statistic $z_k$ as:
+
+$$
+z_k = \frac{\hat{\beta}_k}{\widehat{\text{se}}\!\left(\hat{\beta}_k\right)}
+$$
+
+and we test the hypotheses:
+
+$$
+\begin{gather*}
+H_0: \beta_k = 0 \\
+H_a: \beta_k \neq 0.
+\end{gather*}
+$$
+
+Provided the sample size $n$ is large enough, $z_k$ follows an approximately Standard Normal distribution under $H_0$. Note that `polr()` in R labels this column `t value` in its summary output, but the inference is based on the Normal approximation.
+
+The corresponding $p$-values for each $\hat{\beta}_k$ can be computed. The smaller the $p$-value, the stronger the evidence against $H_0$. As in previous regression models, we set a predetermined significance level (usually $\alpha = 0.05$): if the $p$-value is smaller than $\alpha$, we claim there is evidence to reject the null hypothesis. Hence, small $p$-values indicate that the data support an association between the ordinal response and the $k$th predictor, after adjusting for all other predictors in the model.
+
+Given a significance level $\alpha$, we construct approximate $(1-\alpha)\times 100\%$ confidence intervals for the true $\beta_k$:
+
+$$
+\hat{\beta}_k \pm z_{\alpha/2}\,\widehat{\text{se}}\!\left(\hat{\beta}_k\right),
+$$
+
+where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution. Exponentiating the endpoints of this interval gives a $(1-\alpha)\times 100\%$ confidence interval for the proportional odds ratio $e^{\beta_k}$.
+
+We compute the 95% confidence intervals, odds ratios, and $p$-values below, and filter the significant coefficients at the 5% significance level.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(MASS)
+
+# polr() does not return p-values directly; compute them from the t-values
+# using the Normal approximation
+coef_table <- coef(summary(ordinal_fit))
+p_values   <- 2 * pnorm(abs(coef_table[, "t value"]), lower.tail = FALSE)
+
+# Combine into a tidy inference table for the slope coefficients only
+# (thresholds are not included — they are nuisance parameters here)
+slope_idx <- rownames(coef_table) %in% names(coef(ordinal_fit))
+
+inference_table <- data.frame(
+  term      = rownames(coef_table)[slope_idx],
+  estimate  = coef_table[slope_idx, "Value"],
+  std_error = coef_table[slope_idx, "Std. Error"],
+  statistic = coef_table[slope_idx, "t value"],
+  p_value   = p_values[slope_idx]
+) |>
+  mutate(across(where(is.numeric), \(x) round(x, 4)))
+
+# Add 95% confidence intervals on the log-odds scale, then exponentiate
+ci <- confint(ordinal_fit)   # profile-likelihood CIs (more accurate than Wald)
+inference_table$or       <- round(exp(inference_table$estimate), 4)
+inference_table$ci_lower <- round(exp(ci[inference_table$term, "2.5 %"]),  4)
+inference_table$ci_upper <- round(exp(ci[inference_table$term, "97.5 %"]), 4)
+
+# Print all coefficients
+print(inference_table)
+
+# Filter: significant predictors at the 5% level
+cat("\nSignificant predictors (p < 0.05):\n")
+print(inference_table[inference_table$p_value < 0.05, ])
+```
+
+## Python Code
+
+```{.python}
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+# Extract estimates, SEs, and compute Wald z-statistics and p-values
+params    = ordinal_result.params
+std_errs  = ordinal_result.bse
+z_stats   = params / std_errs
+p_values  = 2 * stats.norm.sf(np.abs(z_stats))
+
+# Confidence intervals on the log-odds scale
+ci = ordinal_result.conf_int()
+
+# In statsmodels OrderedModel the threshold parameters contain "/"
+# in their names; keep only the slope (predictor) parameters
+slope_mask = ~params.index.str.contains("/")
+
+inference_table = pd.DataFrame({
+    "term"      : params[slope_mask].index,
+    "estimate"  : params[slope_mask].values,
+    "std_error" : std_errs[slope_mask].values,
+    "statistic" : z_stats[slope_mask].values,
+    "p_value"   : p_values[slope_mask],
+    "or"        : np.exp(params[slope_mask].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, "lower"].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, "upper"].values),
+}).round(4)
+
+print("All slope coefficients:")
+print(inference_table.to_string(index=False))
+
+print("\nSignificant predictors (p < 0.05):")
+print(inference_table[inference_table["p_value"] < 0.05].to_string(index=False))
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+
+coef_table <- coef(summary(ordinal_fit))
+p_values   <- 2 * pnorm(abs(coef_table[, "t value"]), lower.tail = FALSE)
+
+slope_idx <- rownames(coef_table) %in% names(coef(ordinal_fit))
+
+inference_table <- data.frame(
+  term      = rownames(coef_table)[slope_idx],
+  estimate  = coef_table[slope_idx, "Value"],
+  std_error = coef_table[slope_idx, "Std. Error"],
+  statistic = coef_table[slope_idx, "t value"],
+  p_value   = p_values[slope_idx]
+) |>
+  mutate(across(where(is.numeric), \(x) round(x, 4)))
+
+ci <- confint(ordinal_fit)
+inference_table$or       <- round(exp(inference_table$estimate), 4)
+inference_table$ci_lower <- round(exp(ci[inference_table$term, "2.5 %"]),  4)
+inference_table$ci_upper <- round(exp(ci[inference_table$term, "97.5 %"]), 4)
+
+print(inference_table)
+
+cat("\nSignificant predictors (p < 0.05):\n")
+print(inference_table[inference_table$p_value < 0.05, ])
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+params    = ordinal_result.params
+std_errs  = ordinal_result.bse
+z_stats   = params / std_errs
+p_values  = 2 * stats.norm.sf(np.abs(z_stats))
+ci        = ordinal_result.conf_int()
+
+slope_mask = ~params.index.str.contains("/")
+
+inference_table = pd.DataFrame({
+    "term"      : params[slope_mask].index,
+    "estimate"  : params[slope_mask].values,
+    "std_error" : std_errs[slope_mask].values,
+    "statistic" : z_stats[slope_mask].values,
+    "p_value"   : p_values[slope_mask],
+    "or"        : np.exp(params[slope_mask].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, "lower"].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, "upper"].values),
+}).round(4)
+
+print("All slope coefficients:")
+print(inference_table.to_string(index=False))
+
+print("\nSignificant predictors (p < 0.05):")
+print(inference_table[inference_table["p_value"] < 0.05].to_string(index=False))
+```
+
+:::
+
+In the proportional odds model, each coefficient $\hat{\beta}_k$ describes the association between predictor $X_k$ and the **cumulative log-odds of being at or below any category threshold** $j$, after adjusting for all other predictors. Crucially, this effect is the **same** at every threshold — that is what the proportional odds assumption buys us. We interpret each significant coefficient through its exponentiated form, the **proportional odds ratio** $e^{\hat{\beta}_k}$.
+
+Recall the sign convention used by `polr()` in R (and `OrderedModel` in Python):
+
+$$
+\text{logit}\!\left(P(Y \le j \mid \underline{X})\right) = \hat{\alpha}_j - \hat{\boldsymbol{\beta}}^\top \underline{X}.
+$$
+
+Because predictors are **subtracted**, a positive $\hat{\beta}_k$ means higher values of $X_k$ are associated with **lower** cumulative probability of being in the lower categories, i.e., a shift of probability mass toward **higher** ordinal categories. The proportional odds ratio $e^{\hat{\beta}_k} > 1$ therefore means the odds of being in a *higher* category (i.e., $Y > j$) increase with $X_k$.
+
+Before interpreting these results, however, we should verify that the proportional odds assumption actually holds for each predictor. We do this formally in the next subsection using the Brant–Wald test.
+
+### Brant–Wald Test for Proportional Odds
+
+The **Brant–Wald test** provides a formal check of the proportional odds assumption. The idea is to fit $J - 1 = 3$ separate binary logistic regressions — one per cumulative split — and test whether the slope estimates are statistically equal across splits for each predictor. If a predictor's slope varies significantly across cutpoints, the proportional odds assumption is violated for that predictor.
+
+For each predictor $X_k$, let $\hat{\beta}_{kj}$ be the estimated slope from the binary logistic regression for cutpoint $j$, and let $\hat{\beta}_k^{\text{pool}}$ be the inverse-variance weighted pooled estimate. The Brant statistic for predictor $k$ is:
+
+$$
+B_k = \sum_{j=1}^{J-1} \frac{(\hat{\beta}_{kj} - \hat{\beta}_k^{\text{pool}})^2}{\widehat{\text{Var}}(\hat{\beta}_{kj})},
+$$
+
+which follows a $\chi^2$ distribution with $J - 2$ degrees of freedom under $H_0$ (proportional odds holds for $X_k$). An omnibus version of the test aggregates across all $K$ predictors, giving a $\chi^2$ statistic with $(J-2) \times K$ degrees of freedom.
+
+In R, the `brant()` function from the `brant` package computes this test directly on a `polr` object. In Python, we implement it manually by fitting three binary logistic regressions and comparing their slopes.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(brant)
+
+# Brant-Wald test applied to the fitted proportional odds model
+# H0 for each predictor: slope is equal across all J-1 cumulative splits
+brant(ordinal_fit)
+```
+
+## Python Code
+
+```{.python}
+from scipy.special import expit
+from scipy.stats import chi2
+
+X_brant = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_ord   = college_data["likelihood_to_apply"].cat.codes.values
+cols    = X_brant.columns.tolist()
+X_b     = X_brant.values
+n_b     = len(y_ord)
+
+def fit_binary_logit(X_b, y_bin):
+    from scipy.optimize import minimize
+    X_aug = np.column_stack([np.ones(n_b), X_b])
+    def nll(p):
+        eta = X_aug @ p
+        pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
+        return -np.sum(y_bin * np.log(pr) + (1 - y_bin) * np.log(1 - pr))
+    def grd(p):
+        return X_aug.T @ (expit(X_aug @ p) - y_bin)
+    res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
+                   options={"maxiter": 10000, "gtol": 1e-10})
+    p1  = expit(X_aug @ res.x)
+    vcov = np.linalg.inv((X_aug.T * (p1 * (1 - p1))) @ X_aug)
+    return res.x[1:], np.sqrt(np.diag(vcov))[1:]   # drop intercept
+
+betas_all, ses_all = [], []
+for j in range(3):
+    y_bin = (y_ord <= j).astype(float)
+    b, s  = fit_binary_logit(X_b, y_bin)
+    betas_all.append(b); ses_all.append(s)
+
+betas_all = np.array(betas_all)   # (3, K)
+ses_all   = np.array(ses_all)
+
+print(f"{'Predictor':30s}  j=1     j=2     j=3     chi2(2)  p-value")
+print("-" * 72)
+for k, name in enumerate(cols):
+    b_k = betas_all[:, k]; s_k = ses_all[:, k]
+    w   = 1 / s_k**2
+    b_pool = np.sum(w * b_k) / np.sum(w)
+    chi2_stat = np.sum((b_k - b_pool)**2 / s_k**2)
+    pval = chi2.sf(chi2_stat, df=2)
+    print(f"{name:30s}  {b_k[0]:+.4f}  {b_k[1]:+.4f}  {b_k[2]:+.4f}  "
+          f"{chi2_stat:6.3f}   {pval:.4f}")
+
+omnibus = np.sum([(betas_all[:,k]-np.sum((1/ses_all[:,k]**2)*betas_all[:,k])/
+                   np.sum(1/ses_all[:,k]**2))**2 / ses_all[:,k]**2
+                  for k in range(len(cols))])
+print(f"\nOmnibus: chi2({2*len(cols)}) = {omnibus:.3f},  p = {chi2.sf(omnibus, 2*len(cols)):.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(brant)
+brant(ordinal_fit)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from scipy.special import expit
+from scipy.stats import chi2
+
+X_brant = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_ord   = college_data["likelihood_to_apply"].cat.codes.values
+cols    = X_brant.columns.tolist()
+X_b     = X_brant.values
+n_b     = len(y_ord)
+
+def fit_binary_logit(X_b, y_bin):
+    X_aug = np.column_stack([np.ones(n_b), X_b])
+    def nll(p):
+        eta = X_aug @ p
+        pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
+        return -np.sum(y_bin * np.log(pr) + (1 - y_bin) * np.log(1 - pr))
+    def grd(p):
+        return X_aug.T @ (expit(X_aug @ p) - y_bin)
+    res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
+                   options={"maxiter": 10000, "gtol": 1e-10})
+    p1  = expit(X_aug @ res.x)
+    vcov = np.linalg.inv((X_aug.T * (p1 * (1 - p1))) @ X_aug)
+    return res.x[1:], np.sqrt(np.diag(vcov))[1:]
+
+betas_all, ses_all = [], []
+for j in range(3):
+    y_bin = (y_ord <= j).astype(float)
+    b, s  = fit_binary_logit(X_b, y_bin)
+    betas_all.append(b); ses_all.append(s)
+
+betas_all = np.array(betas_all)
+ses_all   = np.array(ses_all)
+
+print(f"{'Predictor':30s}  j=1     j=2     j=3     chi2(2)  p-value")
+print("-" * 72)
+for k, name in enumerate(cols):
+    b_k = betas_all[:, k]; s_k = ses_all[:, k]
+    w   = 1 / s_k**2
+    b_pool = np.sum(w * b_k) / np.sum(w)
+    chi2_stat = np.sum((b_k - b_pool)**2 / s_k**2)
+    pval = chi2.sf(chi2_stat, df=2)
+    print(f"{name:30s}  {b_k[0]:+.4f}  {b_k[1]:+.4f}  {b_k[2]:+.4f}  "
+          f"{chi2_stat:6.3f}   {pval:.4f}")
+
+omnibus = np.sum([(betas_all[:,k]-np.sum((1/ses_all[:,k]**2)*betas_all[:,k])/
+                   np.sum(1/ses_all[:,k]**2))**2 / ses_all[:,k]**2
+                  for k in range(len(cols))])
+print(f"\nOmnibus: chi2({2*len(cols)}) = {omnibus:.3f},  p = {chi2.sf(omnibus, 2*len(cols)):.4f}")
+```
+
+:::
+
+The Brant–Wald test results are clear-cut. GPA satisfies the proportional odds assumption ($\chi^2(2) = 0.37$, $p = 0.832$), as do all four field-of-study dummies (all $p > 0.24$). **GRE score, however, strongly violates it** ($\chi^2(2) = 91.47$, $p < 0.001$): its per-cutpoint slopes grow steadily from $-0.05$ at the `Low|Medium` split to $-0.15$ at `Medium|High` and $-0.28$ at `High|Very High`, confirming the EDA finding that GRE mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. The omnibus test ($\chi^2(12) = 98.90$, $p < 0.001$) is driven entirely by GRE. Because the violation is confined to a single predictor, a **partial proportional odds model** — which frees only GRE's slope across cutpoints while keeping all other slopes shared — is the appropriate remedy.
+
+### Fitting the Partial Proportional Odds Model
+
+In the partial proportional odds model, GRE score receives a separate slope at each of the $J - 1 = 3$ cumulative logits, while GPA and `field_of_study` retain single shared slopes. The model is:
+
+$$
+\text{logit}\!\left(P(Y \le j \mid \underline{X})\right) = \alpha_j - \left(\beta_{\texttt{GPA}}\, X_{\texttt{GPA}} + \beta_{\texttt{GRE},j}\, X_{\texttt{GRE}} + \boldsymbol{\beta}_{\texttt{field}}^\top \mathbf{Z}_{\texttt{field}}\right), \quad j = 1, 2, 3,
+$$
+
+where $\beta_{\texttt{GPA}}$ and each element of $\boldsymbol{\beta}_{\texttt{field}}$ are shared across all three cumulative splits, but $\beta_{\texttt{GRE},j}$ varies freely with $j$. The total parameter count is $(J - 1) + 1 + (J - 1) + (F - 1) = 3 + 1 + 3 + 4 = 11$, compared with 9 in the fully proportional model.
+
+In R this is straightforward using `vglm()` from the `VGAM` package with a named `parallel` vector. In Python we implement the likelihood directly and optimise with `scipy`.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(VGAM)
+
+# Partial proportional odds model:
+# GPA and field_of_study are constrained (parallel = TRUE)
+# GRE_score is freed across cutpoints (parallel = FALSE)
+ordinal_fit_ppo <- vglm(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
+                       reverse = FALSE),
+  data    = college_data
+)
+
+summary(ordinal_fit_ppo)
+```
+
+## Python Code
+
+```{.python}
+from scipy.optimize import minimize
+from scipy.special import expit
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+college_data["likelihood_to_apply"] = pd.Categorical(
+    college_data["likelihood_to_apply"], categories=ordered_categories, ordered=True
+)
+y_ppo   = college_data["likelihood_to_apply"].cat.codes.values
+X_ppo   = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float).values
+n_ppo   = len(y_ppo)
+
+# Standardise GPA and GRE for numerical stability
+gpa_m, gpa_s = X_ppo[:, 0].mean(), X_ppo[:, 0].std()
+gre_m, gre_s = X_ppo[:, 1].mean(), X_ppo[:, 1].std()
+X_sc = X_ppo.copy()
+X_sc[:, 0] = (X_ppo[:, 0] - gpa_m) / gpa_s
+X_sc[:, 1] = (X_ppo[:, 1] - gre_m) / gre_s
+
+# params: alpha1, log(a2-a1), log(a3-a2),
+#         b_gpa_s, b_gre_j1_s, b_gre_j2_s, b_gre_j3_s, b_field[4]
+def ppo_neg_ll(p):
+    a1=p[0]; a2=a1+np.exp(p[1]); a3=a2+np.exp(p[2])
+    es = p[3]*X_sc[:,0] + X_sc[:,2:]@p[7:11]
+    e1=es+p[4]*X_sc[:,1]; e2=es+p[5]*X_sc[:,1]; e3=es+p[6]*X_sc[:,1]
+    F0=expit(a1-e1); F1=expit(a2-e2); F2=expit(a3-e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p0 = np.array([0.0, np.log(2.0), np.log(2.0),
+               3.6*gpa_s, 0.05*gre_s, 0.15*gre_s, 0.28*gre_s,
+               0.47, 0.22, 0.34, 0.25])
+r1 = minimize(ppo_neg_ll, p0, method="Nelder-Mead",
+              options={"maxiter": 1000000, "xatol": 1e-12, "fatol": 1e-12,
+                       "adaptive": True})
+r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
+              options={"maxiter": 200000, "gtol": 1e-13})
+ppo_params = r2.x
+
+# Unstandardise betas to original scale
+b_gpa  = ppo_params[3] / gpa_s
+b_gre  = ppo_params[4:7] / gre_s
+b_field = ppo_params[7:11]
+
+print("=== Partial Proportional Odds Model ===")
+print(f"GPA  (shared):              beta = {b_gpa:.4f},  OR = {np.exp(b_gpa):.4f}")
+for j, b in enumerate(b_gre):
+    print(f"GRE  (cutpoint j={j+1}):        beta = {b:.4f},  OR = {np.exp(b):.4f}")
+field_names = ["Business", "Humanities", "STEM", "Social Sciences"]
+for nm, b in zip(field_names, b_field):
+    print(f"{nm:10s} (shared):         beta = {b:.4f},  OR = {np.exp(b):.4f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(VGAM)
+
+ordinal_fit_ppo <- vglm(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
+                       reverse = FALSE),
+  data    = college_data
+)
+
+summary(ordinal_fit_ppo)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from scipy.optimize import minimize
+from scipy.special import expit
+
+y_ppo   = college_data["likelihood_to_apply"].cat.codes.values
+X_ppo   = pd.get_dummies(
+    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float).values
+n_ppo   = len(y_ppo)
+
+gpa_m, gpa_s = X_ppo[:, 0].mean(), X_ppo[:, 0].std()
+gre_m, gre_s = X_ppo[:, 1].mean(), X_ppo[:, 1].std()
+X_sc = X_ppo.copy()
+X_sc[:, 0] = (X_ppo[:, 0] - gpa_m) / gpa_s
+X_sc[:, 1] = (X_ppo[:, 1] - gre_m) / gre_s
+
+def ppo_neg_ll(p):
+    a1=p[0]; a2=a1+np.exp(p[1]); a3=a2+np.exp(p[2])
+    es = p[3]*X_sc[:,0] + X_sc[:,2:]@p[7:11]
+    e1=es+p[4]*X_sc[:,1]; e2=es+p[5]*X_sc[:,1]; e3=es+p[6]*X_sc[:,1]
+    F0=expit(a1-e1); F1=expit(a2-e2); F2=expit(a3-e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p0 = np.array([0.0, np.log(2.0), np.log(2.0),
+               3.6*gpa_s, 0.05*gre_s, 0.15*gre_s, 0.28*gre_s,
+               0.47, 0.22, 0.34, 0.25])
+r1 = minimize(ppo_neg_ll, p0, method="Nelder-Mead",
+              options={"maxiter": 1000000, "xatol": 1e-12, "fatol": 1e-12, "adaptive": True})
+r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
+              options={"maxiter": 200000, "gtol": 1e-13})
+ppo_params = r2.x
+
+b_gpa   = ppo_params[3] / gpa_s
+b_gre   = ppo_params[4:7] / gre_s
+b_field = ppo_params[7:11]
+field_names = ["Business", "Humanities", "STEM", "Social Sciences"]
+
+print("=== Partial Proportional Odds Model ===")
+print(f"GPA  (shared):              beta = {b_gpa:.4f},  OR = {np.exp(b_gpa):.4f}")
+for j, b in enumerate(b_gre):
+    print(f"GRE  (cutpoint j={j+1}):        beta = {b:.4f},  OR = {np.exp(b):.4f}")
+for nm, b in zip(field_names, b_field):
+    print(f"{nm:10s} (shared):         beta = {b:.4f},  OR = {np.exp(b):.4f}")
+```
+
+:::
+
+### Interpreting the Partial Proportional Odds Coefficients
+
+The partial proportional odds model yields the following estimated coefficients. The sign convention is the same as before: a positive $\hat{\beta}$ corresponds to higher values of that predictor being associated with higher ordinal categories.
+
+**GPA (`GPA`) — shared slope.** GPA retains a single slope across all three cumulative splits ($\hat{\beta}_{\texttt{GPA}} = 3.87$, $z = 16.23$, $p < 0.001$, OR = 47.80, 95% CI: 29.97, 76.25). The interpretation is unchanged from the proportional odds model:
+
+> *Holding GRE score and field of study constant, a one-unit increase in GPA is associated with 47.80 times higher cumulative odds of falling in a higher likelihood-to-apply category, at every cumulative threshold simultaneously.*
+
+**GRE Score (`GRE_score`) — cutpoint-specific slopes.** GRE score now has three separate slopes, one per cumulative split, all statistically significant:
+
+| Cutpoint | $\hat{\beta}_{\texttt{GRE},j}$ | OR ($e^{\hat\beta}$) | 95% CI | 5-pt OR ($e^{5\hat\beta}$) |
+|---|---|---|---|---|
+| `Low\|Medium` ($j=1$) | 0.044 | 1.045 | (1.019, 1.072) | 1.249 |
+| `Medium\|High` ($j=2$) | 0.155 | 1.167 | (1.138, 1.198) | 2.168 |
+| `High\|Very High` ($j=3$) | 0.277 | 1.319 | (1.275, 1.364) | 3.994 |
+
+The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.045 times higher odds of being above `Low` — a modest effect. But at the `High|Very High` split, the same one-point increase is associated with 1.319 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is even starker: a 5-point GRE advantage multiplies the odds by only 1.25 at the lowest split, but by nearly 4.0 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform predictor across the full range.
+
+**Field of Study (`field_of_study`) — shared slopes.** The field-of-study coefficients are nearly identical to those from the proportional odds model. Only **Business** is statistically significant ($\hat{\beta}_{\texttt{Business}} = 0.45$, $z = 2.04$, $p = 0.041$, OR = 1.57, 95% CI: 1.02, 2.43):
+
+> *Holding GPA and GRE score constant, Business students have 1.57 times the cumulative odds of being in a higher likelihood-to-apply category compared with Arts students, at every cumulative threshold.*
+
+Humanities ($p = 0.321$), STEM ($p = 0.130$), and Social Sciences ($p = 0.333$) remain non-significant, indicating no statistically detectable difference in likelihood to apply relative to Arts after adjusting for academic performance.
 
 ## Results
 
