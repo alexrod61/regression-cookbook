@@ -2199,6 +2199,285 @@ The coefficients for Humanities ($p = 0.321$), STEM ($p = 0.130$), and Social Sc
 
 ## Results
 
+The partial proportional odds model — with GPA and field of study constrained to shared slopes and GRE score freed across cutpoints — is the final model selected for this case study, based on the Brant–Wald test results from the Inference section. Using the sign convention $\text{logit}(P(Y \le j \mid \underline{X})) = \alpha_j - \hat{\boldsymbol{\beta}}^\top \underline{X}$, the fitted model is:
+
+$$
+\text{logit}\!\left(P(Y \le j \mid \underline{X})\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, X_{\texttt{GPA}} + \hat{\beta}_{\texttt{GRE},j}\, X_{\texttt{GRE}} + \hat{\beta}_{\texttt{Business}}\, Z_{\texttt{Business}} + \hat{\beta}_{\texttt{Hum}}\, Z_{\texttt{Hum}} + \hat{\beta}_{\texttt{STEM}}\, Z_{\texttt{STEM}} + \hat{\beta}_{\texttt{SocSci}}\, Z_{\texttt{SocSci}}\right),
+$$
+
+for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`). The estimated thresholds and slopes from the full proportional odds model — the baseline from which inference and the Brant test were conducted — are summarised below:
+
+| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
+|---|---|---|---|---|---|---|
+| $\hat{\alpha}_1$ (`Low\|Medium`) | 31.71 | — | — | — | — | — |
+| $\hat{\alpha}_2$ (`Medium\|High`) | 0.42 | — | — | — | — | — |
+| $\hat{\alpha}_3$ (`High\|Very High`) | 0.28 | — | — | — | — | — |
+| $\hat{\beta}_{\texttt{GPA}}$ | 3.63 | 0.23 | 15.96 | $< 0.001$ | 37.55 | (24.05, 58.61) |
+| $\hat{\beta}_{\texttt{GRE}}$ (shared) | 0.15 | 0.01 | 13.54 | $< 0.001$ | 1.16 | (1.13, 1.18) |
+| $\hat{\beta}_{\texttt{Business}}$ | 0.47 | 0.22 | 2.19 | 0.029 | 1.60 | (1.05, 2.44) |
+| $\hat{\beta}_{\texttt{Humanities}}$ | 0.23 | 0.21 | 1.06 | 0.291 | 1.25 | (0.82, 1.91) |
+| $\hat{\beta}_{\texttt{STEM}}$ | 0.34 | 0.20 | 1.68 | 0.094 | 1.41 | (0.94, 2.10) |
+| $\hat{\beta}_{\texttt{Social Sciences}}$ | 0.25 | 0.21 | 1.17 | 0.241 | 1.28 | (0.85, 1.93) |
+
+After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in R) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.044$, $\hat{\beta}_{\texttt{GRE},2} = 0.155$, and $\hat{\beta}_{\texttt{GRE},3} = 0.277$ at the three cumulative splits respectively, with all other predictor slopes remaining shared. The interpretation of each significant coefficient is:
+
+- **GPA** ($\hat{\beta} = 3.63$, OR = 37.55, 95% CI: 24.05–58.61): Holding GRE score and field of study constant, each additional GPA point is associated with 37.55 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest predictor in the model.
+- **GRE score** (cutpoint-specific): The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with a 4.5% increase in the odds of being above `Low` (OR = 1.045 at $j=1$), rising to a 16.7% increase in the odds of being above `Medium` (OR = 1.167 at $j=2$), and a 31.9% increase in the odds of being in the `Very High` category (OR = 1.319 at $j=3$). This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
+- **Business field of study** ($\hat{\beta} = 0.47$, OR = 1.60, 95% CI: 1.05–2.44, $p = 0.029$): Holding academic performance constant, Business students have 1.60 times higher cumulative odds of being in a higher likelihood-to-apply category compared to Arts students. No other field of study shows a statistically significant difference from Arts.
+
+### Prediction
+
+We split the data into 80% training (800 observations) and 20% test (200 observations), stratified by `likelihood_to_apply`, fit the proportional odds model on the training set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(MASS)
+library(caret)
+library(ggplot2)
+
+set.seed(42)
+train_idx  <- createDataPartition(college_data$likelihood_to_apply, p = 0.8, list = FALSE)
+train_set  <- college_data[train_idx, ]
+test_set   <- college_data[-train_idx, ]
+
+# Fit on training set
+ordinal_fit_train <- polr(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_set, Hess = TRUE
+)
+
+# Predict on test set
+y_pred <- predict(ordinal_fit_train, newdata = test_set)
+
+# Confusion matrix
+conf_matrix <- confusionMatrix(
+  factor(y_pred,          levels = levels(test_set$likelihood_to_apply)),
+  factor(test_set$likelihood_to_apply, levels = levels(test_set$likelihood_to_apply))
+)
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+```
+
+## Python Code
+
+```{.python}
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+college_data["likelihood_to_apply"] = pd.Categorical(
+    college_data["likelihood_to_apply"], categories=ordered_categories, ordered=True
+)
+
+train_df, test_df = train_test_split(
+    college_data, test_size=0.2, random_state=42,
+    stratify=college_data["likelihood_to_apply"]
+)
+
+X_train = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_test  = pd.get_dummies(
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_train = train_df["likelihood_to_apply"]
+y_test  = test_df["likelihood_to_apply"]
+
+# Fit on training set
+train_model  = OrderedModel(y_train, X_train, distr="logit")
+train_result = train_model.fit(method="bfgs", disp=False)
+
+# Predict on test set
+pred_probs = train_result.model.predict(train_result.params, exog=X_test.values)
+pred_codes = pred_probs.argmax(axis=1)
+true_codes = y_test.cat.codes.values
+
+# Confusion matrix
+cm   = confusion_matrix(true_codes, pred_codes, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+library(caret)
+
+set.seed(42)
+train_idx <- createDataPartition(college_data$likelihood_to_apply, p = 0.8, list = FALSE)
+train_set <- college_data[train_idx, ]
+test_set  <- college_data[-train_idx, ]
+
+ordinal_fit_train <- polr(
+  likelihood_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_set, Hess = TRUE
+)
+
+y_pred <- predict(ordinal_fit_train, newdata = test_set)
+
+conf_matrix <- confusionMatrix(
+  factor(y_pred,                   levels = levels(test_set$likelihood_to_apply)),
+  factor(test_set$likelihood_to_apply, levels = levels(test_set$likelihood_to_apply))
+)
+
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+college_data["likelihood_to_apply"] = pd.Categorical(
+    college_data["likelihood_to_apply"], categories=ordered_categories, ordered=True
+)
+
+train_df, test_df = train_test_split(
+    college_data, test_size=0.2, random_state=42,
+    stratify=college_data["likelihood_to_apply"]
+)
+
+X_train = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_test  = pd.get_dummies(
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_train = train_df["likelihood_to_apply"]
+y_test  = test_df["likelihood_to_apply"]
+
+train_model  = OrderedModel(y_train, X_train, distr="logit")
+train_result = train_model.fit(method="bfgs", disp=False)
+
+pred_probs = train_result.model.predict(train_result.params, exog=X_test.values)
+pred_codes = pred_probs.argmax(axis=1)
+true_codes = y_test.cat.codes.values
+
+cm   = confusion_matrix(true_codes, pred_codes, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The corresponding performance metrics are computed below.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+overall_accuracy <- conf_matrix$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+## Python Code
+
+```{.python}
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
+acc    = accuracy_score(true_codes, pred_codes)
+recall = recall_score(true_codes, pred_codes, average="macro")
+f1     = f1_score(true_codes, pred_codes, average="macro")
+
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+overall_accuracy <- conf_matrix$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
+acc    = accuracy_score(true_codes, pred_codes)
+recall = recall_score(true_codes, pred_codes, average="macro")
+f1     = f1_score(true_codes, pred_codes, average="macro")
+
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+On the test set, the model achieves an overall accuracy of **46.0%**, a macro recall of **43.6%**, and a macro F1 of **42.1%**. While these figures are modest in absolute terms, they should be interpreted in the context of a four-class ordinal prediction problem where random guessing would yield 25% accuracy. The confusion matrix reveals a clear ordinal pattern in the errors: most misclassifications land in adjacent categories rather than opposite ends of the scale. For example, the model rarely confuses `Low` with `Very High` or vice versa — mistakes tend to be one step off, which is an important property for an ordinal outcome.
+
+The `Very High` category is predicted most reliably, with a recall of 0.70 and F1 of 0.61, consistent with the inference finding that both GPA and GRE score most sharply distinguish students at the top of the ordinal scale. In contrast, the `High` category is the hardest to classify correctly (recall = 0.16, F1 = 0.22), likely because it sits between two well-separated groups (`Medium` and `Very High`) and receives predictions pulled toward both. This pattern reinforces the inferential finding that the predictors create a clearer separation at the extremes of the ordinal scale than in the middle.
 
 ## Storytelling
 
