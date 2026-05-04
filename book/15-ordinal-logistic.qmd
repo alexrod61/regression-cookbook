@@ -88,27 +88,6 @@ library(VGAM)
 library(cowplot)
 library(brant)
 library(caret)
-
-library(reticulate)
-py_config()
-
-py_require("pandas")
-py_require("numpy")
-py_require("seaborn")
-py_require("plotnine")
-py_require("matplotlib")
-py_require("statsmodels")
-py_require("scikit-learn")
-py_require("scipy")
-
-pandas <- import("pandas")
-numpy <- import("numpy")
-seaborn <- import("seaborn")
-matplotlib <- import("matplotlib")
-statsmodels <- import("statsmodels")
-sklearn <- import("sklearn")
-scipy <- import("scipy")
-plotnine <- import("plotnine")
 ```
 
 ```{python setup-py, include=FALSE}
@@ -1677,6 +1656,330 @@ Each figure shows two panels side-by-side for a given predictor: the left panel 
 
 ## Goodness of Fit
 
+Let us assess how well the fitted proportional odds model explains the observed `likelihood_to_apply` categories on the **training set**. We consider two complementary perspectives: (1) likelihood-based measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale, and (2) classification-based measures that evaluate how accurately the model assigns observations to their correct ordinal category.
+
+### Likelihood-Based Measures
+
+**Residual deviance and null deviance.** The **null deviance** measures how well the intercept-only model (no predictors, only the $J-1$ thresholds) fits the data:
+
+$$
+D_{\text{null}} = -2\,\ell(\hat{\boldsymbol{\alpha}}_{\text{null}}),
+$$
+
+where $\hat{\boldsymbol{\alpha}}_{\text{null}}$ are the thresholds estimated without any predictor. The **residual deviance** is the analogous quantity for the fitted model:
+
+$$
+D_{\text{resid}} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}).
+$$
+
+A well-fitting model should have a substantially smaller residual deviance than the null deviance. The reduction $D_{\text{null}} - D_{\text{resid}}$ is the **likelihood-ratio (LR) statistic**, which under $H_0$ (all slope coefficients are zero) follows a $\chi^2$ distribution with degrees of freedom equal to the number of slope parameters $K$:
+
+$$
+G^2 = D_{\text{null}} - D_{\text{resid}} = -2\bigl(\ell_{\text{null}} - \ell_{\text{fitted}}\bigr) \;\overset{H_0}{\sim}\; \chi^2(K).
+$$
+
+**McFadden's pseudo-$R^2$** expresses the proportional reduction in log-likelihood relative to the null model:
+
+$$
+R^2_{\text{McFadden}} = 1 - \frac{\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}})}{\ell(\hat{\boldsymbol{\alpha}}_{\text{null}})}.
+$$
+
+Unlike OLS $R^2$, McFadden's $R^2$ does not have a natural upper bound of 1, and values in the range 0.2–0.4 are generally considered to indicate good model fit.
+
+**AIC and BIC** penalise the log-likelihood for model complexity:
+
+$$
+\text{AIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + p\log n,
+$$
+
+where $p = (J-1) + K$ is the total number of parameters and $n$ is the sample size. Lower AIC and BIC indicate better fit, and they are most useful for **comparing competing models** (e.g., proportional vs. partial proportional odds).
+
+We compute all of these measures below.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(MASS)
+
+# ── Likelihood-based measures ────────────────────────────────────────────────
+ll_fitted <- logLik(ordinal_fit)          # log-likelihood of fitted model
+
+# Null model: intercepts only, no predictors
+ordinal_null <- polr(
+  likelihood_to_apply ~ 1,
+  data  = train_set,
+  Hess  = TRUE
+)
+ll_null <- logLik(ordinal_null)
+
+null_deviance   <- -2 * as.numeric(ll_null)
+resid_deviance  <- -2 * as.numeric(ll_fitted)
+mcfadden_r2     <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat         <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df           <- ordinal_fit$edf - ordinal_null$edf   # slope params only
+lr_pval         <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("LR statistic:       ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(ordinal_fit), 2), "\n")
+cat("BIC:                ", round(BIC(ordinal_fit), 2), "\n")
+```
+
+## Python Code
+
+```{.python}
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+# ── Likelihood-based measures ────────────────────────────────────────────────
+ll_fitted = ordinal_result.llf
+
+# Null log-likelihood from marginal category proportions
+y_codes  = y_train.cat.codes.values
+props    = np.array([(y_codes == j).mean() for j in range(4)])
+ll_null  = np.sum(np.log(props[y_codes]))
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = ordinal_result.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"LR statistic:       {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {ordinal_result.aic:.2f}")
+print(f"BIC:                {ordinal_result.bic:.2f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+
+ordinal_null <- polr(
+  likelihood_to_apply ~ 1,
+  data  = train_set,
+  Hess  = TRUE
+)
+ll_null   <- logLik(ordinal_null)
+ll_fitted <- logLik(ordinal_fit)
+
+null_deviance  <- -2 * as.numeric(ll_null)
+resid_deviance <- -2 * as.numeric(ll_fitted)
+mcfadden_r2    <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat        <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df          <- ordinal_fit$edf - ordinal_null$edf
+lr_pval        <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("LR statistic:       ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(ordinal_fit), 2), "\n")
+cat("BIC:                ", round(BIC(ordinal_fit), 2), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+ll_fitted = ordinal_result.llf
+
+y_codes = y_train.cat.codes.values
+props   = np.array([(y_codes == j).mean() for j in range(4)])
+ll_null = np.sum(np.log(props[y_codes]))
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = ordinal_result.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"LR statistic:       {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {ordinal_result.aic:.2f}")
+print(f"BIC:                {ordinal_result.bic:.2f}")
+```
+
+:::
+
+The residual deviance (1828.48) is substantially smaller than the null deviance (2205.58), a reduction of 377.10 units. This reduction is captured by the likelihood-ratio statistic $G^2 = 377.10$ on 6 degrees of freedom ($p < 0.001$), providing very strong evidence that at least one predictor improves on the null model. McFadden's $R^2 = 0.171$ falls within the 0.2 range commonly associated with acceptable fit for ordinal models, indicating that GPA, GRE score, and field of study together explain a meaningful share of the variation in `likelihood_to_apply` on the log-likelihood scale.
+
+### Classification-Based Measures
+
+While likelihood-based measures evaluate the model on the probability scale, classification-based measures assess how well the model assigns each observation to its correct ordinal category by taking the category with the highest predicted probability as the point prediction. We use the same three metrics as in Chapter 14: overall accuracy, macro recall, and macro F1.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(caret)
+
+# Predict on training set
+y_pred_train <- predict(ordinal_fit, newdata = train_set)
+
+conf_matrix_train <- confusionMatrix(
+  factor(y_pred_train,            levels = levels(train_set$likelihood_to_apply)),
+  factor(train_set$likelihood_to_apply, levels = levels(train_set$likelihood_to_apply))
+)
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix_train$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+
+# Metrics
+overall_accuracy <- conf_matrix_train$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+## Python Code
+
+```{.python}
+from sklearn.metrics import (confusion_matrix, ConfusionMatrixDisplay,
+                             accuracy_score, recall_score, f1_score)
+import matplotlib.pyplot as plt
+
+# Predict on training set
+pred_probs_train = ordinal_result.model.predict(
+    ordinal_result.params, exog=X_train.values
+)
+pred_codes_train = pred_probs_train.argmax(axis=1)
+true_codes_train = y_train.cat.codes.values
+
+# Confusion matrix
+cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
+
+# Metrics
+acc    = accuracy_score(true_codes_train, pred_codes_train)
+recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
+f1     = f1_score(true_codes_train,       pred_codes_train, average="macro")
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(caret)
+
+y_pred_train <- predict(ordinal_fit, newdata = train_set)
+
+conf_matrix_train <- confusionMatrix(
+  factor(y_pred_train,                  levels = levels(train_set$likelihood_to_apply)),
+  factor(train_set$likelihood_to_apply, levels = levels(train_set$likelihood_to_apply))
+)
+
+cm_df <- as.data.frame(as.table(conf_matrix_train$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+
+overall_accuracy <- conf_matrix_train$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.metrics import (confusion_matrix, ConfusionMatrixDisplay,
+                             accuracy_score, recall_score, f1_score)
+import matplotlib.pyplot as plt
+
+pred_probs_train = ordinal_result.model.predict(
+    ordinal_result.params, exog=X_train.values
+)
+pred_codes_train = pred_probs_train.argmax(axis=1)
+true_codes_train = y_train.cat.codes.values
+
+cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
+
+acc    = accuracy_score(true_codes_train, pred_codes_train)
+recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
+f1     = f1_score(true_codes_train,       pred_codes_train, average="macro")
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+On the training set, the model achieves an overall accuracy of **44.5%**, a macro recall of **41.9%**, and a macro F1 of **40.6%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome — so the model meaningfully outperforms chance, but leaves substantial room for improvement.
+
+The confusion matrix reveals the characteristic ordinal error pattern: most misclassifications fall into **adjacent categories** rather than opposite ends of the scale. For instance, `Low` observations are most often misclassified as `Medium`, and `High` observations are most often confused with `Very High` or `Medium` — rarely with `Low`. This near-diagonal structure is desirable for an ordinal model, as it indicates the model respects the ordering of categories even when it does not predict the exact category correctly.
+
+The `Very High` category is the best-predicted class (recall = 0.78, F1 = 0.68), consistent with the inference finding that both GPA and GRE score create the sharpest separation at the top of the ordinal scale. The `High` category is the most difficult to classify correctly (recall = 0.15, F1 = 0.19), as it sits between two better-separated groups and receives predictions pulled in both directions. Macro recall (0.419) is noticeably lower than accuracy (0.445), indicating mild imbalance in how well the model performs across the four categories — a pattern that persists on the held-out test set and is discussed further in the Results section.
 
 ## Inference
 
