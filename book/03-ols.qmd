@@ -57,6 +57,25 @@ library(cookbook)
 library(tidyverse)
 library(car)
 library(lmtest)
+library(scales)
+library(corrplot)
+library(viridis)
+library(broom)
+
+# Setup the required functions
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr', 
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
 
 # Setting up Python dependencies
 library(reticulate)
@@ -132,7 +151,7 @@ Imagine you have a scatter plot of data points. Now, consider drawing two differ
 
 ::: {.panel-tabset}
 
-## R Code
+## **`R` Code**
 ```{.r}
 # Sample data
 set.seed(42)
@@ -162,7 +181,7 @@ plot <- ggplot() +
   geom_point(data = df, aes(x = Size, y = Price), size = 3, color = "black") +
   geom_line(data = df_long, aes(x = Size, y = Price, color = Line), linewidth = 1.2) +
   scale_color_manual(values = c("Line A (Best Fit)" = "blue", "Line B (Worse Fit)" = "red")) +
-  labs(title = "Comparing Regression Line Fits",
+  labs(title = "",
        x = "House Size (sq ft)",
        y = "House Price (in $1000s)",
        color = "Regression Line") +
@@ -173,7 +192,7 @@ plot <- ggplot() +
 plot
 ```
 
-## Python Code
+## **`Python` Code**
 ```{.python}
 import numpy as np
 import pandas as pd
@@ -206,7 +225,6 @@ fig, ax = plt.subplots(figsize=(6, 4))
 ax.scatter(df['Size'], df['Price'], color='black', label='Actual Data')
 for label, group in df_long.groupby('Line'):
     ax.plot(group['Size'], group['Price'], label=label)
-ax.set_title("Comparing Regression Line Fits", fontsize=14, fontweight='bold')
 ax.set_xlabel("House Size (sq ft)")
 ax.set_ylabel("House Price (in $1000s)")
 ax.legend(title="Regression Line", loc='lower right')
@@ -220,6 +238,8 @@ plt.show()
 
 ## R Output
 ```{r}
+#| label: fig-best-line
+#| fig-cap: "Comparison of best-fit and poorly fitting regression lines for housing data."
 #| echo: false
 #| message: false
 
@@ -251,7 +271,7 @@ plot <- ggplot() +
   geom_point(data = df, aes(x = Size, y = Price), size = 3, color = "black") +
   geom_line(data = df_long, aes(x = Size, y = Price, color = Line), linewidth = 1.2) +
   scale_color_manual(values = c("Line A (Best Fit)" = "blue", "Line B (Worse Fit)" = "red")) +
-  labs(title = "Comparing Regression Line Fits",
+  labs(title = "",
        x = "House Size (sq ft)",
        y = "House Price (in $1000s)",
        color = "Regression Line") +
@@ -297,7 +317,6 @@ fig, ax = plt.subplots(figsize=(6, 4))
 ax.scatter(df['Size'], df['Price'], color='black', label='Actual Data')
 for label, group in df_long.groupby('Line'):
     ax.plot(group['Size'], group['Price'], label=label)
-ax.set_title("Comparing Regression Line Fits", fontsize=14, fontweight='bold')
 ax.set_xlabel("House Size (sq ft)")
 ax.set_ylabel("House Price (in $1000s)")
 ax.legend(title="Regression Line", loc='lower right')
@@ -328,7 +347,7 @@ A lower SSE indicates a line that is closer to the actual data points. OLS choos
 We can compare the two lines by computing their SSE. The code below calculates and prints the SSE for each line:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{.r}
 # Calculate the Sum of Squared Errors for the correct model (Blue)
 sse_correct <- sum((df$Price - df$Predicted_Correct)^2)
@@ -341,7 +360,7 @@ cat("SSE for Best-Fit Line (Blue line):", sse_correct, "\n")
 cat("SSE for Worse-Fit Line (Red line):", sse_wrong, "\n")
 ```
 
-## Python Code
+## **`Python` Code**
 ```{.python}
 # Calculate the Sum of Squared Errors for the correct model (Blue)
 sse_correct = np.sum((df['Price'] - df['Predicted_Correct']) ** 2)
@@ -427,31 +446,100 @@ To demonstrate Ordinary Least Squares (OLS) in action, we will walk through a ca
 
 ### The Dataset
 
-Our dataset captures various aspects of students' financial lives. Each row represents a student, and the columns describe different characteristics. Below is a breakdown of the variables:
+Our dataset captures various aspects of students' financial lives. Each row represents a student, and the columns describe different characteristics. @tbl-toydata-variables provides the relevant details for the regressors in this dataset—namely, employment status, year of study, financial dependency, monthly allowance, cooking habits, living situation, housing type, spending frequency, alcohol consumption, and monthly earnings along with brief descriptions of each variable. Note that we also indicate the **coding names** of all the variables involved in the last column.
 
-| **Variable Name**         | **Description**                                                       |
-|---------------------------|-----------------------------------------------------------------------|
-| **Has_Job**               | Whether the student has a job (0 = No, 1 = Yes).                      |
-| **Year_of_Study**         | The student’s current year of study (e.g., 1st year, 2nd year, etc.). |
-| **Financially_Dependent** | Whether the student is financially dependent on someone else (0 = No, 1 = Yes). |
-| **Monthly_Allowance**     | The amount of financial support the student receives each month.       |
-| **Cooks_at_Home**         | Whether the student prepares their own meals (0 = No, 1 = Yes).        |
-| **Living_Situation**      | The student's living arrangement (e.g., living with family, in a shared apartment, etc.). |
-| **Housing_Type**          | The type of housing the student lives in (e.g., rented, owned, dormitory). |
-| **Goes_Out_Spends_Money** | How frequently the student goes out and spends money (1 = rarely, 5 = very often). |
-| **Drinks_Alcohol**        | Whether the student drinks alcohol (0 = No, 1 = Yes).                 |
-| **Net_Money**             | The amount of money the student has left at the end of the month after income and expenses. |
-| **Monthly_Earnings**      | The student’s earnings from any part-time jobs or other income sources. |
+<!-- | **Variable Name**         | **Description**                                                       | -->
+<!-- |---------------------------|-----------------------------------------------------------------------| -->
+<!-- | **Has_Job**               | Whether the student has a job (0 = No, 1 = Yes).                      | -->
+<!-- | **Year_of_Study**         | The student’s current year of study (e.g., 1st year, 2nd year, etc.). | -->
+<!-- | **Financially_Dependent** | Whether the student is financially dependent on someone else (0 = No, 1 = Yes). | -->
+<!-- | **Monthly_Allowance**     | The amount of financial support the student receives each month.       | -->
+<!-- | **Cooks_at_Home**         | Whether the student prepares their own meals (0 = No, 1 = Yes).        | -->
+<!-- | **Living_Situation**      | The student's living arrangement (e.g., living with family, in a shared apartment, etc.). | -->
+<!-- | **Housing_Type**          | The type of housing the student lives in (e.g., rented, owned, dormitory). | -->
+<!-- | **Goes_Out_Spends_Money** | How frequently the student goes out and spends money (1 = rarely, 5 = very often). | -->
+<!-- | **Drinks_Alcohol**        | Whether the student drinks alcohol (0 = No, 1 = Yes).                 | -->
+<!-- | **Net_Money**             | The amount of money the student has left at the end of the month after income and expenses. | -->
+<!-- | **Monthly_Earnings**      | The student’s earnings from any part-time jobs or other income sources. | -->
 
-Here’s a sample of the dataset:
 
-<div style="overflow-x: auto; white-space: nowrap;">
-| **Has_Job** | **Year_of_Study** | **Financially_Dependent** | **Monthly_Allowance** | **Cooks_at_Home** | **Living_Situation** | **Housing_Type** | **Goes_Out_Spends_Money** | **Drinks_Alcohol** | **Net_Money** | **Monthly_Earnings** |
-|-------------|--------------------|---------------------------|-----------------------|-------------------|----------------------|------------------|---------------------------|--------------------|---------------|----------------------|
-| 0           | 1                  | 0                         | 658.99                | 0                 | 3                    | 1                | 6                           | 0                  | 529.34        | 0.00                 |
-| 1           | 3                  | 0                         | 592.55                | 0                 | 3                    | 2                | 3                           | 1                  | 992.72        | 941.92               |
-| 1           | 4                  | 1                         | 602.54                | 0                 | 2                    | 2                | 2                           | 1                  | 557.30        | 876.57               |
-</div>
+: Classification table for variables in toy data. {#tbl-toydata-variables .striped .hover}
+
+| **Variable**              | **Type**        | **Scale**                | **Model Role** | **Coding Name** |
+|:-----------------------:|:--------------:|:----------------------:|:-------------:|:--------------:|
+| Has Job (0 = No, 1 = Yes) | Discrete | Binary | Regressor | `Has_Job` |
+| The student’s current year of study (e.g., 1st, 2nd, etc.) | Discrete | Ordinal | Regressor | `Year_of_Study` |
+| Financially Dependent (0 = No, 1 = Yes) | Discrete | Binary | Regressor | `Financially_Dependent` |
+| Monthly Allowance (*CAD*) | Continuous | Positively unbounded | Regressor | `Monthly_Allowance` |
+| Cooks at Home (0 = No, 1 = Yes) | Discrete | Binary | Regressor | `Cooks_at_Home` |
+| Living Situation (*Family*, *Shared*, *Alone*, etc.) | Discrete | Categorical | Regressor | `Living_Situation` |
+| Housing Type (*Rent*, *Own*, *Dormitory*) | Discrete | Categorical | Regressor | `Housing_Type` |
+| Goes Out & Spends Money (1 = Rarely, 5 = Very often) | Discrete | Ordinal | Regressor | `Goes_Out_Spends_Money` |
+| Drinks Alcohol (0 = No, 1 = Yes) | Discrete | Binary | Regressor | `Drinks_Alcohol` |
+| Net Money (*CAD*) | Continuous | Unbounded | Response | `Net_Money` |
+| Monthly Earnings (*CAD*) | Continuous | Positively unbounded | Regressor | `Monthly_Earnings` |
+
+
+<!-- Here’s a sample of the dataset: -->
+
+<!-- <div style="overflow-x: auto; white-space: nowrap;"> -->
+<!-- | **Has_Job** | **Year_of_Study** | **Financially_Dependent** | **Monthly_Allowance** | **Cooks_at_Home** | **Living_Situation** | **Housing_Type** | **Goes_Out_Spends_Money** | **Drinks_Alcohol** | **Net_Money** | **Monthly_Earnings** | -->
+<!-- |-------------|--------------------|---------------------------|-----------------------|-------------------|----------------------|------------------|---------------------------|--------------------|---------------|----------------------| -->
+<!-- | 0           | 1                  | 0                         | 658.99                | 0                 | 3                    | 1                | 6                           | 0                  | 529.34        | 0.00                 | -->
+<!-- | 1           | 3                  | 0                         | 592.55                | 0                 | 3                    | 2                | 3                           | 1                  | 992.72        | 941.92               | -->
+<!-- | 1           | 4                  | 1                         | 602.54                | 0                 | 2                    | 2                | 2                           | 1                  | 557.30        | 876.57               | -->
+<!-- </div> -->
+
+
+Let us load this sample of $n = 1,000$ houses in both `R` and `Python`. For `Python`, we will need the [{pandas}](https://pypi.org/project/pandas/) library. @tbl-toy-data-r and @tbl-toy-data-py show the first 100 rows of this full dataset and `R` and `Python`, respectively.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Showing the first 100 rows of toy dataset
+head(data, n = 100)
+```
+
+## **`Python` Code**
+
+``` {.python}
+# Showing the first 100 rows of toy dataset
+print(data.head(100))
+```
+
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: tbl-toy-data-r
+#| tbl-cap: "First 100 rows of toy dataset."
+#| echo: false
+#| message: false
+
+# Showing the first 100 row of the toy dataset
+head(data, n = 100) |> 
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{r}
+#| label: tbl-toy-data-py
+#| tbl-cap: "First 100 rows of toy dataset."
+#| echo: false
+
+# Showing the first 100 houses of the full dataset
+head(data, n = 100) |> 
+  print_as_dt()
+```
+
+:::
 
 This dataset provides a structured way to analyze the financial habits of students and determine which factors contribute most to their financial stability. 
 
@@ -527,12 +615,12 @@ The first task is to ensure data integrity by checking for missing values. Missi
 In our toy dataset, there are no missing values, as confirmed by:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 colSums(is.na(data))
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # Count missing values in each column
 data.isna().sum()
@@ -544,7 +632,7 @@ data.isna().sum()
 For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like `Has_Job` and `Drinks_Alcohol` should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Convert binary categorical variables to factors
 data <- data |>
@@ -554,7 +642,7 @@ data <- data |>
          Cooks_at_Home = as.factor(Cooks_at_Home))
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # Convert binary columns to categorical dtype
 cols_to_convert = ["Has_Job", "Drinks_Alcohol", "Financially_Dependent", "Cooks_at_Home"]
@@ -567,7 +655,7 @@ data[cols_to_convert] = data[cols_to_convert].astype("category")
 Outliers in continuous variables like `Monthly_Earnings` and `Net_Money` can distort the regression analysis by skewing results. We use the **Interquartile Range (IQR)** method to identify these extreme values. Specifically, any observation falling below 1.5 times the IQR below the first quartile (Q1) or above 1.5 times the IQR above the third quartile (Q3) is flagged as an outlier. These outliers are then treated as missing values and removed:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Using IQR method to filter out extreme values in continuous variables
 remove_outliers <- function(x) {
@@ -585,7 +673,7 @@ data <- data |>
 data <- na.omit(data)
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # Define the IQR outlier-removal function
 def remove_outliers(series):
@@ -608,7 +696,7 @@ data = data.dropna()
 To ensure that our OLS model generalizes well to unseen data, we split the dataset into training and testing subsets. The training set is used to estimate the model parameters, and the testing set is used to evaluate the model’s performance. This split is typically done in an 80/20 ratio, as shown below:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Splitting the dataset by row order: first 80% for training, last 20% for testing
 n <- nrow(data)
@@ -617,7 +705,7 @@ train_data <- data[1:split_index, ]
 test_data <- data[(split_index + 1):n, ]
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # Splitting the dataset by row order: first 80% for training, last 20% for testing
 n = len(data)
@@ -664,58 +752,171 @@ We begin by examining continuous variables, which are best visualized using hist
 
 Histograms display the frequency distribution of a continuous variable. They allow us to assess the overall shape, central tendency, and spread of the data. For example, the histogram of `Net_Money` helps us determine if the variable follows a roughly normal distribution or if it is skewed. A normal distribution often appears bell-shaped, while skewness can indicate that the data might benefit from transformations (like logarithmic transformations) to meet the assumptions of regression analysis. In our case, the histogram below shows that `Net_Money` appears roughly normal.
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-# Histogram of Net_Money
-hist(train_data$Net_Money, 
-     main = "Distribution of Net Money", 
-     xlab = "Net Money", 
-     col = "blue", 
-     border = "white")
+#| label: fig-histogram-net-money
+#| fig-cap: "Histogram of net money via training set."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+hist_net_money <- ggplot(train_data, aes(x = as.numeric(Net_Money))) +
+  geom_histogram(binwidth = 100, fill = "navyblue", color = "white") +
+  labs(x = "\n Net Money (CAD)", y = "Count\n") +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  scale_x_continuous(labels = label_dollar(), breaks = seq(-1500, 2000, by = 500)) +
+  scale_y_continuous(breaks = seq(0, 50, by = 10))
+
+hist_net_money
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- #| label: fig-histogram-net-money -->
+<!-- #| fig-cap: "Histogram of net money via training set." -->
+<!-- #| warning: false -->
+<!-- #| echo: false -->
+<!-- #| fig.height: 8 -->
+<!-- #| fig.width: 14 -->
 
-# Histogram of Net_Money
-plt.hist(train_data["Net_Money"].dropna(), bins=8, color="blue", edgecolor="white")
-plt.title("Distribution of Net Money")
-plt.xlabel("Net Money")
-plt.ylabel("Frequency")
-plt.show()
+<!-- # hist(train_data$Net_Money,  -->
+<!-- #      main = "Distribution of Net Money",  -->
+<!-- #      xlab = "Net Money",  -->
+<!-- #      col = "blue",  -->
+<!-- #      border = "white") -->
 
-```
-:::
+<!-- hist_net_money <- ggplot(train_data, aes(x = as.numeric(Net_Money))) + -->
+<!--   geom_histogram(binwidth = 100, fill = "navyblue", color = "white") + -->
+<!--   labs(x = "\n Net Money (CAD)", y = "Count\n") + -->
+<!--   theme_bw() + -->
+<!--   theme( -->
+<!--     axis.text = element_text(size = 15.5), -->
+<!--     axis.title.x = element_text(size = 20), -->
+<!--     axis.title.y = element_text(size = 20, vjust = 0.5), -->
+<!--     strip.text = element_text(size = 20) -->
+<!--   ) + -->
+<!--   coord_cartesian(xlim = c(-1800, 2000)) + -->
+<!--   scale_x_continuous(breaks = seq(-1500, 2000, by = 500)) + -->
+<!--   scale_y_continuous(breaks = seq(0, 50, by = 10)) -->
+
+<!-- hist_net_money -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+
+<!-- # Histogram of Net_Money -->
+<!-- # plt.hist(train_data["Net_Money"].dropna(), bins=8, color="blue", edgecolor="white") -->
+<!-- # plt.title("Distribution of Net Money") -->
+<!-- # plt.xlabel("Net Money") -->
+<!-- # plt.ylabel("Frequency") -->
+<!-- # plt.show() -->
+
+
+
+<!-- import matplotlib.pyplot as plt -->
+<!-- import numpy as np -->
+
+<!-- # Drop missing values -->
+<!-- net_money = train_data["Net_Money"].dropna() -->
+
+<!-- # Create figure (match aspect ratio) -->
+<!-- plt.figure(figsize=(14, 8)) -->
+
+<!-- # Histogram -->
+<!-- plt.hist(net_money, bins=40, color="navy", edgecolor="white") -->
+
+<!-- # Labels -->
+<!-- plt.xlabel("\n Net Money (CAD)", fontsize=20) -->
+<!-- plt.ylabel("Count\n", fontsize=20) -->
+<!-- plt.title("Histogram of net money via training set.", fontsize=18) -->
+
+<!-- # Axis ticks (match R logic) -->
+<!-- plt.xticks(np.arange(-1500, 2001, 500), fontsize=15) -->
+<!-- plt.yticks(fontsize=15) -->
+
+<!-- # Limits (based on your summary) -->
+<!-- plt.xlim(-1800, 2000) -->
+
+<!-- # Clean style similar to theme_bw() -->
+<!-- plt.grid(False) -->
+<!-- plt.gca().set_facecolor("white") -->
+
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 ##### Boxplots
 
 Boxplots provide a concise summary of a variable’s distribution by displaying its quartiles and highlighting potential outliers. Outliers are typically defined as data points that fall below $Q1 - 1.5 * IQR$ or above $Q3 + 1.5 * IQR$. The boxplot below visualizes`Net_Money` and helps us quickly assess if there are any extreme values that might skew the analysis. In this case, the boxplot suggests that there are no significant outliers according to the IQR method (the method commonly used by ggplot to identify outliers).
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-# Boxplot of Net Money
-boxplot(train_data$Net_Money, 
-        main = "Boxplot of Net Money", 
-        ylab = "Net Money", 
-        col = "lightblue")
+#| label: fig-boxplot-net-money
+#| fig-cap: "Boxplot of net money via training set."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+
+boxplot_net_money <- ggplot(train_data, aes(
+  x = "",
+  y = as.numeric(Net_Money)
+)) +
+  geom_boxplot(fill = "#56B4E9") +
+  labs(
+    x = "",
+    y = "Net Money (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(-1800, 2000)) +
+  scale_y_continuous(
+    labels = label_dollar(),
+    breaks = seq(-1500, 2000, by = 500)
+  ) +
+  theme(legend.position = "none")
+
+boxplot_net_money
 ```
 
-## Python Code
-```{python}
-fig, ax = plt.subplots(figsize=(4, 6))
-ax.boxplot(train_data["Net_Money"].dropna(), patch_artist=True,
-           boxprops=dict(facecolor="lightblue"));
-ax.set_title("Boxplot of Net Money")
-ax.set_ylabel("Net Money")
-ax.set_xticks([1])
-ax.set_xticklabels([""])
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Boxplot of Net Money -->
+<!-- boxplot(train_data$Net_Money,  -->
+<!--         main = "Boxplot of Net Money",  -->
+<!--         ylab = "Net Money",  -->
+<!--         col = "lightblue") -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- fig, ax = plt.subplots(figsize=(4, 6)) -->
+<!-- ax.boxplot(train_data["Net_Money"].dropna(), patch_artist=True, -->
+<!--            boxprops=dict(facecolor="lightblue")); -->
+<!-- ax.set_title("Boxplot of Net Money") -->
+<!-- ax.set_ylabel("Net Money") -->
+<!-- ax.set_xticks([1]) -->
+<!-- ax.set_xticklabels([""]) -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 By visualizing the distribution of `Net_Money` with these plots, we gain valuable insights into its behavior. This understanding not only informs whether transformations are needed but also prepares us for deeper analysis as we move forward with regression modelling.
 
@@ -725,32 +926,59 @@ Categorical variables require a different approach from continuous ones because 
 
 For example, consider the variable `Living_Situation`. The bar chart below shows how many students fall into each category. From the chart, we can see that category 1 is more heavily represented, while categories 2 and 3 have roughly similar counts. This insight can be critical—if a category is underrepresented, you might need to consider grouping it with similar categories or applying techniques such as one-hot encoding to ensure that each category contributes appropriately to the model.
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-# Bar plot of Living Situation
-barplot(table(train_data$Living_Situation), 
-        main = "Living Situation Distribution", 
-        xlab = "Living Situation", 
-        ylab = "Frequency", 
-        col = "purple")
+#| label: fig-barplot-living-situation
+#| fig-cap: "Bar plot of living situation via training set."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+barplot_living <- ggplot(train_data, aes(x = factor(Living_Situation))) +
+  geom_bar(fill = "#56B4E9", width = 0.5) +
+  labs(
+    x = "\n Living Situation",
+    y = "Count\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  theme(legend.position = "none")
+
+barplot_living
 ```
 
-## Python Code
-```{python}
-# Count occurrences of each category
-living_counts = train_data["Living_Situation"].value_counts()
 
-# Bar plot of Living Situation
-plt.bar(living_counts.index, living_counts.values, color="purple")
-plt.title("Living Situation Distribution")
-plt.xlabel("Living Situation")
-plt.ylabel("Frequency")
-plt.xticks(rotation=45)  # Optional: rotate labels if they overlap
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Bar plot of Living Situation -->
+<!-- barplot(table(train_data$Living_Situation),  -->
+<!--         main = "Living Situation Distribution",  -->
+<!--         xlab = "Living Situation",  -->
+<!--         ylab = "Frequency",  -->
+<!--         col = "purple") -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- # Count occurrences of each category -->
+<!-- living_counts = train_data["Living_Situation"].value_counts() -->
+
+<!-- # Bar plot of Living Situation -->
+<!-- plt.bar(living_counts.index, living_counts.values, color="purple") -->
+<!-- plt.title("Living Situation Distribution") -->
+<!-- plt.xlabel("Living Situation") -->
+<!-- plt.ylabel("Frequency") -->
+<!-- plt.xticks(rotation=45)  # Optional: rotate labels if they overlap -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 For ordinal variables (which have a natural order but not a fixed numerical interval), you might still use bar charts to show the ranking or frequency of each level. Additionally, understanding these distributions can help you decide whether to treat them as categorical variables or convert them into numeric scores for analysis.
 
@@ -762,21 +990,57 @@ Beyond examining individual variables, it is crucial to explore how they interac
 
 For continuous variables, correlation matrices provide a numerical summary of how strongly pairs of variables are related. High correlations between predictors might signal multicollinearity, which can distort model estimates. For demonstration, consider the correlation matrix computed for `Net_Money`, `Monthly_Allowance`, and `Monthly_Earnings`:
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-# Correlation matrix
-cor_matrix <- cor(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")], use = "complete.obs")
-print(cor_matrix)
+#| label: fig-net-money-correlation-matrix
+#| fig-cap: "Pearson correlation matrix of financial variables via training set, , for numeric variables."
+#| warning: false
+#| echo: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Compute correlation matrix
+eda_corr <- cor(
+  train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")],
+  use = "complete.obs"
+)
+
+# Rename variables for display
+colnames(eda_corr) <- rownames(eda_corr) <- c(
+  "Net Money",
+  "Monthly Allowance",
+  "Monthly Earnings"
+)
+
+# Color palette
+col_palette <- viridis::viridis(200)
+
+# Plot
+corrplot(
+  eda_corr,
+  method = "number",
+  type = "upper",
+  tl.col = "black",
+  col = col_palette,
+  cl.ratio = 0.3
+)
 ```
 
-## Python Code
-```{python}
-# Select relevant columns and drop rows with missing values
-cor_matrix = train_data[["Net_Money", "Monthly_Allowance", "Monthly_Earnings"]].corr(method="pearson")
-print(cor_matrix)
-```
-:::
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Correlation matrix -->
+<!-- cor_matrix <- cor(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")], use = "complete.obs") -->
+<!-- print(cor_matrix) -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- # Select relevant columns and drop rows with missing values -->
+<!-- cor_matrix = train_data[["Net_Money", "Monthly_Allowance", "Monthly_Earnings"]].corr(method="pearson") -->
+<!-- print(cor_matrix) -->
+<!-- ``` -->
+<!-- ::: -->
 
 In the output, we observe a strong positive correlation (corr = 0.757) between `Monthly_Earnings` and `Net_Money`. This result is intuitive. Higher earnings typically lead to more money left at the end of the month, resulting in a higher `Net_Money`.
 
@@ -784,79 +1048,165 @@ In the output, we observe a strong positive correlation (corr = 0.757) between `
 
 Scatter plots visually depict the relationship between two continuous variables. For example, plotting `Monthly_Allowance` against `Net_Money` helps us assess whether students with higher allowances tend to have higher or lower net savings. In the scatter plot below, a slightly positive trend is visible. However, the points are quite scattered, indicating that while there may be a relationship, it is not overwhelmingly strong. Such visual insights might prompt further investigation, perhaps considering polynomial transformations or interaction terms if nonlinearity is suspected.
 
-::: {.panel-tabset}
-## R Code
 ```{r}
-# Scatter plot of Monthly Allowance vs. Net Money
-plot(train_data$Monthly_Allowance, train_data$Net_Money, 
-     main = "Net Money vs. Monthly Allowance", 
-     xlab = "Monthly Allowance", 
-     ylab = "Net Money", 
-     col = "blue", 
-     pch = 19)
-abline(lm(Net_Money ~ Monthly_Allowance, data = train_data), col = "red", lwd = 2)
+#| label: fig-scatter-plot-allowance-net-money
+#| fig-cap: "Scatter plot of monthly allowance versus net money via training set (solid red line indicates a simple linear regression fitting)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+scatterplot_allowance_vs_net_money <- ggplot(
+  train_data,
+  aes(x = as.numeric(Monthly_Allowance), y = as.numeric(Net_Money))
+) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    x = "\n Monthly Allowance (CAD)",
+    y = "Net Money (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    xlim = c(0, 1100),
+    ylim = c(-1800, 2000)
+  ) +
+  scale_y_continuous(
+    labels = label_dollar(),
+    breaks = seq(-1500, 2000, by = 500)
+  ) +
+  scale_x_continuous(
+    labels = label_dollar(),
+    breaks = seq(0, 2000, by = 500)
+  )
+
+scatterplot_allowance_vs_net_money
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Scatter plot with regression line
-plt.figure(figsize=(6, 4))
-sns.regplot(
-    data=train_data,
-    x="Monthly_Allowance",
-    y="Net_Money",
-    scatter_kws={"color": "blue", "s": 40},  # s = point size
-    line_kws={"color": "red", "linewidth": 2}
-)
-plt.title("Net Money vs. Monthly Allowance")
-plt.xlabel("Monthly Allowance")
-plt.ylabel("Net Money")
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Scatter plot of Monthly Allowance vs. Net Money -->
+<!-- plot(train_data$Monthly_Allowance, train_data$Net_Money,  -->
+<!--      main = "Net Money vs. Monthly Allowance",  -->
+<!--      xlab = "Monthly Allowance",  -->
+<!--      ylab = "Net Money",  -->
+<!--      col = "blue",  -->
+<!--      pch = 19) -->
+<!-- abline(lm(Net_Money ~ Monthly_Allowance, data = train_data), col = "red", lwd = 2) -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+<!-- import seaborn as sns -->
+
+<!-- # Scatter plot with regression line -->
+<!-- plt.figure(figsize=(6, 4)) -->
+<!-- sns.regplot( -->
+<!--     data=train_data, -->
+<!--     x="Monthly_Allowance", -->
+<!--     y="Net_Money", -->
+<!--     scatter_kws={"color": "blue", "s": 40},  # s = point size -->
+<!--     line_kws={"color": "red", "linewidth": 2} -->
+<!-- ) -->
+<!-- plt.title("Net Money vs. Monthly Allowance") -->
+<!-- plt.xlabel("Monthly Allowance") -->
+<!-- plt.ylabel("Net Money") -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 
 ##### Boxplots for Categorical Variables
 
 For categorical predictors, boxplots are an excellent tool to compare the distribution of the response variable across different groups. For instance, examining how Net_Money varies by `Living_Situation` can reveal whether students in different living arrangements experience different financial outcomes. In the boxplot below, the distributions of `Net_Money` across categories of `Living_Situation` appear quite similar. This similarity may suggest that `Living_Situation` has little impact on Net_Money in our dataset.
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-# Boxplot of Net Money by Living Situation
-boxplot(Net_Money ~ Living_Situation, 
-        data = train_data, 
-        main = "Net Money by Living Situation", 
-        xlab = "Living Situation", 
-        ylab = "Net Money", 
-        col = "lightgreen")
+#| label: fig-box-plot-net-money-living-situation
+#| fig-cap: "Side-by-side box plots of net money by living situation via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+boxplots_net_money_living <- ggplot(train_data, aes(
+  x = factor(Living_Situation),
+  y = as.numeric(Net_Money),
+  fill = factor(Living_Situation)
+)) +
+  geom_boxplot() +
+  labs(
+    x = "\n Living Situation",
+    y = "Net Money (CAD)\n",
+    fill = "Living Situation"
+  ) +
+  scale_fill_manual(values = c(
+    "#E69F00",
+    "#56B4E9",
+    "#009E73"
+  )) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(ylim = c(-1800, 2000)) +
+  scale_y_continuous(
+    labels = label_dollar(),
+    breaks = seq(-1500, 2000, by = 500)
+  ) +
+  theme(legend.position = "none")
+
+boxplots_net_money_living
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-# Boxplot of Net Money by Living Situation
-plt.figure(figsize=(6, 4))
-sns.boxplot(
-    data=train_data,
-    x="Living_Situation",
-    y="Net_Money",
-    color="lightgreen"
-)
-plt.title("Net Money by Living Situation")
-plt.xlabel("Living Situation")
-plt.ylabel("Net Money")
-plt.xticks(rotation=45)  # Optional: rotate if labels overlap
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Boxplot of Net Money by Living Situation -->
+<!-- boxplot(Net_Money ~ Living_Situation,  -->
+<!--         data = train_data,  -->
+<!--         main = "Net Money by Living Situation",  -->
+<!--         xlab = "Living Situation",  -->
+<!--         ylab = "Net Money",  -->
+<!--         col = "lightgreen") -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+<!-- import seaborn as sns -->
+
+<!-- # Boxplot of Net Money by Living Situation -->
+<!-- plt.figure(figsize=(6, 4)) -->
+<!-- sns.boxplot( -->
+<!--     data=train_data, -->
+<!--     x="Living_Situation", -->
+<!--     y="Net_Money", -->
+<!--     color="lightgreen" -->
+<!-- ) -->
+<!-- plt.title("Net Money by Living Situation") -->
+<!-- plt.xlabel("Living Situation") -->
+<!-- plt.ylabel("Net Money") -->
+<!-- plt.xticks(rotation=45)  # Optional: rotate if labels overlap -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 #### Summary Statistics
 
@@ -865,13 +1215,13 @@ In addition to visual exploration, descriptive statistics provide a numerical su
 For instance, if you notice that the mean of `Monthly_Earning` is significantly higher than its median, it might suggest that a few high values (or outliers) are skewing the data. 
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Summary statistics for numerical variables
 summary(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")])
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # Summary statistics for numerical variables
 train_data[["Net_Money", "Monthly_Allowance", "Monthly_Earnings"]].describe()
@@ -982,7 +1332,7 @@ To estimate the regression coefficients, we fit the OLS model to the training da
 In R, we can fit the regression model using the `lm()` function:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Load necessary library
 library(stats)
@@ -990,11 +1340,15 @@ library(stats)
 # Fit the OLS model
 ols_model <- lm(Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home, data = train_data)
 
-# Display summary of model results
-summary(ols_model)
+# # Display summary of model results
+# summary(ols_model)
+
+# Displaying the tidy table
+tidy(ols_model) |>
+  mutate_if(is.numeric, round, 2)
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 import statsmodels.formula.api as smf
 
@@ -1003,6 +1357,19 @@ ols_model = smf.ols(
     formula="Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home",
     data=train_data
 ).fit()
+
+
+# Creating a tidy summary table
+testing_OLS_tidy = pd.DataFrame({
+    "term": ols_model.params.index,
+    "estimate": np.round(ols_model.params.values, 2),
+    "std_error": np.round(ols_model.bse.values, 2),
+    "t_value": np.round(ols_model.tvalues.values, 2),
+    "p_value": np.round(ols_model.pvalues.values, 2)
+})
+
+# Displaying the tidy table
+print(testing_OLS_tidy)
 
 # Display summary of model results
 print(ols_model.summary())
@@ -1066,34 +1433,73 @@ A core assumption of OLS is that the relationship between each predictor and the
 
 To visualize linearity, we plot the residuals against the fitted values:
 
-::: {.panel-tabset}
-## R Code
 ```{r}
-# Residuals vs Fitted plot (R)
-plot(ols_model$fitted.values, residuals(ols_model), 
-     main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals")
-abline(h = 0, col = "red")
+#| label: fig-residuals-vs-fitted-net-money
+#| fig-cap: "OLS diagnostic plot of residuals versus fitted values via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Extract residuals and fitted values
+aug_training <- augment(ols_model)
+
+# Plot
+residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .resid)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(
+    x = "\n Fitted Values (CAD)",
+    y = "Residuals (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    xlim = range(aug_training$.fitted, na.rm = TRUE),
+    ylim = range(aug_training$.resid, na.rm = TRUE)
+  ) +
+  scale_x_continuous(labels = label_dollar()) +
+  scale_y_continuous(labels = label_dollar())
+
+residuals_vs_fitted
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
 
-# Extract fitted values and residuals
-fitted_vals = ols_model.fittedvalues
-residuals = ols_model.resid
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- # Residuals vs Fitted plot (R) -->
+<!-- plot(ols_model$fitted.values, residuals(ols_model),  -->
+<!--      main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals") -->
+<!-- abline(h = 0, col = "red") -->
+<!-- ``` -->
 
-# Plot Residuals vs Fitted
-plt.figure(figsize=(6, 4))
-plt.scatter(fitted_vals, residuals, alpha=0.7)
-plt.axhline(y=0, color='red', linestyle='--')
-plt.title("Residuals vs Fitted")
-plt.xlabel("Fitted Values")
-plt.ylabel("Residuals")
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+
+<!-- # Extract fitted values and residuals -->
+<!-- fitted_vals = ols_model.fittedvalues -->
+<!-- residuals = ols_model.resid -->
+
+<!-- # Plot Residuals vs Fitted -->
+<!-- plt.figure(figsize=(6, 4)) -->
+<!-- plt.scatter(fitted_vals, residuals, alpha=0.7) -->
+<!-- plt.axhline(y=0, color='red', linestyle='--') -->
+<!-- plt.title("Residuals vs Fitted") -->
+<!-- plt.xlabel("Fitted Values") -->
+<!-- plt.ylabel("Residuals") -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
+
 
 If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure. However, in this case, the residuals appear to be randomly scattered around the horizontal axis, with no obvious patterns such as curves or systematic structure. This suggests that the linearity assumption of the OLS model holds reasonably well in this case. Therefore, no immediate transformation or addition of nonlinear terms is necessary to capture the relationship between predictors and the response variable.
 
@@ -1104,12 +1510,12 @@ The residuals, or errors, in an OLS model should be independent of one another. 
 The Durbin-Watson test is commonly used to detect autocorrelation. This test produces a statistic that ranges between 0 and 4, where values close to 2 indicate no significant autocorrelation, while values near 0 or 4 suggest positive or negative correlation in the residuals.
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 dwtest(ols_model)
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 from statsmodels.stats.stattools import durbin_watson
 
@@ -1135,12 +1541,12 @@ To check for heteroscedasticity, we plot residuals against the fitted values and
 
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 bptest(ols_model)  # Uses all regressors, like Python
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 from statsmodels.stats.diagnostic import het_breuschpagan
 
@@ -1173,31 +1579,61 @@ For valid hypothesis testing and confidence interval estimation, OLS assumes tha
 
 A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
 
-
-
-::: {.panel-tabset}
-## R Code
 ```{r}
-qqnorm(residuals(ols_model))
-qqline(residuals(ols_model), col = "red")
+#| label: fig-qq-plot-net-money
+#| fig-cap: "OLS diagnostic QQ-plot of standardized residuals via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Extract residuals (including standardized residuals)
+aug_training <- augment(ols_model)
+
+# Plot
+QQ_plot <- ggplot(aug_training, aes(sample = .std.resid)) +
+  stat_qq(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  stat_qq_line(linewidth = 1, color = "red") +
+  labs(
+    x = "\n Theoretical Quantiles",
+    y = "Sample Quantiles\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  )
+
+QQ_plot
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
-import scipy.stats as stats
 
-# Extract residuals from the model
-residuals = ols_model.resid
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- qqnorm(residuals(ols_model)) -->
+<!-- qqline(residuals(ols_model), col = "red") -->
+<!-- ``` -->
 
-# Q-Q plot of residuals
-plt.figure(figsize=(6, 4))
-empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
-plt.title("Q-Q Plot of Residuals")
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+<!-- import scipy.stats as stats -->
+
+<!-- # Extract residuals from the model -->
+<!-- residuals = ols_model.resid -->
+
+<!-- # Q-Q plot of residuals -->
+<!-- plt.figure(figsize=(6, 4)) -->
+<!-- empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _ -->
+<!-- plt.title("Q-Q Plot of Residuals") -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 
 
@@ -1216,13 +1652,13 @@ Beyond checking assumptions, it is essential to assess how well the model explai
 We can retrieve the R-squared and Adjusted R-squared values from the model summary:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 summary(ols_model)$r.squared  # R-squared value
 summary(ols_model)$adj.r.squared  # Adjusted R-squared
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # R-squared
 r_squared = ols_model.rsquared
@@ -1246,62 +1682,138 @@ Finally, a high $R^2$ should not be interpreted as evidence of causation, nor do
 
 Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.
 
-::: {.panel-tabset}
-## R Code
 ```{r}
-plot(residuals(ols_model), main = "Residual Plot", ylab = "Residuals")
-abline(h = 0, col = "red")
-```
-
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
+#| label: fig-residuals-index-net-money
+#| fig-cap: "OLS diagnostic plot of residuals versus observation index via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
 
 # Extract residuals
-residuals = ols_model.resid
+aug_training <- augment(ols_model)
 
-# Residual plot (residuals vs observation index)
-plt.figure(figsize=(6, 4))
-plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
-plt.axhline(y=0, color='red', linestyle='--')
-plt.title("Residual Plot")
-plt.xlabel("Observation Index")
-plt.ylabel("Residuals")
-plt.tight_layout()
-plt.show()
+# Add observation index
+aug_training <- aug_training %>%
+  mutate(index = row_number())
+
+# Plot
+residuals_vs_index <- ggplot(aug_training, aes(x = index, y = .resid)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(
+    x = "\n Observation Index",
+    y = "Residuals (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  scale_y_continuous(labels = label_dollar())
+
+residuals_vs_index
 ```
-:::
+
+
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- plot(residuals(ols_model), main = "Residual Plot", ylab = "Residuals") -->
+<!-- abline(h = 0, col = "red") -->
+<!-- ``` -->
+
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+
+<!-- # Extract residuals -->
+<!-- residuals = ols_model.resid -->
+
+<!-- # Residual plot (residuals vs observation index) -->
+<!-- plt.figure(figsize=(6, 4)) -->
+<!-- plt.plot(residuals, marker='o', linestyle='none', alpha=0.7) -->
+<!-- plt.axhline(y=0, color='red', linestyle='--') -->
+<!-- plt.title("Residual Plot") -->
+<!-- plt.xlabel("Observation Index") -->
+<!-- plt.ylabel("Residuals") -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers or highly influential observations in the dataset. The model residuals behave as expected, reinforcing the assumption that the data points do not exert undue influence on the regression fit.
 
 Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.
 
-::: {.panel-tabset}
-## R Code
+
 ```{r}
-cook_values <- cooks.distance(ols_model)
-plot(cook_values, type = "h", main = "Cook's Distance")
+#| label: fig-cooks-distance-net-money
+#| fig-cap: "OLS diagnostic Cook's distance plot via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Extract model diagnostics (includes Cook's distance)
+aug_training <- augment(ols_model) |>
+  mutate(row_id = row_number())
+
+# Plot
+cooks_distance_plot <- ggplot(aug_training, aes(x = row_id, y = .cooksd)) +
+  geom_col(fill = "#0073C2FF", color = "#0073C2FF") +
+  labs(
+    x = "\n Observation Index",
+    y = "Cook's Distance\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    ylim = c(0, max(aug_training$.cooksd, na.rm = TRUE))
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, max(aug_training$.cooksd, na.rm = TRUE), length.out = 6)
+  )
+
+cooks_distance_plot
 ```
 
-## Python Code
-```{python}
-import matplotlib.pyplot as plt
-import statsmodels.api as sm
 
-# Get Cook's distance values
-influence = ols_model.get_influence()
-cooks_d = influence.cooks_distance[0]  # Values
+<!-- ::: {.panel-tabset} -->
+<!-- ## **`R` Code** -->
+<!-- ```{r} -->
+<!-- cook_values <- cooks.distance(ols_model) -->
+<!-- plot(cook_values, type = "h", main = "Cook's Distance") -->
+<!-- ``` -->
 
-# Plot Cook's distance
-fig, ax = plt.subplots(figsize=(6, 4))
-markerline, stemlines, baseline = ax.stem(cooks_d, markerfmt=",")
-ax.set_title("Cook's Distance")
-ax.set_xlabel("Observation Index")
-ax.set_ylabel("Cook's Distance")
-plt.tight_layout()
-plt.show()
-```
-:::
+<!-- ## **`Python` Code** -->
+<!-- ```{python} -->
+<!-- import matplotlib.pyplot as plt -->
+<!-- import statsmodels.api as sm -->
+
+<!-- # Get Cook's distance values -->
+<!-- influence = ols_model.get_influence() -->
+<!-- cooks_d = influence.cooks_distance[0]  # Values -->
+
+<!-- # Plot Cook's distance -->
+<!-- fig, ax = plt.subplots(figsize=(6, 4)) -->
+<!-- markerline, stemlines, baseline = ax.stem(cooks_d, markerfmt=",") -->
+<!-- ax.set_title("Cook's Distance") -->
+<!-- ax.set_xlabel("Observation Index") -->
+<!-- ax.set_ylabel("Cook's Distance") -->
+<!-- plt.tight_layout() -->
+<!-- plt.show() -->
+<!-- ``` -->
+<!-- ::: -->
 
 
 
@@ -1324,13 +1836,13 @@ A key objective of regression modelling is to generate reliable predictions. To 
 In R, we use the `predict()` function to apply the trained OLS model to the test set. In Python, we use the predict() method from the statsmodels library after ensuring the test data is properly formatted.
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Generate predictions on the test set
 y_pred <- predict(ols_model, newdata=test_data)
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 import statsmodels.api as sm
 
@@ -1361,7 +1873,7 @@ Model accuracy is assessed using four standard error metrics:
 These metrics can be computed as follows:
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Extract response variable from test data
 y_test <- test_data$Net_Money
@@ -1375,7 +1887,7 @@ r2 <- summary(ols_model)$r.squared
 cat(sprintf("MAE: %.2f, MSE: %.2f, RMSE: %.2f, R-squared: %.2f", mae, mse, rmse, r2))
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import numpy as np
@@ -1430,7 +1942,7 @@ In this final section, you can test your understanding with the following concep
 
 ::: {.Question}
 ::::{.Question-header}
-Question
+Question 3.1
 ::::
 ::::{.Question-container}
 **Multiple Choice** 
@@ -1449,7 +1961,7 @@ Suppose you fit a linear regression by OLS on the conditioned response $Y_i \mid
 
 ::: {.Answer}
 ::::{.Answer-header}
-Answer
+Answer 3.1
 ::::
 ::::{.Answer-container}
 <details>
@@ -1474,7 +1986,7 @@ since the response is assumed to be **continuous** and **unbounded**. On the oth
 
 ::: {.Question}
 ::::{.Question-header}
-Question
+Question 3.2
 ::::
 ::::{.Question-container}
 **Multiple Choice** 
@@ -1497,7 +2009,7 @@ for a continuous $x$? Select the correct option:
 
 ::: {.Answer}
 ::::{.Answer-header}
-Answer
+Answer 3.2
 ::::
 ::::{.Answer-container}
 <details>
@@ -1516,7 +2028,7 @@ The regression coefficient $\beta_1$ is a statement about the **conditional mean
 
 ::: {.Question}
 ::::{.Question-header}
-Question
+Question 3.3
 ::::
 ::::{.Question-container}
 **Open-ended Question** 
@@ -1527,7 +2039,7 @@ Question
 
 ::: {.Answer}
 ::::{.Answer-header}
-Answer
+Answer 3.3
 ::::
 ::::{.Answer-container}
 <details>
@@ -1546,7 +2058,7 @@ A **correct** and **full** interpretation is:
 
 ::: {.Question}
 ::::{.Question-header}
-Question
+Question 3.4
 ::::
 ::::{.Question-container}
 **Multiple Choice** 
@@ -1565,7 +2077,7 @@ In OLS regression, the $i$th **fitted response value** $\hat{y}_i$ is best descr
 
 ::: {.Answer}
 ::::{.Answer-header}
-Answer
+Answer 3.4
 ::::
 ::::{.Answer-container}
 <details>
@@ -1582,111 +2094,556 @@ In OLS regression, $\hat{y}_i$ **approximates** the conditional mean of $Y$ give
 ::::
 :::
 
-1. Why does OLS minimize the sum of *squared* residuals instead of just the sum of residuals? What problem would arise if we used absolute errors?
 
+
+<!-- 1. Why does OLS minimize the sum of *squared* residuals instead of just the sum of residuals? What problem would arise if we used absolute errors? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Squaring residuals ensures errors don’t cancel out, and penalizes large errors more. Absolute errors lack *differentiability* for optimization. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.5
+::::
+::::{.Question-container}
+**Short Answer**
+
+Why does OLS minimize the sum of *squared* residuals instead of just the sum of residuals? What problem would arise if we used absolute errors?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.5
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
-Squaring residuals ensures errors don’t cancel out, and penalizes large errors more. Absolute errors lack *differentiability* for optimization.
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
+Squaring residuals ensures that positive and negative errors do not cancel out, while also placing greater weight on larger deviations. Using absolute errors would avoid cancellation, but introduces non-differentiability, which makes optimization more difficult compared to the smooth quadratic loss used in OLS.
+
 </details>
+::::
+:::
 
-2. In the house price example (Figure 3.1), if Line A has an SSE of 83 and Line B has an SSE of 3972, which line would OLS choose? Why?
 
+<!-- 2. In the house price example (Figure 3.1), if Line A has an SSE of 83 and Line B has an SSE of 3972, which line would OLS choose? Why? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Line A, as lower SSE implies a better fit. OLS minimizes SSE. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.6
+::::
+::::{.Question-container}
+**Short Answer**
+
+In the house price example (Figure 3.1), if Line A has an SSE of 83 and Line B has an SSE of 3972, which line would OLS choose? Why?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.6
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Line A, as lower SSE implies a better fit. OLS minimizes SSE.
+
 </details>
+::::
+:::
 
-3. Could a regression line ever have an SSE of zero? What would that imply about the data?
+<!-- 3. Could a regression line ever have an SSE of zero? What would that imply about the data? -->
 
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Yes, if all points lie exactly on the line. This would indicate a perfect fit with no noise, which is highly unlikely with real data. -->
+<!-- </details> -->
+
+::: {.Question}
+::::{.Question-header}
+Question 3.7
+::::
+::::{.Question-container}
+**Short Answer**
+
+Could a regression line ever have an SSE of zero? What would that imply about the data?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.7
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Yes, if all points lie exactly on the line. This would indicate a perfect fit with no noise, which is highly unlikely with real data.
+
 </details>
+::::
+:::
 
-4. In the student finance dataset, EDA reveals a strong correlation between `Monthly_Earnings` and `Net_Money`. Can we conclude that large monthly earnings lead to the students have greater net money?
 
+<!-- 4. In the student finance dataset, EDA reveals a strong correlation between `Monthly_Earnings` and `Net_Money`. Can we conclude that large monthly earnings lead to the students have greater net money? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- No, since Correlation $\neq$ causation. Omitted variables may link earnings to savings. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.8
+::::
+::::{.Question-container}
+**Short Answer**
+
+In the student finance dataset, EDA reveals a strong correlation between `Monthly_Earnings` and `Net_Money`. Can we conclude that large monthly earnings lead to the students have greater net money?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.8
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 No, since Correlation $\neq$ causation. Omitted variables may link earnings to savings.
+
 </details>
+::::
+:::
 
-5. If a histogram of `Net_Money` showed extreme right skewness, how could this violate OLS assumptions? What transformation could be done to address this?
 
+
+<!-- 5. If a histogram of `Net_Money` showed extreme right skewness, how could this violate OLS assumptions? What transformation could be done to address this? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Right skew violates normality, a log transformation could help resolve this. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.9
+::::
+::::{.Question-container}
+**Short Answer**
+
+If a histogram of `Net_Money` showed extreme right skewness, how could this violate OLS assumptions? What transformation could be done to address this?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.9
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Right skew violates normality, a log transformation could help resolve this.
+
 </details>
+::::
+:::
 
-6. Why did we convert binary variables (such as `Has_Job`) to factors in R? What could happen if they were left as numeric 1s and 0s?
 
+<!-- 6. Why did we convert binary variables (such as `Has_Job`) to factors in R? What could happen if they were left as numeric 1s and 0s? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Factors ensure correct interpretation as categories (not continuous variables). Numeric 0/1 could work but increases risks of misspecification. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.10
+::::
+::::{.Question-container}
+**Short Answer**
+
+Why did we convert binary variables (such as `Has_Job`) to factors in R? What could happen if they were left as numeric 1s and 0s?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.10
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Factors ensure correct interpretation as categories (not continuous variables). Numeric 0/1 could work but increases risks of misspecification.
+
 </details>
+::::
+:::
 
-7. The regression equation includes `Living_Situation` as a categorical predictor. How would the coefficient for `Living_Situation=2` be interpreted compared to the *baseline* category?
 
+<!-- 7. The regression equation includes `Living_Situation` as a categorical predictor. How would the coefficient for `Living_Situation=2` be interpreted compared to the *baseline* category? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Compared to baseline, `Living_Situation=2` predicts $107.92 higher Net_Money, holding other variables constant. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.11
+::::
+::::{.Question-container}
+**Short Answer**
+
+The regression equation includes `Living_Situation` as a categorical predictor. How would the coefficient for `Living_Situation=2` be interpreted compared to the *baseline* category?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.11
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Compared to baseline, `Living_Situation=2` predicts $107.92 higher Net_Money, holding other variables constant.
+
 </details>
+::::
+:::
 
-8. The coefficient for `Drinks_Alcohol` is −$139.96. How would you explain this in simple terms to a university administrator advocating for alcohol-free campuses?
+<!-- 8. The coefficient for `Drinks_Alcohol` is −$139.96. How would you explain this in simple terms to a university administrator advocating for alcohol-free campuses? -->
 
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- We could say something along the lines of: "Students who drink alcohol average $140 fewer savings. Policies reducing drinking may improve students' financial well-being." -->
+<!-- </details> -->
+
+::: {.Question}
+::::{.Question-header}
+Question 3.12
+::::
+::::{.Question-container}
+**Short Answer**
+
+The coefficient for `Drinks_Alcohol` is −$139.96. How would you explain this in simple terms to a university administrator advocating for alcohol-free campuses?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.12
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 We could say something along the lines of: "Students who drink alcohol average $140 fewer savings. Policies reducing drinking may improve students' financial well-being."
+
 </details>
+::::
+:::
 
-9. If `Monthly_Allowance` had been measured in hundreds of dollars (6.58 instead of 658.99), how would the coefficient of `Monthly_Allowance` change?
 
+<!-- 9. If `Monthly_Allowance` had been measured in hundreds of dollars (6.58 instead of 658.99), how would the coefficient of `Monthly_Allowance` change? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- The coefficient simply scales from 1.52 to 152. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.13
+::::
+::::{.Question-container}
+**Short Answer**
+
+If `Monthly_Allowance` had been measured in hundreds of dollars (6.58 instead of 658.99), how would the coefficient of `Monthly_Allowance` change?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.13
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 The coefficient simply scales from 1.52 to 152.
+
 </details>
+::::
+:::
 
-10. The Breusch-Pagan test for heteroscedasticity returns a p-value of 0.16. What does this imply about the residuals?
 
+<!-- 10. The Breusch-Pagan test for heteroscedasticity returns a p-value of 0.16. What does this imply about the residuals? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- p > 0.05 implies no heteroscedasticity. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.14
+::::
+::::{.Question-container}
+**Short Answer**
+
+The Breusch-Pagan test for heteroscedasticity returns a p-value of 0.16. What does this imply about the residuals?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.14
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 p > 0.05 implies no heteroscedasticity.
+
 </details>
+::::
+:::
 
-11. In the Q-Q p plot shown in 3.9.1, if the residuals deviated sharply from the red line at the tails, what would this suggest? How might you address it?
+<!-- 11. In the Q-Q p plot shown in 3.9.1, if the residuals deviated sharply from the red line at the tails, what would this suggest? How might you address it? -->
 
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- This would suggest non-normally distributed tails. You could consider transformations (such as logging) or robust regression techniques. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.15
+::::
+::::{.Question-container}
+**Short Answer**
+
+In the Q-Q p plot shown in 3.9.1, if the residuals deviated sharply from the red line at the tails, what would this suggest? How might you address it?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.15
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 This would suggest non-normally distributed tails. You could consider transformations (such as logging) or robust regression techniques.
+
 </details>
+::::
+:::
 
-12. The model’s $R^2$ is 0.89. What might a high $R^2$ indicate? Is a higher $R^2$ always better?
 
+<!-- 12. The model’s $R^2$ is 0.89. What might a high $R^2$ indicate? Is a higher $R^2$ always better? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- A high $R^2$ may hide overfitting or omitted variables. It is important to also check residuals for the full picture. -->
+<!-- </details> -->
+
+::: {.Question}
+::::{.Question-header}
+Question 3.16
+::::
+::::{.Question-container}
+**Short Answer**
+
+The model’s $R^2$ is 0.89. What might a high $R^2$ indicate? Is a higher $R^2$ always better?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.16
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 A high $R^2$ may hide overfitting or omitted variables. It is important to also check residuals for the full picture.
+
 </details>
+::::
+:::
 
-13. The coefficient for `Financially_Dependent` is −$488.10. Propose a few real-world mechanisms that could explain this relationship.
 
+<!-- 13. The coefficient for `Financially_Dependent` is −$488.10. Propose a few real-world mechanisms that could explain this relationship. -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- (1) Dependent students earn less; (2) Dependents may have stricter budgets -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.17
+::::
+::::{.Question-container}
+**Short Answer**
+
+The coefficient for `Financially_Dependent` is −$488.10. Propose a few real-world mechanisms that could explain this relationship.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.17
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 (1) Dependent students earn less; (2) Dependents may have stricter budgets
+
 </details>
+::::
+:::
 
-14. If you suspected that the effect of `Monthly_Earnings` on `Net_Money` differs for students who `Cook_at_Home`, how would you modify the regression equation?
 
+<!-- 14. If you suspected that the effect of `Monthly_Earnings` on `Net_Money` differs for students who `Cook_at_Home`, how would you modify the regression equation? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Add a term: `Monthly_Earnings * Cooks_at_Home`. This would allow slope differences. -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.18
+::::
+::::{.Question-container}
+**Short Answer**
+
+If you suspected that the effect of `Monthly_Earnings` on `Net_Money` differs for students who `Cook_at_Home`, how would you modify the regression equation?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.18
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
 Add a term: `Monthly_Earnings * Cooks_at_Home`. This would allow slope differences.
+
 </details>
+::::
+:::
 
-15. The dataset lacks variables like "student debt" or "scholarships." How might this lead to *omitted variable bias*?
 
+<!-- 15. The dataset lacks variables like "student debt" or "scholarships." How might this lead to *omitted variable bias*? -->
+
+<!-- <details> -->
+<!-- <summary><strong>Click to reveal answer</strong></summary> -->
+<!-- Missing debt/scholarships could *bias the coefficients* (for instance overstating job impact). -->
+<!-- </details> -->
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.19
+::::
+::::{.Question-container}
+**Short Answer**
+
+The dataset lacks variables like "student debt" or "scholarships." How might this lead to *omitted variable bias*?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.19
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
-Missing debt/scholarships could *bias the coefficients* (for instance overstating job impact).
-</details>
 
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:** 
+
+Missing debt/scholarships could *bias the coefficients* (for instance overstating job impact).
+
+</details>
+::::
+:::
 
 ### Coding Question 
 
@@ -1719,7 +2676,7 @@ Dive in to see how you can answer these questions using OLS regression!
 <summary><strong>Click to reveal answer</strong></summary>
 
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # Load required libraries
 library(readr)
@@ -1755,7 +2712,7 @@ for (pred in predictors) {
 }
 ```
 
-## Python Code
+## **`Python` Code**
 ```{python}
 import numpy as np
 import pandas as pd
@@ -1803,7 +2760,7 @@ plt.show()
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # B.1 Fit initial model
 model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
@@ -1830,7 +2787,7 @@ ggplot(data = NULL, aes(sample = resid(model1))) +
 
 ```
 
-## Python Code
+## **`Python` Code**
 
 ```{python}
 # B.1 Fit initial model
@@ -1868,7 +2825,7 @@ Heteroscedasticity appears present in the residuals vs fitted plot and the Breus
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # C.1 Durbin-Watson Test (Independence)
 
@@ -1909,7 +2866,7 @@ theme_minimal()
 
 ```
 
-## Python Code
+## **`Python` Code**
 
 ```{python}
 import statsmodels.stats.api as sms
@@ -1976,7 +2933,7 @@ The Durbin-Watson test produces a value of 1.79, close to 2, meaning there is no
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df <- df %>% mutate(prior_courses_category = factor(prior_courses))
@@ -2001,7 +2958,7 @@ summary(model4)
 
 ```
 
-## Python Code
+## **`Python` Code**
 
 ```{python}
 # D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
@@ -2039,7 +2996,7 @@ print(model4.summary())
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
 ::: {.panel-tabset}
-## R Code
+## **`R` Code**
 ```{r}
 # E.1 Compare models
 # Create a comparison table of R² and RMSE
@@ -2109,7 +3066,7 @@ cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
    - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
    - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
 
-## Python Code
+## **`Python` Code**
 ```{python}
 # E.1 Compare models
 models = {
