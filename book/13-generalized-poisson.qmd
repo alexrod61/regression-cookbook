@@ -4,24 +4,52 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-7PRVEBE1EF');
+</script>
+
+<!-- MathJax configuration -->
+<script>
+  MathJax = {
+    tex: {
+      tags: 'ams',
+      useLabelIds: true
+    }
+  };
 </script>
 
 # Generalized Poisson Regression {#sec-generalized-poisson}
 
 ```{r}
 #| include: false
-
 colourize <- function(x, color) {
   if (knitr::is_latex_output()) {
     sprintf("\\textcolor{%s}{%s}", color, x)
   } else if (knitr::is_html_output()) {
-    sprintf("<span style='color: %s;'>%s</span>", color,
-      x)
+    sprintf("<span style='color: %s;'>%s</span>", color, x)
   } else x
 }
 ```
+
+::: {.Warning}
+::::{.Warning-header}
+When to Use and Not Use Generalized Poisson Regression
+::::
+::::{.Warning-container}
+Generalized Poisson regression is a type of generalized linear model that is appropriately used under the following conditions:
+
+- The outcome variable is **discrete** and **count-type** as shown in @fig-generalied-poisson-regression. Examples include number of doctor visits, number of web clicks, number of accidents, etc.
+- Outcomes are statistically independent from one to the next.
+- The data shows **overdispersion** (variance exceeds mean) **or underdispersion** (variance is less than mean). See @sec-classical-poisson for the equidispersion case.
+- Counts occur over fixed and known exposures (such as time intervals or geographic areas).
+- We intend to use the **logarithm of the mean** of the outcome as a **link function**, which ensures that our predictions are always positive.
+
+However, Generalized Poisson regression should not be used in the following scenarios:
+
+- The outcome is not a count (e.g., binary outcomes, proportions, or continuous variables).
+- The dispersion parameter $\delta = 0$ is strongly supported - use [Classical Poisson](10-classical-poisson.qmd) (Chapter 10) instead.
+- The outcome variable includes a large number of zeros - use [Zero-Inflated Poisson](12-zero-inflated-poisson.qmd) (Chapter 12) instead.
+::::
+:::
 
 ::: {#fig-generalied-poisson-regression}
 ```{mermaid}
@@ -68,4 +96,299 @@ mindmap
           )Chapter 13: <br/>Generalized <br/>Poisson <br/>Regression(
             (Generalized <br/>Poisson <br/>Outcome Y)
 ```
+
+Regression analysis mind map depicting all modelling techniques explored in this book. Depending on the type of outcome $Y$, these techniques are split into two large zones: *discrete* and *continuous*.
+:::
+
+```{r setup-r, include=FALSE}
+# TODO: Add required libraries (VGAM, tidyverse, broom, asbio)
+```
+
+```{python setup-py, include=FALSE}
+# TODO: Add required Python imports and custom GP likelihood class
+```
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- Explain why Classical Poisson regression underperforms when the equidispersion assumption is violated.
+- Determine when Generalized Poisson regression is preferred over Classical Poisson and Negative Binomial regression.
+- Write down the Generalized Poisson PMF and its mean-variance relationship.
+- Describe the role of the dispersion parameter $\delta$ and interpret its sign and magnitude.
+- Perform and interpret a dispersion test to detect over- or underdispersion.
+- Fit a Generalized Poisson regression model in R and Python.
+- Interpret the regression coefficients (IRR) and the dispersion parameter $\delta$.
+- Evaluate model performance and compare results against Classical Poisson regression.
+::::
+:::
+
+## Introduction
+
+This chapter extends [Chapter 10](10-classical-poisson.qmd) by introducing a more flexible count regression model. Classical Poisson regression enforces **equidispersion**: the mean and variance of the count outcome must be equal. In practice, this assumption is frequently violated. When the variance *exceeds* the mean, the data is **overdispersed**; when the variance falls *below* the mean, it is **underdispersed**. Under overdispersion, Classical Poisson underestimates standard errors, inflating the risk of Type I error. Under underdispersion, it overestimates standard errors, making real associations harder to detect. Classical Poisson has no mechanism to handle underdispersion at all.
+
+The Generalized Poisson (GP) distribution, introduced by Consul & Jain (1973), relaxes this constraint by adding a single dispersion parameter $\delta$. When $\delta = 0$, GP reduces exactly to Classical Poisson. When $\delta > 0$ it accommodates overdispersion; when $\delta < 0$ it accommodates underdispersion - making it the only standard count model that handles both directions. Both GP and Negative Binomial regression (@sec-negative-binomial, Chapter 11) address overdispersion, but only GP handles underdispersion, and GP nests Classical Poisson as a special case, making model comparison straightforward via a likelihood ratio test.
+
+Some research questions you might explore using Generalized Poisson regression:
+
+- How does the number of satellite male horseshoe crabs around a female nest vary by shell width and color, accounting for the overdispersion present in the data?
+- How does the number of workplace injury claims per employee vary by industry sector and firm size, where variance in claims far exceeds the mean?
+
+::: {.callout-note appearance="simple"}
+**TODO:** Add an underdispersion research question once the Case Study 2 dataset is confirmed.
+:::
+
+### Generalized Poisson Regression Assumptions
+
+The assumptions of Generalized Poisson regression parallel those of Classical Poisson regression, with one key modification:
+
+- **Independence**: Each count response $Y_i$ is independent of all others, with its own mean $\mu_i > 0$.
+- **Log-linearity**: The log of the mean is modelled as a linear combination of the predictors: $\log(\mu_i) = \beta_0 + \beta_1 X_{i,1} + \dots + \beta_k X_{i,k}$.
+- **Dispersion flexibility**: Unlike Classical Poisson, GP allows $\text{Var}(Y_i) \neq \mathbb{E}(Y_i)$. Specifically, $\text{Var}(Y_i) = \mu_i / (1 - \delta)^2$, where $\delta$ controls the direction and degree of dispersion.
+
+### A Graphical Look
+
+::: {.callout-note appearance="simple"}
+**TODO:** Side-by-side figure - left panel: Classical Poisson fit on overdispersed data; right panel: GP fit on same data. Adapt simulation code from Chapter 10.
+:::
+
+## Case Study 1: Horseshoe Crab Satellites (Overdispersion)
+
+We return to the horseshoe crab dataset from Chapter 10. The outcome variable `satell` records the number of male satellites around each female nest. The sample mean of `satell` is approximately 2.92 and the sample variance is approximately 9.91, giving a variance-to-mean ratio of roughly 3.4 - strong preliminary evidence of overdispersion that Classical Poisson was not equipped to handle.
+
+## Data Collection and Wrangling
+
+::: {.callout-note appearance="simple"}
+**TODO:** Confirm how much wrangling to repeat here vs. reference Chapter 10. Current plan: brief reload and mean/variance check only.
+:::
+
+The `crabs` dataset is described in full in Chapter 10. We reload it here using the same 70/30 train/test split and random seed for direct comparability.
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Reload crabs, repeat train/test split (seed = 1046)
+# Recompute mean and variance of satell to confirm overdispersion
+```
+
+## Python Code
+```{.python}
+# TODO: Reload crabs dataframe
+# Recompute mean and variance of satell to confirm overdispersion
+```
+:::
+
+## Data Modelling
+
+The Generalized Poisson (GP) distribution (Consul & Jain, 1973) extends Classical Poisson by introducing a dispersion parameter $\delta$. A random variable $Y_i$ follows a GP distribution if its probability mass function is:
+
+$$
+P(Y_i = y_i \mid \theta_i, \delta) = \frac{\theta_i(\theta_i + \delta y_i)^{y_i - 1} e^{-(\theta_i + \delta y_i)}}{y_i!}, \quad y_i = 0, 1, 2, \ldots
+$$
+
+where $\theta_i > 0$ and $\max(-1, -\theta_i/m) \leq \delta \leq 1$ for $m \geq 4$. The mean and variance are:
+
+$$
+\mathbb{E}(Y_i) = \frac{\theta_i}{1 - \delta} = \mu_i, \qquad \text{Var}(Y_i) = \frac{\mu_i}{(1 - \delta)^2}.
+$$
+
+The dispersion ratio $\text{Var}(Y_i) / \mathbb{E}(Y_i) = 1/(1-\delta)^2$ summarizes departure from equidispersion: equal to 1 when $\delta = 0$ (Classical Poisson), greater than 1 when $\delta > 0$ (overdispersion), and less than 1 when $\delta < 0$ (underdispersion).
+
+We use the same log link as Chapter 10:
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 X_{i,1} + \dots + \beta_k X_{i,k}.
+$$
+
+The interpretation of $\beta$ coefficients and their exponentiated IRRs is identical to Chapter 10. The only addition is $\delta$, estimated alongside $\boldsymbol{\beta}$.
+
+## Estimation
+
+Parameters are estimated via joint maximum likelihood for $(\boldsymbol{\beta}, \delta)$. The log-likelihood is:
+
+$$
+\ell(\boldsymbol{\beta}, \delta) = \sum_{i=1}^n \left[ \log\theta_i + (y_i - 1)\log(\theta_i + \delta y_i) - (\theta_i + \delta y_i) - \log(y_i!) \right]
+$$
+
+where $\theta_i = (1-\delta)\exp(X_i^\top \boldsymbol{\beta})$. Unlike Classical Poisson where only $\boldsymbol{\beta}$ is estimated via IRLS, here both parameters are estimated jointly via Newton-Raphson / BFGS, initialized from a Classical Poisson fit with $\delta^{(0)} = 0$.
+
+::: {.callout-note appearance="simple"}
+**TODO:** Confirm preferred depth for this section - light treatment vs. same depth as the Estimation section in Chapter 10.
+:::
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Fit GP model using VGAM::vglm() with genpoisson1() family
+```
+
+## Python Code
+```{.python}
+# TODO: Fit GP model using custom GenericLikelihoodModel
+```
+:::
+
+## Goodness of Fit
+
+Goodness of fit uses two components. First, residual deviance follows the same formula as in @goodness:
+
+$$
+\text{Residual Deviance} = 2(\ell_{\text{saturated}} - \ell_{\text{fitted}}).
+$$
+
+Second, a dispersion test formally tests $H_0: \delta = 0$ via a likelihood ratio test:
+
+$$
+\Lambda = -2\left(\ell_{\text{Poisson}} - \ell_{\text{GP}}\right) \sim \chi^2_1.
+$$
+
+A small $p$-value confirms that GP significantly improves on Classical Poisson.
+
+::: {.callout-note appearance="simple"}
+**TODO:** Confirm whether to also include the score test for overdispersion from the DSCI 562 notes alongside the LR test.
+:::
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Residual deviance + LR dispersion test (Classical Poisson vs GP)
+```
+
+## Python Code
+```{.python}
+# TODO: Residual deviance + LR dispersion test (Classical Poisson vs GP)
+```
+:::
+
+## Results
+
+### Univariate Generalized Poisson Model
+
+We first fit a univariate GP model with `width` as the sole predictor:
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 X_{i,\text{width}}.
+$$
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Fit univariate GP model (width only)
+# Report coefficients, SEs, Wald test, 95% CIs
+```
+
+## Python Code
+```{.python}
+# TODO: Fit univariate GP model (width only)
+# Report coefficients, SEs, Wald test, 95% CIs
+```
+:::
+
+### Interpreting the Dispersion Parameter
+
+The dispersion parameter $\hat{\delta}$ is new in this chapter:
+
+- If $\hat{\delta} > 0$ and the 95% CI excludes 0: overdispersion is confirmed; GP is preferred over Classical Poisson.
+- The implied dispersion ratio is $1 / (1 - \hat{\delta})^2$, quantifying how much the variance exceeds the mean.
+- If $\hat{\delta} \approx 0$ and the CI contains 0: Classical Poisson was sufficient.
+
+::: {.callout-note appearance="simple"}
+**TODO:** Fill in actual $\hat{\delta}$ and dispersion ratio once model is fit.
+:::
+
+### Multivariate Generalized Poisson Model
+
+We now add `color` as a second predictor:
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 X_{i,\text{width}} + \beta_2 X_{i,\text{color}_2} + \beta_3 X_{i,\text{color}_3} + \beta_4 X_{i,\text{color}_4}.
+$$
+
+The IRR interpretation for both continuous and categorical predictors follows the same logic as Chapter 10.
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Fit multivariate GP model (width + color)
+# Report full coefficient table with IRRs
+```
+
+## Python Code
+```{.python}
+# TODO: Fit multivariate GP model (width + color)
+# Report full coefficient table with IRRs
+```
+:::
+
+### Comparing Classical Poisson vs. Generalized Poisson
+
+::: {.callout-note appearance="simple"}
+**TODO:** Side-by-side table of coefficients, SEs, and p-values from both models. Key point: Classical Poisson underestimates SEs under overdispersion, inflating Type I error risk.
+:::
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Side-by-side comparison table: Classical Poisson vs GP
+```
+
+## Python Code
+```{.python}
+# TODO: Side-by-side comparison table: Classical Poisson vs GP
+```
+:::
+
+### Prediction Using Test Data
+
+Using the same KL divergence metric from Chapter 10:
+
+$$
+\overline{D}_{\mathrm{KL}} = \frac{1}{n}\sum_{i=1}^n \left[ y_i \log\left(\frac{y_i}{\hat{\mu}_i}\right) - y_i + \hat{\mu}_i \right].
+$$
+
+We compare average KL divergence of the GP model against Classical Poisson on the test set. A lower value confirms improved fit.
+
+::: {.panel-tabset}
+## R Code
+```{.r}
+# TODO: Predict on test set, compute and compare KL divergence vs Classical Poisson
+```
+
+## Python Code
+```{.python}
+# TODO: Predict on test set, compute and compare KL divergence vs Classical Poisson
+```
+:::
+
+## Case Study 2: [TBD Dataset] (Underdispersion)
+
+::: {.callout-note appearance="simple"}
+**TODO:** Confirm underdispersion dataset. Full workflow mirrors Case Study 1 with $\delta < 0$.
+:::
+
+## Storytelling
+
+::: {.callout-note appearance="simple"}
+**TODO:** Complete once models are fit. Cover: why GP was needed, what $\delta$ tells us, key predictor findings, and practical guidance for choosing between Poisson, NB, and GP.
+:::
+
+## Practice Problems
+
+::: {.quiz}
+
+### Conceptual Questions
+
+::: {.callout-note appearance="simple"}
+**TODO:** 10-12 questions covering role of $\delta$, dispersion test, GP vs NB, underdispersion intuition, and consequences of ignoring overdispersion.
+:::
+
+:::
+
+### Coding Question
+
+::: {.callout-note appearance="simple"}
+**TODO:** Full A-J problem set parallel to Chapter 10. Dataset TBD - pending decision on underdispersion dataset.
 :::
