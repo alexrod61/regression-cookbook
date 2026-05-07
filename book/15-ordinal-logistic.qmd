@@ -389,7 +389,7 @@ college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
   geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
     position = position_stack(vjust = 0.5), colour = "firebrick3", fontface = "bold", size = 6
   ) +
-  scale_y_continuous(labels = percent_format()) +
+  scale_y_continuous(labels = scales::percent_format()) +
   labs(y = "Percent", x = "Field of Study", fill = "") +
   ggtitle("Stacked Bar Charts") +
   theme(
@@ -537,7 +537,7 @@ college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
   geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
     position = position_stack(vjust = 0.5), colour = "firebrick3", fontface = "bold", size = 6
   ) +
-  scale_y_continuous(labels = percent_format()) +
+  scale_y_continuous(labels = scales::percent_format()) +
   labs(y = "Percent", x = "Field of Study", fill = "") +
   ggtitle("Stacked Bar Charts") +
   theme(
@@ -1149,9 +1149,10 @@ college_data["likelihood_to_apply"] = pd.Categorical(
 )
 
 # Fit the proportional odds model (logit link)
+X = pd.get_dummies(college_data[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
 ordinal_fit = OrderedModel(
     college_data["likelihood_to_apply"],
-    college_data[["GPA", "GRE_score", "field_of_study"]],
+    X,
     distr="logit"
 )
 ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
@@ -1200,9 +1201,10 @@ college_data["likelihood_to_apply"] = pd.Categorical(
     ordered=True
 )
 
+X = pd.get_dummies(college_data[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
 ordinal_fit = OrderedModel(
     college_data["likelihood_to_apply"],
-    college_data[["GPA", "GRE_score", "field_of_study"]],
+    X,
     distr="logit"
 )
 ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
@@ -1758,7 +1760,7 @@ from scipy.stats import chi2 as chi2dist
 ll_fitted = ordinal_result.llf
 
 # Null log-likelihood from marginal category proportions
-y_codes  = y_train.cat.codes.values
+y_codes  = college_data["likelihood_to_apply"].cat.codes.values
 props    = np.array([(y_codes == j).mean() for j in range(4)])
 ll_null  = np.sum(np.log(props[y_codes]))
 
@@ -1791,7 +1793,7 @@ library(MASS)
 
 ordinal_null <- polr(
   likelihood_to_apply ~ 1,
-  data  = train_set,
+  data  = college_data,
   Hess  = TRUE
 )
 ll_null   <- logLik(ordinal_null)
@@ -1824,7 +1826,7 @@ from scipy.stats import chi2 as chi2dist
 
 ll_fitted = ordinal_result.llf
 
-y_codes = y_train.cat.codes.values
+y_codes = college_data["likelihood_to_apply"].cat.codes.values
 props   = np.array([(y_codes == j).mean() for j in range(4)])
 ll_null = np.sum(np.log(props[y_codes]))
 
@@ -1897,10 +1899,10 @@ import matplotlib.pyplot as plt
 
 # Predict on training set
 pred_probs_train = ordinal_result.model.predict(
-    ordinal_result.params, exog=X_train.values
+    ordinal_result.params, exog=X.values
 )
 pred_codes_train = pred_probs_train.argmax(axis=1)
-true_codes_train = y_train.cat.codes.values
+true_codes_train = college_data["likelihood_to_apply"].cat.codes.values
 
 # Confusion matrix
 cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
@@ -1932,11 +1934,11 @@ print(f"Macro F1:         {f1:.3f}")
 #| warning: false
 library(caret)
 
-y_pred_train <- predict(ordinal_fit, newdata = train_set)
+y_pred_train <- predict(ordinal_fit, newdata = college_data)
 
 conf_matrix_train <- confusionMatrix(
-  factor(y_pred_train,                  levels = levels(train_set$likelihood_to_apply)),
-  factor(train_set$likelihood_to_apply, levels = levels(train_set$likelihood_to_apply))
+  factor(y_pred_train,                  levels = levels(college_data$likelihood_to_apply)),
+  factor(college_data$likelihood_to_apply, levels = levels(college_data$likelihood_to_apply))
 )
 
 cm_df <- as.data.frame(as.table(conf_matrix_train$table))
@@ -1970,10 +1972,10 @@ from sklearn.metrics import (confusion_matrix, ConfusionMatrixDisplay,
 import matplotlib.pyplot as plt
 
 pred_probs_train = ordinal_result.model.predict(
-    ordinal_result.params, exog=X_train.values
+    ordinal_result.params, exog=X.values
 )
 pred_codes_train = pred_probs_train.argmax(axis=1)
-true_codes_train = y_train.cat.codes.values
+true_codes_train = college_data["likelihood_to_apply"].cat.codes.values
 
 cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
@@ -2100,8 +2102,8 @@ inference_table = pd.DataFrame({
     "statistic" : z_stats[slope_mask].values,
     "p_value"   : p_values[slope_mask],
     "or"        : np.exp(params[slope_mask].values),
-    "ci_lower"  : np.exp(ci.loc[slope_mask, "lower"].values),
-    "ci_upper"  : np.exp(ci.loc[slope_mask, "upper"].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, 0].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, 1].values),
 }).round(4)
 
 print("All slope coefficients:")
@@ -2173,8 +2175,8 @@ inference_table = pd.DataFrame({
     "statistic" : z_stats[slope_mask].values,
     "p_value"   : p_values[slope_mask],
     "or"        : np.exp(params[slope_mask].values),
-    "ci_lower"  : np.exp(ci.loc[slope_mask, "lower"].values),
-    "ci_upper"  : np.exp(ci.loc[slope_mask, "upper"].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, 0].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, 1].values),
 }).round(4)
 
 print("All slope coefficients:")
@@ -2301,6 +2303,7 @@ brant(ordinal_fit)
 #| warning: false
 from scipy.special import expit
 from scipy.stats import chi2
+from scipy.optimize import minimize
 
 X_brant = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
