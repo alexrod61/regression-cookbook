@@ -1566,11 +1566,11 @@ The **residuals versus fitted values plot**, depicted in @fig-housing-training-r
 
 In plain words, if the OLS mean structure (i.e., the **systematic component** we discussed in @eq-housing-OLS) is doing a reasonable job, we would like to see the residuals scattered around the horizontal zero line with no obvious systematic curve, and we would also prefer not to see a pronounced funnel shape in which the spread of the residuals grows or shrinks dramatically.
 
-::: {.Tip}
-::::{.Tip-header}
-Tip on how to read a residuals-versus-fitted plot!
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on how to read a residuals-versus-fitted plot!
 ::::
-::::{.Tip-container}
+::::{.Heads-up-container}
 This diagnostic is mainly a **pattern-finding tool**, not a formal test. A perfectly random cloud is never expected in practice, but we do want to avoid strong warning signs such as **visible curvature**, **clear clusters** induced by a missing structure, or a **dramatic increase in spread** as fitted values grow. In other words, this plot helps us ask whether the fitted OLS model is missing an important feature of the data-generating pattern.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-easter-eggs-rabbit-8574765/).](img/magnifying-glass-2.png){width="420"}
@@ -1985,6 +1985,13 @@ print(gvif_table)
 
 The above VIF results are all extremely close to $1$ for all regressors. This indicates essentially no meaningful multicollinearity in the current design matrix, which is very good news for our inferential goal because it means coefficient uncertainty is not being inflated by strong redundancy among the explanatory variables.
 
+Then, let us inspect **Cook's distance**, which helps us detect whether a small number of observations are exerting disproportionate influence on the fitted model. That said, before interpreting the specific pattern in @fig-housing-cooks-distance-plot, it is helpful to understand the basic components of a Cook’s distance plot: 
+
+- Along the horizontal axis, we have the **observation index**, so each vertical line corresponds to one observation in the training set. 
+- Along the vertical axis, we have that observation's Cook's distance, which summarizes how much the fitted regression results would change if that observation were removed and the model were fit again. 
+- In plain words, **taller spikes** indicate observations that exert relatively more influence on the fitted model, whereas **shorter spikes** indicate observations whose removal would have little effect. 
+- The main goal of this plot is therefore **not to test a formal hypothesis**, but to visually check whether a small number of observations appear to stand out as disproportionately influential relative to the rest.
+
 ```{r}
 #| label: fig-housing-cooks-distance-plot
 #| fig-cap: "Housing OLS diagnostic Cook's distance plot (via training set)."
@@ -2017,6 +2024,19 @@ cooks_distance_plot_training <- ggplot(aug_training, aes(x = row_id, y = .cooksd
 cooks_distance_plot_training
 ```
 
+With the above interpretation guidelines in mind, the Cook's distance plot in @fig-housing-cooks-distance-plot does not show an obvious handful of observations dominating the fit. There may still be some points that are more influential than others, which is always true in practice, but the overall picture is not one of a model being driven by a few extreme cases. This again supports the idea that our fitted OLS model is reasonably stable on the training data.
+
+Finally, to complete the goodness-of-fit picture, we also report $R^2$ and adjusted $R^2$. These summarize how much of the variation in the response is explained by the fitted model on the training data. The adjusted version is useful because it penalizes the inclusion of additional explanatory variables.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on what $R^2$ does and does not tell us!
+::::
+::::{.Heads-up-container}
+A large $R^2$ does **not** guarantee that the model assumptions are appropriate, and a small $R^2$ does **not** automatically mean that the model is useless. These quantities only summarize in-sample explanatory power. That is why we interpret them **together** with diagnostic plots, formal tests, and—later in this chapter—the testing-set evaluation.
+::::
+:::
+
 ::: {.panel-tabset}
 
 ## **`R`**
@@ -2046,6 +2066,38 @@ print(
 )
 ```
 
+:::
+
+For this training fit, we obtain an $R^2$ of `r round(summary(training_OLS_model)$r.squared, 4)` and an adjusted $R^2$ of `r round(summary(training_OLS_model)$adj.r.squared, 4)`. These values indicate that **the OLS model explains a substantial portion of the variation in sale price within the training sample**. The fact that the adjusted $R^2$ is very close to $R^2$ also suggests that the included explanatory variables are not simply inflating the fit by adding unnecessary complexity.
+
+**Taken together**, the graphical diagnostics, formal hypothesis tests, and summary metrics tell **a fairly coherent story** for this housing example. The residuals-versus-fitted plot does not reveal an obvious structural failure, the QQ-plot and Shapiro–Wilk test do not provide meaningful evidence against normality, the Breusch–Pagan test does not suggest heteroscedasticity, the Durbin–Watson result does not point to autocorrelation, the VIFs show essentially no collinearity problem, and the Cook's distance plot does not indicate that a tiny number of houses are dominating the fit. None of this proves that the OLS model is *perfect*, but it does suggest that the model is behaving well enough on the training data to move forward to the **results** stage for both our inferential and predictive inquiries. @tbl-housing-diagnostics-conclusions summarizes these goodness-of-fit findings.
+
+| **Diagnostic** | **Evidence from our goodness-of-fit analysis** | **Interpretation in plain words** | **Main implication** |
+|---|---|---|---|
+| **Residuals versus fitted values plot** | No strong curvature or funnel shape is visually apparent in @fig-housing-training-residuals-vs-fitted. | The fitted mean structure looks broadly reasonable, and the spread of residuals does not show a major visual instability. | Supports both inference and prediction. |
+| **QQ-plot of standardized residuals** | Points track the reference line reasonably well in @fig-housing-training-qq-plot. | Residuals look broadly compatible with a Normal shape. | Supports classical OLS inference. |
+| **Shapiro–Wilk test** | Test statistic $W$ approximately equal to `r round(tidy(training_OLS_model_shapiro)$statistic, 2)` and $p$-value of about `r round(tidy(training_OLS_model_shapiro)$p.value, 2)`. | No meaningful evidence against normality of residuals. | Supports classical OLS inference. |
+| **Studentized Breusch–Pagan test** | Statistic approximately equal to `r round(bptest(training_OLS_model)$statistic, 2)` and $p$-value of about `r round(bptest(training_OLS_model)$p.value, 2)`. | No meaningful evidence of heteroscedasticity. | Supports stable standard errors and prediction. |
+| **Durbin–Watson test** | Statistic approximately equal to `r round(dwtest(training_OLS_model)$statistic, 4)` and $p$-value of about `r round(dwtest(training_OLS_model)$p.value, 4)`. | No meaningful evidence of positive residual autocorrelation. | Supports reliability of standard errors. |
+| **Variance inflation factors (VIFs)** | All values are very close to 1. | The explanatory variables do not show a problematic overlap structure. | Supports coefficient stability and interpretation. |
+| **Cook's distance plot** | No obvious standout observations dominate the plot. | The fitted model does not appear to be driven by a small number of highly influential houses. | Supports model stability. |
+| **$R^2$ and adjusted $R^2$** | $R^2$ equal to `r round(summary(training_OLS_model)$r.squared, 4)` and adjusted $R^2$ equal to `r round(summary(training_OLS_model)$adj.r.squared, 4)`. | The model explains a substantial amount of in-sample variation without much penalty for complexity. | Encouraging for in-sample predictive behaviour. |
+
+: Summary of goodness-of-fit conclusions for the OLS housing model fit on the training data. {#tbl-housing-diagnostics-conclusions .striped .hover}
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on what to do when goodness-of-fit checks raise concerns!
+::::
+::::{.Heads-up-container}
+In practice, goodness-of-fit checks should **not** be treated as a simple yes/no gatekeeping device. A fitted regression model is rarely declared "*perfect*" or "*completely invalid*" based on a single plot or test alone. Instead, the goal is to examine the **overall diagnostic picture** by combining **graphical checks**, **formal hypothesis tests**, the **modelling purpose** of the analysis, **subject-matter context**, and the **severity** of any detected problems.
+
+When several diagnostics raise concerns, this does not automatically mean that the analysis must be discarded. Rather, it is often a signal to pause and ask whether the current model is still adequate for the inferential or predictive goal at hand, or whether some revision is needed. Such revisions may include reconsidering the explanatory variables, adding transformations or interaction terms, revisiting possible outliers or influential observations, or returning to the **data modelling** stage of the workflow.
+
+![Image by [*manfredsteger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-traffic-lights-police-6230164/).](img/traffic-lights.png){width="475"}
+
+If the diagnostic issues are mild, the model may still be serviceable with a careful discussion of its limitations in the subsequent **storytelling** stage. However, if the lack of fit is more substantial or structurally incompatible with the assumptions of the current model, then it may be more appropriate to move toward an alternative regression framework. This is one of the reasons why later chapters in this textbook include a textbox called **When to Use and Not Use a Given Regression Model**: those textboxes are intended to help you decide when the current model is no longer a good match for the data-generating behaviour and when it may be time to iterate back to the **data modelling** stage of the workflow and consider a different regression approach.
+::::
 :::
 
 ### Results {#sec-ds-workflow-results}
