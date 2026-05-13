@@ -362,24 +362,17 @@ Each row in the dataset represents one policyholder, and the main outcome record
 
 The dataset contains the following variables.
 
-```{r tbl-zip-variables}
-#| echo: false
-#| tbl-cap: "Variables in the zero-inflated insurance-claims dataset."
+| **Variable Name** | **Coding Name Alias** | **Type** | **Scale** | **Model Role** | **Notes** |
+|:----------:|:----------:|:----------:|:----------:|:----------:|:-----------|
+| Number of Insurance Claims (*past year*) | `claims` | Discrete | Nonnegative count; positively unbounded in principle | Response | Zero-inflated count outcome. A value of $0$ means no claims were filed during the observation window. |
+| Driver Age (*years*) | `driver_age` | Continuous | Bounded by design: 18 - 75 years | Regressor | Age of the policyholder or driver. |
+| Annual Mileage (*km/year*) | `annual_mileage` | Continuous | Bounded by design: 2,000 - 40,000 km/year | Regressor | Total kilometers driven per year. |
+| Vehicle Age (*years*) | `vehicle_age` | Discrete | Bounded integer: 0 - 20 years | Regressor | Age of the insured vehicle. |
+| Sex Indicator (*female* or *male*) | `male` | Discrete | Bounded binary indicator: $0$ or $1$ | Regressor | $1$ indicates male and $0$ indicates female, according to the dataset coding. |
+| Driving Environment (*rural* or *urban*) | `urban_area` | Discrete | Bounded binary indicator: $0$ or $1$ | Regressor | $1$ indicates urban driving environment and $0$ indicates rural driving environment. |
+| Prior Claims Indicator (*no* or *yes*) | `prior_claims` | Discrete | Bounded binary indicator: $0$ or $1$ | Regressor | $1$ indicates at least one prior claim and $0$ indicates no prior claims. |
 
-zip_variable_table <- tribble(
-  ~Variable, ~Role, ~Type, ~Description,
-  "claims", "Response", "Count", "Number of insurance claims filed during the observation period.",
-  "driver_age", "Regressor", "Continuous", "Age of the policyholder or driver.",
-  "annual_mileage", "Regressor", "Continuous", "Approximate number of miles driven per year.",
-  "vehicle_age", "Regressor", "Discrete / ordinal", "Age of the insured vehicle in years.",
-  "male", "Regressor", "Binary", "Indicator equal to 1 for male drivers and 0 otherwise, according to the dataset coding.",
-  "urban_area", "Regressor", "Binary", "Indicator equal to 1 for drivers in an urban area and 0 otherwise.",
-  "prior_claims", "Regressor", "Binary", "Indicator equal to 1 when the driver has prior claims and 0 otherwise."
-)
-
-zip_variable_table |>
-  print_as_dt()
-```
+: Variables in the zero-inflated insurance-claims dataset.
 
 A value of **zero** for the response means that the policyholder **filed no claims during the observation period**. Importantly, that zero can be interpreted in more than one way. In some cases, the policyholder may be effectively outside the claims-generating process for that period, or had such limited exposure that a positive claim count was structurally unlikely. In other cases, the policyholder may have been fully at risk of filing a claim but simply happened not to do so. This distinction is central to the two-part structure of the ZIP model, which will be discussed later in the data-modelling section.
 
@@ -2344,3 +2337,45 @@ if (reticulate::py_eval("'correlation_summary_py' in globals()", convert = TRUE)
 :::
 
 The correlation summary reinforces the graphical EDA. In the training data, `annual_mileage` has the strongest correlation with `claims`, about **`r zip_stat("corr_annual_claims")`**, and with `has_claim`, about **`r zip_stat("corr_annual_has_claim")`**. `prior_claims` is also notable, with correlations of about **`r zip_stat("corr_prior_claims")`** with `claims` and **`r zip_stat("corr_prior_has_claim")`** with `has_claim`. These correlations do not establish causality, but they help explain why these covariates are sensible choices for the model components.
+
+### EDA summary
+
+The exploratory analysis points to two connected conclusions. First, `claims` is a count response with a large concentration at zero. Second, the covariates do not all show the same marginal relationship with the response, so the later ZIP model should be allowed to separate the zero-generating mechanism from the count-generating mechanism.
+
+| **EDA Theme** | **TLDR** | **Dynamic Evidence** | **Modelling Implication** |
+|:------------------:|:----------------|:----------------|:----------------|
+| Response shape | The response is heavily concentrated at zero, with a smaller right tail of positive claim counts. | There are **`r zip_stat("zero_n")`** zero-claim observations out of **`r zip_stat("train_n")`** training observations; the largest observed count is **`r zip_stat("max_claims")`**. | A count model is needed, but the zero pile-up should be modelled explicitly. |
+| Mean - variance pattern | The response is more variable than a simple equidispersed Poisson pattern would suggest. | The sample mean is **`r zip_stat("sample_mean")`**, the sample variance is **`r zip_stat("sample_variance")`**, and the variance-to-mean ratio is **`r zip_stat("variance_to_mean")`**. | A one-process Classical Poisson model may be too restrictive. |
+| Zero inflation check | The observed zero rate is larger than the zero rate implied by a Poisson model with the same mean. | The observed zero rate is **`r zip_stat("observed_zero_rate")`**, while the Poisson-expected zero rate is **`r zip_stat("poisson_zero_rate")`**; the excess zero rate is **`r zip_stat("excess_zero_rate")`**. | This is direct empirical motivation for a zero-inflated model. |
+| Zero versus nonzero profiles | Policyholders with at least one claim tend to have higher mileage and a higher prior-claims rate. | Mean annual mileage is **`r zip_stat("mileage_nonzero")`** for nonzero-claim policyholders versus **`r zip_stat("mileage_zero")`** for zero-claim policyholders; the prior-claims rate is **`r zip_stat("prior_rate_nonzero")`** versus **`r zip_stat("prior_rate_zero")`**. | `annual_mileage` and `prior_claims` are plausible regressors for both claim frequency and the zero/nonzero distinction. |
+| Binary covariates | `prior_claims` shows the clearest binary-covariate contrast; `urban_area` is weaker in this training split. | With prior claims, mean claims are **`r zip_stat("prior_mean_yes")`** and the zero rate is **`r zip_stat("prior_zero_yes")`**; without prior claims, mean claims are **`r zip_stat("prior_mean_no")`** and the zero rate is **`r zip_stat("prior_zero_no")`**. The urban groups differ by about **`r zip_stat("urban_mean_diff")`** in mean claims and **`r zip_stat("urban_zero_diff")`** in zero rate. | `prior_claims` should be treated as an important candidate covariate; `urban_area` may still be retained for substantive insurance interpretation. |
+| Continuous covariates | `annual_mileage` has the clearest positive marginal association with the response. | Mean claims rise from **`r zip_stat("annual_low_mean")`** in the lowest mileage bin to **`r zip_stat("annual_high_mean")`** in the highest mileage bin; the zero rate falls from **`r zip_stat("annual_low_zero")`** to **`r zip_stat("annual_high_zero")`**. Its correlations are **`r zip_stat("corr_annual_claims")`** with `claims` and **`r zip_stat("corr_annual_has_claim")`** with `has_claim`. | `annual_mileage` is a natural candidate for the count component and the zero-inflation component. |
+
+: TLDR summary of the EDA findings for the zero-inflated insurance-claims training data.
+
+## Preparing for Modelling
+
+The data schema confirms that the response is a zero-inflated count and that the available regressors are either continuous, integer-valued, or binary. There are no multi-category nominal covariates in this dataset, so we do not need to create a baseline category plus a collection of dummy variables. The binary covariates are already coded as $0/1$ indicators, and the continuous or integer-valued regressors can enter the model directly unless a later modelling choice calls for centering, scaling, or nonlinear transformations.
+
+For policyholder $i$, define the response as
+
+$$Y_i = \texttt{claims}_i,$$
+
+where $Y_i$ is the number of claims filed during the observation window. The candidate covariates are indexed in the same order as the variable table above, excluding the response.
+
+| **Symbol** | **Coding Name Alias** | **Variable Meaning** | **Type** | **Binary Coding** |
+|:-------------:|:-------------:|:--------------|:-------------:|:--------------|
+| $x_{1,i}$ | `driver_age` | Age of policyholder $i$, measured in years. | Continuous | Not binary. |
+| $x_{2,i}$ | `annual_mileage` | Total kilometers driven per year by policyholder $i$. | Continuous | Not binary. |
+| $x_{3,i}$ | `vehicle_age` | Age of the insured vehicle for policyholder $i$, measured in years. | Discrete | Not binary; integer-valued from 0 to 20. |
+| $x_{4,i}$ | `male` | Sex indicator for policyholder $i$. | Discrete | $1$ means male; $0$ means female. |
+| $x_{5,i}$ | `urban_area` | Primary driving-environment indicator for policyholder $i$. | Discrete | $1$ means urban; $0$ means rural. |
+| $x_{6,i}$ | `prior_claims` | Prior-claims-history indicator for policyholder $i$. | Discrete | $1$ means the driver filed claims in previous years; $0$ means no prior claims. |
+
+: Covariate notation for the zero-inflated insurance-claims model.
+
+Using this notation, a compact covariate vector for the full set of candidate regressors is
+
+$$\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right),$$
+
+where the leading $1$ represents the intercept. In the ZIP model, this covariate vector can be used to build two linked regression components: a count component for the expected number of claims among policyholders in the count-generating process, and a zero-inflation component for the probability of belonging to the extra-zero group. Later sections can choose whether both components use the same covariates or whether one component uses a smaller, substantively motivated subset.
