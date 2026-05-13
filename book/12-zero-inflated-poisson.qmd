@@ -1,5 +1,10 @@
 <!-- Google tag (gtag.js) -->
+
+```{=html}
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-7PRVEBE1EF"></script>
+```
+
+```{=html}
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -7,6 +12,20 @@
 
   gtag('config', 'G-7PRVEBE1EF');
 </script>
+```
+
+<!-- MathJax configuration -->
+
+```{=html}
+<script>
+  MathJax = {
+    tex: {
+      tags: 'ams',
+      useLabelIds: true
+    }
+  };
+</script>
+```
 
 # Zero-Inflated Poisson Regression {#sec-zero-inflated-poisson}
 
@@ -17,11 +36,32 @@ colourize <- function(x, color) {
   if (knitr::is_latex_output()) {
     sprintf("\\textcolor{%s}{%s}", color, x)
   } else if (knitr::is_html_output()) {
-    sprintf("<span style='color: %s;'>%s</span>", color,
-      x)
+    sprintf("<span style='color: %s;'>%s</span>", color, x)
   } else x
 }
 ```
+
+::::: Warning
+::: Warning-header
+When to Use and Not Use Zero-Inflated Poisson Regression
+:::
+
+::: Warning-container
+Zero-Inflated Poisson (ZIP) regression is useful when:
+
+- The outcome variable is **discrete** and **count-type**, taking values $0, 1, 2, \dots$.
+- The data contain **more zeros than a standard Poisson model would typically expect**.
+- It is scientifically plausible that zeros may arise from **more than one mechanism**.
+- We want to model both whether an observation belongs to a **certain-zero group** and, separately, the expected count among observations that remain in the count-generating process.
+
+However, ZIP regression should not be used automatically whenever zeros appear in a dataset. In particular:
+
+- If the outcome is **binary**, use the model introduced in @sec-binary-logistic.
+- If the outcome is a count but the data do not exhibit unusual zero inflation, start with the Classical Poisson model introduced in @sec-classical-poisson.
+- If the outcome is overdispersed for reasons not primarily driven by excess zeros, compare against the Negative Binomial model introduced in @sec-negative-binomial.
+- If there is no substantive reason to believe that a separate zero-generating process exists, a simpler count model is usually easier to interpret.
+:::
+:::::
 
 ::: {#fig-zero-inflated-poisson-regression}
 ```{mermaid}
@@ -66,4 +106,2241 @@ mindmap
           )Chapter 12: <br/>Zero Inflated Poisson <br/>Regression(
             (Zero Inflated <br/>Poisson <br/>Outcome Y)
 ```
+
+Regression analysis mind map depicting where Zero-Inflated Poisson regression fits within the broader family of models introduced in this book.
 :::
+
+```{r setup-r, include=FALSE}
+# Load required libraries
+library(readr)
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(purrr)
+library(magrittr)
+library(ggplot2)
+library(scales)
+library(knitr)
+library(reticulate)
+library(DT)
+
+# These packages are used later for model fitting.
+# Install them before rendering if they are not already available.
+# install.packages(c("pscl", "broom"))
+library(pscl)
+library(broom)
+
+# Local data path used in the current chapter draft.
+# If the cookbook later hosts the CSV in GitHub, replace this local path with the raw CSV URL.
+zip_data_path <- "12-zip_files/zero_inflated_poisson.csv"
+
+if (file.exists(zip_data_path)) {
+  ZIP_data <- read_csv(zip_data_path, show_col_types = FALSE)
+} else {
+  ZIP_data <- tibble()
+}
+
+data <- ZIP_data
+response_var <- "claims"
+
+if (nrow(data) > 0) {
+  data <- data |>
+    mutate(
+      has_claim = as.integer(.data[[response_var]] > 0),
+      male = as.integer(male),
+      urban_area = as.integer(urban_area),
+      prior_claims = as.integer(prior_claims)
+    )
+}
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr',
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
+
+fmt_sig <- function(x, digits = 4) {
+  if (length(x) == 0 || is.null(x) || all(is.na(x))) return("NA")
+  x <- x[1]
+  if (is.numeric(x) && abs(x - round(x)) < .Machine$double.eps^0.5) {
+    return(format(round(x), big.mark = ",", scientific = FALSE, trim = TRUE))
+  }
+  format(signif(x, digits), scientific = FALSE, trim = TRUE)
+}
+
+fmt_table <- function(x, digits = 4) {
+  x |>
+    mutate(across(where(is.numeric), ~ signif(.x, digits)))
+}
+
+zip_has_data <- function() {
+  exists("data") && nrow(data) > 0 && response_var %in% names(data)
+}
+
+zip_has_train <- function() {
+  exists("train_data") && nrow(train_data) > 0 && response_var %in% names(train_data)
+}
+
+zip_stat <- function(name) {
+  if (exists("zip_eda_stats") && name %in% names(zip_eda_stats)) {
+    fmt_sig(zip_eda_stats[[name]])
+  } else {
+    "NA"
+  }
+}
+
+zip_theme <- theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20),
+    legend.position = "bottom"
+  )
+
+py_df_to_tibble <- function(py_object_name) {
+  records <- reticulate::py_eval(
+    paste0(py_object_name, ".to_dict(orient='records')"),
+    convert = TRUE
+  )
+
+  dplyr::bind_rows(records)
+}
+
+py_require("pandas")
+py_require("numpy")
+py_require("matplotlib")
+py_require("seaborn")
+py_require("statsmodels")
+py_require("scikit-learn")
+```
+
+```{python setup-py, include=FALSE}
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
+from statsmodels.discrete.count_model import ZeroInflatedPoisson
+
+zip_data_path = Path("12-zip_files/zero_inflated_poisson.csv")
+
+if zip_data_path.exists():
+    data = pd.read_csv(zip_data_path)
+else:
+    data = pd.DataFrame()
+
+response_var = "claims"
+
+if not data.empty:
+    data = data.copy()
+    data["has_claim"] = (data[response_var] > 0).astype(int)
+    for col in ["male", "urban_area", "prior_claims"]:
+        data[col] = data[col].astype(int)
+
+# Shared visual settings for Python plots.
+# This mirrors the white-grid seaborn/matplotlib style used in the Classical Poisson chapter.
+sns.set_theme(style="whitegrid")
+
+ZIP_FIGSIZE = (8, 5)
+ZIP_WIDE_FIGSIZE = (14, 8)
+ZIP_BAR_COLOR = "0.35"
+ZIP_POINT_COLOR = "0.10"
+ZIP_LINE_COLOR = "0.10"
+
+plt.rcParams.update({
+    "figure.figsize": ZIP_FIGSIZE,
+    "axes.labelsize": 12,
+    "axes.titlesize": 13,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "legend.fontsize": 10,
+})
+
+def zip_clean_axis(ax):
+    """Apply a consistent seaborn/matplotlib finishing style."""
+    ax.set_axisbelow(True)
+    ax.grid(True, axis="both", alpha=0.35)
+    sns.despine(ax=ax)
+    return ax
+```
+
+::::: LO
+::: LO-header
+Learning Objectives
+:::
+
+::: LO-container
+By the end of this chapter, you will be able to:
+
+- Explain why Zero-Inflated Poisson (ZIP) regression is useful for count outcomes with **more zeros than a standard Poisson model would typically expect**.
+- Describe the difference between **structural zeros** and **ordinary sampling zeros** in a count-data setting.
+- Identify the response variable and main explanatory variables in the insurance-claims example used throughout the chapter.
+- Use exploratory summaries and plots to assess whether a standard Poisson model may be inadequate.
+- Write the two components of a ZIP model: a **zero-inflation model** and a **Poisson count model**.
+- Fit and compare Classical Poisson or Logistic Regression with ZIP models using both `R` and `Python`.
+- Interpret coefficients from the count component and the zero-inflation component.
+:::
+:::::
+
+## Introduction
+
+In many applied regression problems, the outcome of interest is a **count**: the number of events, occurrences, or cases observed for an individual or unit over a fixed period of time. Examples include the number of hospital visits, the number of customer complaints, the number of defects on a manufactured item, or the number of insurance claims filed by a policyholder in a year.
+
+A common starting point for this kind of outcome is **Classical Poisson regression**, introduced in @sec-classical-poisson, which is designed for nonnegative integer-valued responses. However, in practice, some count datasets contain **many more zeros than a simple Poisson model would be expected to generate**. In those situations, a standard Poisson regression may fit poorly, especially near zero, and may fail to represent the data-generating process in a meaningful way.
+
+This chapter introduces **Zero-Inflated Poisson (ZIP) regression**, a model designed for count data with **excess zeros**. ZIP regression is **similar to a generalized linear model (GLM)** because each part uses a familiar GLM-style link function. More precisely, though, it is best understood as the combination of two linked regression components: a logistic-style model for whether an observation belongs to a zero-generating state, and a Poisson log-link model for the count-generating state. Thus, ZIP regression connects naturally to @sec-binary-logistic and @sec-classical-poisson respectively, but it is not just a single ordinary GLM.
+
+::::: {#Definition-zip .definition}
+::: definition-header
+Definition of Zero-Inflated Poisson
+:::
+
+::: definition-container
+A **Zero-Inflated Poisson (ZIP) model** is a two-component model for a count response with excess zeros. One component models the probability that an observation belongs to a latent group that can only produce zeros. The other component models the expected count among observations that remain in the ordinary Poisson count-generating process.
+:::
+:::::
+
+Throughout the chapter, we use a **synthetic insurance-claims dataset** as a running example. In this setting, the response of interest is the **number of claims filed by a policyholder during a fixed time window**. This is a useful example because insurance data often contain a large proportion of zeros: many policyholders do not file any claims at all, while a smaller subset files one or more. That practical feature makes the insurance setting a natural context for introducing zero-inflated modelling.
+
+The chapter is organised as follows:
+
+- **Introduction and chapter roadmap:** We introduce Zero-Inflated Poisson (ZIP) regression, explain why it is useful for count data with excess zeros, and position it relative to related cookbook chapters.
+- **Running example and data context:** We introduce the cookbook insurance-claims dataset, clarify the response variable, classify the covariates, and explain what a zero means in this setting.
+- **Data splitting:** Before EDA or model fitting, we follow the workflow introduced in @sec-ds-workflow and create training and testing sets. The training set is used for EDA and model fitting, while the testing set is held out for later prediction and model assessment.
+- **Exploratory Data Analysis (EDA):** Using only the training data, we examine the observed count distribution, the number of zeros and non-zeros, marginal covariate patterns, and the empirical evidence that motivates a zero-inflated model.
+- **Why not just use logistic regression?:** We explain what is lost when the count response is reduced to a zero-versus-nonzero outcome and connect this discussion to @sec-binary-logistic.
+- **Why not just use Poisson regression?:** We fit and interpret the Classical Poisson baseline, describe its log-link structure, and explain why a single-process count model may not be sufficient; see also @sec-classical-poisson.
+- **Intuition behind zero inflation:** We distinguish between structural zeros and ordinary sampling zeros using the insurance example.
+- **Overview of the Zero-Inflated Poisson model:** We introduce the two-component ZIP model formally, including the zero-inflation component, the count component, the mean and variance, and the role of the Hessian in standard-error estimation.
+- **Interpreting the two components in the running example:** We explain how covariates can affect the probability of belonging to the extra-zero group, the expected claim count, or both.
+- **Estimation and model fitting:** We fit the ZIP model numerically and show the full workflow in both R and Python.
+- **Interpretation of fitted results:** We read the fitted coefficient tables for both components and translate the results into insurance-claims language.
+- **Inference for model parameters:** We discuss standard errors, confidence intervals, p-values, and inferential statements for both the count and zero-inflation components.
+- **Hypothesis testing:** We test individual covariates, compare nested ZIP models, and discuss when formal comparisons against simpler alternatives are useful.
+- **Prediction with the ZIP model:** We generate predicted expected counts, predicted zero probabilities, probabilities of specific counts, simulated outcomes, and evaluate prediction quality on held-out data.
+- **Comparing ZIP to simpler alternatives:** We compare ZIP with logistic regression and Classical Poisson regression, using both statistical summaries and practical interpretation.
+- **Model assessment and diagnostics:** We assess whether the fitted model captures the observed zero frequency and count distribution, and whether it improves meaningfully over simpler models.
+- **Practical considerations and interpretation cautions:** We discuss common pitfalls, related models such as hurdle and zero-inflated negative binomial models, and the importance of substantive justification.
+- **Chapter summary:** We recap the motivation, two-part structure, inferential goals, predictive goals, and practical lessons from the running insurance example.
+- **Optional appendices:** We reserve space for additional mathematical details, implementation notes, and extended reproducibility scripts in R and Python.
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on further documented use-cases!
+:::
+
+::: Heads-up-container
+ZIP models are not only teaching examples. Documented applied uses include [manufacturing defects](https://www.stat.cmu.edu/technometrics/90-00/vol-34-01/v3401001.pdf?utm_source=chatgpt.com), [insurance claim counts](file:///C:/Users/hpala/Downloads/55914343.pdf), [public-health and epidemiology count outcomes](https://pmc.ncbi.nlm.nih.gov/articles/PMC3238139/), [health-care utilization](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0291426), among others.
+:::
+:::::
+
+::::: Tip
+::: Tip-header
+Tip on model selection for count variables
+:::
+
+::: Tip-container
+When deciding between @sec-classical-poisson, @sec-negative-binomial, and @sec-zero-inflated-poisson, do not rely only on the number of observed zeros. Combine the empirical evidence with a subject-matter explanation for why some observations may come from a different zero-generating mechanism.
+:::
+:::::
+
+## Running Example and Data Context
+
+To motivate ZIP regression, we use the insurance-claims data prepared for this chapter of the Regression Cookbook. The current draft loads the file locally from `12-zip_files/zero_inflated_poisson.csv`; this local path can later be replaced by a raw GitHub URL if the cookbook data are hosted centrally. The dataset was provided for the cookbook workflow, and we treat it here as the chapter's teaching dataset rather than as an external real-world insurance portfolio.
+
+Each row in the dataset represents one policyholder, and the main outcome records how many insurance claims that policyholder filed during the observation window. The response variable is `claims`, a nonnegative integer-valued count: $0, 1, 2, \dots$
+
+The dataset contains the following variables.
+
+```{r tbl-zip-variables}
+#| echo: false
+#| tbl-cap: "Variables in the zero-inflated insurance-claims dataset."
+
+zip_variable_table <- tribble(
+  ~Variable, ~Role, ~Type, ~Description,
+  "claims", "Response", "Count", "Number of insurance claims filed during the observation period.",
+  "driver_age", "Regressor", "Continuous", "Age of the policyholder or driver.",
+  "annual_mileage", "Regressor", "Continuous", "Approximate number of miles driven per year.",
+  "vehicle_age", "Regressor", "Discrete / ordinal", "Age of the insured vehicle in years.",
+  "male", "Regressor", "Binary", "Indicator equal to 1 for male drivers and 0 otherwise, according to the dataset coding.",
+  "urban_area", "Regressor", "Binary", "Indicator equal to 1 for drivers in an urban area and 0 otherwise.",
+  "prior_claims", "Regressor", "Binary", "Indicator equal to 1 when the driver has prior claims and 0 otherwise."
+)
+
+zip_variable_table |>
+  print_as_dt()
+```
+
+A value of **zero** for the response means that the policyholder **filed no claims during the observation period**. Importantly, that zero can be interpreted in more than one way. In some cases, the policyholder may be effectively outside the claims-generating process for that period, or had such limited exposure that a positive claim count was structurally unlikely. In other cases, the policyholder may have been fully at risk of filing a claim but simply happened not to do so. This distinction is central to the two-part structure of the ZIP model, which will be discussed later in the data-modelling section.
+
+### Loading and previewing the data
+
+The following scripts load the cookbook CSV and create the `has_claim` indicator used during the EDA. The two languages use the same column names, but they store objects in language-specific data structures: a tibble in `R` and a pandas DataFrame in `Python`.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+library(readr)
+library(dplyr)
+
+zip_data_path <- "12-zip_files/zero_inflated_poisson.csv"
+
+ZIP_data <- read_csv(zip_data_path, show_col_types = FALSE) |>
+  mutate(
+    has_claim = as.integer(claims > 0),
+    male = as.integer(male),
+    urban_area = as.integer(urban_area),
+    prior_claims = as.integer(prior_claims)
+  )
+
+data <- ZIP_data
+head(data, 10)
+```
+
+## **`Python` Code**
+
+``` python
+from pathlib import Path
+import pandas as pd
+
+zip_data_path = Path("12-zip_files/zero_inflated_poisson.csv")
+
+data = pd.read_csv(zip_data_path)
+data["has_claim"] = (data["claims"] > 0).astype(int)
+for col in ["male", "urban_area", "prior_claims"]:
+    data[col] = data[col].astype(int)
+
+data.head(10)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-load-zip-data-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "First 10 rows of the zero-inflated insurance-claims dataset using R."
+
+if (zip_has_data()) {
+  head(data, 10) |>
+    print_as_dt()
+} else {
+  tibble(Message = paste0("Data file not found at ", zip_data_path)) |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python load-zip-data-py-run}
+#| echo: false
+#| results: hide
+
+if zip_data_path.exists():
+    data = pd.read_csv(zip_data_path)
+    data["has_claim"] = (data["claims"] > 0).astype(int)
+    for col in ["male", "urban_area", "prior_claims"]:
+        data[col] = data[col].astype(int)
+else:
+    data = pd.DataFrame()
+
+data_preview = data.head(10).copy()
+```
+
+```{r tbl-load-zip-data-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "First 10 rows of the zero-inflated insurance-claims dataset using Python."
+
+py_records <- reticulate::py_eval(
+  "data.head(10).to_dict(orient='records')",
+  convert = TRUE
+)
+
+py_data_preview <- dplyr::bind_rows(py_records)
+
+if (is.data.frame(py_data_preview) && nrow(py_data_preview) > 0) {
+  py_data_preview |>
+    print_as_dt()
+} else {
+  tibble(Message = "Python data preview is empty or unavailable.") |>
+    print_as_dt()
+}
+```
+:::
+
+The preview should show seven original variables plus the derived `has_claim` indicator. In the EDA scratchpad for this chapter, the file contains 1,000 rows, the expected seven original columns, and no missing values.
+
+## Data Splitting
+
+Following the data science workflow introduced in @sec-ds-workflow, we split the data before conducting EDA or fitting models. The training set is used for exploratory analysis, model fitting, and coefficient interpretation. The testing set is held out for later prediction and model assessment.
+
+In this chapter, the split is created by **shuffling the row order with seed 123** and then cutting the shuffled data at the 80% threshold for training. We intentionally **do not stratify** by `has_claim`; with a simple random shuffle, the sample itself is expected to carry the excess-zero structure into the training and testing sets.
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on `R` and `Python` data splits!
+:::
+
+::: Heads-up-container
+Even when the same seed value is used, `R` and `Python` may create different training and testing sets because they rely on different pseudo-random number generators and different shuffling implementations. The code below deliberately shows the same conceptual procedure in both languages. It **will produce different row assignments**.
+:::
+:::::
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+set.seed(123)
+
+split_data <- data |>
+  mutate(row_id = row_number(), .before = 1)
+
+n <- nrow(split_data)
+split_index <- floor(0.8 * n)
+shuffled_rows <- sample(seq_len(n), size = n, replace = FALSE)
+
+train_data <- split_data[shuffled_rows[seq_len(split_index)], ]
+test_data <- split_data[shuffled_rows[(split_index + 1):n], ]
+
+split_check_r <- tibble(
+  split = c("training", "testing"),
+  n = c(nrow(train_data), nrow(test_data)),
+  proportion = c(nrow(train_data), nrow(test_data)) / nrow(split_data)
+)
+
+# Share the canonical R split with Python for all later computations.
+py$training_data <- r_to_py(train_data)
+py$testing_data <- r_to_py(test_data)
+```
+
+## **`Python` Code**
+
+``` python
+rng = np.random.default_rng(123)
+
+data_with_row_id = data.copy()
+if "row_id" not in data_with_row_id.columns:
+    data_with_row_id.insert(0, "row_id", np.arange(1, len(data_with_row_id) + 1))
+
+n = len(data_with_row_id)
+split_index = int(np.floor(0.8 * n))
+shuffled_rows = rng.permutation(n)
+
+training_data_independent = data_with_row_id.iloc[shuffled_rows[:split_index]].copy()
+testing_data_independent = data_with_row_id.iloc[shuffled_rows[split_index:]].copy()
+
+split_check_py_independent = pd.DataFrame({
+    "split": ["training", "testing"],
+    "n": [len(training_data_independent), len(testing_data_independent)],
+    "proportion": [
+        len(training_data_independent) / len(data_with_row_id),
+        len(testing_data_independent) / len(data_with_row_id),
+    ],
+})
+
+# The canonical Python objects used later are supplied by R through reticulate:
+# training_data and testing_data
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-split-zip-data-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Training and testing split check using the shuffled R split."
+
+if (zip_has_data()) {
+  set.seed(123)
+
+  split_data <- data |>
+    mutate(row_id = row_number(), .before = 1)
+
+  n <- nrow(split_data)
+  split_index <- floor(0.8 * n)
+  shuffled_rows <- sample(seq_len(n), size = n, replace = FALSE)
+
+  train_data <- split_data[shuffled_rows[seq_len(split_index)], ]
+  test_data <- split_data[shuffled_rows[(split_index + 1):n], ]
+
+  split_check_r <- tibble(
+    split = c("training", "testing"),
+    n = c(nrow(train_data), nrow(test_data)),
+    proportion = c(nrow(train_data), nrow(test_data)) / nrow(split_data)
+  )
+
+  py$training_data <- r_to_py(train_data)
+  py$testing_data <- r_to_py(test_data)
+
+  split_check_r |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = paste0("Data file not found at ", zip_data_path)) |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python split-zip-data-py-independent-run}
+#| echo: false
+#| results: hide
+
+split_check_py_independent = pd.DataFrame()
+
+if not data.empty:
+    rng = np.random.default_rng(123)
+
+    data_with_row_id = data.copy()
+    if "row_id" not in data_with_row_id.columns:
+        data_with_row_id.insert(0, "row_id", np.arange(1, len(data_with_row_id) + 1))
+
+    n = len(data_with_row_id)
+    split_index = int(np.floor(0.8 * n))
+    shuffled_rows = rng.permutation(n)
+
+    training_data_independent = data_with_row_id.iloc[shuffled_rows[:split_index]].copy()
+    testing_data_independent = data_with_row_id.iloc[shuffled_rows[split_index:]].copy()
+
+    split_check_py_independent = pd.DataFrame({
+        "split": ["training", "testing"],
+        "n": [len(training_data_independent), len(testing_data_independent)],
+        "proportion": [
+            len(training_data_independent) / len(data_with_row_id),
+            len(testing_data_independent) / len(data_with_row_id),
+        ],
+    })
+```
+
+```{r tbl-split-zip-data-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Training and testing split check using the independently shuffled Python split."
+
+if (reticulate::py_eval("'split_check_py_independent' in globals()", convert = TRUE)) {
+  split_check_py_independent_r <- reticulate::py_eval(
+    "split_check_py_independent.to_dict(orient='records')",
+    convert = TRUE
+  ) |>
+    dplyr::bind_rows()
+
+  if (nrow(split_check_py_independent_r) > 0) {
+    split_check_py_independent_r |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Independent Python split check is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = paste0("Data file not found at ", zip_data_path)) |>
+    print_as_dt()
+}
+```
+:::
+
+Although both languages use the same seed and the same 80/20 shuffled-split idea, they are not expected to select the same rows. From this point forward, the EDA and model fitting are based on the canonical `R` training set only. In the `Python` chunks, the objects `training_data` and `testing_data` are copies of the canonical `R` split, passed through `reticulate`.
+
+```{r zip-compute-eda-values, include=FALSE}
+if (zip_has_train()) {
+  claims_summary_wide <- train_data |>
+    summarise(
+      `Number of observations` = n(),
+      `Number of zeros` = sum(claims == 0, na.rm = TRUE),
+      `Proportion of zeros` = mean(claims == 0, na.rm = TRUE),
+      `Sample mean` = mean(claims, na.rm = TRUE),
+      `Sample variance` = var(claims, na.rm = TRUE),
+      `Variance-to-mean ratio` = var(claims, na.rm = TRUE) / mean(claims, na.rm = TRUE),
+      `Poisson expected zero rate` = exp(-mean(claims, na.rm = TRUE)),
+      `Excess zero rate` = mean(claims == 0, na.rm = TRUE) - exp(-mean(claims, na.rm = TRUE)),
+      `Maximum` = max(claims, na.rm = TRUE)
+    )
+
+  claims_summary <- claims_summary_wide |>
+    pivot_longer(
+      cols = everything(),
+      names_to = "Summary",
+      values_to = "Value"
+    )
+
+  zero_group_summary <- train_data |>
+    group_by(has_claim) |>
+    summarise(
+      n = n(),
+      mean_driver_age = mean(driver_age, na.rm = TRUE),
+      mean_annual_mileage = mean(annual_mileage, na.rm = TRUE),
+      mean_vehicle_age = mean(vehicle_age, na.rm = TRUE),
+      male_rate = mean(male, na.rm = TRUE),
+      urban_rate = mean(urban_area, na.rm = TRUE),
+      prior_claims_rate = mean(prior_claims, na.rm = TRUE),
+      mean_claims = mean(claims, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(
+      claim_status = if_else(has_claim == 0, "Zero claims", "At least one claim")
+    ) |>
+    select(claim_status, everything(), -has_claim)
+
+  binary_cols <- c("male", "urban_area", "prior_claims")
+
+  binary_summary <- purrr::map_dfr(binary_cols, function(col) {
+    train_data |>
+      group_by(value = .data[[col]]) |>
+      summarise(
+        n = n(),
+        mean_claims = mean(claims, na.rm = TRUE),
+        var_claims = var(claims, na.rm = TRUE),
+        zero_rate = mean(claims == 0, na.rm = TRUE),
+        nonzero_rate = mean(claims > 0, na.rm = TRUE),
+        max_claims = max(claims, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      mutate(variable = col, .before = 1)
+  })
+
+  make_binned_summary <- function(df, variable, bins = 6) {
+    x <- df[[variable]]
+    bin_breaks <- seq(
+      min(x, na.rm = TRUE),
+      max(x, na.rm = TRUE),
+      length.out = bins + 1
+    )
+  
+    df |>
+      mutate(
+        variable = .env$variable,
+        bin_id = cut(
+          .data[[variable]],
+          breaks = bin_breaks,
+          include.lowest = TRUE,
+          labels = FALSE
+        ),
+        bin = cut(
+          .data[[variable]],
+          breaks = bin_breaks,
+          include.lowest = TRUE,
+          dig.lab = 6
+        ),
+        bin_lower = bin_breaks[bin_id],
+        bin_upper = bin_breaks[bin_id + 1],
+        bin_midpoint = (bin_lower + bin_upper) / 2,
+        bin_width = bin_upper - bin_lower
+      ) |>
+      filter(!is.na(bin_id)) |>
+      group_by(
+        variable,
+        bin_id,
+        bin,
+        bin_lower,
+        bin_upper,
+        bin_midpoint,
+        bin_width
+      ) |>
+      summarise(
+        n = n(),
+        mean_claims = mean(claims, na.rm = TRUE),
+        zero_rate = mean(claims == 0, na.rm = TRUE),
+        .groups = "drop"
+      ) |>
+      arrange(variable, bin_midpoint)
+  }
+  
+  binned_summary <- bind_rows(
+    make_binned_summary(train_data, "driver_age"),
+    make_binned_summary(train_data, "annual_mileage"),
+    make_binned_summary(train_data, "vehicle_age")
+  )
+
+  correlation_summary <- train_data |>
+    select(driver_age, annual_mileage, vehicle_age, male, urban_area, prior_claims, claims, has_claim) |>
+    summarise(across(
+      c(driver_age, annual_mileage, vehicle_age, male, urban_area, prior_claims),
+      list(
+        corr_with_claims = ~ cor(.x, claims),
+        corr_with_has_claim = ~ cor(.x, has_claim)
+      ),
+      .names = "{.col}_{.fn}"
+    )) |>
+    pivot_longer(
+      cols = everything(),
+      names_to = c("variable", ".value"),
+      names_pattern = "(.*)_(corr_with_.*)"
+    )
+
+  prior_claims_yes <- binary_summary |> filter(variable == "prior_claims", value == 1)
+  prior_claims_no <- binary_summary |> filter(variable == "prior_claims", value == 0)
+  urban_yes <- binary_summary |> filter(variable == "urban_area", value == 1)
+  urban_no <- binary_summary |> filter(variable == "urban_area", value == 0)
+  annual_bins <- binned_summary |> filter(variable == "annual_mileage")
+  annual_low <- annual_bins |> arrange(bin_midpoint) |> slice(1)
+  annual_high <- annual_bins |> arrange(bin_midpoint) |> slice(n())
+  corr_annual <- correlation_summary |> filter(variable == "annual_mileage")
+  corr_prior <- correlation_summary |> filter(variable == "prior_claims")
+
+  zip_eda_stats <- list(
+    zero_n = sum(train_data$claims == 0, na.rm = TRUE),
+    train_n = nrow(train_data),
+    max_claims = max(train_data$claims, na.rm = TRUE),
+    sample_mean = mean(train_data$claims, na.rm = TRUE),
+    sample_variance = var(train_data$claims, na.rm = TRUE),
+    variance_to_mean = var(train_data$claims, na.rm = TRUE) / mean(train_data$claims, na.rm = TRUE),
+    poisson_zero_rate = exp(-mean(train_data$claims, na.rm = TRUE)),
+    observed_zero_rate = mean(train_data$claims == 0, na.rm = TRUE),
+    excess_zero_rate = mean(train_data$claims == 0, na.rm = TRUE) - exp(-mean(train_data$claims, na.rm = TRUE)),
+    mileage_nonzero = zero_group_summary |> filter(claim_status == "At least one claim") |> pull(mean_annual_mileage),
+    mileage_zero = zero_group_summary |> filter(claim_status == "Zero claims") |> pull(mean_annual_mileage),
+    prior_rate_nonzero = zero_group_summary |> filter(claim_status == "At least one claim") |> pull(prior_claims_rate),
+    prior_rate_zero = zero_group_summary |> filter(claim_status == "Zero claims") |> pull(prior_claims_rate),
+    prior_mean_yes = prior_claims_yes$mean_claims,
+    prior_zero_yes = prior_claims_yes$zero_rate,
+    prior_mean_no = prior_claims_no$mean_claims,
+    prior_zero_no = prior_claims_no$zero_rate,
+    urban_mean_diff = abs(urban_yes$mean_claims - urban_no$mean_claims),
+    urban_zero_diff = abs(urban_yes$zero_rate - urban_no$zero_rate),
+    annual_low_mean = annual_low$mean_claims,
+    annual_high_mean = annual_high$mean_claims,
+    annual_low_zero = annual_low$zero_rate,
+    annual_high_zero = annual_high$zero_rate,
+    corr_annual_claims = corr_annual$corr_with_claims,
+    corr_annual_has_claim = corr_annual$corr_with_has_claim,
+    corr_prior_claims = corr_prior$corr_with_claims,
+    corr_prior_has_claim = corr_prior$corr_with_has_claim
+  )
+}
+```
+
+```{python validate-canonical-split-py}
+#| include: false
+
+numeric_cols = [
+    "row_id",
+    "driver_age",
+    "annual_mileage",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims",
+    "claims",
+    "has_claim",
+]
+
+integer_cols = [
+    "row_id",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims",
+    "claims",
+    "has_claim",
+]
+
+for df_name in ["training_data", "testing_data"]:
+    if df_name in globals():
+        df = globals()[df_name].copy()
+
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        for col in integer_cols:
+            if col in df.columns:
+                df[col] = df[col].astype("Int64")
+
+        globals()[df_name] = df
+
+
+```
+
+## Exploratory Data Analysis (EDA)
+
+Before fitting any model, we examine whether the empirical distribution of `claims` in the **training data** is consistent with a simple Poisson pattern. The main EDA question is not merely "Are there zeros?" Count data often include zeros. The question is whether there are **more zeros than the Poisson mean-variance structure would lead us to expect**, and whether the covariates show patterns that make a two-component model plausible.
+
+Because the split was performed before EDA, the numerical summaries in this section should be interpreted as **training-set summaries**. The exact values are the same in `R` and `Python` because both languages now use the canonical `R` split.
+
+### Response distribution and zero inflation
+
+A natural first step is to summarise and visualise the count response `claims` in the training data. Because this is a count variable, a bar plot of observed counts is usually more informative than a density plot.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+claim_counts <- train_data |>
+  count(claims, name = "n")
+
+ggplot(claim_counts, aes(x = factor(claims), y = n)) +
+  geom_col() +
+  labs(
+    x = "Number of claims",
+    y = "Number of policyholders"
+  ) +
+  zip_theme
+```
+
+## **`Python` Code**
+
+``` python
+claim_counts = (
+    training_data["claims"]
+    .astype("int64")
+    .value_counts()
+    .sort_index()
+    .reset_index()
+)
+claim_counts.columns = ["claims", "n"]
+
+fig, ax = plt.subplots(figsize=ZIP_FIGSIZE)
+sns.barplot(
+    data=claim_counts,
+    x=claim_counts["claims"].astype(str),
+    y="n",
+    color=ZIP_BAR_COLOR,
+    ax=ax
+)
+ax.set_xlabel("Number of claims")
+ax.set_ylabel("Number of policyholders")
+zip_clean_axis(ax)
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r fig-claims-distribution-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed distribution of the insurance-claims response in the canonical training data using R."
+#| eval: !expr zip_has_train()
+
+claim_counts <- train_data |>
+  count(claims, name = "n")
+
+ggplot(claim_counts, aes(x = factor(claims), y = n)) +
+  geom_col() +
+  labs(
+    x = "Number of claims",
+    y = "Number of policyholders"
+  ) +
+  zip_theme
+```
+
+## **`Python` Output**
+
+```{python fig-claims-distribution-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed distribution of the insurance-claims response in the canonical training data using Python."
+#| eval: !expr reticulate::py_eval("'training_data' in globals() and len(training_data) > 0 and response_var in training_data.columns", convert = TRUE)
+
+claim_counts = (
+    training_data["claims"]
+    .astype("int64")
+    .value_counts()
+    .sort_index()
+    .reset_index()
+)
+claim_counts.columns = ["claims", "n"]
+
+fig, ax = plt.subplots(figsize=ZIP_FIGSIZE)
+sns.barplot(
+    data=claim_counts,
+    x=claim_counts["claims"].astype(str),
+    y="n",
+    color=ZIP_BAR_COLOR,
+    ax=ax
+)
+ax.set_xlabel("Number of claims")
+ax.set_ylabel("Number of policyholders")
+zip_clean_axis(ax)
+plt.tight_layout()
+plt.show()
+```
+:::
+
+As shown in @fig-claims-distribution-r and @fig-claims-distribution-py, the training-data distribution remains strongly concentrated at zero and then declines through the positive counts. In the training set, there are **`r zip_stat("zero_n")`** zero-claim policyholders out of **`r zip_stat("train_n")`** training observations, while the maximum observed count is **`r zip_stat("max_claims")`**. This visual pattern is the first sign that a one-process Poisson model may not be flexible enough.
+
+The next table compares the observed zero rate in the training data with the zero rate implied by a Poisson distribution whose mean equals the training-set sample mean.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+claims_summary <- train_data |>
+  summarise(
+    `Number of observations` = n(),
+    `Number of zeros` = sum(claims == 0, na.rm = TRUE),
+    `Proportion of zeros` = mean(claims == 0, na.rm = TRUE),
+    `Sample mean` = mean(claims, na.rm = TRUE),
+    `Sample variance` = var(claims, na.rm = TRUE),
+    `Variance-to-mean ratio` = var(claims, na.rm = TRUE) / mean(claims, na.rm = TRUE),
+    `Poisson expected zero rate` = exp(-mean(claims, na.rm = TRUE)),
+    `Excess zero rate` = mean(claims == 0, na.rm = TRUE) - exp(-mean(claims, na.rm = TRUE)),
+    `Maximum` = max(claims, na.rm = TRUE)
+  ) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "Summary",
+    values_to = "Value"
+  )
+
+claims_summary |>
+  fmt_table() |>
+  print_as_dt()
+```
+
+## **`Python` Code**
+
+``` python
+y_train_eda = training_data["claims"]
+
+claims_summary = pd.Series({
+    "Number of observations": len(y_train_eda),
+    "Number of zeros": int((y_train_eda == 0).sum()),
+    "Proportion of zeros": (y_train_eda == 0).mean(),
+    "Sample mean": y_train_eda.mean(),
+    "Sample variance": y_train_eda.var(ddof=1),
+    "Variance-to-mean ratio": y_train_eda.var(ddof=1) / y_train_eda.mean(),
+    "Poisson expected zero rate": np.exp(-y_train_eda.mean()),
+    "Excess zero rate": (y_train_eda == 0).mean() - np.exp(-y_train_eda.mean()),
+    "Maximum": y_train_eda.max()
+}).reset_index()
+claims_summary.columns = ["Summary", "Value"]
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-claims-summary-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Summary of the insurance-claims response in the canonical training data using R."
+
+if (exists("claims_summary")) {
+  claims_summary |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Claims summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python claims-summary-py-run}
+#| echo: false
+#| results: hide
+
+if "training_data" in globals() and len(training_data) > 0:
+    y_train_eda = training_data["claims"]
+
+    claims_summary_py = pd.Series({
+        "Number of observations": len(y_train_eda),
+        "Number of zeros": int((y_train_eda == 0).sum()),
+        "Proportion of zeros": (y_train_eda == 0).mean(),
+        "Sample mean": y_train_eda.mean(),
+        "Sample variance": y_train_eda.var(ddof=1),
+        "Variance-to-mean ratio": y_train_eda.var(ddof=1) / y_train_eda.mean(),
+        "Poisson expected zero rate": np.exp(-y_train_eda.mean()),
+        "Excess zero rate": (y_train_eda == 0).mean() - np.exp(-y_train_eda.mean()),
+        "Maximum": y_train_eda.max()
+    }).reset_index()
+    claims_summary_py.columns = ["Summary", "Value"]
+```
+
+```{r tbl-claims-summary-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Summary of the insurance-claims response in the canonical training data using Python."
+
+if (reticulate::py_eval("'claims_summary_py' in globals()", convert = TRUE)) {
+  claims_summary_py_r <- py_df_to_tibble("claims_summary_py")
+
+  if (nrow(claims_summary_py_r) > 0) {
+    claims_summary_py_r |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Claims summary is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = "Claims summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+This table formalises the visual insight from @fig-claims-distribution-r. In the training data, the sample mean is **`r zip_stat("sample_mean")`**, the sample variance is **`r zip_stat("sample_variance")`**, and the variance-to-mean ratio is **`r zip_stat("variance_to_mean")`**. A Poisson distribution with the same mean would imply an expected zero rate of about **`r zip_stat("poisson_zero_rate")`**, but the observed zero rate is **`r zip_stat("observed_zero_rate")`**. The difference, **`r zip_stat("excess_zero_rate")`**, is a simple empirical measure of excess zeros.
+
+### Zero claims versus nonzero claims
+
+The next comparison keeps the count response intact, but splits the training data into observations with zero claims and observations with at least one claim. This table is especially useful because ZIP regression is motivated by the possibility that the zero and count-generating parts of the data behave differently.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+zero_group_summary <- train_data |>
+  group_by(has_claim) |>
+  summarise(
+    n = n(),
+    mean_driver_age = mean(driver_age, na.rm = TRUE),
+    mean_annual_mileage = mean(annual_mileage, na.rm = TRUE),
+    mean_vehicle_age = mean(vehicle_age, na.rm = TRUE),
+    male_rate = mean(male, na.rm = TRUE),
+    urban_rate = mean(urban_area, na.rm = TRUE),
+    prior_claims_rate = mean(prior_claims, na.rm = TRUE),
+    mean_claims = mean(claims, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    claim_status = if_else(has_claim == 0, "Zero claims", "At least one claim")
+  ) |>
+  select(claim_status, everything(), -has_claim)
+
+zero_group_summary_display <- zero_group_summary |>
+  mutate(
+    claim_status = factor(
+      claim_status,
+      levels = c("Zero claims", "At least one claim")
+    )
+  ) |>
+  pivot_longer(
+    cols = -claim_status,
+    names_to = "Statistic",
+    values_to = "Value"
+  ) |>
+  mutate(
+    Statistic = recode(
+      Statistic,
+      n = "Number of observations",
+      mean_driver_age = "Mean driver age",
+      mean_annual_mileage = "Mean annual mileage",
+      mean_vehicle_age = "Mean vehicle age",
+      male_rate = "Male rate",
+      urban_rate = "Urban-area rate",
+      prior_claims_rate = "Prior-claims rate",
+      mean_claims = "Mean claims"
+    )
+  ) |>
+  pivot_wider(
+    names_from = claim_status,
+    values_from = Value
+  )
+
+zero_group_summary_display |>
+  fmt_table() |>
+  print_as_dt()
+```
+
+## **`Python` Code**
+
+``` python
+zero_group_summary = (
+    training_data.groupby("has_claim")
+    .agg(
+        n=("claims", "size"),
+        mean_driver_age=("driver_age", "mean"),
+        mean_annual_mileage=("annual_mileage", "mean"),
+        mean_vehicle_age=("vehicle_age", "mean"),
+        male_rate=("male", "mean"),
+        urban_rate=("urban_area", "mean"),
+        prior_claims_rate=("prior_claims", "mean"),
+        mean_claims=("claims", "mean")
+    )
+    .reset_index()
+)
+
+zero_group_summary["claim_status"] = zero_group_summary["has_claim"].map({
+    0: "Zero claims",
+    1: "At least one claim"
+})
+
+zero_group_summary = zero_group_summary.drop(columns="has_claim")
+
+statistic_labels = {
+    "n": "Number of observations",
+    "mean_driver_age": "Mean driver age",
+    "mean_annual_mileage": "Mean annual mileage",
+    "mean_vehicle_age": "Mean vehicle age",
+    "male_rate": "Male rate",
+    "urban_rate": "Urban-area rate",
+    "prior_claims_rate": "Prior-claims rate",
+    "mean_claims": "Mean claims",
+}
+
+statistic_order = list(statistic_labels.values())
+claim_status_order = ["Zero claims", "At least one claim"]
+
+zero_group_summary_display = zero_group_summary.melt(
+    id_vars="claim_status",
+    var_name="Statistic",
+    value_name="Value"
+)
+zero_group_summary_display["Statistic"] = zero_group_summary_display["Statistic"].map(statistic_labels)
+zero_group_summary_display["Statistic"] = pd.Categorical(
+    zero_group_summary_display["Statistic"],
+    categories=statistic_order,
+    ordered=True
+)
+zero_group_summary_display["claim_status"] = pd.Categorical(
+    zero_group_summary_display["claim_status"],
+    categories=claim_status_order,
+    ordered=True
+)
+
+zero_group_summary_display = (
+    zero_group_summary_display
+    .pivot(index="Statistic", columns="claim_status", values="Value")
+    .reset_index()
+)
+zero_group_summary_display.columns.name = None
+zero_group_summary_display = zero_group_summary_display[
+    ["Statistic", "Zero claims", "At least one claim"]
+]
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-zero-vs-nonzero-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "covariate comparison between zero-claim and nonzero-claim policyholders in the canonical training data using R."
+
+if (exists("zero_group_summary")) {
+  zero_group_summary_display <- zero_group_summary |>
+    mutate(
+      claim_status = factor(
+        claim_status,
+        levels = c("Zero claims", "At least one claim")
+      )
+    ) |>
+    pivot_longer(
+      cols = -claim_status,
+      names_to = "Statistic",
+      values_to = "Value"
+    ) |>
+    mutate(
+      Statistic = recode(
+        Statistic,
+        n = "Number of observations",
+        mean_driver_age = "Mean driver age",
+        mean_annual_mileage = "Mean annual mileage",
+        mean_vehicle_age = "Mean vehicle age",
+        male_rate = "Male rate",
+        urban_rate = "Urban-area rate",
+        prior_claims_rate = "Prior-claims rate",
+        mean_claims = "Mean claims"
+      )
+    ) |>
+    pivot_wider(
+      names_from = claim_status,
+      values_from = Value
+    )
+
+  zero_group_summary_display |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Zero-versus-nonzero summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python zero-vs-nonzero-py-run}
+#| echo: false
+#| results: hide
+
+if "training_data" in globals() and len(training_data) > 0:
+    zero_group_summary_py = (
+        training_data.groupby("has_claim")
+        .agg(
+            n=("claims", "size"),
+            mean_driver_age=("driver_age", "mean"),
+            mean_annual_mileage=("annual_mileage", "mean"),
+            mean_vehicle_age=("vehicle_age", "mean"),
+            male_rate=("male", "mean"),
+            urban_rate=("urban_area", "mean"),
+            prior_claims_rate=("prior_claims", "mean"),
+            mean_claims=("claims", "mean")
+        )
+        .reset_index()
+    )
+
+    zero_group_summary_py["claim_status"] = zero_group_summary_py["has_claim"].map({
+        0: "Zero claims",
+        1: "At least one claim"
+    })
+
+    zero_group_summary_py = zero_group_summary_py.drop(columns="has_claim")
+
+    statistic_labels = {
+        "n": "Number of observations",
+        "mean_driver_age": "Mean driver age",
+        "mean_annual_mileage": "Mean annual mileage",
+        "mean_vehicle_age": "Mean vehicle age",
+        "male_rate": "Male rate",
+        "urban_rate": "Urban-area rate",
+        "prior_claims_rate": "Prior-claims rate",
+        "mean_claims": "Mean claims",
+    }
+
+    statistic_order = list(statistic_labels.values())
+    claim_status_order = ["Zero claims", "At least one claim"]
+
+    zero_group_summary_py_display = zero_group_summary_py.melt(
+        id_vars="claim_status",
+        var_name="Statistic",
+        value_name="Value"
+    )
+    zero_group_summary_py_display["Statistic"] = zero_group_summary_py_display["Statistic"].map(statistic_labels)
+    zero_group_summary_py_display["Statistic"] = pd.Categorical(
+        zero_group_summary_py_display["Statistic"],
+        categories=statistic_order,
+        ordered=True
+    )
+    zero_group_summary_py_display["claim_status"] = pd.Categorical(
+        zero_group_summary_py_display["claim_status"],
+        categories=claim_status_order,
+        ordered=True
+    )
+
+    zero_group_summary_py_display = (
+        zero_group_summary_py_display
+        .pivot(index="Statistic", columns="claim_status", values="Value")
+        .reset_index()
+    )
+    zero_group_summary_py_display.columns.name = None
+    zero_group_summary_py_display = zero_group_summary_py_display[
+        ["Statistic", "Zero claims", "At least one claim"]
+    ]
+```
+
+```{r tbl-zero-vs-nonzero-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "covariate comparison between zero-claim and nonzero-claim policyholders in the canonical training data using Python."
+
+if (reticulate::py_eval("'zero_group_summary_py_display' in globals()", convert = TRUE)) {
+  zero_group_summary_py_display_r <- py_df_to_tibble("zero_group_summary_py_display")
+
+  if (nrow(zero_group_summary_py_display_r) > 0) {
+    zero_group_summary_py_display_r |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Zero-versus-nonzero summary is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = "Zero-versus-nonzero summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+The training-data EDA shows that the nonzero-claim group drives more miles on average: **`r zip_stat("mileage_nonzero")`** annual miles compared with **`r zip_stat("mileage_zero")`** for the zero-claim group. The prior-claims rate is also higher among policyholders with at least one claim during the study period: **`r zip_stat("prior_rate_nonzero")`** compared with **`r zip_stat("prior_rate_zero")`**. This does not prove a causal mechanism, but it suggests that mileage and prior claims may help distinguish the zero and nonzero portions of the response.
+
+### Binary covariates
+
+The binary covariates provide a compact way to inspect whether group membership is associated with different average counts and different zero rates in the training data.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+binary_cols <- c("male", "urban_area", "prior_claims")
+
+binary_summary <- purrr::map_dfr(binary_cols, function(col) {
+  train_data |>
+    group_by(value = .data[[col]]) |>
+    summarise(
+      n = n(),
+      mean_claims = mean(claims, na.rm = TRUE),
+      var_claims = var(claims, na.rm = TRUE),
+      zero_rate = mean(claims == 0, na.rm = TRUE),
+      nonzero_rate = mean(claims > 0, na.rm = TRUE),
+      max_claims = max(claims, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(variable = col, .before = 1)
+})
+
+binary_summary |>
+  fmt_table() |>
+  print_as_dt()
+```
+
+## **`Python` Code**
+
+``` python
+binary_cols = ["male", "urban_area", "prior_claims"]
+binary_summary = []
+
+for col in binary_cols:
+    summary = (
+        training_data.groupby(col)
+        .agg(
+            n=("claims", "size"),
+            mean_claims=("claims", "mean"),
+            var_claims=("claims", "var"),
+            zero_rate=("claims", lambda x: (x == 0).mean()),
+            nonzero_rate=("claims", lambda x: (x > 0).mean()),
+            max_claims=("claims", "max")
+        )
+        .reset_index()
+        .rename(columns={col: "value"})
+    )
+    summary.insert(0, "variable", col)
+    binary_summary.append(summary)
+
+binary_summary = pd.concat(binary_summary, ignore_index=True)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-binary-summary-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Claims summary by binary covariates in the canonical training data using R."
+
+if (exists("binary_summary")) {
+  binary_summary |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Binary-covariate summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python binary-summary-py-run}
+#| echo: false
+#| results: hide
+
+if "training_data" in globals() and len(training_data) > 0:
+    binary_cols = ["male", "urban_area", "prior_claims"]
+    binary_summary_py = []
+
+    for col in binary_cols:
+        summary = (
+            training_data.groupby(col)
+            .agg(
+                n=("claims", "size"),
+                mean_claims=("claims", "mean"),
+                var_claims=("claims", "var"),
+                zero_rate=("claims", lambda x: (x == 0).mean()),
+                nonzero_rate=("claims", lambda x: (x > 0).mean()),
+                max_claims=("claims", "max")
+            )
+            .reset_index()
+            .rename(columns={col: "value"})
+        )
+        summary.insert(0, "variable", col)
+        binary_summary_py.append(summary)
+
+    binary_summary_py = pd.concat(binary_summary_py, ignore_index=True)
+```
+
+```{r tbl-binary-summary-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Claims summary by binary covariates in the canonical training data using Python."
+
+if (reticulate::py_eval("'binary_summary_py' in globals()", convert = TRUE)) {
+  binary_summary_py_r <- py_df_to_tibble("binary_summary_py")
+
+  if (nrow(binary_summary_py_r) > 0) {
+    binary_summary_py_r |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Binary-covariate summary is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = "Binary-covariate summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+The strongest binary-covariate contrast in the training-data EDA is expected to remain `prior_claims`. Policyholders with prior claims have a mean of about **`r zip_stat("prior_mean_yes")`** claims and a zero rate of about **`r zip_stat("prior_zero_yes")`**; those without prior claims have a mean of about **`r zip_stat("prior_mean_no")`** claims and a zero rate of about **`r zip_stat("prior_zero_no")`**. By contrast, the `urban_area` groups differ by about **`r zip_stat("urban_mean_diff")`** in mean claims and **`r zip_stat("urban_zero_diff")`** in zero rate in this training set.
+
+### Continuous covariates and visual trends
+
+The continuous covariates can be inspected through scatterplots and binned summaries. Because the response is a discrete count, points stack horizontally at integer values.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+continuous_data <- train_data |>
+  select(claims, driver_age, annual_mileage, vehicle_age) |>
+  pivot_longer(
+    cols = c(driver_age, annual_mileage, vehicle_age),
+    names_to = "covariate",
+    values_to = "value"
+  )
+
+ggplot(continuous_data, aes(x = value, y = claims)) +
+  geom_point(alpha = 0.35) +
+  facet_wrap(~ covariate, scales = "free_x") +
+  labs(
+    x = "Covariate value",
+    y = "Number of claims"
+  ) +
+  zip_theme
+```
+
+## **`Python` Code**
+
+``` python
+continuous_cols = ["driver_age", "annual_mileage", "vehicle_age"]
+covariate_labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+}
+
+plt.close("all")
+
+fig, axes = plt.subplots(
+    nrows=1,
+    ncols=len(continuous_cols),
+    figsize=(14, 4.5),
+    sharey=True
+)
+
+for ax, col in zip(axes, continuous_cols):
+    plot_data = training_data[[col, "claims"]].copy()
+    plot_data[col] = pd.to_numeric(plot_data[col], errors="coerce")
+    plot_data["claims"] = pd.to_numeric(plot_data["claims"], errors="coerce")
+
+    sns.scatterplot(
+        data=plot_data,
+        x=col,
+        y="claims",
+        color=ZIP_POINT_COLOR,
+        alpha=0.35,
+        edgecolor=None,
+        s=28,
+        ax=ax
+    )
+
+    ax.set_title(covariate_labels[col])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Number of claims" if col == continuous_cols[0] else "")
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+plt.close(fig)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r fig-claims-vs-continuous-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Claims versus continuous covariates in the canonical training data using R."
+#| eval: !expr zip_has_train()
+
+continuous_data <- train_data |>
+  select(claims, driver_age, annual_mileage, vehicle_age) |>
+  pivot_longer(
+    cols = c(driver_age, annual_mileage, vehicle_age),
+    names_to = "covariate",
+    values_to = "value"
+  )
+
+ggplot(continuous_data, aes(x = value, y = claims)) +
+  geom_point(alpha = 0.35) +
+  facet_wrap(~ covariate, scales = "free_x") +
+  labs(
+    x = "Covariate value",
+    y = "Number of claims"
+  ) +
+  zip_theme
+```
+
+## **`Python` Output**
+
+```{python fig-claims-vs-continuous-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Claims versus continuous covariates in the canonical training data using Python."
+#| eval: !expr reticulate::py_eval("'training_data' in globals() and len(training_data) > 0 and response_var in training_data.columns", convert = TRUE)
+
+continuous_cols = ["driver_age", "annual_mileage", "vehicle_age"]
+covariate_labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+}
+
+plt.close("all")
+
+fig, axes = plt.subplots(
+    nrows=1,
+    ncols=len(continuous_cols),
+    figsize=(14, 4.5),
+    sharey=True
+)
+
+for ax, col in zip(axes, continuous_cols):
+    plot_data = training_data[[col, "claims"]].copy()
+    plot_data[col] = pd.to_numeric(plot_data[col], errors="coerce")
+    plot_data["claims"] = pd.to_numeric(plot_data["claims"], errors="coerce")
+
+    sns.scatterplot(
+        data=plot_data,
+        x=col,
+        y="claims",
+        color=ZIP_POINT_COLOR,
+        alpha=0.35,
+        edgecolor=None,
+        s=28,
+        ax=ax
+    )
+
+    ax.set_title(covariate_labels[col])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Number of claims" if col == continuous_cols[0] else "")
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+plt.close(fig)
+```
+:::
+
+As shown in @fig-claims-vs-continuous-r and @fig-claims-vs-continuous-py, annual mileage displays the clearest positive marginal pattern: higher-mileage policyholders are more likely to appear among the larger claim counts. Vehicle age shows a weaker positive pattern, while driver age has a more modest relationship.
+
+Binned summaries make these patterns easier to read.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+make_binned_summary <- function(df, variable, bins = 6) {
+  x <- df[[variable]]
+  bin_breaks <- seq(
+    min(x, na.rm = TRUE),
+    max(x, na.rm = TRUE),
+    length.out = bins + 1
+  )
+
+  df |>
+    mutate(
+      variable = .env$variable,
+      bin_id = cut(
+        .data[[variable]],
+        breaks = bin_breaks,
+        include.lowest = TRUE,
+        labels = FALSE
+      ),
+      bin = cut(
+        .data[[variable]],
+        breaks = bin_breaks,
+        include.lowest = TRUE,
+        dig.lab = 6
+      ),
+      bin_lower = bin_breaks[bin_id],
+      bin_upper = bin_breaks[bin_id + 1],
+      bin_midpoint = (bin_lower + bin_upper) / 2,
+      bin_width = bin_upper - bin_lower
+    ) |>
+    filter(!is.na(bin_id)) |>
+    group_by(
+      variable,
+      bin_id,
+      bin,
+      bin_lower,
+      bin_upper,
+      bin_midpoint,
+      bin_width
+    ) |>
+    summarise(
+      n = n(),
+      mean_claims = mean(claims, na.rm = TRUE),
+      zero_rate = mean(claims == 0, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    arrange(variable, bin_midpoint)
+}
+
+binned_summary <- bind_rows(
+  make_binned_summary(train_data, "driver_age"),
+  make_binned_summary(train_data, "annual_mileage"),
+  make_binned_summary(train_data, "vehicle_age")
+)
+
+binned_summary |>
+  select(variable, bin, bin_midpoint, n, mean_claims, zero_rate) |>
+  mutate(bin = as.character(bin)) |>
+  fmt_table() |>
+  print_as_dt()
+```
+
+## **`Python` Code**
+
+``` python
+continuous_cols = ["driver_age", "annual_mileage", "vehicle_age"]
+binned_summaries = []
+
+def fmt_axis_value(x):
+    if abs(x) >= 1000:
+        return f"{x:,.0f}"
+    if abs(x - round(x)) < 1e-8:
+        return f"{x:.0f}"
+    return f"{x:.1f}"
+
+def fmt_interval(left, right, first=False):
+    left_bracket = "[" if first else "("
+    return f"{left_bracket}{fmt_axis_value(left)}, {fmt_axis_value(right)}]"
+
+for col in continuous_cols:
+    temp = training_data.copy()
+    temp[col] = pd.to_numeric(temp[col], errors="coerce")
+    temp["claims"] = pd.to_numeric(temp["claims"], errors="coerce")
+
+    bin_edges = np.linspace(temp[col].min(), temp[col].max(), 7)
+
+    temp["bin_id"] = (
+        pd.cut(
+            temp[col],
+            bins=bin_edges,
+            include_lowest=True,
+            labels=False
+        )
+        .astype("Int64") + 1
+    )
+
+    summary = (
+        temp.dropna(subset=["bin_id"])
+        .groupby("bin_id", observed=True)
+        .agg(
+            n=("claims", "size"),
+            mean_claims=("claims", "mean"),
+            zero_rate=("claims", lambda x: (x == 0).mean())
+        )
+        .reset_index()
+    )
+
+    summary.insert(0, "variable", col)
+    summary["bin_lower"] = summary["bin_id"].apply(lambda i: bin_edges[int(i) - 1])
+    summary["bin_upper"] = summary["bin_id"].apply(lambda i: bin_edges[int(i)])
+    summary["bin_midpoint"] = (summary["bin_lower"] + summary["bin_upper"]) / 2
+    summary["bin_width"] = summary["bin_upper"] - summary["bin_lower"]
+
+    summary["bin"] = summary.apply(
+        lambda row: fmt_interval(
+            row["bin_lower"],
+            row["bin_upper"],
+            first=int(row["bin_id"]) == 1
+        ),
+        axis=1
+    )
+
+    binned_summaries.append(summary)
+
+binned_summary = pd.concat(binned_summaries, ignore_index=True)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-binned-summary-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Mean claims and zero rates by binned continuous covariates in the canonical training data using R."
+
+if (exists("binned_summary")) {
+  binned_summary |>
+    select(variable, bin, bin_midpoint, n, mean_claims, zero_rate) |>
+    mutate(bin = as.character(bin)) |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Binned summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python binned-summary-py-run}
+#| echo: false
+#| results: hide
+
+continuous_cols = ["driver_age", "annual_mileage", "vehicle_age"]
+binned_summaries = []
+
+def fmt_axis_value(x):
+    if abs(x) >= 1000:
+        return f"{x:,.0f}"
+    if abs(x - round(x)) < 1e-8:
+        return f"{x:.0f}"
+    return f"{x:.1f}"
+
+def fmt_interval(left, right, first=False):
+    left_bracket = "[" if first else "("
+    return f"{left_bracket}{fmt_axis_value(left)}, {fmt_axis_value(right)}]"
+
+for col in continuous_cols:
+    temp = training_data.copy()
+    temp[col] = pd.to_numeric(temp[col], errors="coerce")
+    temp["claims"] = pd.to_numeric(temp["claims"], errors="coerce")
+
+    bin_edges = np.linspace(temp[col].min(), temp[col].max(), 7)
+
+    temp["bin_id"] = (
+        pd.cut(
+            temp[col],
+            bins=bin_edges,
+            include_lowest=True,
+            labels=False
+        )
+        .astype("Int64") + 1
+    )
+
+    summary = (
+        temp.dropna(subset=["bin_id"])
+        .groupby("bin_id", observed=True)
+        .agg(
+            n=("claims", "size"),
+            mean_claims=("claims", "mean"),
+            zero_rate=("claims", lambda x: (x == 0).mean())
+        )
+        .reset_index()
+    )
+
+    summary.insert(0, "variable", col)
+    summary["bin_lower"] = summary["bin_id"].apply(lambda i: bin_edges[int(i) - 1])
+    summary["bin_upper"] = summary["bin_id"].apply(lambda i: bin_edges[int(i)])
+    summary["bin_midpoint"] = (summary["bin_lower"] + summary["bin_upper"]) / 2
+    summary["bin_width"] = summary["bin_upper"] - summary["bin_lower"]
+
+    summary["bin"] = summary.apply(
+        lambda row: fmt_interval(
+            row["bin_lower"],
+            row["bin_upper"],
+            first=int(row["bin_id"]) == 1
+        ),
+        axis=1
+    )
+
+    binned_summaries.append(summary)
+
+binned_summary_py = pd.concat(binned_summaries, ignore_index=True)
+```
+
+```{r tbl-binned-summary-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Mean claims and zero rates by binned continuous covariates in the canonical training data using Python."
+
+if (reticulate::py_eval("'binned_summary_py' in globals()", convert = TRUE)) {
+  binned_summary_py_r <- py_df_to_tibble("binned_summary_py")
+
+  if (nrow(binned_summary_py_r) > 0) {
+    binned_summary_py_r |>
+      select(variable, bin, bin_midpoint, n, mean_claims, zero_rate) |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Binned summary is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = "Binned summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+The binned EDA indicates that annual mileage is the most pronounced continuous covariate. In the training data, the mean number of claims rises from about **`r zip_stat("annual_low_mean")`** in the lowest mileage bin to about **`r zip_stat("annual_high_mean")`** in the highest mileage bin, while the zero-claim rate falls from about **`r zip_stat("annual_low_zero")`** to about **`r zip_stat("annual_high_zero")`**. This pattern supports including `annual_mileage` in both the count and zero-inflation components of the model.
+
+The following plot visualizes the same binned summaries from @tbl-binned-summary-r, making it easier to compare the direction of the mean-count and zero-rate patterns across the continuous covariates.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+binned_plot_data <- binned_summary |>
+  mutate(
+    variable = factor(
+      variable,
+      levels = c("driver_age", "annual_mileage", "vehicle_age"),
+      labels = c("Driver age", "Annual mileage", "Vehicle age")
+    )
+  ) |>
+  pivot_longer(
+    cols = c(mean_claims, zero_rate),
+    names_to = "metric",
+    values_to = "value"
+  ) |>
+  mutate(
+    metric = recode(
+      metric,
+      mean_claims = "Mean claims",
+      zero_rate = "Zero-claim rate"
+    ),
+    metric = factor(metric, levels = c("Mean claims", "Zero-claim rate"))
+  )
+
+midpoint_breaks <- sort(unique(binned_plot_data$bin_midpoint))
+
+ggplot(binned_plot_data) +
+  geom_rect(
+    aes(
+      xmin = bin_lower,
+      xmax = bin_upper,
+      ymin = 0,
+      ymax = value
+    ),
+    fill = "grey35",
+    color = "white",
+    linewidth = 0.25
+  ) +
+  facet_grid(metric ~ variable, scales = "free") +
+  scale_x_continuous(
+    breaks = function(lims) {
+      midpoint_breaks[midpoint_breaks >= lims[1] & midpoint_breaks <= lims[2]]
+    },
+    labels = function(x) {
+      format(signif(x, 4), big.mark = ",", scientific = FALSE, trim = TRUE)
+    },
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    x = "Class midpoint",
+    y = "Training-set summary"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14, vjust = 0.5),
+    strip.text = element_text(size = 12),
+    legend.position = "bottom",
+    panel.spacing.x = unit(0.45, "lines"),
+    panel.spacing.y = unit(0.45, "lines")
+  )
+```
+
+## **`Python` Code**
+
+``` python
+plt.close("all")
+
+binned_plot_data = binned_summary.copy()
+
+variable_order = ["driver_age", "annual_mileage", "vehicle_age"]
+variable_labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+}
+metric_order = ["Mean claims", "Zero-claim rate"]
+
+binned_plot_data = binned_plot_data.melt(
+    id_vars=[
+        "variable",
+        "bin",
+        "bin_id",
+        "bin_lower",
+        "bin_upper",
+        "bin_midpoint",
+        "bin_width"
+    ],
+    value_vars=["mean_claims", "zero_rate"],
+    var_name="metric",
+    value_name="value"
+)
+
+binned_plot_data["metric"] = binned_plot_data["metric"].map({
+    "mean_claims": "Mean claims",
+    "zero_rate": "Zero-claim rate"
+})
+
+fig, axes = plt.subplots(
+    nrows=len(metric_order),
+    ncols=len(variable_order),
+    figsize=ZIP_WIDE_FIGSIZE,
+    sharey=False
+)
+
+for row_idx, metric in enumerate(metric_order):
+    for col_idx, variable in enumerate(variable_order):
+        ax = axes[row_idx, col_idx]
+
+        plot_data = (
+            binned_plot_data[
+                (binned_plot_data["metric"] == metric)
+                & (binned_plot_data["variable"] == variable)
+            ]
+            .sort_values("bin_midpoint")
+            .copy()
+        )
+
+        ax.bar(
+            x=plot_data["bin_midpoint"],
+            height=plot_data["value"],
+            width=plot_data["bin_width"] * 0.95,
+            align="center",
+            color=ZIP_BAR_COLOR,
+            edgecolor="white",
+            linewidth=0.25
+        )
+
+        ax.set_xticks(plot_data["bin_midpoint"])
+        ax.set_xticklabels(
+            [fmt_axis_value(x) for x in plot_data["bin_midpoint"]],
+            rotation=45,
+            ha="right"
+        )
+
+        ax.set_xlim(
+            plot_data["bin_lower"].min(),
+            plot_data["bin_upper"].max()
+        )
+
+        ax.set_title(f"{metric} | {variable_labels[variable]}")
+        ax.set_xlabel("Class midpoint" if row_idx == len(metric_order) - 1 else "")
+        ax.set_ylabel("Training-set summary" if col_idx == 0 else "")
+
+        zip_clean_axis(ax)
+
+plt.subplots_adjust(wspace=0.22, hspace=0.55)
+plt.tight_layout()
+plt.show()
+plt.close(fig)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r fig-binned-trends-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Binned mean claims and zero-claim rates for continuous covariates in the canonical training data using R."
+#| fig.width: 14
+#| fig.height: 8
+#| eval: !expr exists("binned_summary") && nrow(binned_summary) > 0
+
+binned_plot_data <- binned_summary |>
+  mutate(
+    variable = factor(
+      variable,
+      levels = c("driver_age", "annual_mileage", "vehicle_age"),
+      labels = c("Driver age", "Annual mileage", "Vehicle age")
+    )
+  ) |>
+  pivot_longer(
+    cols = c(mean_claims, zero_rate),
+    names_to = "metric",
+    values_to = "value"
+  ) |>
+  mutate(
+    metric = recode(
+      metric,
+      mean_claims = "Mean claims",
+      zero_rate = "Zero-claim rate"
+    ),
+    metric = factor(metric, levels = c("Mean claims", "Zero-claim rate"))
+  )
+
+midpoint_breaks <- sort(unique(binned_plot_data$bin_midpoint))
+
+ggplot(binned_plot_data) +
+  geom_rect(
+    aes(
+      xmin = bin_lower,
+      xmax = bin_upper,
+      ymin = 0,
+      ymax = value
+    ),
+    fill = "grey35",
+    color = "white",
+    linewidth = 0.25
+  ) +
+  facet_grid(metric ~ variable, scales = "free") +
+  scale_x_continuous(
+    breaks = function(lims) {
+      midpoint_breaks[midpoint_breaks >= lims[1] & midpoint_breaks <= lims[2]]
+    },
+    labels = function(x) {
+      format(signif(x, 4), big.mark = ",", scientific = FALSE, trim = TRUE)
+    },
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    x = "Class midpoint",
+    y = "Training-set summary"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14, vjust = 0.5),
+    strip.text = element_text(size = 12),
+    legend.position = "bottom",
+    panel.spacing.x = unit(0.45, "lines"),
+    panel.spacing.y = unit(0.45, "lines")
+  )
+```
+
+## **`Python` Output**
+
+```{python fig-binned-trends-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Binned mean claims and zero-claim rates for continuous covariates in the canonical training data using Python."
+#| eval: !expr reticulate::py_eval("'binned_summary_py' in globals() and len(binned_summary_py) > 0", convert = TRUE)
+
+plt.close("all")
+
+binned_plot_data = binned_summary_py.copy()
+
+variable_order = ["driver_age", "annual_mileage", "vehicle_age"]
+variable_labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+}
+metric_order = ["Mean claims", "Zero-claim rate"]
+
+binned_plot_data = binned_plot_data.melt(
+    id_vars=[
+        "variable",
+        "bin",
+        "bin_id",
+        "bin_lower",
+        "bin_upper",
+        "bin_midpoint",
+        "bin_width"
+    ],
+    value_vars=["mean_claims", "zero_rate"],
+    var_name="metric",
+    value_name="value"
+)
+
+binned_plot_data["metric"] = binned_plot_data["metric"].map({
+    "mean_claims": "Mean claims",
+    "zero_rate": "Zero-claim rate"
+})
+
+fig, axes = plt.subplots(
+    nrows=len(metric_order),
+    ncols=len(variable_order),
+    figsize=ZIP_WIDE_FIGSIZE,
+    sharey=False
+)
+
+for row_idx, metric in enumerate(metric_order):
+    for col_idx, variable in enumerate(variable_order):
+        ax = axes[row_idx, col_idx]
+
+        plot_data = (
+            binned_plot_data[
+                (binned_plot_data["metric"] == metric)
+                & (binned_plot_data["variable"] == variable)
+            ]
+            .sort_values("bin_midpoint")
+            .copy()
+        )
+
+        ax.bar(
+            x=plot_data["bin_midpoint"],
+            height=plot_data["value"],
+            width=plot_data["bin_width"] * 0.95,
+            align="center",
+            color=ZIP_BAR_COLOR,
+            edgecolor="white",
+            linewidth=0.25
+        )
+
+        ax.set_xticks(plot_data["bin_midpoint"])
+        ax.set_xticklabels(
+            [fmt_axis_value(x) for x in plot_data["bin_midpoint"]],
+            rotation=45,
+            ha="right"
+        )
+
+        ax.set_xlim(
+            plot_data["bin_lower"].min(),
+            plot_data["bin_upper"].max()
+        )
+
+        ax.set_title(f"{metric} | {variable_labels[variable]}")
+        ax.set_xlabel("Class midpoint" if row_idx == len(metric_order) - 1 else "")
+        ax.set_ylabel("Training-set summary" if col_idx == 0 else "")
+
+        zip_clean_axis(ax)
+
+plt.subplots_adjust(wspace=0.22, hspace=0.55)
+plt.tight_layout()
+plt.show()
+plt.close(fig)
+```
+:::
+
+### Correlation summary
+
+The final EDA table gives a compact numerical summary of the marginal associations between each covariate, the original count response, and the binary `has_claim` indicator.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+correlation_summary <- train_data |>
+  select(driver_age, annual_mileage, vehicle_age, male, urban_area, prior_claims, claims, has_claim) |>
+  summarise(across(
+    c(driver_age, annual_mileage, vehicle_age, male, urban_area, prior_claims),
+    list(
+      corr_with_claims = ~ cor(.x, claims),
+      corr_with_has_claim = ~ cor(.x, has_claim)
+    ),
+    .names = "{.col}_{.fn}"
+  )) |>
+  pivot_longer(
+    cols = everything(),
+    names_to = c("variable", ".value"),
+    names_pattern = "(.*)_(corr_with_.*)"
+  )
+
+correlation_summary |>
+  fmt_table() |>
+  print_as_dt()
+```
+
+## **`Python` Code**
+
+``` python
+corr = training_data[[
+    "driver_age", "annual_mileage", "vehicle_age", "male",
+    "urban_area", "prior_claims", "claims", "has_claim"
+]].corr()
+
+correlation_summary = pd.DataFrame({
+    "corr_with_claims": corr["claims"].drop(["claims", "has_claim"]),
+    "corr_with_has_claim": corr["has_claim"].drop(["claims", "has_claim"])
+}).reset_index(names="variable")
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-correlation-summary-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Correlation of covariates with claims and has_claim in the canonical training data using R."
+
+if (exists("correlation_summary")) {
+  correlation_summary |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Correlation summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python correlation-summary-py-run}
+#| echo: false
+#| results: hide
+
+if "training_data" in globals() and len(training_data) > 0:
+    corr = training_data[[
+        "driver_age", "annual_mileage", "vehicle_age", "male",
+        "urban_area", "prior_claims", "claims", "has_claim"
+    ]].corr()
+
+    correlation_summary_py = pd.DataFrame({
+        "corr_with_claims": corr["claims"].drop(["claims", "has_claim"]),
+        "corr_with_has_claim": corr["has_claim"].drop(["claims", "has_claim"])
+    }).reset_index(names="variable")
+```
+
+```{r tbl-correlation-summary-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Correlation of covariates with claims and has_claim in the canonical training data using Python."
+
+if (reticulate::py_eval("'correlation_summary_py' in globals()", convert = TRUE)) {
+  correlation_summary_py_r <- py_df_to_tibble("correlation_summary_py")
+
+  if (nrow(correlation_summary_py_r) > 0) {
+    correlation_summary_py_r |>
+      fmt_table() |>
+      print_as_dt()
+  } else {
+    tibble(Message = "Correlation summary is empty.") |>
+      print_as_dt()
+  }
+} else {
+  tibble(Message = "Correlation summary is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+The correlation summary reinforces the graphical EDA. In the training data, `annual_mileage` has the strongest correlation with `claims`, about **`r zip_stat("corr_annual_claims")`**, and with `has_claim`, about **`r zip_stat("corr_annual_has_claim")`**. `prior_claims` is also notable, with correlations of about **`r zip_stat("corr_prior_claims")`** with `claims` and **`r zip_stat("corr_prior_has_claim")`** with `has_claim`. These correlations do not establish causality, but they help explain why these covariates are sensible choices for the model components.
