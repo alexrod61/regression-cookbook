@@ -2343,7 +2343,7 @@ The correlation summary reinforces the graphical EDA. In the training data, `ann
 The exploratory analysis points to two connected conclusions. First, `claims` is a count response with a large concentration at zero. Second, the covariates do not all show the same marginal relationship with the response, so the later ZIP model should be allowed to separate the zero-generating mechanism from the count-generating mechanism.
 
 | **EDA Theme** | **TLDR** | **Dynamic Evidence** | **Modelling Implication** |
-|:------------------:|:----------------|:----------------|:----------------|
+|:------------------:|:-----------------|:-----------------|:-----------------|
 | Response shape | The response is heavily concentrated at zero, with a smaller right tail of positive claim counts. | There are **`r zip_stat("zero_n")`** zero-claim observations out of **`r zip_stat("train_n")`** training observations; the largest observed count is **`r zip_stat("max_claims")`**. | A count model is needed, but the zero pile-up should be modelled explicitly. |
 | Mean - variance pattern | The response is more variable than a simple equidispersed Poisson pattern would suggest. | The sample mean is **`r zip_stat("sample_mean")`**, the sample variance is **`r zip_stat("sample_variance")`**, and the variance-to-mean ratio is **`r zip_stat("variance_to_mean")`**. | A one-process Classical Poisson model may be too restrictive. |
 | Zero inflation check | The observed zero rate is larger than the zero rate implied by a Poisson model with the same mean. | The observed zero rate is **`r zip_stat("observed_zero_rate")`**, while the Poisson-expected zero rate is **`r zip_stat("poisson_zero_rate")`**; the excess zero rate is **`r zip_stat("excess_zero_rate")`**. | This is direct empirical motivation for a zero-inflated model. |
@@ -2376,6 +2376,1555 @@ where $Y_i$ is the number of claims filed during the observation window. The can
 
 Using this notation, a compact covariate vector for the full set of candidate regressors is
 
-$$\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right),$$
+$$
+\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right)
+$$
 
-where the leading $1$ represents the intercept. In the ZIP model, this covariate vector can be used to build two linked regression components: a count component for the expected number of claims among policyholders in the count-generating process, and a zero-inflation component for the probability of belonging to the extra-zero group. Later sections can choose whether both components use the same covariates or whether one component uses a smaller, substantively motivated subset.
+Where the leading $1$ represents the intercept. In the ZIP model, this covariate vector can be used to build two linked regression components: a count component for the expected number of claims among policyholders in the count-generating process, and a zero-inflation component for the probability of belonging to the extra-zero group. Later sections can choose whether both components use the same covariates or whether one component uses a smaller, substantively motivated subset.
+
+## Comparing to Other Approaches
+
+Before introducing the full Zero-Inflated Poisson (ZIP) model, it is useful to compare it with two simpler approaches that each capture only part of the modelling problem.
+
+First, we can turn the count response into a binary response. Define $H_i = \mathbb{I}(Y_i > 0)$ where $Y_i$ is the number of claims for policyholder $i$. A Binary Logistic Regression model for `has_claim` then describes whether a policyholder filed at least one claim, but it does not distinguish between one claim and several claims.
+
+Second, we can keep the original count response and fit a Classical Poisson Regression model for `claims`. This model describes the expected number of claims directly, but it treats all observations as coming from a single count-generating process. In particular, it ties the zero rate to the same mean parameter that governs the positive counts.
+
+These two models are not replacements for ZIP regression in this chapter. Instead, they give us a useful comparison point: Logistic Regression focuses on the zero-versus-nonzero distinction, while Classical Poisson Regression focuses on the count scale. ZIP regression combines these ideas by allowing a separate zero-generating component and a count-generating component.
+
+
+```{r lr-cpr-setup-r, include=FALSE}
+if (zip_has_train()) {
+  train_data <- train_data |>
+    mutate(
+      has_claim = as.integer(claims > 0),
+      male = as.integer(male),
+      urban_area = as.integer(urban_area),
+      prior_claims = as.integer(prior_claims)
+    )
+
+  zip_model_covariates <- c(
+    "driver_age",
+    "annual_mileage",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims"
+  )
+
+  zip_covariate_labels <- c(
+    driver_age = "Driver age",
+    annual_mileage = "Annual mileage",
+    vehicle_age = "Vehicle age",
+    male = "Male indicator",
+    urban_area = "Urban-area indicator",
+    prior_claims = "Prior-claims indicator"
+  )
+
+  zip_binary_covariates <- c("male", "urban_area", "prior_claims")
+  zip_continuous_covariates <- c("driver_age", "annual_mileage", "vehicle_age")
+
+  zip_mode_binary <- function(x) {
+    as.integer(names(sort(table(x), decreasing = TRUE))[1])
+  }
+
+  zip_reference_values <- tibble(
+    driver_age = median(train_data$driver_age, na.rm = TRUE),
+    annual_mileage = median(train_data$annual_mileage, na.rm = TRUE),
+    vehicle_age = median(train_data$vehicle_age, na.rm = TRUE),
+    male = zip_mode_binary(train_data$male),
+    urban_area = zip_mode_binary(train_data$urban_area),
+    prior_claims = zip_mode_binary(train_data$prior_claims)
+  )
+
+  zip_interpret_scales <- tibble(
+    term = zip_model_covariates,
+    comparison = c(
+      "+10 years of driver age",
+      "+10,000 km of annual mileage",
+      "+5 years of vehicle age",
+      "male ($1$) versus female ($0$)",
+      "urban ($1$) versus rural ($0$)",
+      "prior claims ($1$) versus none ($0$)"
+    ),
+    change = c(10, 10000, 5, 1, 1, 1)
+  )
+
+  lr_model_r <- glm(
+    has_claim ~ driver_age + annual_mileage + vehicle_age + male + urban_area + prior_claims,
+    data = train_data,
+    family = binomial(link = "logit")
+  )
+
+  cpr_model_r <- glm(
+    claims ~ driver_age + annual_mileage + vehicle_age + male + urban_area + prior_claims,
+    data = train_data,
+    family = poisson(link = "log")
+  )
+
+  lr_coef_r <- broom::tidy(lr_model_r) |>
+    mutate(model = "Binary Logistic Regression", .before = 1)
+
+  cpr_coef_r <- broom::tidy(cpr_model_r) |>
+    mutate(model = "Classical Poisson Regression", .before = 1)
+
+  make_scaled_effects <- function(model, scale_tbl, effect_name) {
+    coef_tbl <- broom::tidy(model)
+    ci_tbl <- as.data.frame(confint.default(model, level = 0.95)) |>
+      tibble::rownames_to_column("term") |>
+      rename(conf.low = `2.5 %`, conf.high = `97.5 %`)
+
+    coef_tbl |>
+      left_join(ci_tbl, by = "term") |>
+      inner_join(scale_tbl, by = "term") |>
+      transmute(
+        covariate = term,
+        comparison,
+        log_scale_change = estimate * change,
+        !!effect_name := exp(estimate * change),
+        lower_95 = exp(conf.low * change),
+        upper_95 = exp(conf.high * change),
+        percent_change = 100 * (exp(estimate * change) - 1),
+        p_value = p.value
+      )
+  }
+
+  lr_effects_r <- make_scaled_effects(
+    lr_model_r,
+    zip_interpret_scales,
+    "odds_ratio"
+  )
+
+  cpr_effects_r <- make_scaled_effects(
+    cpr_model_r,
+    zip_interpret_scales,
+    "rate_ratio"
+  )
+
+  make_reference_grid <- function(df, focal, values) {
+    grid <- zip_reference_values[rep(1, length(values)), ]
+    grid[[focal]] <- values
+    grid
+  }
+
+  make_fitted_curve <- function(model, df, focal, outcome_type) {
+    if (focal %in% zip_binary_covariates) {
+      values <- c(0, 1)
+    } else {
+      values <- seq(
+        min(df[[focal]], na.rm = TRUE),
+        max(df[[focal]], na.rm = TRUE),
+        length.out = 100
+      )
+    }
+
+    new_data <- make_reference_grid(df, focal, values)
+
+    tibble(
+      covariate = focal,
+      covariate_label = unname(zip_covariate_labels[focal]),
+      x = values,
+      fitted = predict(model, newdata = new_data, type = "response"),
+      outcome_type = outcome_type
+    )
+  }
+
+  make_observed_continuous <- function(df, focal, outcome, bins = 6) {
+    breaks <- seq(
+      min(df[[focal]], na.rm = TRUE),
+      max(df[[focal]], na.rm = TRUE),
+      length.out = bins + 1
+    )
+
+    df |>
+      mutate(
+        bin_id = cut(
+          .data[[focal]],
+          breaks = breaks,
+          include.lowest = TRUE,
+          labels = FALSE
+        )
+      ) |>
+      filter(!is.na(bin_id)) |>
+      group_by(bin_id) |>
+      summarise(
+        x = mean(.data[[focal]], na.rm = TRUE),
+        observed = mean(.data[[outcome]], na.rm = TRUE),
+        n = n(),
+        .groups = "drop"
+      ) |>
+      mutate(
+        covariate = focal,
+        covariate_label = unname(zip_covariate_labels[focal])
+      )
+  }
+
+  make_observed_binary <- function(df, focal, outcome) {
+    df |>
+      group_by(x = .data[[focal]]) |>
+      summarise(
+        observed = mean(.data[[outcome]], na.rm = TRUE),
+        n = n(),
+        .groups = "drop"
+      ) |>
+      mutate(
+        covariate = focal,
+        covariate_label = unname(zip_covariate_labels[focal])
+      )
+  }
+
+  lr_fitted_r <- purrr::map_dfr(
+    zip_model_covariates,
+    ~ make_fitted_curve(lr_model_r, train_data, .x, "Fitted probability")
+  )
+
+  cpr_fitted_r <- purrr::map_dfr(
+    zip_model_covariates,
+    ~ make_fitted_curve(cpr_model_r, train_data, .x, "Fitted mean")
+  )
+
+  lr_observed_r <- bind_rows(
+    purrr::map_dfr(
+      zip_continuous_covariates,
+      ~ make_observed_continuous(train_data, .x, "has_claim")
+    ),
+    purrr::map_dfr(
+      zip_binary_covariates,
+      ~ make_observed_binary(train_data, .x, "has_claim")
+    )
+  )
+
+  cpr_observed_r <- bind_rows(
+    purrr::map_dfr(
+      zip_continuous_covariates,
+      ~ make_observed_continuous(train_data, .x, "claims")
+    ),
+    purrr::map_dfr(
+      zip_binary_covariates,
+      ~ make_observed_binary(train_data, .x, "claims")
+    )
+  )
+}
+```
+
+```{python lr-cpr-setup-py, include=FALSE}
+if "training_data" in globals() and len(training_data) > 0:
+    training_data = training_data.copy()
+
+    zip_model_covariates_py = [
+        "driver_age",
+        "annual_mileage",
+        "vehicle_age",
+        "male",
+        "urban_area",
+        "prior_claims",
+    ]
+
+    # Create the binary response explicitly.
+    training_data["claims"] = pd.to_numeric(
+        training_data["claims"],
+        errors="coerce"
+    )
+    training_data["has_claim"] = (training_data["claims"] > 0).astype(int)
+
+    # Force all model columns to ordinary numeric values.
+    model_cols = zip_model_covariates_py + ["claims", "has_claim"]
+
+    for col in model_cols:
+        training_data[col] = pd.to_numeric(
+            training_data[col],
+            errors="coerce"
+        )
+
+    training_data = training_data.dropna(subset=model_cols).copy()
+
+    # IMPORTANT:
+    # statsmodels can fail when pandas nullable Int64 columns are passed through
+    # reticulate, because they may arrive as object dtype.
+    # Use ordinary float arrays/data frames for the design matrix.
+    X_train_zip = sm.add_constant(
+        training_data[zip_model_covariates_py].astype(float),
+        has_constant="add"
+    )
+
+    H_train_zip = training_data["has_claim"].astype(int)
+    Y_train_zip = training_data["claims"].astype(float)
+
+    lr_model_py = sm.Logit(H_train_zip, X_train_zip).fit(disp=False)
+
+    cpr_model_py = sm.GLM(
+        Y_train_zip,
+        X_train_zip,
+        family=sm.families.Poisson()
+    ).fit()
+
+    def model_table(model, model_name):
+        ci = pd.DataFrame(
+            np.asarray(model.conf_int()),
+            index=model.params.index,
+            columns=["conf_low", "conf_high"]
+        )
+
+        out = pd.DataFrame({
+            "model": model_name,
+            "term": model.params.index,
+            "estimate": model.params.values,
+            "std.error": model.bse.values,
+            "statistic": model.tvalues.values,
+            "p.value": model.pvalues.values,
+            "conf.low": ci["conf_low"].values,
+            "conf.high": ci["conf_high"].values,
+        })
+
+        return out
+
+    lr_coef_py = model_table(
+        lr_model_py,
+        "Binary Logistic Regression"
+    )
+
+    cpr_coef_py = model_table(
+        cpr_model_py,
+        "Classical Poisson Regression"
+    )
+
+    scale_rows_py = pd.DataFrame({
+        "term": zip_model_covariates_py,
+        "comparison": [
+            "+10 years of driver age",
+            "+10,000 km of annual mileage",
+            "+5 years of vehicle age",
+            "male ($1$) versus female ($0$)",
+            "urban ($1$) versus rural ($0$)",
+            "prior claims ($1$) versus none ($0$)",
+        ],
+        "change": [10, 10000, 5, 1, 1, 1],
+    })
+
+    def scaled_effects(model, effect_name):
+        ci = pd.DataFrame(
+            np.asarray(model.conf_int()),
+            index=model.params.index,
+            columns=["conf_low", "conf_high"]
+        )
+
+        coef = pd.DataFrame({
+            "term": model.params.index,
+            "estimate": model.params.values,
+            "conf.low": ci["conf_low"].values,
+            "conf.high": ci["conf_high"].values,
+            "p_value": model.pvalues.values,
+        })
+
+        out = coef.merge(scale_rows_py, on="term", how="inner")
+        out["log_scale_change"] = out["estimate"] * out["change"]
+        out[effect_name] = np.exp(out["log_scale_change"])
+        out["lower_95"] = np.exp(out["conf.low"] * out["change"])
+        out["upper_95"] = np.exp(out["conf.high"] * out["change"])
+        out["percent_change"] = 100 * (out[effect_name] - 1)
+
+        return out[[
+            "term",
+            "comparison",
+            "log_scale_change",
+            effect_name,
+            "lower_95",
+            "upper_95",
+            "percent_change",
+            "p_value",
+        ]].rename(columns={"term": "covariate"})
+
+    lr_effects_py = scaled_effects(lr_model_py, "odds_ratio")
+    cpr_effects_py = scaled_effects(cpr_model_py, "rate_ratio")
+```
+
+### Binary Logistic Regression for `has_claim`
+
+#### Model definition
+
+The Logistic Regression alternative uses the derived binary response 
+
+$$
+H_i = \begin{cases} 1, & \text{if policyholder } i \text{ filed at least one claim}, \\ 0, & \text{if policyholder } i \text{ filed no claims}. \end{cases}
+$$
+
+The probabilistic assumption is $H_i \mid \mathbf{x}_i \sim \text{Bernoulli}(\pi_i),$ where $\pi_i = P(H_i = 1 \mid \mathbf{x}_i)$ is the probability that policyholder $i$ filed at least one claim.
+
+The link function is the logit link: $\text{logit}(\pi_i) = \log\left(\frac{\pi_i}{1 - \pi_i}\right).$
+
+Using the six covariates from the running example, the systematic component is 
+
+$$
+\log\left(\frac{\pi_i}{1 - \pi_i}\right)
+=
+\alpha_0
++
+\alpha_1 x_{1,i}
++
+\alpha_2 x_{2,i}
++
+\alpha_3 x_{3,i}
++
+\alpha_4 x_{4,i}
++
+\alpha_5 x_{5,i}
++
+\alpha_6 x_{6,i}
+$$
+
+Where we have $7$ different $\alpha_j$ coefficients, which change linearly the log-odds of having at least one claim versus not having it. In our case, $\alpha_0$ stands for the "base" log-odds for having at least one claim, while all other covariates are $0$, while the remaining $\alpha_j, \text{ } j \in \{1, 2, \dots, 6\}$ stand for the increase in the log-odds for each unit change in the corresponding $x_{j, i}$ regressor.
+
+In this formulation, the model describes the probability of at least one claim. It intentionally ignores the difference between one claim and multiple claims.
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on the connection to Chapter 8!
+:::
+
+::: Heads-up-container
+The logit link, Bernoulli assumption, and odds-ratio interpretation are introduced in @sec-binary-logistic. Here we use them only as a comparison point for the ZIP model, not as a full reintroduction of Binary Logistic Regression.
+:::
+:::::
+
+#### Fitting the model
+
+For this comparison, we fit the model using the canonical training data created earlier in the chapter. The binary response `has_claim` is created explicitly in both languages so that the transformation from `claims` to $H_i$ is visible.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+train_data <- train_data |>
+  mutate(has_claim = as.integer(claims > 0))
+
+lr_model_r <- glm(
+  has_claim ~ driver_age + annual_mileage + vehicle_age + male + urban_area + prior_claims,
+  data = train_data,
+  family = binomial(link = "logit")
+)
+
+broom::tidy(lr_model_r)
+```
+
+## **`Python` Code**
+
+``` python
+training_data = training_data.copy()
+training_data["has_claim"] = (training_data["claims"] > 0).astype(int)
+
+covariates = [
+    "driver_age",
+    "annual_mileage",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims",
+]
+
+X = sm.add_constant(training_data[covariates], has_constant="add")
+H = training_data["has_claim"]
+
+lr_model_py = sm.Logit(H, X).fit(disp=False)
+
+lr_coef_py = pd.DataFrame({
+    "term": lr_model_py.params.index,
+    "estimate": lr_model_py.params.values,
+    "std.error": lr_model_py.bse.values,
+    "statistic": lr_model_py.tvalues.values,
+    "p.value": lr_model_py.pvalues.values,
+})
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-lr-fit-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Binary Logistic Regression coefficient table for the canonical training data using R."
+
+if (exists("lr_coef_r")) {
+  lr_coef_r |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Binary Logistic Regression output is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python lr-fit-py-run}
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+
+import pandas as pd
+import statsmodels.api as sm
+
+# Use the canonical R split if the Python object is not already available.
+if "training_data" not in globals():
+    training_data = r.train_data.copy()
+
+training_data = training_data.copy()
+training_data["has_claim"] = (training_data["claims"] > 0).astype(int)
+
+covariates = [
+    "driver_age",
+    "annual_mileage",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims",
+]
+
+for col in covariates + ["claims", "has_claim"]:
+    training_data[col] = pd.to_numeric(training_data[col], errors="coerce")
+
+training_data = training_data.dropna(subset=covariates + ["has_claim"]).copy()
+
+X = sm.add_constant(training_data[covariates].astype(float), has_constant="add")
+H = training_data["has_claim"].astype(int)
+
+lr_model_py = sm.Logit(H, X).fit(disp=False)
+
+lr_coef_py = pd.DataFrame({
+    "term": lr_model_py.params.index,
+    "estimate": lr_model_py.params.values,
+    "std.error": lr_model_py.bse.values,
+    "statistic": lr_model_py.tvalues.values,
+    "p.value": lr_model_py.pvalues.values,
+})
+```
+
+```{r tbl-lr-fit-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Binary Logistic Regression coefficient table for the canonical training data using Python."
+
+if (reticulate::py_eval("'lr_coef_py' in globals()", convert = TRUE)) {
+  py_df_to_tibble("lr_coef_py") |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Binary Logistic Regression output is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+The two outputs may not be formatted identically. `R` and `Python` use different summary conventions, and their numerical optimizers can differ in small implementation details. Because both chunks use the same canonical training split, the fitted coefficients should nevertheless be within similar ranges.
+
+#### Interpreting the coefficients
+
+The raw Logistic Regression coefficients are on the log-odds scale. To make them easier to read, the next table exponentiates scaled coefficient changes. The continuous covariates are rescaled to more meaningful comparisons: 10 years for `driver_age`, 10,000 km for `annual_mileage`, and 5 years for `vehicle_age`. Binary covariates are interpreted as the change from $0$ to $1$.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+zip_interpret_scales <- tibble(
+  term = c("driver_age", "annual_mileage", "vehicle_age", "male", "urban_area", "prior_claims"),
+  comparison = c(
+    "+10 years of driver age",
+    "+10,000 km of annual mileage",
+    "+5 years of vehicle age",
+    "male (1) versus female (0)",
+    "urban (1) versus rural (0)",
+    "prior claims (1) versus none (0)"
+  ),
+  change = c(10, 10000, 5, 1, 1, 1)
+)
+
+coef_tbl <- broom::tidy(lr_model_r)
+ci_tbl <- confint.default(lr_model_r) |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  rename(conf.low = `2.5 %`, conf.high = `97.5 %`)
+
+lr_effects_r <- coef_tbl |>
+  left_join(ci_tbl, by = "term") |>
+  inner_join(zip_interpret_scales, by = "term") |>
+  transmute(
+    covariate = term,
+    comparison,
+    log_scale_change = estimate * change,
+    odds_ratio = exp(estimate * change),
+    lower_95 = exp(conf.low * change),
+    upper_95 = exp(conf.high * change),
+    percent_change = 100 * (exp(estimate * change) - 1),
+    p_value = p.value
+  )
+```
+
+## **`Python` Code**
+
+``` python
+scale_rows = pd.DataFrame({
+    "term": covariates,
+    "comparison": [
+        "+10 years of driver age",
+        "+10,000 km of annual mileage",
+        "+5 years of vehicle age",
+        "male (1) versus female (0)",
+        "urban (1) versus rural (0)",
+        "prior claims (1) versus none (0)",
+    ],
+    "change": [10, 10000, 5, 1, 1, 1],
+})
+
+ci = lr_model_py.conf_int()
+ci.columns = ["conf.low", "conf.high"]
+coef = pd.DataFrame({
+    "term": lr_model_py.params.index,
+    "estimate": lr_model_py.params.values,
+    "conf.low": ci["conf.low"].values,
+    "conf.high": ci["conf.high"].values,
+    "p_value": lr_model_py.pvalues.values,
+})
+
+lr_effects_py = coef.merge(scale_rows, on="term", how="inner")
+lr_effects_py["log_scale_change"] = lr_effects_py["estimate"] * lr_effects_py["change"]
+lr_effects_py["odds_ratio"] = np.exp(lr_effects_py["log_scale_change"])
+lr_effects_py["lower_95"] = np.exp(lr_effects_py["conf.low"] * lr_effects_py["change"])
+lr_effects_py["upper_95"] = np.exp(lr_effects_py["conf.high"] * lr_effects_py["change"])
+lr_effects_py["percent_change"] = 100 * (lr_effects_py["odds_ratio"] - 1)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-lr-effects-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Scaled odds-ratio interpretation for the Binary Logistic Regression model using R."
+
+if (exists("lr_effects_r")) {
+  lr_effects_r |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Scaled Logistic Regression effects are unavailable until the model is fitted.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python lr-effects-py-run}
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
+# Recreate the Logistic Regression model if it is not already available.
+if "lr_model_py" not in globals():
+    if "training_data" not in globals():
+        training_data = r.train_data.copy()
+
+    training_data = training_data.copy()
+    training_data["has_claim"] = (training_data["claims"] > 0).astype(int)
+
+    covariates = [
+        "driver_age",
+        "annual_mileage",
+        "vehicle_age",
+        "male",
+        "urban_area",
+        "prior_claims",
+    ]
+
+    for col in covariates + ["claims", "has_claim"]:
+        training_data[col] = pd.to_numeric(training_data[col], errors="coerce")
+
+    training_data = training_data.dropna(subset=covariates + ["has_claim"]).copy()
+
+    X = sm.add_constant(training_data[covariates].astype(float), has_constant="add")
+    H = training_data["has_claim"].astype(int)
+
+    lr_model_py = sm.Logit(H, X).fit(disp=False)
+
+scale_rows = pd.DataFrame({
+    "term": [
+        "driver_age",
+        "annual_mileage",
+        "vehicle_age",
+        "male",
+        "urban_area",
+        "prior_claims",
+    ],
+    "comparison": [
+        "+10 years of driver age",
+        "+10,000 km of annual mileage",
+        "+5 years of vehicle age",
+        "male (1) versus female (0)",
+        "urban (1) versus rural (0)",
+        "prior claims (1) versus none (0)",
+    ],
+    "change": [10, 10000, 5, 1, 1, 1],
+})
+
+ci = pd.DataFrame(
+    np.asarray(lr_model_py.conf_int()),
+    index=lr_model_py.params.index,
+    columns=["conf.low", "conf.high"]
+)
+
+coef = pd.DataFrame({
+    "term": lr_model_py.params.index,
+    "estimate": lr_model_py.params.values,
+    "conf.low": ci["conf.low"].values,
+    "conf.high": ci["conf.high"].values,
+    "p_value": lr_model_py.pvalues.values,
+})
+
+lr_effects_py = coef.merge(scale_rows, on="term", how="inner")
+lr_effects_py["log_scale_change"] = lr_effects_py["estimate"] * lr_effects_py["change"]
+lr_effects_py["odds_ratio"] = np.exp(lr_effects_py["log_scale_change"])
+lr_effects_py["lower_95"] = np.exp(lr_effects_py["conf.low"] * lr_effects_py["change"])
+lr_effects_py["upper_95"] = np.exp(lr_effects_py["conf.high"] * lr_effects_py["change"])
+lr_effects_py["percent_change"] = 100 * (lr_effects_py["odds_ratio"] - 1)
+
+lr_effects_py = lr_effects_py[[
+    "term",
+    "comparison",
+    "log_scale_change",
+    "odds_ratio",
+    "lower_95",
+    "upper_95",
+    "percent_change",
+    "p_value",
+]].rename(columns={"term": "covariate"})
+```
+
+```{r tbl-lr-effects-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Scaled odds-ratio interpretation for the Binary Logistic Regression model using Python."
+
+if (reticulate::py_eval("'lr_effects_py' in globals()", convert = TRUE)) {
+  py_df_to_tibble("lr_effects_py") |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Scaled Logistic Regression effects are unavailable until the model is fitted.") |>
+    print_as_dt()
+}
+```
+:::
+
+An odds ratio greater than $1$ indicates higher odds of at least one claim for the stated comparison, holding the other covariates fixed. An odds ratio below $1$ indicates lower odds. These are odds-scale statements, not direct probability differences.
+
+#### Visualizing the fitted Logistic Regression patterns
+
+The next figures overlay empirical training-set summaries with fitted probabilities from the Logistic Regression model. For continuous covariates, the empirical points are binned averages. For binary covariates, the empirical points are group averages. The fitted curves or fitted line segments vary one covariate at a time while holding the remaining covariates at typical training-set values.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+# Fitted probabilities were computed by varying one covariate at a time
+# while holding the remaining covariates at typical training-set values.
+
+ggplot() +
+  geom_point(
+    data = lr_observed_r,
+    aes(x = x, y = observed),
+    alpha = 0.85,
+    size = 2
+  ) +
+  geom_line(
+    data = lr_fitted_r,
+    aes(x = x, y = fitted),
+    linewidth = 1.1
+  ) +
+  facet_wrap(~ covariate_label, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  labs(
+    x = "Covariate value",
+    y = "Probability of at least one claim"
+  ) +
+  zip_theme
+```
+
+## **`Python` Code**
+
+``` python
+# Fitted probabilities are computed by varying one covariate at a time
+# while holding the remaining covariates at typical training-set values.
+
+continuous_covariates = ["driver_age", "annual_mileage", "vehicle_age"]
+binary_covariates = ["male", "urban_area", "prior_claims"]
+labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+    "male": "Male indicator",
+    "urban_area": "Urban-area indicator",
+    "prior_claims": "Prior-claims indicator",
+}
+
+reference = {
+    "driver_age": training_data["driver_age"].median(),
+    "annual_mileage": training_data["annual_mileage"].median(),
+    "vehicle_age": training_data["vehicle_age"].median(),
+    "male": int(training_data["male"].mode().iloc[0]),
+    "urban_area": int(training_data["urban_area"].mode().iloc[0]),
+    "prior_claims": int(training_data["prior_claims"].mode().iloc[0]),
+}
+
+fig, axes = plt.subplots(2, 3, figsize=ZIP_WIDE_FIGSIZE, sharey=True)
+axes = axes.flatten()
+
+for ax, covariate in zip(axes, continuous_covariates + binary_covariates):
+    if covariate in binary_covariates:
+        grid_values = np.array([0, 1])
+        observed = (
+            training_data.groupby(covariate)["has_claim"]
+            .mean()
+            .reset_index()
+            .rename(columns={covariate: "x", "has_claim": "observed"})
+        )
+    else:
+        grid_values = np.linspace(training_data[covariate].min(), training_data[covariate].max(), 100)
+        temp = training_data[[covariate, "has_claim"]].copy()
+        temp["bin"] = pd.cut(temp[covariate], bins=6, include_lowest=True)
+        observed = (
+            temp.groupby("bin", observed=True)
+            .agg(x=(covariate, "mean"), observed=("has_claim", "mean"))
+            .reset_index(drop=True)
+        )
+
+    grid = pd.DataFrame([reference] * len(grid_values))
+    grid[covariate] = grid_values
+    X_grid = sm.add_constant(grid[zip_model_covariates_py], has_constant="add")
+    fitted = lr_model_py.predict(X_grid)
+
+    ax.scatter(observed["x"], observed["observed"], alpha=0.85, s=35)
+    ax.plot(grid_values, fitted, linewidth=1.8)
+    ax.set_title(labels[covariate])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Probability of at least one claim")
+    ax.set_ylim(0, 1)
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r fig-lr-fitted-patterns-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed event rates and fitted Logistic Regression probabilities by covariate using R."
+#| fig.width: 14
+#| fig.height: 8
+#| eval: !expr exists("lr_observed_r") && exists("lr_fitted_r")
+
+ggplot() +
+  geom_point(
+    data = lr_observed_r,
+    aes(x = x, y = observed),
+    alpha = 0.85,
+    size = 2
+  ) +
+  geom_line(
+    data = lr_fitted_r,
+    aes(x = x, y = fitted),
+    linewidth = 1.1
+  ) +
+  facet_wrap(~ covariate_label, scales = "free_x") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  labs(
+    x = "Covariate value",
+    y = "Probability of at least one claim"
+  ) +
+  zip_theme
+```
+
+## **`Python` Output**
+
+```{python fig-lr-fitted-patterns-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed event rates and fitted Logistic Regression probabilities by covariate using Python."
+#| eval: !expr reticulate::py_eval("'lr_model_py' in globals()", convert = TRUE)
+
+continuous_covariates = ["driver_age", "annual_mileage", "vehicle_age"]
+binary_covariates = ["male", "urban_area", "prior_claims"]
+
+labels = {
+    "driver_age": "Driver age",
+    "annual_mileage": "Annual mileage",
+    "vehicle_age": "Vehicle age",
+    "male": "Male indicator",
+    "urban_area": "Urban-area indicator",
+    "prior_claims": "Prior-claims indicator",
+}
+
+reference = {
+    "driver_age": training_data["driver_age"].median(),
+    "annual_mileage": training_data["annual_mileage"].median(),
+    "vehicle_age": training_data["vehicle_age"].median(),
+    "male": int(training_data["male"].mode().iloc[0]),
+    "urban_area": int(training_data["urban_area"].mode().iloc[0]),
+    "prior_claims": int(training_data["prior_claims"].mode().iloc[0]),
+}
+
+fig, axes = plt.subplots(2, 3, figsize=ZIP_WIDE_FIGSIZE, sharey=True)
+axes = axes.flatten()
+
+for ax, covariate in zip(axes, continuous_covariates + binary_covariates):
+    if covariate in binary_covariates:
+        grid_values = np.array([0, 1])
+
+        observed = (
+            training_data.groupby(covariate)["has_claim"]
+            .mean()
+            .reset_index()
+            .rename(columns={covariate: "x", "has_claim": "observed"})
+        )
+    else:
+        grid_values = np.linspace(
+            training_data[covariate].min(),
+            training_data[covariate].max(),
+            100
+        )
+
+        temp = training_data[[covariate, "has_claim"]].copy()
+        temp["bin"] = pd.cut(temp[covariate], bins=6, include_lowest=True)
+
+        observed = (
+            temp.groupby("bin", observed=True)
+            .agg(
+                x=(covariate, "mean"),
+                observed=("has_claim", "mean")
+            )
+            .reset_index(drop=True)
+        )
+
+    grid = pd.DataFrame([reference] * len(grid_values))
+    grid[covariate] = grid_values
+
+    X_grid = sm.add_constant(
+        grid[zip_model_covariates_py],
+        has_constant="add"
+    )
+
+    fitted = lr_model_py.predict(X_grid)
+
+    ax.scatter(
+        observed["x"],
+        observed["observed"],
+        color=ZIP_POINT_COLOR,
+        alpha=0.85,
+        s=35,
+        label="Observed"
+    )
+
+    ax.plot(
+        grid_values,
+        fitted,
+        color=ZIP_LINE_COLOR,
+        linewidth=1.8,
+        label="Fitted"
+    )
+
+    ax.set_title(labels[covariate])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Probability of at least one claim")
+    ax.set_ylim(0, 1)
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+```
+:::
+
+The Logistic Regression fit is useful for describing how the covariates are associated with the probability of filing at least one claim. However, once `claims` has been converted to `has_claim`, all positive counts are treated the same. A policyholder with one claim and a policyholder with several claims both have $H_i = 1$.
+
+### Classical Poisson Regression for `claims`
+
+#### Model definition
+
+The Classical Poisson Regression alternative keeps the original count response. Let
+
+$$
+Y_i = \text{number of claims filed by policyholder } i.
+$$
+
+The probabilistic assumption is $Y_i \mid \mathbf{x}_i \sim \operatorname{Poisson}(\lambda_i),$ where $\lambda_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ is the expected number of claims for policyholder $i$.
+
+The link function is the log link: $g(\lambda_i) = \log(\lambda_i)$
+
+Using the same six covariates, the systematic component is
+
+$$
+\log(\lambda_i)
+=
+\beta_0
++
+\beta_1 x_{1,i}
++
+\beta_2 x_{2,i}
++
+\beta_3 x_{3,i}
++
+\beta_4 x_{4,i}
++
+\beta_5 x_{5,i}
++
+\beta_6 x_{6,i}
+$$
+Where we have $7$ different $\beta_j$ coefficients, which change linearly the log-mean claims for a given set of covariate status. In our case, $\beta_0$ stands for the "base" log-mean for the claims, while all other covariates are $0$, while all $\beta_j, \text{ } j \in \{1, 2, \dots, 6\}$ stand for the increase in the log-mean for each unit change in the corresponding $x_{j, i}$ regressor.
+
+This model works directly on the count scale through $\lambda_i$, but it also imposes the Poisson mean-variance relationship: $$ \mathbb{E}(Y_i \mid \mathbf{x}_i) = \operatorname{Var}(Y_i \mid \mathbf{x}_i) = \lambda_i. $$
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on the connection to Chapter 10!
+:::
+
+::: Heads-up-container
+The Poisson probability model, log link, and rate-ratio interpretation are introduced in @sec-classical-poisson. Here we use Classical Poisson Regression as a baseline count model before moving to ZIP regression.
+:::
+:::::
+
+#### Fitting the model
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+cpr_model_r <- glm(
+  claims ~ driver_age + annual_mileage + vehicle_age + male + urban_area + prior_claims,
+  data = train_data,
+  family = poisson(link = "log")
+)
+
+broom::tidy(cpr_model_r)
+```
+
+## **`Python` Code**
+
+``` python
+X = sm.add_constant(training_data[covariates], has_constant="add")
+Y = training_data["claims"]
+
+cpr_model_py = sm.GLM(
+    Y,
+    X,
+    family=sm.families.Poisson()
+).fit()
+
+cpr_coef_py = pd.DataFrame({
+    "term": cpr_model_py.params.index,
+    "estimate": cpr_model_py.params.values,
+    "std.error": cpr_model_py.bse.values,
+    "statistic": cpr_model_py.tvalues.values,
+    "p.value": cpr_model_py.pvalues.values,
+})
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-cpr-fit-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Classical Poisson Regression coefficient table for the canonical training data using R."
+
+if (exists("cpr_coef_r")) {
+  cpr_coef_r |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Classical Poisson Regression output is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python cpr-fit-py-run}
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+
+import pandas as pd
+import statsmodels.api as sm
+
+# Use the canonical R split if the Python object is not already available.
+if "training_data" not in globals():
+    training_data = r.train_data.copy()
+
+training_data = training_data.copy()
+
+zip_model_covariates_py = [
+    "driver_age",
+    "annual_mileage",
+    "vehicle_age",
+    "male",
+    "urban_area",
+    "prior_claims",
+]
+
+for col in zip_model_covariates_py + ["claims"]:
+    training_data[col] = pd.to_numeric(training_data[col], errors="coerce")
+
+training_data = training_data.dropna(
+    subset=zip_model_covariates_py + ["claims"]
+).copy()
+
+X_cpr = sm.add_constant(
+    training_data[zip_model_covariates_py].astype(float),
+    has_constant="add"
+)
+
+Y = training_data["claims"].astype(float)
+
+cpr_model_py = sm.GLM(
+    Y,
+    X_cpr,
+    family=sm.families.Poisson()
+).fit()
+
+cpr_coef_py = pd.DataFrame({
+    "term": cpr_model_py.params.index,
+    "estimate": cpr_model_py.params.values,
+    "std.error": cpr_model_py.bse.values,
+    "statistic": cpr_model_py.tvalues.values,
+    "p.value": cpr_model_py.pvalues.values,
+})
+```
+
+```{r tbl-cpr-fit-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Classical Poisson Regression coefficient table for the canonical training data using Python."
+
+if (reticulate::py_eval("'cpr_coef_py' in globals()", convert = TRUE)) {
+  py_df_to_tibble("cpr_coef_py") |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Classical Poisson Regression output is unavailable until the training data are available.") |>
+    print_as_dt()
+}
+```
+:::
+
+As with the Logistic Regression output, the `R` and `Python` summaries may differ in formatting and small numerical details. The key comparison is substantive: the signs, approximate magnitudes, and interpretation on the exponential scale.
+
+#### Interpreting the coefficients
+
+Poisson Regression coefficients are on the log-mean scale. Exponentiating a coefficient gives a multiplicative effect on the expected count. The next table uses the same scaling choices as above so that the coefficient interpretation is easier to compare across the two approaches.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+coef_tbl <- broom::tidy(cpr_model_r)
+ci_tbl <- confint.default(cpr_model_r) |>
+  as.data.frame() |>
+  tibble::rownames_to_column("term") |>
+  rename(conf.low = `2.5 %`, conf.high = `97.5 %`)
+
+cpr_effects_r <- coef_tbl |>
+  left_join(ci_tbl, by = "term") |>
+  inner_join(zip_interpret_scales, by = "term") |>
+  transmute(
+    covariate = term,
+    comparison,
+    log_scale_change = estimate * change,
+    rate_ratio = exp(estimate * change),
+    lower_95 = exp(conf.low * change),
+    upper_95 = exp(conf.high * change),
+    percent_change = 100 * (exp(estimate * change) - 1),
+    p_value = p.value
+  )
+```
+
+## **`Python` Code**
+
+``` python
+ci = cpr_model_py.conf_int()
+ci.columns = ["conf.low", "conf.high"]
+coef = pd.DataFrame({
+    "term": cpr_model_py.params.index,
+    "estimate": cpr_model_py.params.values,
+    "conf.low": ci["conf.low"].values,
+    "conf.high": ci["conf.high"].values,
+    "p_value": cpr_model_py.pvalues.values,
+})
+
+cpr_effects_py = coef.merge(scale_rows, on="term", how="inner")
+cpr_effects_py["log_scale_change"] = cpr_effects_py["estimate"] * cpr_effects_py["change"]
+cpr_effects_py["rate_ratio"] = np.exp(cpr_effects_py["log_scale_change"])
+cpr_effects_py["lower_95"] = np.exp(cpr_effects_py["conf.low"] * cpr_effects_py["change"])
+cpr_effects_py["upper_95"] = np.exp(cpr_effects_py["conf.high"] * cpr_effects_py["change"])
+cpr_effects_py["percent_change"] = 100 * (cpr_effects_py["rate_ratio"] - 1)
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r tbl-cpr-effects-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Scaled rate-ratio interpretation for the Classical Poisson Regression model using R."
+
+if (exists("cpr_effects_r")) {
+  cpr_effects_r |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Scaled Poisson Regression effects are unavailable until the model is fitted.") |>
+    print_as_dt()
+}
+```
+
+## **`Python` Output**
+
+```{python cpr-effects-py-run}
+#| echo: false
+#| results: hide
+#| message: false
+#| warning: false
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+
+# Recreate the Classical Poisson Regression model if it is not already available.
+if "cpr_model_py" not in globals():
+    if "training_data" not in globals():
+        training_data = r.train_data.copy()
+
+    training_data = training_data.copy()
+
+    zip_model_covariates_py = [
+        "driver_age",
+        "annual_mileage",
+        "vehicle_age",
+        "male",
+        "urban_area",
+        "prior_claims",
+    ]
+
+    for col in zip_model_covariates_py + ["claims"]:
+        training_data[col] = pd.to_numeric(training_data[col], errors="coerce")
+
+    training_data = training_data.dropna(
+        subset=zip_model_covariates_py + ["claims"]
+    ).copy()
+
+    X_cpr = sm.add_constant(
+        training_data[zip_model_covariates_py].astype(float),
+        has_constant="add"
+    )
+
+    Y = training_data["claims"].astype(float)
+
+    cpr_model_py = sm.GLM(
+        Y,
+        X_cpr,
+        family=sm.families.Poisson()
+    ).fit()
+
+scale_rows = pd.DataFrame({
+    "term": [
+        "driver_age",
+        "annual_mileage",
+        "vehicle_age",
+        "male",
+        "urban_area",
+        "prior_claims",
+    ],
+    "comparison": [
+        "+10 years of driver age",
+        "+10,000 km of annual mileage",
+        "+5 years of vehicle age",
+        "male (1) versus female (0)",
+        "urban (1) versus rural (0)",
+        "prior claims (1) versus none (0)",
+    ],
+    "change": [10, 10000, 5, 1, 1, 1],
+})
+
+ci = pd.DataFrame(
+    np.asarray(cpr_model_py.conf_int()),
+    index=cpr_model_py.params.index,
+    columns=["conf.low", "conf.high"]
+)
+
+coef = pd.DataFrame({
+    "term": cpr_model_py.params.index,
+    "estimate": cpr_model_py.params.values,
+    "conf.low": ci["conf.low"].values,
+    "conf.high": ci["conf.high"].values,
+    "p_value": cpr_model_py.pvalues.values,
+})
+
+cpr_effects_py = coef.merge(scale_rows, on="term", how="inner")
+cpr_effects_py["log_scale_change"] = (
+    cpr_effects_py["estimate"] * cpr_effects_py["change"]
+)
+cpr_effects_py["rate_ratio"] = np.exp(cpr_effects_py["log_scale_change"])
+cpr_effects_py["lower_95"] = np.exp(
+    cpr_effects_py["conf.low"] * cpr_effects_py["change"]
+)
+cpr_effects_py["upper_95"] = np.exp(
+    cpr_effects_py["conf.high"] * cpr_effects_py["change"]
+)
+cpr_effects_py["percent_change"] = 100 * (cpr_effects_py["rate_ratio"] - 1)
+
+cpr_effects_py = cpr_effects_py[[
+    "term",
+    "comparison",
+    "log_scale_change",
+    "rate_ratio",
+    "lower_95",
+    "upper_95",
+    "percent_change",
+    "p_value",
+]].rename(columns={"term": "covariate"})
+```
+
+```{r tbl-cpr-effects-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| tbl-cap: "Scaled rate-ratio interpretation for the Classical Poisson Regression model using Python."
+
+if (reticulate::py_eval("'cpr_effects_py' in globals()", convert = TRUE)) {
+  py_df_to_tibble("cpr_effects_py") |>
+    fmt_table() |>
+    print_as_dt()
+} else {
+  tibble(Message = "Scaled Poisson Regression effects are unavailable until the model is fitted.") |>
+    print_as_dt()
+}
+```
+
+:::
+
+A rate ratio greater than $1$ means that the expected number of claims is higher for the stated comparison, holding the other covariates fixed. A rate ratio below $1$ means that the expected number of claims is lower.
+
+#### Visualizing the fitted Poisson Regression patterns
+
+The next figures overlay empirical mean claims with fitted Poisson means. As before, continuous covariates use binned empirical summaries, binary covariates use group summaries, and the fitted curves vary one covariate at a time while holding the remaining covariates fixed at typical training-set values.
+
+::: panel-tabset
+## **`R` Code**
+
+``` r
+ggplot() +
+  geom_point(
+    data = cpr_observed_r,
+    aes(x = x, y = observed),
+    alpha = 0.85,
+    size = 2
+  ) +
+  geom_line(
+    data = cpr_fitted_r,
+    aes(x = x, y = fitted),
+    linewidth = 1.1
+  ) +
+  facet_wrap(~ covariate_label, scales = "free_x") +
+  labs(
+    x = "Covariate value",
+    y = "Mean number of claims"
+  ) +
+  zip_theme
+```
+
+## **`Python` Code**
+
+``` python
+fig, axes = plt.subplots(2, 3, figsize=ZIP_WIDE_FIGSIZE, sharey=False)
+axes = axes.flatten()
+
+for ax, covariate in zip(axes, continuous_covariates + binary_covariates):
+    if covariate in binary_covariates:
+        grid_values = np.array([0, 1])
+        observed = (
+            training_data.groupby(covariate)["claims"]
+            .mean()
+            .reset_index()
+            .rename(columns={covariate: "x", "claims": "observed"})
+        )
+    else:
+        grid_values = np.linspace(training_data[covariate].min(), training_data[covariate].max(), 100)
+        temp = training_data[[covariate, "claims"]].copy()
+        temp["bin"] = pd.cut(temp[covariate], bins=6, include_lowest=True)
+        observed = (
+            temp.groupby("bin", observed=True)
+            .agg(x=(covariate, "mean"), observed=("claims", "mean"))
+            .reset_index(drop=True)
+        )
+
+    grid = pd.DataFrame([reference] * len(grid_values))
+    grid[covariate] = grid_values
+    X_grid = sm.add_constant(grid[zip_model_covariates_py], has_constant="add")
+    fitted = cpr_model_py.predict(X_grid)
+
+    ax.scatter(observed["x"], observed["observed"], alpha=0.85, s=35)
+    ax.plot(grid_values, fitted, linewidth=1.8)
+    ax.set_title(labels[covariate])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Mean number of claims")
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+```
+:::
+
+::: panel-tabset
+## **`R` Output**
+
+```{r fig-cpr-fitted-patterns-r}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed mean claims and fitted Classical Poisson Regression means by covariate using R."
+#| fig.width: 14
+#| fig.height: 8
+#| eval: !expr exists("cpr_observed_r") && exists("cpr_fitted_r")
+
+ggplot() +
+  geom_point(
+    data = cpr_observed_r,
+    aes(x = x, y = observed),
+    alpha = 0.85,
+    size = 2
+  ) +
+  geom_line(
+    data = cpr_fitted_r,
+    aes(x = x, y = fitted),
+    linewidth = 1.1
+  ) +
+  facet_wrap(~ covariate_label, scales = "free_x") +
+  labs(
+    x = "Covariate value",
+    y = "Mean number of claims"
+  ) +
+  zip_theme
+```
+
+## **`Python` Output**
+
+```{python fig-cpr-fitted-patterns-py}
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-cap: "Observed mean claims and fitted Classical Poisson Regression means by covariate using Python."
+#| eval: !expr reticulate::py_eval("'cpr_model_py' in globals()", convert = TRUE)
+
+fig, axes = plt.subplots(2, 3, figsize=ZIP_WIDE_FIGSIZE, sharey=False)
+axes = axes.flatten()
+
+for ax, covariate in zip(axes, continuous_covariates + binary_covariates):
+    if covariate in binary_covariates:
+        grid_values = np.array([0, 1])
+
+        observed = (
+            training_data.groupby(covariate)["claims"]
+            .mean()
+            .reset_index()
+            .rename(columns={covariate: "x", "claims": "observed"})
+        )
+    else:
+        grid_values = np.linspace(
+            training_data[covariate].min(),
+            training_data[covariate].max(),
+            100
+        )
+
+        temp = training_data[[covariate, "claims"]].copy()
+        temp["bin"] = pd.cut(temp[covariate], bins=6, include_lowest=True)
+
+        observed = (
+            temp.groupby("bin", observed=True)
+            .agg(
+                x=(covariate, "mean"),
+                observed=("claims", "mean")
+            )
+            .reset_index(drop=True)
+        )
+
+    grid = pd.DataFrame([reference] * len(grid_values))
+    grid[covariate] = grid_values
+
+    X_grid = sm.add_constant(
+        grid[zip_model_covariates_py],
+        has_constant="add"
+    )
+
+    fitted = cpr_model_py.predict(X_grid)
+
+    ax.scatter(
+        observed["x"],
+        observed["observed"],
+        color=ZIP_POINT_COLOR,
+        alpha=0.85,
+        s=35,
+        label="Observed"
+    )
+
+    ax.plot(
+        grid_values,
+        fitted,
+        color=ZIP_LINE_COLOR,
+        linewidth=1.8,
+        label="Fitted"
+    )
+
+    ax.set_title(labels[covariate])
+    ax.set_xlabel("Covariate value")
+    ax.set_ylabel("Mean number of claims")
+    zip_clean_axis(ax)
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+Classical Poisson Regression preserves the count response and gives a direct model for the expected number of claims. However, it uses one count-generating process for all observations. If many zeros arise from a separate mechanism, a single Poisson mean may have difficulty representing both the large mass at zero and the positive-count distribution.
+
+### Why ZIP can be useful here
+
+The two simpler approaches highlight the motivation for ZIP regression.
+
+| **Approach** | **Response Used** | **What It Captures Well** | **Main Limitation in This Example** |
+|:-----------------|:-----------------|:-----------------|:-----------------|
+| Binary Logistic Regression | $H_i = \mathbb{I}(Y_i > 0)$, implemented as `has_claim` | The probability that a policyholder files at least one claim | It collapses all positive counts into one category, so it cannot distinguish one claim from multiple claims. |
+| Classical Poisson Regression | $Y_i$, implemented as `claims` | The expected number of claims on the original count scale | It assumes a single Poisson count-generating process and ties the zero rate to the same mean that governs the count distribution. |
+| Zero-Inflated Poisson Regression | $Y_i$, implemented as `claims` | A two-component model: one part for excess zeros and one part for the count-generating process | It is more complex, so it should be used when the EDA and subject-matter context justify a separate zero-generating mechanism. |
+
+In the insurance-claims setting, the EDA suggested a large zero-claim group and a positive-count pattern among the remaining observations. Logistic Regression can describe whether a claim occurred, but it discards count severity. Classical Poisson Regression can model counts, but it may struggle when the observed zero rate is much larger than a single Poisson process would imply. ZIP regression is useful because it gives these two pieces separate but connected roles: one component models extra zeros, and the other models claim counts.
