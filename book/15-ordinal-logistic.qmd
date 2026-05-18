@@ -1939,18 +1939,21 @@ brant(ordinal_fit)
 ```{.python}
 from scipy.special import expit
 from scipy.stats import chi2
+from scipy.optimize import minimize
 
+# Design matrix (no intercept) and ordinal response (0-indexed)
 X_brant = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float)
-y_ord   = college_data["likelihood_to_apply"].cat.codes.values
-cols    = X_brant.columns.tolist()
-X_b     = X_brant.values
-n_b     = len(y_ord)
+y_ord = college_data["likelihood_to_apply"].cat.codes.values
+cols  = X_brant.columns.tolist()
+X     = X_brant.values
+n, K  = X.shape
+J     = int(y_ord.max()) + 1            # number of ordinal categories
 
-def fit_binary_logit(X_b, y_bin):
-    from scipy.optimize import minimize
-    X_aug = np.column_stack([np.ones(n_b), X_b])
+def fit_binary_logit(X, y_bin):
+    """Binary logit with intercept; returns (beta_full, vcov_full, pi_hat)."""
+    X_aug = np.column_stack([np.ones(len(y_bin)), X])
     def nll(p):
         eta = X_aug @ p
         pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
@@ -1959,35 +1962,66 @@ def fit_binary_logit(X_b, y_bin):
         return X_aug.T @ (expit(X_aug @ p) - y_bin)
     res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
                    options={"maxiter": 10000, "gtol": 1e-10})
-    p1  = expit(X_aug @ res.x)
-    vcov = np.linalg.inv((X_aug.T * (p1 * (1 - p1))) @ X_aug)
-    return res.x[1:], np.sqrt(np.diag(vcov))[1:]   # drop intercept
+    beta  = res.x
+    p_hat = expit(X_aug @ beta)
+    vcov  = np.linalg.inv((X_aug * (p_hat * (1 - p_hat))[:, None]).T @ X_aug)
+    return beta, vcov, p_hat
 
-betas_all, ses_all = [], []
-for j in range(3):
-    y_bin = (y_ord <= j).astype(float)
-    b, s  = fit_binary_logit(X_b, y_bin)
-    betas_all.append(b); ses_all.append(s)
+# Fit J-1 binary logits with z_m = 1[y > m] (R brant()'s convention)
+beta_full = np.zeros((J-1, K+1))
+vcov_full = []
+pi_hat    = np.zeros((n, J-1))           # pi_hat[:, m] = P(Y > m | X)
+for m in range(J-1):
+    z_m = (y_ord > m).astype(float)
+    b, V, p = fit_binary_logit(X, z_m)
+    beta_full[m, :] = b
+    vcov_full.append(V)
+    pi_hat[:, m] = p
 
-betas_all = np.array(betas_all)   # (3, K)
-ses_all   = np.array(ses_all)
+# Joint covariance matrix of all slopes across cumulative splits.
+# Off-diagonal blocks use Brant (1990)'s formula; diagonals use vcov of each fit.
+X_aug   = np.column_stack([np.ones(n), X])
+varBeta = np.zeros(((J-1)*K, (J-1)*K))
+for m in range(J-2):
+    for l in range(m+1, J-1):
+        Wml = pi_hat[:, l] - pi_hat[:, m] * pi_hat[:, l]
+        Wm  = pi_hat[:, m] * (1 - pi_hat[:, m])
+        Wl  = pi_hat[:, l] * (1 - pi_hat[:, l])
+        XtWmX_inv = np.linalg.inv((X_aug * Wm[:, None]).T @ X_aug)
+        XtWlX_inv = np.linalg.inv((X_aug * Wl[:, None]).T @ X_aug)
+        XtWmlX    = (X_aug * Wml[:, None]).T @ X_aug
+        cov_block = (XtWmX_inv @ XtWmlX @ XtWlX_inv)[1:, 1:]   # drop intercept
+        varBeta[m*K:(m+1)*K, l*K:(l+1)*K] = cov_block
+        varBeta[l*K:(l+1)*K, m*K:(m+1)*K] = cov_block.T
+for m in range(J-1):
+    varBeta[m*K:(m+1)*K, m*K:(m+1)*K] = vcov_full[m][1:, 1:]
 
-# Per-regressor Brant statistics
+# Stack the slope estimates across the J-1 cumulative splits
+betaStar = beta_full[:, 1:].flatten()
+
+# Contrast matrix D enforcing equal slopes across splits: shape ((J-2)K, (J-1)K)
+I_K, Z_K = np.eye(K), np.zeros((K, K))
+D = np.vstack([
+    np.hstack([I_K if j == 0 else (-I_K if j == i+1 else Z_K)
+               for j in range(J-1)])
+    for i in range(J-2)
+])
+
+# Omnibus Wald statistic
+Dbeta   = D @ betaStar
+omnibus = Dbeta @ np.linalg.inv(D @ varBeta @ D.T) @ Dbeta
+omni_df = (J-2) * K
+omni_p  = chi2.sf(omnibus, omni_df)
+
+# Per-regressor Wald statistics
 rows = []
 for k, name in enumerate(cols):
-    b_k = betas_all[:, k]; s_k = ses_all[:, k]
-    w   = 1 / s_k**2
-    b_pool = np.sum(w * b_k) / np.sum(w)
-    chi2_stat = np.sum((b_k - b_pool)**2 / s_k**2)
-    pval = chi2.sf(chi2_stat, df=2)
-    rows.append((name, chi2_stat, 2, pval))
-
-# Omnibus statistic
-omnibus = np.sum([(betas_all[:,k]-np.sum((1/ses_all[:,k]**2)*betas_all[:,k])/
-                   np.sum(1/ses_all[:,k]**2))**2 / ses_all[:,k]**2
-                  for k in range(len(cols))])
-omni_df = 2 * len(cols)
-omni_p  = chi2.sf(omnibus, omni_df)
+    s   = np.arange(k, K*(J-1), K)        # positions of regressor k in betaStar
+    Ds  = D[:, s]
+    Ds  = Ds[~np.all(Ds == 0, axis=1), :] # drop all-zero rows
+    Vs  = varBeta[np.ix_(s, s)]
+    x2k = Ds @ betaStar[s] @ np.linalg.inv(Ds @ Vs @ Ds.T) @ Ds @ betaStar[s]
+    rows.append((name, float(x2k), J-2, chi2.sf(x2k, J-2)))
 
 # Print in R brant()-style format
 sep = "-" * 60
@@ -2028,13 +2062,14 @@ from scipy.optimize import minimize
 X_brant = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float)
-y_ord   = college_data["likelihood_to_apply"].cat.codes.values
-cols    = X_brant.columns.tolist()
-X_b     = X_brant.values
-n_b     = len(y_ord)
+y_ord = college_data["likelihood_to_apply"].cat.codes.values
+cols  = X_brant.columns.tolist()
+X     = X_brant.values
+n, K  = X.shape
+J     = int(y_ord.max()) + 1
 
-def fit_binary_logit(X_b, y_bin):
-    X_aug = np.column_stack([np.ones(n_b), X_b])
+def fit_binary_logit(X, y_bin):
+    X_aug = np.column_stack([np.ones(len(y_bin)), X])
     def nll(p):
         eta = X_aug @ p
         pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
@@ -2043,37 +2078,60 @@ def fit_binary_logit(X_b, y_bin):
         return X_aug.T @ (expit(X_aug @ p) - y_bin)
     res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
                    options={"maxiter": 10000, "gtol": 1e-10})
-    p1  = expit(X_aug @ res.x)
-    vcov = np.linalg.inv((X_aug.T * (p1 * (1 - p1))) @ X_aug)
-    return res.x[1:], np.sqrt(np.diag(vcov))[1:]
+    beta  = res.x
+    p_hat = expit(X_aug @ beta)
+    vcov  = np.linalg.inv((X_aug * (p_hat * (1 - p_hat))[:, None]).T @ X_aug)
+    return beta, vcov, p_hat
 
-betas_all, ses_all = [], []
-for j in range(3):
-    y_bin = (y_ord <= j).astype(float)
-    b, s  = fit_binary_logit(X_b, y_bin)
-    betas_all.append(b); ses_all.append(s)
+beta_full = np.zeros((J-1, K+1))
+vcov_full = []
+pi_hat    = np.zeros((n, J-1))
+for m in range(J-1):
+    z_m = (y_ord > m).astype(float)
+    b, V, p = fit_binary_logit(X, z_m)
+    beta_full[m, :] = b
+    vcov_full.append(V)
+    pi_hat[:, m] = p
 
-betas_all = np.array(betas_all)
-ses_all   = np.array(ses_all)
+X_aug   = np.column_stack([np.ones(n), X])
+varBeta = np.zeros(((J-1)*K, (J-1)*K))
+for m in range(J-2):
+    for l in range(m+1, J-1):
+        Wml = pi_hat[:, l] - pi_hat[:, m] * pi_hat[:, l]
+        Wm  = pi_hat[:, m] * (1 - pi_hat[:, m])
+        Wl  = pi_hat[:, l] * (1 - pi_hat[:, l])
+        XtWmX_inv = np.linalg.inv((X_aug * Wm[:, None]).T @ X_aug)
+        XtWlX_inv = np.linalg.inv((X_aug * Wl[:, None]).T @ X_aug)
+        XtWmlX    = (X_aug * Wml[:, None]).T @ X_aug
+        cov_block = (XtWmX_inv @ XtWmlX @ XtWlX_inv)[1:, 1:]
+        varBeta[m*K:(m+1)*K, l*K:(l+1)*K] = cov_block
+        varBeta[l*K:(l+1)*K, m*K:(m+1)*K] = cov_block.T
+for m in range(J-1):
+    varBeta[m*K:(m+1)*K, m*K:(m+1)*K] = vcov_full[m][1:, 1:]
 
-# Per-regressor Brant statistics
-rows = []
-for k, name in enumerate(cols):
-    b_k = betas_all[:, k]; s_k = ses_all[:, k]
-    w   = 1 / s_k**2
-    b_pool = np.sum(w * b_k) / np.sum(w)
-    chi2_stat = np.sum((b_k - b_pool)**2 / s_k**2)
-    pval = chi2.sf(chi2_stat, df=2)
-    rows.append((name, chi2_stat, 2, pval))
+betaStar = beta_full[:, 1:].flatten()
 
-# Omnibus statistic
-omnibus = np.sum([(betas_all[:,k]-np.sum((1/ses_all[:,k]**2)*betas_all[:,k])/
-                   np.sum(1/ses_all[:,k]**2))**2 / ses_all[:,k]**2
-                  for k in range(len(cols))])
-omni_df = 2 * len(cols)
+I_K, Z_K = np.eye(K), np.zeros((K, K))
+D = np.vstack([
+    np.hstack([I_K if j == 0 else (-I_K if j == i+1 else Z_K)
+               for j in range(J-1)])
+    for i in range(J-2)
+])
+
+Dbeta   = D @ betaStar
+omnibus = Dbeta @ np.linalg.inv(D @ varBeta @ D.T) @ Dbeta
+omni_df = (J-2) * K
 omni_p  = chi2.sf(omnibus, omni_df)
 
-# Print in R brant()-style format
+rows = []
+for k, name in enumerate(cols):
+    s   = np.arange(k, K*(J-1), K)
+    Ds  = D[:, s]
+    Ds  = Ds[~np.all(Ds == 0, axis=1), :]
+    Vs  = varBeta[np.ix_(s, s)]
+    x2k = Ds @ betaStar[s] @ np.linalg.inv(Ds @ Vs @ Ds.T) @ Ds @ betaStar[s]
+    rows.append((name, float(x2k), J-2, chi2.sf(x2k, J-2)))
+
 sep = "-" * 60
 print(sep)
 print(f"{'Test for':30s} {'X2':>8s}  {'df':>3s}  {'probability':>11s}")
