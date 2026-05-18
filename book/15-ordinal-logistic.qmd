@@ -2186,11 +2186,8 @@ summary(ordinal_fit_ppo)
 ```{.python}
 from scipy.optimize import minimize
 from scipy.special import expit
+from scipy.stats import norm
 
-ordered_categories = ["Low", "Medium", "High", "Very High"]
-college_data["likelihood_to_apply"] = pd.Categorical(
-    college_data["likelihood_to_apply"], categories=ordered_categories, ordered=True
-)
 y_ppo   = college_data["likelihood_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
@@ -2204,6 +2201,7 @@ X_sc = X_ppo.copy()
 X_sc[:, 0] = (X_ppo[:, 0] - gpa_m) / gpa_s
 X_sc[:, 1] = (X_ppo[:, 1] - gre_m) / gre_s
 
+# Reparameterised, standardised NLL using sign convention logit(P(Y<=j)) = a_j - b*X
 # params: alpha1, log(a2-a1), log(a3-a2),
 #         b_gpa_s, b_gre_j1_s, b_gre_j2_s, b_gre_j3_s, b_field[4]
 def ppo_neg_ll(p):
@@ -2225,18 +2223,102 @@ r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
               options={"maxiter": 200000, "gtol": 1e-13})
 ppo_params = r2.x
 
-# Unstandardise betas to original scale
-b_gpa  = ppo_params[3] / gpa_s
-b_gre  = ppo_params[4:7] / gre_s
-b_field = ppo_params[7:11]
+# Convert standardised parameters back to original scale (under the "-b*X" sign convention)
+a1_sc, a2_sc, a3_sc = (ppo_params[0],
+                       ppo_params[0]+np.exp(ppo_params[1]),
+                       ppo_params[0]+np.exp(ppo_params[1])+np.exp(ppo_params[2]))
+b_gpa_o     = ppo_params[3] / gpa_s
+b_gre_o     = ppo_params[4:7] / gre_s
+b_field_o   = ppo_params[7:11]
+a1_o = a1_sc + b_gpa_o*gpa_m + b_gre_o[0]*gre_m
+a2_o = a2_sc + b_gpa_o*gpa_m + b_gre_o[1]*gre_m
+a3_o = a3_sc + b_gpa_o*gpa_m + b_gre_o[2]*gre_m
 
-print("=== Partial Proportional Odds Model ===")
-print(f"GPA  (shared):              beta = {b_gpa:.4f},  OR = {np.exp(b_gpa):.4f}")
-for j, b in enumerate(b_gre):
-    print(f"GRE  (cutpoint j={j+1}):        beta = {b:.4f},  OR = {np.exp(b):.4f}")
-field_names = ["Business", "Humanities", "STEM", "Social Sciences"]
-for nm, b in zip(field_names, b_field):
-    print(f"{nm:10s} (shared):         beta = {b:.4f},  OR = {np.exp(b):.4f}")
+# Refit in original-scale space at the optimum to obtain a clean numerical Hessian.
+# Then flip slope signs to match vglm()'s "+b*X" convention used in R's summary().
+def ppo_neg_ll_orig_plus(p):
+    a1, a2, a3 = p[0], p[1], p[2]
+    b_gpa, b_g1, b_g2, b_g3 = p[3], p[4], p[5], p[6]
+    b_field = p[7:11]
+    es = b_gpa*X_ppo[:,0] + X_ppo[:,2:]@b_field
+    e1=es+b_g1*X_ppo[:,1]; e2=es+b_g2*X_ppo[:,1]; e3=es+b_g3*X_ppo[:,1]
+    F0=expit(a1+e1); F1=expit(a2+e2); F2=expit(a3+e3)   # +b*X convention
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+# Coefficients in R's "+b*X" sign convention (slopes flipped)
+p_R = np.array([a1_o, a2_o, a3_o, -b_gpa_o,
+                -b_gre_o[0], -b_gre_o[1], -b_gre_o[2],
+                -b_field_o[0], -b_field_o[1], -b_field_o[2], -b_field_o[3]])
+
+# Numerical Hessian → vcov → standard errors
+def num_hess(f, x, eps=1e-5):
+    K = len(x); H = np.zeros((K, K))
+    for i in range(K):
+        for j in range(i, K):
+            xpp = x.copy(); xpp[i]+=eps; xpp[j]+=eps
+            xpm = x.copy(); xpm[i]+=eps; xpm[j]-=eps
+            xmp = x.copy(); xmp[i]-=eps; xmp[j]+=eps
+            xmm = x.copy(); xmm[i]-=eps; xmm[j]-=eps
+            H[i,j] = H[j,i] = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4*eps*eps)
+    return H
+
+H   = num_hess(ppo_neg_ll_orig_plus, p_R)
+se  = np.sqrt(np.diag(np.linalg.inv(H)))
+log_lik = -ppo_neg_ll_orig_plus(p_R)
+res_dev = -2 * log_lik
+res_df  = n_ppo*3 - len(p_R)
+
+labels = ["(Intercept):1", "(Intercept):2", "(Intercept):3", "GPA",
+          "GRE_score:1", "GRE_score:2", "GRE_score:3",
+          "field_of_studyBusiness", "field_of_studyHumanities",
+          "field_of_studySocial Sciences", "field_of_studySTEM"]
+# Reorder field dummies to R's alphabetical order (Business, Humanities, Social Sciences, STEM)
+# pd.get_dummies output is already alphabetical; reorder p_R/se to match label order above
+field_order_in_data = ["Business", "Humanities", "STEM", "Social Sciences"]
+field_order_R       = ["Business", "Humanities", "Social Sciences", "STEM"]
+perm = [field_order_in_data.index(f) for f in field_order_R]
+p_R_ord = np.concatenate([p_R[:7], p_R[7:11][perm]])
+se_ord  = np.concatenate([se[:7],  se[7:11][perm]])
+
+def stars(p):
+    if p < 0.001: return "***"
+    if p < 0.01:  return "** "
+    if p < 0.05:  return "*  "
+    if p < 0.1:   return ".  "
+    return "   "
+
+print("Call:")
+print("ordinal_fit_ppo = vglm(likelihood_to_apply ~ GPA + GRE_score + field_of_study,")
+print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
+print("                                           GRE_score, reverse = FALSE),")
+print("                       data = college_data)\n")
+print("Coefficients:")
+print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
+for lbl, est, s in zip(labels, p_R_ord, se_ord):
+    z = est / s
+    p_two = 2 * (1 - norm.cdf(abs(z)))
+    print(f"{lbl:30s} {est:>10.3e} {s:>10.3e} {z:>9.3f} {p_two:>9.0e} {stars(p_two)}")
+print("---")
+print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+print("Names of linear predictors: logitlink(P[Y<=1]), logitlink(P[Y<=2]),")
+print("                            logitlink(P[Y<=3])\n")
+print(f"Residual deviance: {res_dev:.3f} on {res_df} degrees of freedom\n")
+print(f"Log-likelihood: {log_lik:.3f} on {res_df} degrees of freedom\n")
+print("Number of BFGS iterations:", r2.nit, "\n")
+
+# Exponentiated coefficients (slopes only, two columns)
+print("Exponentiated coefficients:")
+slope_lbls = labels[3:]
+slope_exp  = np.exp(p_R_ord[3:])
+for i in range(0, len(slope_lbls), 2):
+    if i + 1 < len(slope_lbls):
+        print(f"{slope_lbls[i]:>30s} {slope_lbls[i+1]:>30s}")
+        print(f"{slope_exp[i]:>30.8f} {slope_exp[i+1]:>30.8f}")
+    else:
+        print(f"{slope_lbls[i]:>30s}")
+        print(f"{slope_exp[i]:>30.8f}")
 ```
 
 :::
@@ -2269,6 +2351,7 @@ summary(ordinal_fit_ppo)
 #| warning: false
 from scipy.optimize import minimize
 from scipy.special import expit
+from scipy.stats import norm
 
 y_ppo   = college_data["likelihood_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
@@ -2300,17 +2383,97 @@ r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
               options={"maxiter": 200000, "gtol": 1e-13})
 ppo_params = r2.x
 
-b_gpa   = ppo_params[3] / gpa_s
-b_gre   = ppo_params[4:7] / gre_s
-b_field = ppo_params[7:11]
-field_names = ["Business", "Humanities", "STEM", "Social Sciences"]
+# Unstandardise and rebuild parameters in original scale (-b*X convention)
+a1_sc, a2_sc, a3_sc = (ppo_params[0],
+                       ppo_params[0]+np.exp(ppo_params[1]),
+                       ppo_params[0]+np.exp(ppo_params[1])+np.exp(ppo_params[2]))
+b_gpa_o   = ppo_params[3] / gpa_s
+b_gre_o   = ppo_params[4:7] / gre_s
+b_field_o = ppo_params[7:11]
+a1_o = a1_sc + b_gpa_o*gpa_m + b_gre_o[0]*gre_m
+a2_o = a2_sc + b_gpa_o*gpa_m + b_gre_o[1]*gre_m
+a3_o = a3_sc + b_gpa_o*gpa_m + b_gre_o[2]*gre_m
 
-print("=== Partial Proportional Odds Model ===")
-print(f"GPA  (shared):              beta = {b_gpa:.4f},  OR = {np.exp(b_gpa):.4f}")
-for j, b in enumerate(b_gre):
-    print(f"GRE  (cutpoint j={j+1}):        beta = {b:.4f},  OR = {np.exp(b):.4f}")
-for nm, b in zip(field_names, b_field):
-    print(f"{nm:10s} (shared):         beta = {b:.4f},  OR = {np.exp(b):.4f}")
+# Refit-able NLL in "+b*X" convention (R vglm's parallel = FALSE ~ GRE_score with reverse = FALSE)
+def ppo_neg_ll_orig_plus(p):
+    a1, a2, a3 = p[0], p[1], p[2]
+    b_gpa, b_g1, b_g2, b_g3 = p[3], p[4], p[5], p[6]
+    b_field = p[7:11]
+    es = b_gpa*X_ppo[:,0] + X_ppo[:,2:]@b_field
+    e1=es+b_g1*X_ppo[:,1]; e2=es+b_g2*X_ppo[:,1]; e3=es+b_g3*X_ppo[:,1]
+    F0=expit(a1+e1); F1=expit(a2+e2); F2=expit(a3+e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p_R = np.array([a1_o, a2_o, a3_o, -b_gpa_o,
+                -b_gre_o[0], -b_gre_o[1], -b_gre_o[2],
+                -b_field_o[0], -b_field_o[1], -b_field_o[2], -b_field_o[3]])
+
+# Numerical Hessian → vcov → standard errors
+def num_hess(f, x, eps=1e-5):
+    K = len(x); H = np.zeros((K, K))
+    for i in range(K):
+        for j in range(i, K):
+            xpp = x.copy(); xpp[i]+=eps; xpp[j]+=eps
+            xpm = x.copy(); xpm[i]+=eps; xpm[j]-=eps
+            xmp = x.copy(); xmp[i]-=eps; xmp[j]+=eps
+            xmm = x.copy(); xmm[i]-=eps; xmm[j]-=eps
+            H[i,j] = H[j,i] = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4*eps*eps)
+    return H
+
+H   = num_hess(ppo_neg_ll_orig_plus, p_R)
+se  = np.sqrt(np.diag(np.linalg.inv(H)))
+log_lik = -ppo_neg_ll_orig_plus(p_R)
+res_dev = -2 * log_lik
+res_df  = n_ppo*3 - len(p_R)
+
+labels = ["(Intercept):1", "(Intercept):2", "(Intercept):3", "GPA",
+          "GRE_score:1", "GRE_score:2", "GRE_score:3",
+          "field_of_studyBusiness", "field_of_studyHumanities",
+          "field_of_studySocial Sciences", "field_of_studySTEM"]
+field_order_in_data = ["Business", "Humanities", "STEM", "Social Sciences"]
+field_order_R       = ["Business", "Humanities", "Social Sciences", "STEM"]
+perm = [field_order_in_data.index(f) for f in field_order_R]
+p_R_ord = np.concatenate([p_R[:7], p_R[7:11][perm]])
+se_ord  = np.concatenate([se[:7],  se[7:11][perm]])
+
+def stars(p):
+    if p < 0.001: return "***"
+    if p < 0.01:  return "** "
+    if p < 0.05:  return "*  "
+    if p < 0.1:   return ".  "
+    return "   "
+
+print("Call:")
+print("ordinal_fit_ppo = vglm(likelihood_to_apply ~ GPA + GRE_score + field_of_study,")
+print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
+print("                                           GRE_score, reverse = FALSE),")
+print("                       data = college_data)\n")
+print("Coefficients:")
+print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
+for lbl, est, s in zip(labels, p_R_ord, se_ord):
+    z = est / s
+    p_two = 2 * (1 - norm.cdf(abs(z)))
+    print(f"{lbl:30s} {est:>10.3e} {s:>10.3e} {z:>9.3f} {p_two:>9.0e} {stars(p_two)}")
+print("---")
+print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+print("Names of linear predictors: logitlink(P[Y<=1]), logitlink(P[Y<=2]),")
+print("                            logitlink(P[Y<=3])\n")
+print(f"Residual deviance: {res_dev:.3f} on {res_df} degrees of freedom\n")
+print(f"Log-likelihood: {log_lik:.3f} on {res_df} degrees of freedom\n")
+print("Number of BFGS iterations:", r2.nit, "\n")
+
+print("Exponentiated coefficients:")
+slope_lbls = labels[3:]
+slope_exp  = np.exp(p_R_ord[3:])
+for i in range(0, len(slope_lbls), 2):
+    if i + 1 < len(slope_lbls):
+        print(f"{slope_lbls[i]:>30s} {slope_lbls[i+1]:>30s}")
+        print(f"{slope_exp[i]:>30.8f} {slope_exp[i+1]:>30.8f}")
+    else:
+        print(f"{slope_lbls[i]:>30s}")
+        print(f"{slope_exp[i]:>30.8f}")
 ```
 
 :::
