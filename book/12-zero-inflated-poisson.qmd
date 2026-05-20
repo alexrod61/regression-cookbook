@@ -27,6 +27,22 @@
 </script>
 ```
 
+<!-- Scrollable Tables configuration -->
+
+```{=html}
+<style>
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-scroll table {
+  min-width: 1400px;
+}
+</style>
+```
+
+
 # Zero-Inflated Poisson Regression {#sec-zero-inflated-poisson}
 
 ```{r}
@@ -329,22 +345,16 @@ The chapter is organised as follows:
 - **Introduction and chapter roadmap:** We introduce Zero-Inflated Poisson (ZIP) regression, explain why it is useful for count data with excess zeros, and position it relative to related cookbook chapters.
 - **Running example and data context:** We introduce the cookbook insurance-claims dataset, clarify the response variable, classify the covariates, and explain what a zero means in this setting.
 - **Data splitting:** Before EDA or model fitting, we follow the workflow introduced in @sec-ds-workflow and create training and testing sets. The training set is used for EDA and model fitting, while the testing set is held out for later prediction and model assessment.
-- **Exploratory Data Analysis (EDA):** Using only the training data, we examine the observed count distribution, the number of zeros and non-zeros, marginal covariate patterns, and the empirical evidence that motivates a zero-inflated model.
-- **Why not just use logistic regression?:** We explain what is lost when the count response is reduced to a zero-versus-nonzero outcome and connect this discussion to @sec-binary-logistic.
-- **Why not just use Poisson regression?:** We fit and interpret the Classical Poisson baseline, describe its log-link structure, and explain why a single-process count model may not be sufficient; see also @sec-classical-poisson.
-- **Intuition behind zero inflation:** We distinguish between structural zeros and ordinary sampling zeros using the insurance example.
-- **Overview of the Zero-Inflated Poisson model:** We introduce the two-component ZIP model formally, including the zero-inflation component, the count component, the mean and variance, and the role of the Hessian in standard-error estimation.
-- **Interpreting the two components in the running example:** We explain how covariates can affect the probability of belonging to the extra-zero group, the expected claim count, or both.
+- **Exploratory Data Analysis (EDA):** Using only the training data, we examine the observed count distribution, the number of zeros and non-zeros, marginal covariate patterns, and the empirical evidence that motivates a zero-inflated model.- **Preparing for modelling:** We define the response and covariate notation used throughout the rest of the chapter.
+- **Comparing ZIP to simpler alternatives:** We compare Binary Logistic Regression and Classical Poisson Regression to clarify what each simpler model captures and misses.
+- **Data modelling:** We formally define the Zero-Inflated Poisson response distribution and its two regression components before moving into estimation.
 - **Estimation and model fitting:** We fit the ZIP model numerically and show the full workflow in both R and Python.
 - **Interpretation of fitted results:** We read the fitted coefficient tables for both components and translate the results into insurance-claims language.
 - **Inference for model parameters:** We discuss standard errors, confidence intervals, p-values, and inferential statements for both the count and zero-inflation components.
 - **Hypothesis testing:** We test individual covariates, compare nested ZIP models, and discuss when formal comparisons against simpler alternatives are useful.
 - **Prediction with the ZIP model:** We generate predicted expected counts, predicted zero probabilities, probabilities of specific counts, simulated outcomes, and evaluate prediction quality on held-out data.
-- **Comparing ZIP to simpler alternatives:** We compare ZIP with logistic regression and Classical Poisson regression, using both statistical summaries and practical interpretation.
 - **Model assessment and diagnostics:** We assess whether the fitted model captures the observed zero frequency and count distribution, and whether it improves meaningfully over simpler models.
 - **Practical considerations and interpretation cautions:** We discuss common pitfalls, related models such as hurdle and zero-inflated negative binomial models, and the importance of substantive justification.
-- **Chapter summary:** We recap the motivation, two-part structure, inferential goals, predictive goals, and practical lessons from the running insurance example.
-- **Optional appendices:** We reserve space for additional mathematical details, implementation notes, and extended reproducibility scripts in R and Python.
 
 ::::: Heads-up
 ::: Heads-up-header
@@ -352,7 +362,21 @@ Heads-up on further documented use-cases!
 :::
 
 ::: Heads-up-container
-ZIP models are not only teaching examples. Documented applied uses include [manufacturing defects](https://www.stat.cmu.edu/technometrics/90-00/vol-34-01/v3401001.pdf?utm_source=chatgpt.com), [insurance claim counts](file:///C:/Users/hpala/Downloads/55914343.pdf), [public-health and epidemiology count outcomes](https://pmc.ncbi.nlm.nih.gov/articles/PMC3238139/), [health-care utilization](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0291426), among others.
+ZIP models are not only teaching examples. @tbl-zip-documented-use-cases summarizes several documented applications where zero-inflated count models help separate an excess-zero process from a count-generating process.
+
+
+::: {.table-scroll}
+
+| **Paper** | **Main author(s)** | **Brief description** | **Outcome variable explored ($Y$)** | **Research question** | **Methods in general** | **Main result or modelling lesson** |
+|:----------|:----------|:----------|:----------|:----------|:----------|:----------|
+| [*Zero-Inflated Poisson Regression, With an Application to Defects in Manufacturing*](https://www.stat.cmu.edu/technometrics/90-00/vol-34-01/v3401001.pdf) | Diane Lambert | Introduces ZIP regression through a printed wiring-board soldering-defect application, where some production conditions can generate a nearly perfect zero-defect state while imperfect states still produce counts. | Number of soldering defects per area on printed wiring boards. | Which manufacturing conditions affect the probability of a perfect zero-defect state and the expected number of defects when defects are possible? | ZIP regression with covariates in both the structural-zero probability and the Poisson mean; comparison to log-linear Poisson models and likelihood-based inference. | The ZIP framework revealed that two conditions with similar overall means could differ in *why* those means were low: one could have a higher chance of being in the perfect state, while another could have a lower mean among imperfect items. |
+| [*Zero-Inflated Poisson Regression Analysis on Frequency of Health Insurance Claim PT. XYZ*](https://www.atlantis-press.com/article/55914343.pdf) | Rahmaniar Dwinta Kusuma and Yogo Purwono | Applies ZIP regression to private health-insurance claim-frequency data with many zeros and compares it with ordinary Poisson regression. | Health-insurance claim frequency for insured individuals. | Which insured characteristics are associated with claim frequency, and is ZIP more suitable than ordinary Poisson regression for these data? | Poisson regression and ZIP regression, with model comparison using Vuong's test and information criteria such as AIC and BIC. | The study reports that ZIP regression is more suitable than ordinary Poisson regression for the claim-frequency data and can support insurance premium-pricing considerations. |
+| [*Zero-inflated and hurdle models of count data with extra zeros: examples from an HIV-risk reduction intervention trial*](https://pubmed.ncbi.nlm.nih.gov/21854279/) | Mei-Chen Hu, Martina Pavlicova, and Edward V. Nunes | Reviews count models for extra zeros in behavioural-health trials and illustrates how different distributional assumptions change the estimated intervention effect. | Count of unprotected sexual occasions in an HIV-risk reduction intervention trial. | How should intervention effects be estimated when behavioural count outcomes contain excess zeros and overdispersion? | Comparison of Poisson, Negative Binomial, ZIP, Poisson hurdle, Zero-Inflated Negative Binomial, and Negative Binomial hurdle models. | The Zero-Inflated Negative Binomial model provided the best fit in the example, illustrating that using a model that mismatches the distribution can bias intervention-effect estimates upward or downward. |
+| [*Zero-inflated Poisson regression analysis of factors associated with under-five mortality in Ethiopia using 2019 Ethiopian mini demographic and health survey data*](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0291426) | Alemayehu Siffir Argawu and Gizachew Gobebo Mekebo | Uses national Ethiopian survey data to identify factors associated with under-five mortality while accounting for excess zeros in the count response. | Number of children per woman who died before age five. | Which maternal, child, household, and regional factors are associated with under-five mortality in Ethiopia? | Count regression model comparison, with ZIP selected based on model-comparison criteria. | ZIP was selected as the best model among the compared count models; several factors, including place of residence, delivery place, maternal age, birth order, birth type, cooking fuel, and water-access time, were statistically associated with under-five mortality. |
+
+: Examples of documented applied uses of zero-inflated count models. {#tbl-zip-documented-use-cases .striped .hover}
+
+:::
 :::
 :::::
 
@@ -384,7 +408,7 @@ The dataset contains the following variables.
 | Driving Environment (*rural* or *urban*) | `urban_area` | Discrete | Bounded binary indicator: $0$ or $1$ | Regressor | $1$ indicates urban driving environment and $0$ indicates rural driving environment. |
 | Prior Claims Indicator (*no* or *yes*) | `prior_claims` | Discrete | Bounded binary indicator: $0$ or $1$ | Regressor | $1$ indicates at least one prior claim and $0$ indicates no prior claims. |
 
-: Variables in the zero-inflated insurance-claims dataset.
+: Variables in the zero-inflated insurance-claims dataset. {#tbl-zip-variables .striped .hover}
 
 A value of **zero** for the response means that the policyholder **filed no claims during the observation period**. Importantly, that zero can be interpreted in more than one way. In some cases, the policyholder may be effectively outside the claims-generating process for that period, or had such limited exposure that a positive claim count was structurally unlikely. In other cases, the policyholder may have been fully at risk of filing a claim but simply happened not to do so. This distinction is central to the two-part structure of the ZIP model, which will be discussed later in the data-modelling section.
 
@@ -2350,20 +2374,23 @@ if (reticulate::py_eval("'correlation_summary_py' in globals()", convert = TRUE)
 
 The correlation summary reinforces the graphical EDA. In the training data, `annual_mileage` has the strongest correlation with `claims`, about **`r zip_stat("corr_annual_claims")`**, and with `has_claim`, about **`r zip_stat("corr_annual_has_claim")`**. `prior_claims` is also notable, with correlations of about **`r zip_stat("corr_prior_claims")`** with `claims` and **`r zip_stat("corr_prior_has_claim")`** with `has_claim`. These correlations do not establish causality, but they help explain why these covariates are sensible choices for the model components.
 
+One caution is worth keeping in mind before moving from EDA to modelling. These marginal summaries inspect each covariate mostly one at a time, but the fitted regression model will estimate the contribution of each regressor while holding the others fixed. If two covariates tend to move together, the apparent pattern for one variable may partly reflect the influence of another. For example, the plots and summaries suggest strong patterns for `annual_mileage` and `prior_claims`, but later coefficient interpretation should still be read as a model-based adjusted statement rather than as a direct copy of the marginal EDA pattern.
+
 ### EDA summary
 
 The exploratory analysis points to two connected conclusions. First, `claims` is a count response with a large concentration at zero. Second, the covariates do not all show the same marginal relationship with the response, so the later ZIP model should be allowed to separate the zero-generating mechanism from the count-generating mechanism.
 
 | **EDA Theme** | **TLDR** | **Dynamic Evidence** | **Modelling Implication** |
-|:------------------:|:-----------------|:-----------------|:-----------------|
+|:-----------------:|:-----------------|:-----------------|:-----------------|
 | Response shape | The response is heavily concentrated at zero, with a smaller right tail of positive claim counts. | There are **`r zip_stat("zero_n")`** zero-claim observations out of **`r zip_stat("train_n")`** training observations; the largest observed count is **`r zip_stat("max_claims")`**. | A count model is needed, but the zero pile-up should be modelled explicitly. |
 | Mean - variance pattern | The response is more variable than a simple equidispersed Poisson pattern would suggest. | The sample mean is **`r zip_stat("sample_mean")`**, the sample variance is **`r zip_stat("sample_variance")`**, and the variance-to-mean ratio is **`r zip_stat("variance_to_mean")`**. | A one-process Classical Poisson model may be too restrictive. |
 | Zero inflation check | The observed zero rate is larger than the zero rate implied by a Poisson model with the same mean. | The observed zero rate is **`r zip_stat("observed_zero_rate")`**, while the Poisson-expected zero rate is **`r zip_stat("poisson_zero_rate")`**; the excess zero rate is **`r zip_stat("excess_zero_rate")`**. | This is direct empirical motivation for a zero-inflated model. |
 | Zero versus nonzero profiles | Policyholders with at least one claim tend to have higher mileage and a higher prior-claims rate. | Mean annual mileage is **`r zip_stat("mileage_nonzero")`** for nonzero-claim policyholders versus **`r zip_stat("mileage_zero")`** for zero-claim policyholders; the prior-claims rate is **`r zip_stat("prior_rate_nonzero")`** versus **`r zip_stat("prior_rate_zero")`**. | `annual_mileage` and `prior_claims` are plausible regressors for both claim frequency and the zero/nonzero distinction. |
 | Binary covariates | `prior_claims` shows the clearest binary-covariate contrast; `urban_area` is weaker in this training split. | With prior claims, mean claims are **`r zip_stat("prior_mean_yes")`** and the zero rate is **`r zip_stat("prior_zero_yes")`**; without prior claims, mean claims are **`r zip_stat("prior_mean_no")`** and the zero rate is **`r zip_stat("prior_zero_no")`**. The urban groups differ by about **`r zip_stat("urban_mean_diff")`** in mean claims and **`r zip_stat("urban_zero_diff")`** in zero rate. | `prior_claims` should be treated as an important candidate covariate; `urban_area` may still be retained for substantive insurance interpretation. |
 | Continuous covariates | `annual_mileage` has the clearest positive marginal association with the response. | Mean claims rise from **`r zip_stat("annual_low_mean")`** in the lowest mileage bin to **`r zip_stat("annual_high_mean")`** in the highest mileage bin; the zero rate falls from **`r zip_stat("annual_low_zero")`** to **`r zip_stat("annual_high_zero")`**. Its correlations are **`r zip_stat("corr_annual_claims")`** with `claims` and **`r zip_stat("corr_annual_has_claim")`** with `has_claim`. | `annual_mileage` is a natural candidate for the count component and the zero-inflation component. |
+| Covariate interpretation caution | Marginal EDA patterns are useful, but they do not isolate each regressor's adjusted contribution. | `annual_mileage` and `prior_claims` both show strong relationships with `claims` and `has_claim`, so their fitted coefficients should later be interpreted conditionally on the other model terms. | Later model interpretation should distinguish descriptive marginal patterns from adjusted regression effects. |
 
-: TLDR summary of the EDA findings for the zero-inflated insurance-claims training data.
+: TLDR summary of the EDA findings for the zero-inflated insurance-claims training data. {#tbl-zip-eda-summary .striped .hover}
 
 ## Preparing for Modelling
 
@@ -2384,13 +2411,11 @@ where $Y_i$ is the number of claims filed during the observation window. The can
 | $x_{5,i}$ | `urban_area` | Primary driving-environment indicator for policyholder $i$. | Discrete | $1$ means urban; $0$ means rural. |
 | $x_{6,i}$ | `prior_claims` | Prior-claims-history indicator for policyholder $i$. | Discrete | $1$ means the driver filed claims in previous years; $0$ means no prior claims. |
 
-: Covariate notation for the zero-inflated insurance-claims model.
+: Covariate notation for the zero-inflated insurance-claims model. {#tbl-zip-covariate-notation .striped .hover}
 
 Using this notation, a compact covariate vector for the full set of candidate regressors is
 
-$$
-\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right)
-$$
+$$\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right)$$
 
 Where the leading $1$ represents the intercept. In the ZIP model, this covariate vector can be used to build two linked regression components: a count component for the expected number of claims among policyholders in the count-generating process, and a zero-inflation component for the probability of belonging to the extra-zero group. Later sections can choose whether both components use the same covariates or whether one component uses a smaller, substantively motivated subset.
 
@@ -2403,7 +2428,6 @@ First, we can turn the count response into a binary response. Define $H_i = \mat
 Second, we can keep the original count response and fit a Classical Poisson Regression model for `claims`. This model describes the expected number of claims directly, so it keeps the count scale used in @fig-claims-vs-continuous-r and @tbl-binned-summary-r. However, it treats all observations as coming from a single count-generating process. In particular, it ties the zero rate to the same mean parameter that governs the positive counts.
 
 These two models are not replacements for ZIP regression in this chapter. Instead, they give us useful comparison points. Logistic Regression focuses on the zero-versus-nonzero distinction. Classical Poisson Regression focuses on the count scale. ZIP regression combines these ideas by allowing a separate zero-generating component and a count-generating component.
-
 
 ```{r lr-cpr-setup-r, include=FALSE}
 if (zip_has_train()) {
@@ -2750,7 +2774,6 @@ if "training_data" in globals() and len(training_data) > 0:
     cpr_effects_py = scaled_effects(cpr_model_py, "rate_ratio")
 ```
 
-
 ```{r lr-cpr-insight-stats-r, include=FALSE}
 # Dynamic quantities used to interpret the Logistic and Classical Poisson
 # comparison models without hardcoding rendered values in the prose.
@@ -2873,32 +2896,25 @@ if (
 
 The Logistic Regression alternative uses the derived binary response in @eq-zip-lr-binary-response.
 
-$$
-H_i =
+$$H_i =
 \begin{cases}
 1, & \text{if policyholder } i \text{ filed at least one claim}, \\
 0, & \text{if policyholder } i \text{ filed no claims}.
-\end{cases}
-$${#eq-zip-lr-binary-response}
+\end{cases}$${#eq-zip-lr-binary-response}
 
 The probabilistic assumption is given in @eq-zip-lr-bernoulli, where $\pi_i = P(H_i = 1 \mid \mathbf{x}_i)$ is the probability that policyholder $i$ filed at least one claim.
 
-$$
-H_i \mid \mathbf{x}_i \sim \operatorname{Bernoulli}(\pi_i)
-$${#eq-zip-lr-bernoulli}
+$$H_i \mid \mathbf{x}_i \sim \operatorname{Bernoulli}(\pi_i)$${#eq-zip-lr-bernoulli}
 
 The link function is the logit link in @eq-zip-lr-logit-link.
 
-$$
-\operatorname{logit}(\pi_i)
+$$\operatorname{logit}(\pi_i)
 =
-\log\left(\frac{\pi_i}{1 - \pi_i}\right)
-$${#eq-zip-lr-logit-link}
+\log\left(\frac{\pi_i}{1 - \pi_i}\right)$${#eq-zip-lr-logit-link}
 
 Using the six covariates from the running example, the systematic component is shown in @eq-zip-lr-systematic.
 
-$$
-\log\left(\frac{\pi_i}{1 - \pi_i}\right)
+$$\log\left(\frac{\pi_i}{1 - \pi_i}\right)
 =
 \alpha_0
 +
@@ -2912,8 +2928,7 @@ $$
 +
 \alpha_5 x_{5,i}
 +
-\alpha_6 x_{6,i}
-$${#eq-zip-lr-systematic}
+\alpha_6 x_{6,i}$${#eq-zip-lr-systematic}
 
 In @eq-zip-lr-systematic, there are $7$ coefficients, $\alpha_0, \alpha_1, \ldots, \alpha_6$, which change the log-odds of having at least one claim. The intercept $\alpha_0$ is the baseline log-odds when all covariates are equal to zero, while $\alpha_j$ for $j \in \{1, 2, \ldots, 6\}$ represents the change in log-odds for a one-unit increase in the corresponding regressor $x_{j,i}$, holding the other covariates fixed.
 
@@ -3061,7 +3076,15 @@ if (reticulate::py_eval("'lr_coef_py' in globals()", convert = TRUE)) {
 ```
 :::
 
+::::: Heads-up
+::: Heads-up-header
+Heads-up on `R` and `Python` model summaries!
+:::
+
+::: Heads-up-container
 The two outputs may not be formatted identically. `R` and `Python` use different summary conventions, and their numerical optimizers can differ in small implementation details. Because both chunks use the same canonical training split, the fitted coefficients should nevertheless be within similar ranges.
+:::
+:::::
 
 The coefficient table in @tbl-lr-fit-r already points to the main event-probability story. The strongest positive fitted associations with `has_claim` are attached to `annual_mileage` and `prior_claims`, matching the EDA pattern in which higher-mileage policyholders and policyholders with prior claims were less concentrated at zero. `driver_age` is also positive in this binary model, but the fitted evidence is weaker than for mileage and prior claims. By contrast, `vehicle_age`, `male`, and `urban_area` are much flatter on the zero-versus-nonzero scale in this fit.
 
@@ -3515,26 +3538,19 @@ This is exactly what Logistic Regression is meant to do: describe the probabilit
 
 The Classical Poisson Regression alternative keeps the original count response, defined in @eq-zip-cpr-response.
 
-$$
-Y_i = \text{number of claims filed by policyholder } i
-$${#eq-zip-cpr-response}
+$$Y_i = \text{number of claims filed by policyholder } i$${#eq-zip-cpr-response}
 
 The probabilistic assumption is shown in @eq-zip-cpr-distribution, where $\lambda_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ is the expected number of claims for policyholder $i$.
 
-$$
-Y_i \mid \mathbf{x}_i \sim \operatorname{Poisson}(\lambda_i)
-$${#eq-zip-cpr-distribution}
+$$Y_i \mid \mathbf{x}_i \sim \operatorname{Poisson}(\lambda_i)$${#eq-zip-cpr-distribution}
 
 The link function is the log link in @eq-zip-cpr-log-link.
 
-$$
-g(\lambda_i) = \log(\lambda_i)
-$${#eq-zip-cpr-log-link}
+$$g(\lambda_i) = \log(\lambda_i)$${#eq-zip-cpr-log-link}
 
 Using the same six covariates, the systematic component is given in @eq-zip-cpr-systematic.
 
-$$
-\log(\lambda_i)
+$$\log(\lambda_i)
 =
 \beta_0
 +
@@ -3548,20 +3564,17 @@ $$
 +
 \beta_5 x_{5,i}
 +
-\beta_6 x_{6,i}
-$${#eq-zip-cpr-systematic}
+\beta_6 x_{6,i}$${#eq-zip-cpr-systematic}
 
 In @eq-zip-cpr-systematic, there are $7$ coefficients, $\beta_0, \beta_1, \ldots, \beta_6$, which change the log-mean number of claims. The intercept $\beta_0$ is the baseline log-mean when all covariates are equal to zero, while $\beta_j$ for $j \in \{1, 2, \ldots, 6\}$ represents the change in log-mean claims for a one-unit increase in the corresponding regressor $x_{j,i}$, holding the other covariates fixed.
 
 This model works directly on the count scale through $\lambda_i$, but it also imposes the Poisson mean-variance relationship in @eq-zip-cpr-mean-variance.
 
-$$
-\mathbb{E}(Y_i \mid \mathbf{x}_i)
+$$\mathbb{E}(Y_i \mid \mathbf{x}_i)
 =
 \operatorname{Var}(Y_i \mid \mathbf{x}_i)
 =
-\lambda_i
-$${#eq-zip-cpr-mean-variance}
+\lambda_i$${#eq-zip-cpr-mean-variance}
 
 ::::: Heads-up
 ::: Heads-up-header
@@ -3701,7 +3714,15 @@ if (reticulate::py_eval("'cpr_coef_py' in globals()", convert = TRUE)) {
 ```
 :::
 
-As with the Logistic Regression output, the `R` and `Python` summaries may differ in formatting and small numerical details. The key comparison is substantive: the signs, approximate magnitudes, and interpretation on the exponential scale.
+::::: Heads-up
+::: Heads-up-header
+Heads-up on `R` and `Python` model summaries!
+:::
+
+::: Heads-up-container
+As with the Logistic Regression output, the two outputs may not be formatted identically. `R` and `Python` use different summary conventions, and their numerical optimizers can differ in small implementation details. Because both chunks use the same canonical training split, the fitted coefficients should nevertheless be within similar ranges.
+:::
+:::::
 
 The coefficient table in @tbl-cpr-fit-r tells a count-scale story rather than a zero-versus-nonzero story. `annual_mileage` and `prior_claims` remain strong positive predictors, but `vehicle_age` and `male` now also show clearer positive fitted associations with the expected number of claims. This is an important difference from the Logistic Regression fit: a covariate may be weak for predicting whether any claim occurs, but still matter for the expected number of claims once the count scale is preserved.
 
@@ -3897,7 +3918,6 @@ if (reticulate::py_eval("'cpr_effects_py' in globals()", convert = TRUE)) {
       print_as_dt()
 }
 ```
-
 :::
 
 A rate ratio greater than $1$ means that the expected number of claims is higher for the stated comparison, holding the other covariates fixed. A rate ratio below $1$ means that the expected number of claims is lower.
@@ -4087,37 +4107,11 @@ plt.show()
 
 The fitted patterns in @fig-cpr-fitted-patterns-r show why the Poisson baseline is informative. The fitted mean count increases from about **`r lr_cpr_stat("cpr_annual_mean_low")`** to about **`r lr_cpr_stat("cpr_annual_mean_high")`** across the mileage range, and from about **`r lr_cpr_stat("cpr_vehicle_mean_low")`** to about **`r lr_cpr_stat("cpr_vehicle_mean_high")`** across the vehicle-age range, with other covariates held at typical training-set values. The prior-claims panel also shows a clear fitted increase, from about **`r lr_cpr_stat("cpr_prior_mean_no")`** to about **`r lr_cpr_stat("cpr_prior_mean_yes")`**.
 
-Classical Poisson Regression therefore preserves the count response and gives a direct model for claim frequency. However, it uses one count-generating process for all observations. If many zeros arise from a separate mechanism, a single Poisson mean may have difficulty representing both the large mass at zero and the positive-count distribution. The next check makes this limitation explicit by comparing the observed zero frequency with the zero frequency implied by the fitted Poisson means.
+Classical Poisson Regression therefore preserves the count response and gives a direct model for claim frequency. The fitted patterns in @fig-cpr-fitted-patterns-r and @fig-cpr-fitted-patterns-py are useful because they show the same directional signals already suggested by the EDA: mileage, prior claims, and vehicle age are associated with higher expected counts. At the same time, the fitted Poisson curves are pulled toward the many zero observations. In practical terms, this means that a one-process Poisson model can follow the broad trend but still understate the expected count in parts of the covariate range where the empirical mean is high, such as the upper annual-mileage bins. The model is trying to represent both the zero pile-up and the positive-count pattern with one mean function, so the excess zeros can pull the fitted mean downward.
 
-The calculation is straightforward once the fitted Poisson means are available. For each policyholder, the fitted Classical Poisson Regression model gives a fitted mean $\widehat{\lambda}_i$. Under the Poisson model in @eq-zip-cpr-distribution, the probability of observing zero claims for that same policyholder is shown in @eq-zip-cpr-zero-probability.
+This is the key limitation for the present chapter. If many zeros arise from a separate mechanism, a single Poisson mean may have difficulty representing both the large mass at zero and the positive-count distribution. The next check makes this limitation explicit by comparing the observed zero frequency with the zero frequency implied by the fitted Poisson means.
 
-$$
-\widehat{p}^{\text{CPR}}_{0,i}
-=
-P(Y_i = 0 \mid \widehat{\lambda}_i)
-=
-\exp(-\widehat{\lambda}_i)
-$${#eq-zip-cpr-zero-probability}
-
-Averaging the fitted zero probabilities in @eq-zip-cpr-zero-probability gives the model-implied zero rate, and summing them gives the expected number of zero-claim policyholders under the fitted Poisson model, as shown in @eq-zip-cpr-zero-frequency.
-
-$$
-\widehat{r}^{\text{CPR}}_0
-=
-\frac{1}{n}\sum_{i=1}^{n}\widehat{p}^{\text{CPR}}_{0,i},
-\qquad
-\widehat{N}^{\text{CPR}}_0
-=
-\sum_{i=1}^{n}\widehat{p}^{\text{CPR}}_{0,i}
-$${#eq-zip-cpr-zero-frequency}
-
-The same table also reports the Pearson dispersion ratio in @eq-zip-cpr-pearson-dispersion, where $p$ is the number of estimated regression coefficients in the fitted Classical Poisson model.
-
-$$
-\widehat{\phi}_{\text{Pearson}}
-=
-\frac{\sum_{i=1}^{n}\frac{(y_i - \widehat{\lambda}_i)^2}{\widehat{\lambda}_i}}{n - p}
-$${#eq-zip-cpr-pearson-dispersion}
+The calculation is straightforward once the fitted Poisson means are available. For each policyholder, the fitted Classical Poisson Regression model gives a fitted mean $\widehat{\lambda}_i$. Under the Poisson model, the probability of observing zero claims for that same policyholder is $\exp(-\widehat{\lambda}_i)$. Averaging these fitted zero probabilities gives the model-implied zero rate; summing them gives the expected number of zero-claim policyholders under the fitted Poisson model.
 
 ::: panel-tabset
 ## **`R` Code**
@@ -4136,8 +4130,7 @@ cpr_zero_check_r <- tibble(
     "Average fitted Poisson zero probability",
     "Observed minus fitted zero rate",
     "Observed number of zeros",
-    "Expected number of zeros under fitted Poisson",
-    "Pearson dispersion ratio"
+    "Expected number of zeros under fitted Poisson"
   ),
   Value = c(
     mean(train_data$claims == 0, na.rm = TRUE),
@@ -4145,9 +4138,7 @@ cpr_zero_check_r <- tibble(
     mean(train_data$claims == 0, na.rm = TRUE) -
       mean(cpr_fitted_zero_prob_r, na.rm = TRUE),
     sum(train_data$claims == 0, na.rm = TRUE),
-    sum(cpr_fitted_zero_prob_r, na.rm = TRUE),
-    sum(residuals(cpr_model_r, type = "pearson")^2, na.rm = TRUE) /
-      df.residual(cpr_model_r)
+    sum(cpr_fitted_zero_prob_r, na.rm = TRUE)
   )
 )
 
@@ -4174,7 +4165,6 @@ cpr_fitted_zero_prob_py = np.exp(-cpr_fitted_mu_py)
 # Step 4: compare the observed and model-implied zero frequencies.
 observed_zero_rate_py = (training_data["claims"] == 0).mean()
 observed_zero_n_py = int((training_data["claims"] == 0).sum())
-pearson_dispersion_py = cpr_model_py.pearson_chi2 / cpr_model_py.df_resid
 
 cpr_zero_check_py = pd.DataFrame({
     "Summary": [
@@ -4183,7 +4173,6 @@ cpr_zero_check_py = pd.DataFrame({
         "Observed minus fitted zero rate",
         "Observed number of zeros",
         "Expected number of zeros under fitted Poisson",
-        "Pearson dispersion ratio",
     ],
     "Value": [
         observed_zero_rate_py,
@@ -4191,7 +4180,6 @@ cpr_zero_check_py = pd.DataFrame({
         observed_zero_rate_py - cpr_fitted_zero_prob_py.mean(),
         observed_zero_n_py,
         cpr_fitted_zero_prob_py.sum(),
-        pearson_dispersion_py,
     ],
 })
 ```
@@ -4216,8 +4204,7 @@ if (exists("cpr_model_r") && zip_has_train()) {
       "Average fitted Poisson zero probability",
       "Observed minus fitted zero rate",
       "Observed number of zeros",
-      "Expected number of zeros under fitted Poisson",
-      "Pearson dispersion ratio"
+      "Expected number of zeros under fitted Poisson"
     ),
     Value = c(
       mean(train_data$claims == 0, na.rm = TRUE),
@@ -4225,9 +4212,7 @@ if (exists("cpr_model_r") && zip_has_train()) {
       mean(train_data$claims == 0, na.rm = TRUE) -
         mean(cpr_fitted_zero_prob_r, na.rm = TRUE),
       sum(train_data$claims == 0, na.rm = TRUE),
-      sum(cpr_fitted_zero_prob_r, na.rm = TRUE),
-      sum(residuals(cpr_model_r, type = "pearson")^2, na.rm = TRUE) /
-        df.residual(cpr_model_r)
+      sum(cpr_fitted_zero_prob_r, na.rm = TRUE)
     )
   )
 
@@ -4298,7 +4283,6 @@ cpr_fitted_zero_prob_py = np.exp(-cpr_fitted_mu_py)
 
 observed_zero_rate_py = (training_data["claims"] == 0).mean()
 observed_zero_n_py = int((training_data["claims"] == 0).sum())
-pearson_dispersion_py = cpr_model_py.pearson_chi2 / cpr_model_py.df_resid
 
 cpr_zero_check_py = pd.DataFrame({
     "Summary": [
@@ -4307,7 +4291,6 @@ cpr_zero_check_py = pd.DataFrame({
         "Observed minus fitted zero rate",
         "Observed number of zeros",
         "Expected number of zeros under fitted Poisson",
-        "Pearson dispersion ratio",
     ],
     "Value": [
         observed_zero_rate_py,
@@ -4315,7 +4298,6 @@ cpr_zero_check_py = pd.DataFrame({
         observed_zero_rate_py - cpr_fitted_zero_prob_py.mean(),
         observed_zero_n_py,
         cpr_fitted_zero_prob_py.sum(),
-        pearson_dispersion_py,
     ],
 })
 ```
@@ -4337,7 +4319,7 @@ if (reticulate::py_eval("'cpr_zero_check_py' in globals()", convert = TRUE)) {
 ```
 :::
 
-In @tbl-cpr-zero-check-r and @tbl-cpr-zero-check-py, the observed zero rate is **`r lr_cpr_pct("observed_zero_rate")`**, while the average zero probability implied by the fitted Classical Poisson model is about **`r lr_cpr_pct("cpr_fitted_zero_rate")`**. The gap is about **`r lr_cpr_pct("cpr_zero_gap")`**, or roughly **`r lr_cpr_stat("observed_zero_n")`** observed zeros versus **`r lr_cpr_stat("cpr_expected_zero_n")`** expected zeros under the fitted Poisson means. This does not mean the Poisson model is useless; it captures important count-scale gradients. It does mean that the model has no separate mechanism for the extra zeros.
+In @tbl-cpr-zero-check-r and @tbl-cpr-zero-check-py, the observed zero rate is **`r lr_cpr_pct("observed_zero_rate")`**, while the average zero probability implied by the fitted Classical Poisson model is about **`r lr_cpr_pct("cpr_fitted_zero_rate")`**. The gap is about **`r lr_cpr_pct("cpr_zero_gap")`**, or roughly **`r lr_cpr_stat("observed_zero_n")`** observed zeros versus **`r lr_cpr_stat("cpr_expected_zero_n")`** expected zeros under the fitted Poisson means. This does not mean the Poisson model is useless; it captures important count-scale gradients. It does mean that the model has no separate mechanism for the extra zeros, and that the same fitted mean must compromise between explaining zero observations and positive counts.
 
 ### Why ZIP can be useful here
 
@@ -4346,7 +4328,382 @@ The two simpler approaches highlight the motivation for ZIP regression.
 | **Approach** | **Response Used** | **What the fitted comparison shows here** | **Main Limitation in This Example** |
 |:-----------------|:-----------------|:-----------------|:-----------------|
 | Binary Logistic Regression | $H_i = \mathbb{I}(Y_i > 0)$, implemented as `has_claim` | @tbl-lr-effects-r and @fig-lr-fitted-patterns-r show a strong zero-versus-nonzero signal for `annual_mileage` and `prior_claims`; the fitted odds ratios are about **`r lr_cpr_stat("lr_annual_or")`** and **`r lr_cpr_stat("lr_prior_or")`** for the scaled comparisons. | It collapses all positive counts into one category. In the training data, positive counts average **`r lr_cpr_stat("positive_mean_claims")`** and can reach **`r lr_cpr_stat("positive_max_claims")`**, so a binary response discards meaningful claim-frequency information. |
-| Classical Poisson Regression | $Y_i$, implemented as `claims` | @tbl-cpr-effects-r and @fig-cpr-fitted-patterns-r show clear count-scale gradients, especially for `annual_mileage`, `prior_claims`, and `vehicle_age`; their scaled fitted rate ratios are about **`r lr_cpr_stat("cpr_annual_rr")`**, **`r lr_cpr_stat("cpr_prior_rr")`**, and **`r lr_cpr_stat("cpr_vehicle_rr")`**. | It assumes a single Poisson count-generating process. As shown in @tbl-cpr-zero-check-r and @tbl-cpr-zero-check-py, its fitted zero probability is about **`r lr_cpr_pct("cpr_fitted_zero_rate")`**, below the observed zero rate of **`r lr_cpr_pct("observed_zero_rate")`**. |
+| Classical Poisson Regression | $Y_i$, implemented as `claims` | @tbl-cpr-effects-r and @fig-cpr-fitted-patterns-r show clear count-scale gradients, especially for `annual_mileage`, `prior_claims`, and `vehicle_age`; their scaled fitted rate ratios are about **`r lr_cpr_stat("cpr_annual_rr")`**, **`r lr_cpr_stat("cpr_prior_rr")`**, and **`r lr_cpr_stat("cpr_vehicle_rr")`**. | It assumes a single Poisson count-generating process. As shown in @tbl-cpr-zero-check-r and @tbl-cpr-zero-check-py, its fitted zero probability is about **`r lr_cpr_pct("cpr_fitted_zero_rate")`**, below the observed zero rate of **`r lr_cpr_pct("observed_zero_rate")`**. The excess zeros also pull the fitted count curve downward, which can understate the empirical mean count in high-risk regions of the covariate space. |
 | Zero-Inflated Poisson Regression | $Y_i$, implemented as `claims` | The EDA and the two baseline fits point to two simultaneous features: a strong zero-versus-nonzero process and meaningful variation in the positive count scale. | It is more complex, so it should be used when the EDA and subject-matter context justify a separate zero-generating mechanism. |
 
-In the insurance-claims setting, the EDA suggested a large zero-claim group and a positive-count pattern among the remaining observations. Logistic Regression describes the first piece: who is likely to file at least one claim. Classical Poisson Regression describes the second piece: how expected claim counts change with the covariates. ZIP regression is useful because it gives these two pieces separate but connected roles. One component models extra zeros, while the other models claim counts among observations that remain in the count-generating process.
+: Summary comparison of Binary Logistic Regression, Classical Poisson Regression, and Zero-Inflated Poisson Regression for the insurance-claims running example. {#tbl-zip-model-comparison .striped .hover}
+
+In the insurance-claims setting, the EDA suggested a large zero-claim group and a positive-count pattern among the remaining observations. Logistic Regression describes the first piece: who is likely to file at least one claim. Classical Poisson Regression describes the second piece: how expected claim counts change with the covariates, but it has to use the same mean structure to explain both the many zeros and the positive-count trend. ZIP regression is useful because it gives these two pieces separate but connected roles. One component models extra zeros, while the other models claim counts among observations that remain in the count-generating process.
+
+## Data Modelling
+
+The previous section used Binary Logistic Regression and Classical Poisson Regression as baseline comparisons. We now define the model that this chapter is actually about: Zero-Inflated Poisson Regression. The goal of this section is to move from the empirical motivation to the formal modelling equations that will later be estimated in `R` and `Python`.
+
+We first describe the model generically, without attaching the covariates to the insurance example. After that, we translate the notation back to the variables defined in @tbl-zip-covariate-notation.
+
+### Response distribution: a zero-inflated Poisson random variable
+
+Let $Y_i$ be a nonnegative count response for observational unit $i$, where $i = 1, 2, 3, \ldots, n$, and $n$ is the number of observations. A Zero-Inflated Poisson model assumes that each observation can arise from one of two latent states:
+
+1. A **structural-zero state**, where the response is forced to be zero.
+2. A **count-generating state**, where the response follows an ordinary Poisson distribution and can still equal zero by chance.
+
+To represent this idea, let's define a latent indicator $S_i$ which will work as an auxiliary variable to represent the presence of a structural zero. We have then that $S_i = 1$ means that observation $i$ belongs to the structural-zero state, and $S_i = 0$ means that observation $i$ belongs to the Poisson count-generating state. Let
+
+$$
+S_i \sim \operatorname{Bernoulli}(\pi_i),
+$${#eq-zip-latent-state}
+
+where $\pi_i = P(S_i = 1)$ is the probability that observation $i$ belongs to the structural-zero state. Conditional on this latent state, the response is generated as follows:
+
+$$
+Y_i \mid S_i =
+\begin{cases}
+0, & \text{if } S_i = 1, \\
+\operatorname{Poisson}(\lambda_i), & \text{if } S_i = 0.
+\end{cases}
+$${#eq-zip-latent-generation}
+
+The parameter $\lambda_i > 0$ is the Poisson mean in the count-generating state. The structural-zero state is important because it adds zeros that cannot be explained by the ordinary Poisson process alone. In other words, some zeros are **structural zeros**, while other zeros are **ordinary sampling zeros** generated by the Poisson distribution.
+
+Using @eq-zip-latent-state and @eq-zip-latent-generation, the probability of observing zero can be built in two steps. First, $Y_i = 0$ can happen because the observation is in the structural-zero state. Second, it can happen because the observation is in the count-generating state and the Poisson random variable happens to be zero:
+
+$$
+\begin{aligned}
+P(Y_i = 0 )
+&= P(S_i = 1 )
+   + P(S_i = 0)P(Y_i = 0 \mid S_i = 0) \\
+&= \pi_i + (1 - \pi_i)\exp(-\lambda_i).
+\end{aligned}
+$${#eq-zip-zero-probability}
+
+For a positive count in our response $y_i = 1, 2, 3, \dots$, the only way to observe $Y_i = y_i$ is to be in the count-generating state and then draw $y_i$ from the Poisson distribution:
+
+$$
+P(Y_i = y_i)
+= (1 - \pi_i)\frac{\exp(-\lambda_i)\lambda_i^{y_i}}{y_i!},
+\qquad y_i = 1, 2, 3, \dots
+$${#eq-zip-positive-probability}
+
+Equations @eq-zip-zero-probability and @eq-zip-positive-probability define the Zero-Inflated Poisson probability model.
+
+More formally, this distribution is represented as the following Probability Mass Function (PMF):
+
+$$
+P(Y_i=y_i)=
+\begin{cases}
+\pi_i+(1-\pi_i)\exp(-\lambda_i), & \text{if } y_i = 0 \\[6pt]
+(1-\pi_i)\dfrac{\exp(-\lambda_i) \lambda_i^{y_i}}{y_i!}, & \text{if } y_i = 1, 2, 3 \dots 
+\end{cases}
+$${#eq-zip-pmf}
+
+This also shows why the ZIP model can produce more zeros than an ordinary Poisson model: the zero probability is not only $\exp(-\lambda_i)$, but $\pi_i + (1 - \pi_i)\exp(-\lambda_i)$.
+
+The conditional mean under this model is
+
+$$
+\mathbb{E}(Y_i) = \sum_{y_i=0}^\infty y_i P(Y_i=y_i) = (1 - \pi_i)\lambda_i.
+$${#eq-zip-conditional-mean}
+
+Thus, the expected count depends on both components. A larger $\lambda_i$ increases the expected count among observations in the count-generating state, while a larger $\pi_i$ lowers the marginal expected count by moving more observations into the structural-zero state.
+
+::::: Tip
+::: Tip-header
+Tip on deriving the expected value of a ZIP random variable
+:::
+
+::: Tip-container
+A convenient way to derive the expected value of a Zero-Inflated Poisson random variable is to start directly from its PMF and then notice that the zero term contributes nothing to the expectation.
+
+Suppose that, for policyholder $i$,
+
+$$
+P(Y_i = y_i)
+=
+\begin{cases}
+\pi_i + (1 - \pi_i)\exp(-\lambda_i), & y_i = 0, \\[6pt]
+(1 - \pi_i)\dfrac{\exp(-\lambda_i)\lambda_i^{y_i}}{y_i!}, & y_i = 1, 2, 3, \ldots
+\end{cases}
+$$
+
+where $\pi_i$ is the probability of belonging to the structural-zero state, and $\lambda_i$ is the Poisson mean in the count-generating state.
+
+The expectation is
+
+$$
+\mathbb{E}(Y_i)
+=
+\sum_{y_i = 0}^{\infty}
+y_i P(Y_i = y_i).
+$$
+
+The first term of this sum corresponds to $y_i = 0$. Since it is multiplied by zero, it drops out:
+
+$$
+\mathbb{E}(Y_i)
+=
+\sum_{y_i = 1}^{\infty}
+y_i
+(1 - \pi_i)
+\dfrac{\exp(-\lambda_i)\lambda_i^{y_i}}{y_i!}.
+$$
+
+Now factor out the terms that do not depend on $y_i$:
+
+$$
+\mathbb{E}(Y_i)
+=
+(1 - \pi_i)\exp(-\lambda_i)
+\sum_{y_i = 1}^{\infty}
+\dfrac{y_i\lambda_i^{y_i}}{y_i!}.
+$$
+
+Since
+
+$$
+\dfrac{y_i}{y_i!}
+=
+\dfrac{1}{(y_i - 1)!},
+$$
+
+we can rewrite the sum as
+
+$$
+\mathbb{E}(Y_i)
+=
+(1 - \pi_i)\exp(-\lambda_i)
+\sum_{y_i = 1}^{\infty}
+\dfrac{\lambda_i^{y_i}}{(y_i - 1)!}.
+$$
+
+Now change the index by letting $p = y_i - 1$. When $y_i = 1$, $p = 0$, so
+
+$$
+\mathbb{E}(Y_i)
+=
+(1 - \pi_i)\exp(-\lambda_i)
+\sum_{p = 0}^{\infty}
+\dfrac{\lambda_i^{p + 1}}{p!}.
+$$
+
+Factor out one $\lambda_i$ from $\lambda_i^{p+1}$:
+
+$$
+\mathbb{E}(Y_i \mid \mathbf{x}_i)
+=
+(1 - \pi_i)\exp(-\lambda_i)
+\sum_{p = 0}^{\infty}
+\dfrac{\lambda_i^{p}\lambda_i}{p!}
+=
+(1 - \pi_i)\exp(-\lambda_i)\lambda_i
+\sum_{p = 0}^{\infty}
+\dfrac{\lambda_i^p}{p!}.
+$$
+
+Finally, recall the exponential McLaurin series expansion
+
+$$
+\exp(x)
+=
+\sum_{n = 0}^{\infty}
+\dfrac{x^n}{n!}
+$$
+where $x$ is equivalent to $\lambda_i$, and $n$ is equivalent to $p$.
+
+Therefore,
+
+$$
+\mathbb{E}(Y_i)
+=
+(1 - \pi_i)\exp(-\lambda_i)\lambda_i\exp(\lambda_i)
+=
+(1 - \pi_i)\exp(-\lambda_i + \lambda_i) \cdot \lambda_i
+=
+(1 - \pi_i)\lambda_i.
+$$
+
+So, for a ZIP model,
+
+$$
+\boxed{
+\mathbb{E}(Y_i)
+=
+(1 - \pi_i)\lambda_i
+}
+$$
+
+This result is intuitive: the count-generating Poisson process has mean $\lambda_i$, but it is active only with probability $1 - \pi_i$. The structural-zero group contributes no counts to the expectation.
+:::
+:::::
+
+### Modelling the parameters with covariates
+
+Now suppose that each observational unit has $k$ candidate covariates. A compact covariate vector can be written as
+
+$$
+\mathbf{x}_i = (1, x_{1,i}, x_{2,i}, \ldots, x_{k,i})^\top,
+$${#eq-zip-generic-covariate-vector}
+
+where the leading $1$ represents the intercept. 
+
+The main implication having a compound probability distribution combining both the structural zeros and the actual counts is that out model now has two systematic components (one for each respectively, with its own link function to the expected value). This is perhaps the main difference from a traditional GLM when only one link function and only one systematic component is associated to the response.
+
+For this chapter, we use $\alpha$ coefficients for the structural-zero component and $\beta$ coefficients for the count component.
+
+The structural-zero probability is modelled with a logit link:
+
+$$
+\operatorname{logit}(\pi_i)
+= \log\left(\frac{\pi_i}{1 - \pi_i}\right)
+= \alpha_0 + \alpha_1x_{1,i} + \alpha_2x_{2,i} + \cdots + \alpha_mx_{k,i}.
+$${#eq-zip-zero-linear-predictor}
+
+Alternatively we can also define the $\boldsymbol{\alpha}$ vector as
+
+$$
+\boldsymbol{\alpha} = (\alpha_0, \alpha_{1}, \alpha_{2}, \ldots, \alpha_{k})^\top,
+$${#eq-zip-alpha-vector}
+
+and in matrix-vector product form, the same equation is
+
+$$
+\operatorname{logit}(\pi_i) = \mathbf{x}_i^\top \boldsymbol{\alpha}.
+$${#eq-zip-zero-matrix-form}
+
+Equivalently,
+
+$$
+\pi_i = \frac{\exp(\mathbf{x}_i^\top \boldsymbol{\alpha})}{1 + \exp(\mathbf{x}_i^\top \boldsymbol{\alpha})}.
+$${#eq-zip-zero-inverse-link}
+
+A positive $\alpha_j$ means that increasing $x_{j,i}$ increases the log-odds of belonging to the structural-zero state, holding the other covariates fixed. On the exponential scale, $\exp(\alpha_j)$ is an odds ratio for structural-zero membership for a one-unit increase in $x_{j,i}$.
+
+The Poisson count mean is modelled with a log link:
+
+$$
+\log(\lambda_i)
+= \beta_0 + \beta_1x_{1,i} + \beta_2x_{2,i} + \cdots + \beta_mx_{m,i}.
+$${#eq-zip-count-linear-predictor}
+
+Alternatively we can also define the $\boldsymbol{\beta}$ vector as
+
+$$
+\boldsymbol{\beta} = (\beta_0, \beta_{1}, \beta_{2}, \ldots, \beta_{k})^\top,
+$${#eq-zip-beta-vector}
+
+and in matrix-vector product form, the same equation is
+
+$$
+\log(\lambda_i) = \mathbf{x}_i^\top \boldsymbol{\beta}.
+$${#eq-zip-count-matrix-form}
+
+Equivalently,
+
+$$
+\lambda_i = \exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$${#eq-zip-count-inverse-link}
+
+A positive $\beta_j$ means that increasing $x_{j,i}$ increases the log mean of the Poisson count-generating process, holding the other covariates fixed. On the exponential scale, $\exp(\beta_j)$ is a rate ratio for the Poisson mean in the count-generating state for a one-unit increase in $x_{j,i}$.
+
+If we put both of these components together, the link to the overall mean for the count response would look as follows:
+
+$$
+\begin{aligned}
+\mathbb{E}(Y_i \mid \mathbf{x}_i)
+&= (1-\pi_i)\lambda_i \\[10pt]
+&= \bigg(1-\frac{\exp(\mathbf{x}_i^\top \boldsymbol{\alpha})}{1 + \exp(\mathbf{x}_i^\top \boldsymbol{\alpha})}\bigg)\cdot \exp(\mathbf{x}_i^\top \boldsymbol{\beta})\\[10pt]
+&=\bigg(\frac{1}{1+\exp(\mathbf{x}_i^\top \boldsymbol{\alpha})} \bigg)\cdot \exp(\mathbf{x}_i^\top \boldsymbol{\beta})\\[10pt]
+&=\frac{\exp(\mathbf{x}_i^\top \boldsymbol{\beta})}{1+\exp(\mathbf{x}_i^\top \boldsymbol{\alpha})}\\[10pt]
+&=\dfrac{\exp(\beta_0+\beta_1 x_{1,i} + \beta_2 x_{2,i} +  \dots +\beta_k x_{k,i})}{1+\exp(\alpha_0+\alpha_1 x_{1,i} + \alpha_2 x_{2,i} +  \dots +\alpha_k x_{k,i})}
+\end{aligned}
+$${#eq-zip-complete-link-mean}
+
+::::: Heads-up
+::: Heads-up-header
+Heads-up on using the same covariates in both components!
+:::
+
+::: Heads-up-container
+The notation above uses the same covariate vector $\mathbf{x}_i$ in both components for simplicity and for consistency with the running example. In practice, the zero-inflation component and the count component can use **different covariate sets**. For example, one component could use all candidate regressors, while the other uses a smaller subset selected for substantive reasons: nature of the problem, feature selection, reducing model complexity, etc.
+:::
+:::::
+
+### Assumptions behind the ZIP formulation
+
+The ZIP model is useful only when its two-component story is plausible. In this chapter, the main assumptions are:
+
+- **Count response:** The response $Y_i$ is a nonnegative integer-valued count.
+- **Independent observations:** Conditional on the covariates and model parameters, the observations are treated as independent.
+- **Two zero sources:** It is substantively plausible that some zeros are structural zeros, while other zeros arise from the Poisson count-generating process.
+- **Correct component interpretation:** The zero-inflation component models the probability of belonging to the structural-zero state, and the count component models the Poisson mean among observations that remain in the count-generating state.
+- **Link-function structure:** The logit link for $\pi_i$ and log link for $\lambda_i$ are reasonable ways to connect the covariates to the two parameters.
+- **Poisson count-generating state:** Conditional on being in the count-generating state, the Poisson mean-variance relationship is a reasonable starting point.
+- **Enough information for two components:** There are enough positive counts and enough variation in the covariates to estimate both components without severe instability.
+
+If the count-generating part is still strongly overdispersed after accounting for excess zeros, then a Zero-Inflated Negative Binomial model may be a more appropriate extension. If there is no substantive reason to distinguish structural zeros from ordinary sampling zeros, then a simpler count model may be easier to justify and communicate.
+
+### Interpretation caveats
+
+The two-component structure makes ZIP regression powerful, but it also requires careful interpretation. The most important caveat is that a covariate can appear in both components. When this happens, that covariate can affect the chance of being a structural zero and the expected count among observations in the count-generating state at the same time.
+
+This can produce results that feel counter-intuitive at first. For example, a covariate could have a positive $\alpha_j$ and a positive $\beta_j$. In that case, higher values of the covariate are associated with **higher odds of being in the structural-zero state**, but also with a **higher expected count among observations that are not structural zeros**. These statements are not contradictory because they refer to different latent parts of the model.
+
+The marginal expected count in @eq-zip-conditional-mean depends on both $\pi_i$ and $\lambda_i$. Therefore, a coefficient in one component should not automatically be interpreted as the total effect of a covariate on the observed count. A full marginal interpretation usually requires combining both components through predicted values or marginal effects.
+
+::::: Tip
+::: Tip-header
+Tip on reading ZIP coefficients
+:::
+
+::: Tip-container
+A positive count-component coefficient and a positive zero-inflation coefficient do not mean the model is wrong. They may indicate a population where a covariate separates two kinds of observations: a subgroup increasingly likely to have no events at all, and a remaining at-risk subgroup with larger expected counts. This is one reason predicted probabilities and fitted means are often more intuitive than coefficient tables alone.
+:::
+:::::
+
+### ZIP model for the insurance-claims running example
+
+We now return to the notation from @tbl-zip-covariate-notation. For policyholder $i$, the response is $Y_i = \texttt{claims}_i$, and the six candidate covariates are
+
+$$
+\mathbf{x}_i = \left(1, x_{1,i}, x_{2,i}, x_{3,i}, x_{4,i}, x_{5,i}, x_{6,i}\right)^\top,
+$${#eq-zip-example-covariate-vector}
+
+where $x_{1,i}$ is `driver_age`, $x_{2,i}$ is `annual_mileage`, $x_{3,i}$ is `vehicle_age`, $x_{4,i}$ is `male`, $x_{5,i}$ is `urban_area`, and $x_{6,i}$ is `prior_claims`.
+
+For the zero-inflation component, we write
+
+$$
+\log\left(\frac{\pi_i}{1 - \pi_i}\right)
+= \alpha_0
++ \alpha_1x_{1,i}
++ \alpha_2x_{2,i}
++ \alpha_3x_{3,i}
++ \alpha_4x_{4,i}
++ \alpha_5x_{5,i}
++ \alpha_6x_{6,i}.
+$${#eq-zip-example-zero-component}
+
+Here, $\pi_i$ is the probability that policyholder $i$ belongs to the structural-zero group. For example, $\alpha_2$ describes how annual mileage is associated with the log-odds of being in that structural-zero group, holding the other covariates fixed.
+
+For the count component, we write
+
+$$
+\log(\lambda_i)
+= \beta_0
++ \beta_1x_{1,i}
++ \beta_2x_{2,i}
++ \beta_3x_{3,i}
++ \beta_4x_{4,i}
++ \beta_5x_{5,i}
++ \beta_6x_{6,i}.
+$${#eq-zip-example-count-component}
+
+Here, $\lambda_i$ is the expected number of claims for policyholder $i$ **conditional on being in the count-generating state**. For example, $\beta_2$ describes how annual mileage is associated with the log mean claim count among policyholders who remain in the count-generating process, holding the other covariates fixed.
+
+Together, @eq-zip-example-zero-component and @eq-zip-example-count-component define the working ZIP model for the insurance-claims example. This specification uses the same six covariates in both components, which is useful for teaching because it lets us compare how the same regressor can behave differently in the structural-zero and count-generating parts of the model.
+
+The combination of these two would look like this for the mean response, recalling @eq-zip-complete-link-mean:
+
+$$
+\mathbb{E}(Y_i \mid x_{1,i}, x_{2,i}, \dots, x_{6,i}) = \dfrac{\exp(\beta_0+\beta_1 x_{1,i} + \dots + \beta_6 x_{6,i})}{1 + \exp(\alpha_0+\alpha_1 x_{1,i} + \dots + \alpha_6 x_{6,i})}
+$${#eq-zip-example-complete-link-mean}
