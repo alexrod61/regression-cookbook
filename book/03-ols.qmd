@@ -781,7 +781,7 @@ import matplotlib.pyplot as plt
 
 # Histogram of Net_Money
 plt.hist(train_data["Net_Money"].dropna(), bins=8, color="blue", edgecolor="white")
-plt.title("Distribution of Net Money")
+plt.title("")
 plt.xlabel("Net Money")
 plt.ylabel("Frequency")
 plt.show()
@@ -1352,7 +1352,7 @@ sns.regplot(
     scatter_kws={"color": "blue", "s": 40},  # s = point size
     line_kws={"color": "red", "linewidth": 2}
 )
-plt.title("Net Money vs. Monthly Allowance")
+plt.title("")
 plt.xlabel("Monthly Allowance")
 plt.ylabel("Net Money")
 plt.tight_layout()
@@ -1430,7 +1430,7 @@ sns.regplot(
     scatter_kws={"color": "blue", "s": 40},  # s = point size
     line_kws={"color": "red", "linewidth": 2}
 )
-plt.title("Net Money vs. Monthly Allowance")
+plt.title("")
 plt.xlabel("Monthly Allowance")
 plt.ylabel("Net Money")
 plt.tight_layout()
@@ -1499,7 +1499,7 @@ sns.boxplot(
     y="Net_Money",
     color="lightgreen"
 )
-plt.title("Net Money by Living Situation")
+plt.title("")
 plt.xlabel("Living Situation")
 plt.ylabel("Net Money")
 plt.tight_layout()
@@ -1576,7 +1576,7 @@ sns.boxplot(
     y="Net_Money",
     palette=["#E69F00", "#56B4E9", "#009E73"]
 )
-plt.title("Net Money by Living Situation")
+plt.title("")
 plt.xlabel("Living Situation")
 plt.ylabel("Net Money")
 plt.tight_layout()
@@ -1585,8 +1585,6 @@ plt.show()
 
 :::
   
-
-
 #### Summary Statistics
 
 In addition to visual exploration, descriptive statistics provide a numerical summary of the dataset that is especially useful for beginners. Summary statistics give you a snapshot of the central tendency and spread of your data, helping you quickly grasp its overall characteristics.
@@ -1702,7 +1700,182 @@ If significant interaction effects exist—such as students who live independent
 
 With the data modelling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each predictor contributes to the response variable, allowing us to measure their individual effects on Net Money.
 
-The goal of estimation is to determine the best-fitting regression line by minimizing the sum of squared residuals—the differences between the observed and predicted values. This step provides a mathematical basis for analyzing financial behaviors in students.
+The goal of estimation is to determine the best-fitting regression line by minimizing the sum of squared residuals—the differences between the observed and predicted values. This step provides a mathematical basis for analyzing financial behaviors in students. Although functions such as `lm()` estimate regression coefficients automatically (as we will see in the next section), understanding the mathematical foundation of ordinary least squares helps clarify how linear regression models are fit. The following tip briefly reviews the underlying theory.
+
+::: {.Tip}
+::::{.Tip-header}
+The Matrix Form of Linear Regression
+::::
+::::{.Tip-container}
+
+In ordinary least squares (OLS) regression, we model the relationship between a response variable and one or more predictors using the matrix equation
+
+$$
+\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}
+$$
+where:
+  
+- $\mathbf{Y}$ is an $n \times 1$ vector of observed response values, where $n$ is the number of observations in the sample.
+  
+- $\mathbf{X}$ is an $n \times (p+1)$ design matrix containing the regressors, where $p$ is the number of regressors The additional column corresponds to the intercept term.
+  
+- $\boldsymbol{\beta}$ is a $(p+1) \times 1$ vector of regression coefficients including the intercept coefficient.
+  
+- $\boldsymbol{\varepsilon}$ is an $n \times 1$ vector of random errors (residual terms).
+
+If we have $n$ observations and $p$ regressors, the design matrix may look like
+
+$$
+\mathbf{X} =
+\begin{bmatrix}
+1 & x_{11} & x_{12} & \cdots & x_{1p} \\
+1 & x_{21} & x_{22} & \cdots & x_{2p} \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+1 & x_{n1} & x_{n2} & \cdots & x_{np}
+\end{bmatrix}
+$$
+  
+Each row of the matrix corresponds to one observation in the dataset, while each column corresponds to a regressor. For example, the element $x_{ij}$ represents the value of the $j$th predictor for the $i$th observation.
+
+The first column of ones represents the intercept term. Including this column allows the model to estimate a constant baseline value (the intercept) rather than forcing the regression line (or more accurately hyperplane) to pass through the origin.
+
+For example, suppose we have data from $n = 100$ individuals and we want to predict salary using two predictors: years of experience and years of education. In this case, the response vector $\mathbf{Y}$ would contain 100 salary values, making it a $100 \times 1$ vector. Since we have two regressors plus an intercept term, the design matrix $\mathbf{X}$ would have 100 rows and 3 columns. The first column would contain only ones for the intercept, the second column might contain years of experience, and the third column might contain years of education. The coefficient vector $\boldsymbol{\beta}$ would therefore contain three coefficients: one intercept coefficient and one coefficient for each predictor.
+
+A small portion of the design matrix may look like
+
+$$
+\mathbf{X} =
+\begin{bmatrix}
+1 & 5 & 16 \\
+1 & 2 & 14 \\
+1 & 8 & 18 \\
+1 & 10 & 20 \\
+\vdots & \vdots & \vdots
+\end{bmatrix}
+$$
+
+where:
+
+- the first column of ones represents the intercept term,
+- the second column contains years of experience,
+- the third column contains years of education,
+- and each row corresponds to one individual in the dataset.
+
+Recall that the goal of OLS is to find the coefficient vector $\boldsymbol{\beta}$ that minimizes the sum of squared residuals:
+  
+$$
+RSS = \sum_{i=1}^{n}(Y_i - \hat{Y}_i)^2
+$$
+This objective function can be written more compactly by using matrix notation as:
+
+$$
+RSS = (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+$$
+  
+Here, the superscript ${}^\top$ denotes the matrix transpose operation, which converts a column vector into a row vector. This allows the expression to produce a single scalar value representing the residual sum of squares.
+  
+To find the value of $\boldsymbol{\beta}$ that minimizes the residual sum of squares, we differentiate the objective function with respect to $\boldsymbol{\beta}$ and set the derivative equal to zero. Starting from the matrix form of the residual sum of squares,
+
+$$
+RSS =
+(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top
+(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+$$
+
+we can expand the expression as follows:
+
+$$
+RSS =
+\left(\mathbf{Y}^\top - (\mathbf{X}\boldsymbol{\beta})^\top\right)
+(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+$$
+
+Using the transpose rule $(\mathbf{X}\boldsymbol{\beta})^\top =
+\boldsymbol{\beta}^\top \mathbf{X}^\top$, we get
+
+$$
+RSS =
+(\mathbf{Y}^\top - \boldsymbol{\beta}^\top \mathbf{X}^\top)
+(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+$$
+
+Now multiply the terms:
+
+$$
+RSS =
+\mathbf{Y}^\top \mathbf{Y}
+-
+\mathbf{Y}^\top \mathbf{X}\boldsymbol{\beta}
+-
+\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
++
+\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+$$
+
+The two middle terms are scalars and are equal to each other:
+
+$$
+\mathbf{Y}^\top \mathbf{X}\boldsymbol{\beta}
+=
+\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
+$$
+
+Therefore, the expression simplifies to
+
+$$
+RSS =
+\mathbf{Y}^\top \mathbf{Y}
+-
+2\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
++
+\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+$$
+
+
+  
+Taking the derivative with respect to $\boldsymbol{\beta}$:
+  
+$$
+  \frac{\partial RSS}{\partial \boldsymbol{\beta}}
+=
+  -2\mathbf{X}^\top \mathbf{Y}
++
+  2\mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+$$
+  
+Setting the derivative equal to zero:
+  
+$$
+  -2\mathbf{X}^\top \mathbf{Y}
++
+  2\mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+= 0
+$$
+  
+which simplifies to the **normal equations**
+
+$$
+  \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+=
+  \mathbf{X}^\top \mathbf{Y}
+$$
+  
+Assuming $(\mathbf{X}^\top \mathbf{X})$ is invertible, we can solve for the estimated coefficient vector:
+  
+$$
+  \hat{\boldsymbol{\beta}}
+=
+  (\mathbf{X}^\top \mathbf{X})^{-1}
+\mathbf{X}^\top \mathbf{Y}
+$$
+  
+This expression is known as the **ordinary least squares estimator**. Conceptually, OLS chooses the regression coefficients that produce the smallest possible squared prediction error for the observed data.
+
+In practice, software such as `lm()` in R computes these estimates automatically using efficient numerical algorithms rather than explicitly calculating matrix inverses. Although we do not need to perform these calculations by hand, it is still important to understand what happens behind the scenes when fitting a linear regression model using the `lm()` function.
+
+::::
+:::
+
 
 ### Fitting the Model
 
