@@ -1198,21 +1198,25 @@ Each $p_j(\underline{x})$ is guaranteed to be a valid (non-negative) probability
 
 ### The Log-Likelihood Function
 
-Let $y_{i,j} = 1$ if the $i$th individual falls in category $j$, and $y_{i,j} = 0$ otherwise. The likelihood function for the ordinal logistic regression model is:
+To estimate the model, we need a way to measure how well a given set of parameters explains the observed data. The **likelihood function** does exactly this: it expresses the probability of the data we actually observed as a function of the unknown parameters, and estimation amounts to finding the parameter values that make this probability as large as possible.
+
+We first encode each individual's observed category using an **indicator variable**. Let $y_{i,j} = 1$ if the $i$th individual falls in category $j$, and $y_{i,j} = 0$ otherwise. Because every individual falls in exactly one of the $J$ categories, for each person $i$ precisely one of the values $y_{i,1}, y_{i,2}, \ldots, y_{i,J}$ equals $1$ and the rest are $0$. This indicator simply acts as a switch that "selects" the category each individual actually landed in. The likelihood function for the ordinal logistic regression model is then:
 
 $$
 \mathcal{L}(\boldsymbol{\alpha}, \boldsymbol{\beta} \mid y) = \prod_{i=1}^n \prod_{j=1}^J p_j(\underline{x}_i)^{y_{i,j}},
 $$
 
-where $\boldsymbol{\alpha} = (\alpha_1, \alpha_2, \ldots, \alpha_{J-1})^\top$ is the vector of thresholds and $\boldsymbol{\beta} = (\beta_1, \beta_2, \ldots, \beta_K)^\top$ is the vector of shared slopes. This is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
+where $n$ is the number of individuals in the sample, $J$ is the number of ordered categories, and $p_j(\underline{x}_i) = P(Y = j \mid \underline{x}_i)$ is the model-implied probability that individual $i$ (with regressor values $\underline{x}_i$) falls in category $j$, as derived earlier by differencing the cumulative probabilities. The two unknown parameter sets being estimated are collected in $\boldsymbol{\alpha} = (\alpha_1, \alpha_2, \ldots, \alpha_{J-1})^\top$, the vector of thresholds (the category-specific intercepts), and $\boldsymbol{\beta} = (\beta_1, \beta_2, \ldots, \beta_K)^\top$, the vector of $K$ shared slopes that apply across all cumulative splits.
 
-Taking the logarithm yields the log-likelihood:
+The two products have intuitive roles. The **inner product** over $j$ runs across the $J$ categories for a single individual: because of the indicator $y_{i,j}$ in the exponent, every term equals $1$ except the one matching the individual's true category, so the inner product collapses to just $p_j(\underline{x}_i)$ for that observed category. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
+
+Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the log-likelihood:
 
 $$
 \ell(\boldsymbol{\alpha}, \boldsymbol{\beta}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_j(\underline{x}_i).
 $$
 
-There is no closed-form solution for $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$ that maximizes $\ell$, so we rely on iterative numerical optimization, typically the **Newton–Raphson** method.
+Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$, the parameter values under which the observed data are most probable. Unlike ordinary least squares, however, there is no closed-form algebraic expression for the values of $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$ that maximize $\ell$: the category probabilities $p_j(\underline{x}_i)$ enter the log-likelihood non-linearly through the logistic function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice here is the **Newton–Raphson** method, which we describe next.
 
 ### The Newton–Raphson Method
 
