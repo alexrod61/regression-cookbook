@@ -422,7 +422,7 @@ print(college_data["inclination_to_apply"].cat.categories.tolist())
 
 ## Exploratory Data Analysis
 
-To visualize the relationship between `inclination_to_apply` and each continuous explanatory variable (`GPA` and `GRE_score`), we will use the following side-by-side plots:
+We will begin by splitting the data into 80% training (800 observations) and 20% test (200 observations), stratified by `inclination_to_apply`. To visualize the relationship between `inclination_to_apply` and each continuous explanatory variable (`GPA` and `GRE_score`), we will use the following side-by-side plots:
 
 - **Boxplots.**
 - **Violin plots.**
@@ -434,7 +434,16 @@ To visualize the relationship between `inclination_to_apply` and `field_of_study
 ### R Code
 
 ```{.r}
-college_data_side_boxplots <- college_data |>
+library(MASS)
+library(caret)
+library(ggplot2)
+
+set.seed(42)
+train_idx  <- createDataPartition(college_data$inclination_to_apply, p = 0.8, list = FALSE)
+train_df  <- college_data[train_idx, ]
+test_df   <- college_data[-train_idx, ]
+
+train_df_side_boxplots <- train_df |>
   ggplot(aes(inclination_to_apply, GPA)) +
   geom_boxplot(aes(fill = inclination_to_apply)) +
   labs(y = "GPA", x = "Inclination Apply\nto Graduate School") +
@@ -449,7 +458,7 @@ college_data_side_boxplots <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-college_data_side_violin <- college_data |>
+train_df_side_violin <- train_df |>
   ggplot(aes(inclination_to_apply, GPA)) +
   geom_violin(aes(fill = inclination_to_apply)) +
   labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
@@ -469,16 +478,16 @@ college_data_side_violin <- college_data |>
   scale_fill_brewer(palette="BuPu")
 
 # Data wrangling
-college_data_prop_summary <- as.data.frame(xtabs(
+train_df_prop_summary <- as.data.frame(xtabs(
   ~ field_of_study +
     inclination_to_apply,
-  college_data
+  train_df
 ) / rowSums(xtabs(
   ~ field_of_study + inclination_to_apply,
-  college_data
+  train_df
 )), responseName = "prop")
 
-college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
+train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
   x = field_of_study,
   y = prop, fill = inclination_to_apply
 )) +
@@ -500,19 +509,25 @@ college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
   guides(fill = guide_legend(title = "Inclination to Apply")) +
   scale_fill_brewer(palette = "Blues")
 
-plot_grid(college_data_side_boxplots, college_data_side_violin, nrow = 1)
-college_data_stacked_bars
+plot_grid(train_df_side_boxplots, train_df_side_violin, nrow = 1)
+train_df_stacked_bars
 ```
 
 ### Python Code
 
 ```{.py}
-# ── 1. Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+from sklearn.model_selection import train_test_split
+train_df, test_df = train_test_split(
+    train_df, test_size=0.2, random_state=42,
+    stratify=train_df["inclination_to_apply"]
+)
+
+# Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
-sns.boxplot(data=college_data, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
             palette='BuPu', ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=16, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
@@ -522,12 +537,12 @@ for lbl in axes[0].get_xticklabels():
     lbl.set_ha('right')
 
 # --- Violin Plot with mean point ---
-sns.violinplot(data=college_data, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
                palette='BuPu', ax=axes[1], legend=False, dodge=False)
-ordered_cats = list(college_data['inclination_to_apply'].cat.categories) \
-    if hasattr(college_data['inclination_to_apply'], 'cat') \
-    else sorted(college_data['inclination_to_apply'].unique())
-means = college_data.groupby('inclination_to_apply', observed=True)['GPA'].mean()
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GPA'].mean()
 xticks = axes[1].get_xticks()
 for i, cat in enumerate(ordered_cats):
     axes[1].plot(xticks[i], means[cat], marker='D', color='red',
@@ -546,8 +561,8 @@ plt.show()
 
 # Data wrangling (equivalent to xtabs + prop.table)
 pivot = pd.crosstab(
-    college_data['field_of_study'],
-    college_data['inclination_to_apply'],
+    train_df['field_of_study'],
+    train_df['inclination_to_apply'],
     normalize='index'
 )
 
@@ -594,7 +609,16 @@ plt.show()
 #| echo: false
 #| message: false
 #| warning: false
-college_data_side_boxplots <- college_data |>
+library(MASS)
+library(caret)
+library(ggplot2)
+
+set.seed(42)
+train_idx  <- createDataPartition(train_df$inclination_to_apply, p = 0.8, list = FALSE)
+train_df  <- train_df[train_idx, ]
+test_df   <- train_df[-train_idx, ]
+
+train_df_side_boxplots <- train_df |>
   ggplot(aes(inclination_to_apply, GPA)) +
   geom_boxplot(aes(fill = inclination_to_apply)) +
   labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
@@ -609,7 +633,7 @@ college_data_side_boxplots <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-college_data_side_violin <- college_data |>
+train_df_side_violin <- train_df |>
   ggplot(aes(inclination_to_apply, GPA)) +
   geom_violin(aes(fill = inclination_to_apply)) +
   labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
@@ -629,16 +653,16 @@ college_data_side_violin <- college_data |>
   scale_fill_brewer(palette="BuPu")
 
 # Data wrangling
-college_data_prop_summary <- as.data.frame(xtabs(
+train_df_prop_summary <- as.data.frame(xtabs(
   ~ field_of_study +
     inclination_to_apply,
-  college_data
+  train_df
 ) / rowSums(xtabs(
   ~ field_of_study + inclination_to_apply,
-  college_data
+  train_df
 )), responseName = "prop")
 
-college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
+train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
   x = field_of_study,
   y = prop, fill = inclination_to_apply
 )) +
@@ -660,8 +684,8 @@ college_data_stacked_bars <- ggplot(college_data_prop_summary, aes(
   guides(fill = guide_legend(title = "Inclination to Apply")) +
   scale_fill_brewer(palette = "Blues")
 
-plot_grid(college_data_side_boxplots, college_data_side_violin, nrow = 1)
-college_data_stacked_bars
+plot_grid(train_df_side_boxplots, train_df_side_violin, nrow = 1)
+train_df_stacked_bars
 ```
 
 ### Python Output
@@ -670,12 +694,18 @@ college_data_stacked_bars
 #| echo: false
 #| message: false
 #| warning: false
-# ── 1. Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+from sklearn.model_selection import train_test_split
+train_df, test_df = train_test_split(
+    train_df, test_size=0.2, random_state=42,
+    stratify=train_df["inclination_to_apply"]
+)
+
+# Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
-sns.boxplot(data=college_data, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
             palette='BuPu', ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=16, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
@@ -685,12 +715,12 @@ for lbl in axes[0].get_xticklabels():
     lbl.set_ha('right')
 
 # --- Violin Plot with mean point ---
-sns.violinplot(data=college_data, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
                palette='BuPu', ax=axes[1], legend=False, dodge=False)
-ordered_cats = list(college_data['inclination_to_apply'].cat.categories) \
-    if hasattr(college_data['inclination_to_apply'], 'cat') \
-    else sorted(college_data['inclination_to_apply'].unique())
-means = college_data.groupby('inclination_to_apply', observed=True)['GPA'].mean()
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GPA'].mean()
 xticks = axes[1].get_xticks()
 for i, cat in enumerate(ordered_cats):
     axes[1].plot(xticks[i], means[cat], marker='D', color='red',
@@ -709,8 +739,8 @@ plt.show()
 
 # Data wrangling (equivalent to xtabs + prop.table)
 pivot = pd.crosstab(
-    college_data['field_of_study'],
-    college_data['inclination_to_apply'],
+    train_df['field_of_study'],
+    train_df['inclination_to_apply'],
     normalize='index'
 )
 
@@ -762,7 +792,7 @@ Next, we examine how `GRE_score` relates to `inclination_to_apply` using the sam
 ### R Code
 
 ```{.r}
-college_data_gre_boxplots <- college_data |>
+train_df_gre_boxplots <- train_df |>
   ggplot(aes(inclination_to_apply, GRE_score)) +
   geom_boxplot(aes(fill = inclination_to_apply)) +
   labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
@@ -776,7 +806,7 @@ college_data_gre_boxplots <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-college_data_gre_violin <- college_data |>
+train_df_gre_violin <- train_df |>
   ggplot(aes(inclination_to_apply, GRE_score)) +
   geom_violin(aes(fill = inclination_to_apply)) +
   labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
@@ -794,7 +824,7 @@ college_data_gre_violin <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-plot_grid(college_data_gre_boxplots, college_data_gre_violin, nrow = 1)
+plot_grid(train_df_gre_boxplots, train_df_gre_violin, nrow = 1)
 ```
 
 ### Python Code
@@ -803,7 +833,7 @@ plot_grid(college_data_gre_boxplots, college_data_gre_violin, nrow = 1)
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
-sns.boxplot(data=college_data, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
             palette='BuPu', ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=16, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
@@ -813,12 +843,12 @@ for lbl in axes[0].get_xticklabels():
     lbl.set_ha('right')
 
 # --- Violin Plot with mean point ---
-sns.violinplot(data=college_data, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
                palette='BuPu', ax=axes[1], legend=False, dodge=False)
-ordered_cats = list(college_data['inclination_to_apply'].cat.categories) \
-    if hasattr(college_data['inclination_to_apply'], 'cat') \
-    else sorted(college_data['inclination_to_apply'].unique())
-means = college_data.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
 xticks = axes[1].get_xticks()
 for i, cat in enumerate(ordered_cats):
     axes[1].plot(xticks[i], means[cat], marker='D', color='red',
@@ -844,7 +874,7 @@ plt.show()
 #| echo: false
 #| message: false
 #| warning: false
-college_data_gre_boxplots <- college_data |>
+train_df_gre_boxplots <- train_df |>
   ggplot(aes(inclination_to_apply, GRE_score)) +
   geom_boxplot(aes(fill = inclination_to_apply)) +
   labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
@@ -858,7 +888,7 @@ college_data_gre_boxplots <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-college_data_gre_violin <- college_data |>
+train_df_gre_violin <- train_df |>
   ggplot(aes(inclination_to_apply, GRE_score)) +
   geom_violin(aes(fill = inclination_to_apply)) +
   labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
@@ -876,7 +906,7 @@ college_data_gre_violin <- college_data |>
   ) +
   scale_fill_brewer(palette="BuPu")
 
-plot_grid(college_data_gre_boxplots, college_data_gre_violin, nrow = 1)
+plot_grid(train_df_gre_boxplots, train_df_gre_violin, nrow = 1)
 ```
 
 ### Python Output
@@ -888,7 +918,7 @@ plot_grid(college_data_gre_boxplots, college_data_gre_violin, nrow = 1)
 fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
-sns.boxplot(data=college_data, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
             palette='BuPu', ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=16, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
@@ -898,12 +928,12 @@ for lbl in axes[0].get_xticklabels():
     lbl.set_ha('right')
 
 # --- Violin Plot with mean point ---
-sns.violinplot(data=college_data, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
                palette='BuPu', ax=axes[1], legend=False, dodge=False)
-ordered_cats = list(college_data['inclination_to_apply'].cat.categories) \
-    if hasattr(college_data['inclination_to_apply'], 'cat') \
-    else sorted(college_data['inclination_to_apply'].unique())
-means = college_data.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
 xticks = axes[1].get_xticks()
 for i, cat in enumerate(ordered_cats):
     axes[1].plot(xticks[i], means[cat], marker='D', color='red',
@@ -1274,8 +1304,8 @@ We now fit the proportional odds model to the college dataset using `inclination
 library(MASS)
 
 # Ensure inclination_to_apply is an ordered factor with correct level order
-college_data$inclination_to_apply <- factor(
-  college_data$inclination_to_apply,
+train_df$inclination_to_apply <- factor(
+  train_df$inclination_to_apply,
   levels = c("Low", "Medium", "High", "Very High"),
   ordered = TRUE
 )
@@ -1284,7 +1314,7 @@ college_data$inclination_to_apply <- factor(
 # Note: polr() uses the sign convention logit P(Y <= j) = alpha_j - beta * X
 ordinal_fit <- polr(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
-  data = college_data,
+  data = train_df,
   Hess = TRUE   # return the Hessian for inference
 )
 
@@ -1298,16 +1328,16 @@ from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 # Ensure inclination_to_apply is an ordered categorical
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-college_data["inclination_to_apply"] = pd.Categorical(
-    college_data["inclination_to_apply"],
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"],
     categories=ordered_categories,
     ordered=True
 )
 
 # Fit the proportional odds model (logit link)
-X = pd.get_dummies(college_data[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
+X = pd.get_dummies(train_df[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
 ordinal_fit = OrderedModel(
-    college_data["inclination_to_apply"],
+    train_df["inclination_to_apply"],
     X,
     distr="logit"
 )
@@ -1327,15 +1357,15 @@ print(ordinal_result.summary())
 #| warning: false
 library(MASS)
 
-college_data$inclination_to_apply <- factor(
-  college_data$inclination_to_apply,
+train_df$inclination_to_apply <- factor(
+  train_df$inclination_to_apply,
   levels = c("Low", "Medium", "High", "Very High"),
   ordered = TRUE
 )
 
 ordinal_fit <- polr(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
-  data = college_data,
+  data = train_df,
   Hess = TRUE
 )
 
@@ -1351,15 +1381,15 @@ summary(ordinal_fit)
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-college_data["inclination_to_apply"] = pd.Categorical(
-    college_data["inclination_to_apply"],
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"],
     categories=ordered_categories,
     ordered=True
 )
 
-X = pd.get_dummies(college_data[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
+X = pd.get_dummies(train_df[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
 ordinal_fit = OrderedModel(
-    college_data["inclination_to_apply"],
+    train_df["inclination_to_apply"],
     X,
     distr="logit"
 )
@@ -1426,7 +1456,7 @@ library(VGAM)
 ordinal_fit_np <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
-  data = college_data
+  data = train_df
 )
 
 summary(ordinal_fit_np)
@@ -1446,11 +1476,11 @@ import numpy as np
 
 cats      = ["Low", "Medium", "High", "Very High"]
 X_np      = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]],
+    train_df[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
 X_np      = sm.add_constant(X_np)              # add the intercept term
-y_ord     = college_data["inclination_to_apply"].cat.codes  # 0,1,2,3
+y_ord     = train_df["inclination_to_apply"].cat.codes  # 0,1,2,3
 
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
 np_models = {}
@@ -1486,7 +1516,7 @@ library(VGAM)
 ordinal_fit_np <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
-  data = college_data
+  data = train_df
 )
 
 summary(ordinal_fit_np)
@@ -1503,11 +1533,11 @@ import numpy as np
 
 cats  = ["Low", "Medium", "High", "Very High"]
 X_np  = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]],
+    train_df[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
 X_np  = sm.add_constant(X_np)
-y_ord = college_data["inclination_to_apply"].cat.codes
+y_ord = train_df["inclination_to_apply"].cat.codes
 
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
 np_models = {}
@@ -1586,7 +1616,7 @@ ll_fitted <- logLik(ordinal_fit)          # log-likelihood of fitted model
 # Null model: intercepts only, no regressors
 ordinal_null <- polr(
   inclination_to_apply ~ 1,
-  data  = train_set,
+  data  = train_df,
   Hess  = TRUE
 )
 ll_null <- logLik(ordinal_null)
@@ -1617,7 +1647,7 @@ from scipy.stats import chi2 as chi2dist
 ll_fitted = ordinal_result.llf
 
 # Null log-likelihood from marginal category proportions
-y_codes  = college_data["inclination_to_apply"].cat.codes.values
+y_codes  = train_df["inclination_to_apply"].cat.codes.values
 props    = np.array([(y_codes == j).mean() for j in range(4)])
 ll_null  = np.sum(np.log(props[y_codes]))
 
@@ -1650,7 +1680,7 @@ library(MASS)
 
 ordinal_null <- polr(
   inclination_to_apply ~ 1,
-  data  = college_data,
+  data  = train_df,
   Hess  = TRUE
 )
 ll_null   <- logLik(ordinal_null)
@@ -1683,7 +1713,7 @@ from scipy.stats import chi2 as chi2dist
 
 ll_fitted = ordinal_result.llf
 
-y_codes = college_data["inclination_to_apply"].cat.codes.values
+y_codes = train_df["inclination_to_apply"].cat.codes.values
 props   = np.array([(y_codes == j).mean() for j in range(4)])
 ll_null = np.sum(np.log(props[y_codes]))
 
@@ -1718,11 +1748,11 @@ While likelihood-based measures evaluate the model on the probability scale, cla
 library(caret)
 
 # Predict on training set
-y_pred_train <- predict(ordinal_fit, newdata = train_set)
+y_pred_train <- predict(ordinal_fit, newdata = train_df)
 
 conf_matrix_train <- confusionMatrix(
-  factor(y_pred_train,            levels = levels(train_set$inclination_to_apply)),
-  factor(train_set$inclination_to_apply, levels = levels(train_set$inclination_to_apply))
+  factor(y_pred_train,            levels = levels(train_df$inclination_to_apply)),
+  factor(train_df$inclination_to_apply, levels = levels(train_df$inclination_to_apply))
 )
 
 # Visualise
@@ -1760,7 +1790,7 @@ pred_probs_train = ordinal_result.model.predict(
     ordinal_result.params, exog=X.values
 )
 pred_codes_train = pred_probs_train.argmax(axis=1)
-true_codes_train = college_data["inclination_to_apply"].cat.codes.values
+true_codes_train = train_df["inclination_to_apply"].cat.codes.values
 
 # Confusion matrix
 cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
@@ -1792,11 +1822,11 @@ print(f"Macro F1:         {f1:.3f}")
 #| warning: false
 library(caret)
 
-y_pred_train <- predict(ordinal_fit, newdata = college_data)
+y_pred_train <- predict(ordinal_fit, newdata = train_df)
 
 conf_matrix_train <- confusionMatrix(
-  factor(y_pred_train,                  levels = levels(college_data$inclination_to_apply)),
-  factor(college_data$inclination_to_apply, levels = levels(college_data$inclination_to_apply))
+  factor(y_pred_train,                  levels = levels(train_df$inclination_to_apply)),
+  factor(train_df$inclination_to_apply, levels = levels(train_df$inclination_to_apply))
 )
 
 cm_df <- as.data.frame(as.table(conf_matrix_train$table))
@@ -1834,7 +1864,7 @@ pred_probs_train = ordinal_result.model.predict(
     ordinal_result.params, exog=X.values
 )
 pred_codes_train = pred_probs_train.argmax(axis=1)
-true_codes_train = college_data["inclination_to_apply"].cat.codes.values
+true_codes_train = train_df["inclination_to_apply"].cat.codes.values
 
 cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
@@ -2094,9 +2124,9 @@ from scipy.optimize import minimize
 
 # Design matrix (no intercept) and ordinal response (0-indexed)
 X_brant = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float)
-y_ord = college_data["inclination_to_apply"].cat.codes.values
+y_ord = train_df["inclination_to_apply"].cat.codes.values
 cols  = X_brant.columns.tolist()
 X     = X_brant.values
 n, K  = X.shape
@@ -2211,9 +2241,9 @@ from scipy.stats import chi2
 from scipy.optimize import minimize
 
 X_brant = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float)
-y_ord = college_data["inclination_to_apply"].cat.codes.values
+y_ord = train_df["inclination_to_apply"].cat.codes.values
 cols  = X_brant.columns.tolist()
 X     = X_brant.values
 n, K  = X.shape
@@ -2326,7 +2356,7 @@ ordinal_fit_ppo <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
                        reverse = FALSE),
-  data    = college_data
+  data    = train_df
 )
 
 summary(ordinal_fit_ppo)
@@ -2339,9 +2369,9 @@ from scipy.optimize import minimize
 from scipy.special import expit
 from scipy.stats import norm
 
-y_ppo   = college_data["inclination_to_apply"].cat.codes.values
+y_ppo   = train_df["inclination_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float).values
 n_ppo   = len(y_ppo)
 
@@ -2444,7 +2474,7 @@ print("Call:")
 print("ordinal_fit_ppo = vglm(inclination_to_apply ~ GPA + GRE_score + field_of_study,")
 print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
 print("                                           GRE_score, reverse = FALSE),")
-print("                       data = college_data)\n")
+print("                       data = train_df)\n")
 print("Coefficients:")
 print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
 for lbl, est, s in zip(labels, p_R_ord, se_ord):
@@ -2488,7 +2518,7 @@ ordinal_fit_ppo <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
                        reverse = FALSE),
-  data    = college_data
+  data    = train_df
 )
 
 summary(ordinal_fit_ppo)
@@ -2504,9 +2534,9 @@ from scipy.optimize import minimize
 from scipy.special import expit
 from scipy.stats import norm
 
-y_ppo   = college_data["inclination_to_apply"].cat.codes.values
+y_ppo   = train_df["inclination_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
-    college_data[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float).values
 n_ppo   = len(y_ppo)
 
@@ -2600,7 +2630,7 @@ print("Call:")
 print("ordinal_fit_ppo = vglm(inclination_to_apply ~ GPA + GRE_score + field_of_study,")
 print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
 print("                                           GRE_score, reverse = FALSE),")
-print("                       data = college_data)\n")
+print("                       data = train_df)\n")
 print("Coefficients:")
 print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
 for lbl, est, s in zip(labels, p_R_ord, se_ord):
@@ -2683,7 +2713,7 @@ After the Brant–Wald test revealed that GRE score's slope varies significantly
 
 ### Prediction
 
-We split the data into 80% training (800 observations) and 20% test (200 observations), stratified by `inclination_to_apply`, fit the proportional odds model on the training set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+Let's fit the proportional odds model on the training set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
 ::: {.panel-tabset}
 
@@ -2694,24 +2724,19 @@ library(MASS)
 library(caret)
 library(ggplot2)
 
-set.seed(42)
-train_idx  <- createDataPartition(college_data$inclination_to_apply, p = 0.8, list = FALSE)
-train_set  <- college_data[train_idx, ]
-test_set   <- college_data[-train_idx, ]
-
 # Fit on training set
 ordinal_fit_train <- polr(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
-  data = train_set, Hess = TRUE
+  data = train_df, Hess = TRUE
 )
 
 # Predict on test set
-y_pred <- predict(ordinal_fit_train, newdata = test_set)
+y_pred <- predict(ordinal_fit_train, newdata = test_df)
 
 # Confusion matrix
 conf_matrix <- confusionMatrix(
-  factor(y_pred,          levels = levels(test_set$inclination_to_apply)),
-  factor(test_set$inclination_to_apply, levels = levels(test_set$inclination_to_apply))
+  factor(y_pred,          levels = levels(test_df$inclination_to_apply)),
+  factor(test_df$inclination_to_apply, levels = levels(test_df$inclination_to_apply))
 )
 
 # Visualise
@@ -2731,18 +2756,12 @@ cm_df |>
 ### Python Code
 
 ```{.python}
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-college_data["inclination_to_apply"] = pd.Categorical(
-    college_data["inclination_to_apply"], categories=ordered_categories, ordered=True
-)
-
-train_df, test_df = train_test_split(
-    college_data, test_size=0.2, random_state=42,
-    stratify=college_data["inclination_to_apply"]
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
 )
 
 X_train = pd.get_dummies(
@@ -2783,24 +2802,16 @@ plt.show()
 #| echo: false
 #| message: false
 #| warning: false
-library(MASS)
-library(caret)
-
-set.seed(42)
-train_idx <- createDataPartition(college_data$inclination_to_apply, p = 0.8, list = FALSE)
-train_set <- college_data[train_idx, ]
-test_set  <- college_data[-train_idx, ]
-
 ordinal_fit_train <- polr(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
-  data = train_set, Hess = TRUE
+  data = train_df, Hess = TRUE
 )
 
-y_pred <- predict(ordinal_fit_train, newdata = test_set)
+y_pred <- predict(ordinal_fit_train, newdata = test_df)
 
 conf_matrix <- confusionMatrix(
-  factor(y_pred,                   levels = levels(test_set$inclination_to_apply)),
-  factor(test_set$inclination_to_apply, levels = levels(test_set$inclination_to_apply))
+  factor(y_pred,                   levels = levels(test_df$inclination_to_apply)),
+  factor(test_df$inclination_to_apply, levels = levels(test_df$inclination_to_apply))
 )
 
 cm_df <- as.data.frame(as.table(conf_matrix$table))
@@ -2827,13 +2838,13 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-college_data["inclination_to_apply"] = pd.Categorical(
-    college_data["inclination_to_apply"], categories=ordered_categories, ordered=True
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
 )
 
 train_df, test_df = train_test_split(
-    college_data, test_size=0.2, random_state=42,
-    stratify=college_data["inclination_to_apply"]
+    train_df, test_size=0.2, random_state=42,
+    stratify=train_df["inclination_to_apply"]
 )
 
 X_train = pd.get_dummies(
