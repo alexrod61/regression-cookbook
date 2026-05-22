@@ -1220,7 +1220,12 @@ Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\alpha}}$ and $\hat{\bol
 
 ### The Newton–Raphson Method
 
-Let $\boldsymbol{\theta} = (\alpha_1, \ldots, \alpha_{J-1}, \beta_1, \ldots, \beta_K)^\top \in \mathbb{R}^{(J-1)+K}$ collect all parameters. The Newton–Raphson procedure iterates using the score function and Hessian matrix of the log-likelihood.
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Newton–Raphson Method
+::::
+::::{.Tip-container}
+The parameters we ultimately estimate are the thresholds $\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_{J-1})^\top$ and the shared slopes $\boldsymbol{\beta} = (\beta_1, \ldots, \beta_K)^\top$. Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\alpha}$ and $\boldsymbol{\beta}$ jointly by iterating with the score function and Hessian matrix of the log-likelihood.
 
 **Score function.** The partial derivative of the log-likelihood with respect to each threshold $\alpha_j$ is:
 
@@ -1236,32 +1241,27 @@ $$
 
 The key difference from the multinomial case is that the slopes $\beta_k$ appear in **all** $J-1$ cumulative logits simultaneously, so their score components aggregate information across every cumulative split.
 
-::: {.Tip}
-::::{.Tip-header}
-Tip on the Hessian Matrix
-::::
-::::{.Tip-container}
-**Hessian matrix.** The Hessian $H(\boldsymbol{\theta})$ consists of second-order partial derivatives of $\ell$. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+K) \times (J-1+K)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, see @agresti2010analysis, Chapter 3.
-::::
-:::
+**Hessian matrix.** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of $\ell$ with respect to the thresholds and slopes. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+K) \times (J-1+K)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, see @agresti2010analysis, Chapter 3.
 
-**Iteration.** The Newton–Raphson update at step $t$ is:
+**Iteration.** Collecting the thresholds and slopes into the stacked parameter pair $(\boldsymbol{\alpha}, \boldsymbol{\beta})$, the Newton–Raphson update at step $t$ is:
 
 $$
-\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - \left[ H\!\left(\boldsymbol{\theta}^{(t)}\right) \right]^{-1} S\!\left(\boldsymbol{\theta}^{(t)}\right),
+\begin{pmatrix} \boldsymbol{\alpha}^{(t+1)} \\ \boldsymbol{\beta}^{(t+1)} \end{pmatrix} \leftarrow \begin{pmatrix} \boldsymbol{\alpha}^{(t)} \\ \boldsymbol{\beta}^{(t)} \end{pmatrix} - \left[ H\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right) \right]^{-1} S\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right),
 $$
 
-where $S(\boldsymbol{\theta})$ is the stacked score vector. The algorithm is initialized at $\boldsymbol{\theta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeats until changes in $\ell$ or $\boldsymbol{\theta}$ fall below a convergence tolerance.
+where $S(\boldsymbol{\alpha}, \boldsymbol{\beta})$ is the stacked score vector holding the threshold derivatives followed by the slope derivatives. The algorithm is initialized at $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeats until changes in $\ell$, $\boldsymbol{\alpha}$, and $\boldsymbol{\beta}$ fall below a convergence tolerance.
 
 The full Newton–Raphson/IRLS procedure is:
 
-1. Initialize $\boldsymbol{\theta}^{(0)} = \mathbf{0}$ (stacked thresholds and slopes).
+1. Initialize $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (the thresholds and slopes).
 2. Repeat until convergence:
-   - Compute the linear regressors $\alpha_j - \boldsymbol{\beta}^\top \underline{x}_i$ for all $i$ and $j$.
+   - Compute the linear predictors $\alpha_j - \boldsymbol{\beta}^\top \underline{x}_i$ for all $i$ and $j$.
    - Compute cumulative probabilities $P(Y \le j \mid \underline{x}_i)$ and category probabilities $p_j(\underline{x}_i)$.
-   - Compute the log-likelihood $\ell(\boldsymbol{\theta}^{(t)})$, score $S(\boldsymbol{\theta}^{(t)})$, and Hessian $H(\boldsymbol{\theta}^{(t)})$.
-   - Update $\boldsymbol{\theta}^{(t+1)} \leftarrow \boldsymbol{\theta}^{(t)} - [H(\boldsymbol{\theta}^{(t)})]^{-1} S(\boldsymbol{\theta}^{(t)})$.
+   - Compute the log-likelihood $\ell(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$, score $S(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$, and Hessian $H(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$.
+   - Update $(\boldsymbol{\alpha}^{(t+1)}, \boldsymbol{\beta}^{(t+1)})$ using the Newton–Raphson step above.
    - Check convergence.
+::::
+:::
 
 ### Fitting the Proportional Odds Model
 
