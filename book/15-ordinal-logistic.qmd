@@ -41,7 +41,7 @@ print_as_dt <- function(x){
 
 ::: {.Warning}
 ::::{.Warning-header}
-When to Use and Not Use Ordinal Logistic Regressions
+When to Use and Not Use Ordinal Logistic Regression
 ::::
 ::::{.Warning-container}
 Ordinal logistic regression is a model for ordered categorical outcomes that is appropriately used under the following conditions:
@@ -244,7 +244,7 @@ In all these examples, the ordering is essential. Treating these outcomes as nom
 
 We will explore a dataset containing some factors that might influence the decision of college juniors to apply to graduate school. This dataset provides a classic example of an ordinal response, such that the categories are ordered in the response variable. We explore two primary research questions based on this dataset.
 
-- How are a student's GPA, GRE score, and field of study **associated** with their likelihood of applying to graduate school?
+- How are a student's GPA, GRE score, and field of study **associated** with their inclination to apply to graduate school?
 - Can we accurately **predict** a student's likelihood of applying to graduate school based on their GPA, GRE score, and field of study?
 
 These questions correspond to two distinct **statistical objectives**:
@@ -320,32 +320,50 @@ print_as_dt(college_data_100)
 
 :::
 
-In this example, the variable `inclination_to_apply` will be our response of interest. Let's set it up as an **ordered factor** via the `as.ordered()` function in `R` and `pd.Categorical()` with `ordered=True` in `Python`.
+In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we must explicitly tell `R` and `Python` that this variable is **ordinal**, not just a set of unordered labels. This matters for two reasons. First, ordinal logistic regression is built on the *cumulative* probability of being at or below each category, so the software needs to know the correct ordering (`Low` < `Medium` < `High` < `Very High`) in order to form those cumulative splits. Second, if the categories were left as plain (nominal) factors, the model would ignore their natural ranking and effectively treat them as unordered, discarding exactly the structure we want to exploit.
+
+By default, both languages order categories **alphabetically**, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually in the substantively meaningful order. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm the ordering is exactly as intended.
 
 ::: {.panel-tabset}
 
 ### R Code
 
 ```{.r}
-# Factorize the response variable and print its levels
+# Convert the response into an ORDERED factor.
+# as.ordered() flags the variable as ordinal so R knows the categories
+# have a ranking rather than being interchangeable labels.
 college_data$inclination_to_apply <- as.ordered(college_data$inclination_to_apply)
+
+# By default, factor levels are sorted alphabetically, which would wrongly
+# place "High" before "Low". fct_relevel() overrides this and fixes the
+# levels in their true substantive order: Low < Medium < High < Very High.
 college_data$inclination_to_apply <- fct_relevel(
   college_data$inclination_to_apply,
   c("Low", "Medium", "High", "Very High")
 )
+
+# Print the levels to confirm the ordering is correct before modelling.
 levels(college_data$inclination_to_apply)
 ```
 
 ### Python Code
 
 ```{.python}
-# Factorize the response variable and print its levels
+# Define the categories in their true substantive order.
+# Listing them explicitly avoids pandas' default alphabetical sorting,
+# which would wrongly place "High" before "Low".
 ordered_categories = ["Low", "Medium", "High", "Very High"]
+
+# Convert the response into an ORDERED categorical.
+# ordered=True tells pandas the categories have a ranking, so comparisons
+# like "Low" < "High" are meaningful and the model can form cumulative splits.
 college_data["inclination_to_apply"] = pd.Categorical(
     college_data["inclination_to_apply"],
     categories=ordered_categories,
     ordered=True
 )
+
+# Print the categories to confirm the ordering is correct before modelling.
 print(college_data["inclination_to_apply"].cat.categories.tolist())
 ```
 
@@ -359,11 +377,20 @@ print(college_data["inclination_to_apply"].cat.categories.tolist())
 #| echo: false
 #| message: false
 #| warning: false
+# Convert the response into an ORDERED factor.
+# as.ordered() flags the variable as ordinal so R knows the categories
+# have a ranking rather than being interchangeable labels.
 college_data$inclination_to_apply <- as.ordered(college_data$inclination_to_apply)
+
+# By default, factor levels are sorted alphabetically, which would wrongly
+# place "High" before "Low". fct_relevel() overrides this and fixes the
+# levels in their true substantive order: Low < Medium < High < Very High.
 college_data$inclination_to_apply <- fct_relevel(
   college_data$inclination_to_apply,
   c("Low", "Medium", "High", "Very High")
 )
+
+# Print the levels to confirm the ordering is correct before modelling.
 levels(college_data$inclination_to_apply)
 ```
 
@@ -373,12 +400,21 @@ levels(college_data$inclination_to_apply)
 #| echo: false
 #| message: false
 #| warning: false
+# Define the categories in their true substantive order.
+# Listing them explicitly avoids pandas' default alphabetical sorting,
+# which would wrongly place "High" before "Low".
 ordered_categories = ["Low", "Medium", "High", "Very High"]
+
+# Convert the response into an ORDERED categorical.
+# ordered=True tells pandas the categories have a ranking, so comparisons
+# like "Low" < "High" are meaningful and the model can form cumulative splits.
 college_data["inclination_to_apply"] = pd.Categorical(
     college_data["inclination_to_apply"],
     categories=ordered_categories,
     ordered=True
 )
+
+# Print the categories to confirm the ordering is correct before modelling.
 print(college_data["inclination_to_apply"].cat.categories.tolist())
 ```
 
