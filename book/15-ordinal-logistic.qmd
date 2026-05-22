@@ -1435,10 +1435,13 @@ summary(ordinal_fit_np)
 ### Python Code
 
 ```{.python}
-# Fit J-1 = 3 separate binary logistic regression model, one per cumulative split.
-# Each models P(Y <= j) vs P(Y > j) for j = 1, 2, 3.
+# statsmodels has no built-in non-proportional ordinal model, so we fit
+# J-1 = 3 separate binary logistic regressions, one per cumulative split.
+# Each models P(Y <= j) vs P(Y > j) for j = 1, 2, 3. Using sm.Logit (rather
+# than sklearn) lets us report standard errors and z-values, matching the
+# coefficient table that R's vglm() summary produces.
 
-from sklearn.linear_model import LogisticRegression
+import statsmodels.api as sm
 import numpy as np
 
 cats      = ["Low", "Medium", "High", "Very High"]
@@ -1446,6 +1449,7 @@ X_np      = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
+X_np      = sm.add_constant(X_np)              # add the intercept term
 y_ord     = college_data["inclination_to_apply"].cat.codes  # 0,1,2,3
 
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
@@ -1454,13 +1458,17 @@ np_models = {}
 for j, label in enumerate(cutpoints):
     # binary target: 1 if Y <= j, 0 if Y > j
     y_bin = (y_ord <= j).astype(int)
-    clf   = LogisticRegression(max_iter=1000, random_state=0)
-    clf.fit(X_np, y_bin)
-    np_models[label] = clf
-    coefs = dict(zip(X_np.columns, clf.coef_[0]))
-    print(f"\nCutpoint {label}  (intercept = {clf.intercept_[0]:.3f})")
-    for var, coef in coefs.items():
-        print(f"  {var}: {coef:.3f}")
+    model = sm.Logit(y_bin, X_np).fit(disp=False)
+    np_models[label] = model
+
+    # Coefficient table: estimate, standard error, and z-value per regressor
+    coef_table = pd.DataFrame({
+        "coef":    model.params,
+        "std err": model.bse,
+        "z":       model.tvalues,
+    }).round(3)
+    print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
+    print(coef_table.to_string())
 ```
 
 :::
@@ -1490,7 +1498,7 @@ summary(ordinal_fit_np)
 #| echo: false
 #| message: false
 #| warning: false
-from sklearn.linear_model import LogisticRegression
+import statsmodels.api as sm
 import numpy as np
 
 cats  = ["Low", "Medium", "High", "Very High"]
@@ -1498,6 +1506,7 @@ X_np  = pd.get_dummies(
     college_data[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
+X_np  = sm.add_constant(X_np)
 y_ord = college_data["inclination_to_apply"].cat.codes
 
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
@@ -1505,18 +1514,20 @@ np_models = {}
 
 for j, label in enumerate(cutpoints):
     y_bin = (y_ord <= j).astype(int)
-    clf   = LogisticRegression(max_iter=1000, random_state=0)
-    clf.fit(X_np, y_bin)
-    np_models[label] = clf
-    coefs = dict(zip(X_np.columns, clf.coef_[0]))
-    print(f"\nCutpoint {label}  (intercept = {clf.intercept_[0]:.3f})")
-    for var, coef in coefs.items():
-        print(f"  {var}: {coef:.3f}")
+    model = sm.Logit(y_bin, X_np).fit(disp=False)
+    np_models[label] = model
+    coef_table = pd.DataFrame({
+        "coef":    model.params,
+        "std err": model.bse,
+        "z":       model.tvalues,
+    }).round(3)
+    print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
+    print(coef_table.to_string())
 ```
 
 :::
 
-The `R` output from `vglm()` displays a separate row of coefficient estimates for each regressor at each of the $J-1$ cumulative logits. If the proportional odds assumption held perfectly, these slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
+Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, and z-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we obtain the equivalent information by fitting one binary logistic regression per cutpoint with `sm.Logit` and printing a matching table for each. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
 
 ## Goodness of Fit
 
