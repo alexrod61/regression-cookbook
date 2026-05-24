@@ -69,6 +69,13 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
+- Explain what **Beta regression** is and identify when it is the appropriate modelling choice for proportion data.
+- Describe why **Ordinary Least Squares** is not suitable for proportion outcomes and how Beta regression addresses these limitations.
+- Describe the **Beta distribution** and how its shape flexibility allows it to represent a wide variety of proportion data.
+- Understand the role of the **logit link function** in Beta regression and how it connects the linear predictor to the mean proportion.
+- Fit a Beta regression model using `R` or `Python` and interpret coefficients as **odds ratios** for the mean proportion.
+- Evaluate model fit using **log-likelihood**, **AIC**, the **precision parameter**, and **residual diagnostics**.
+
 ::::
 :::
 
@@ -80,9 +87,9 @@ Traditional linear regression is not well suited for this type of data. It produ
 
 ## What is Beta Regression
 
-Beta regression is a regression model designed for situations where the response variable is a proportion that takes values on the open interval between zero and one. Instead of modelling the response directly as a straight line, Beta regression assumes that the response follows a Beta distribution. This distribution is defined only on the zero to one interval and is flexible enough to represent many different shapes.
+Beta regression is a regression model for response variables that are proportions, meaning they take values strictly between zero and one. It works by assuming the response follows a Beta distribution and modelling how the expected value of that distribution changes with the predictors.
 
-Because of this flexibility, Beta regression is well suited for data such as conversion rates, completion rates, coverage percentages, or any outcome that represents a fraction of a whole. The model naturally respects the bounds of the data and avoids unrealistic predictions.
+A key advantage of this approach is that the Beta distribution can take many different shapes depending on the data. It can be symmetric, skewed to the left or right, or concentrated near the boundaries. This shape flexibility means the model can fit a wide variety of proportion data without needing to force it into a rigid template.
 
 ## The Beta Distribution
 
@@ -226,7 +233,7 @@ Here is a snapshot of the dataset:
 </div>
 
 
-This dataset allows us to examine how academic behaviors and lifestyle choices are associated with student performance, while respecting the proportional nature of the outcome.
+The dataset includes students across multiple academic years and a variety of living and working arrangements, giving a realistic cross-section of student life.
 
 ### The Problem We’re Trying to Solve
 
@@ -240,11 +247,11 @@ Rather than focusing only on prediction, we are interested in understanding how 
 
 ## Study Design
 
-Just like we discussed above, our goal is to understand how academic and lifestyle factors are associated with students’ final grades.
+Knowing what we want to learn, the next step is to be clear about the type of question we are asking.
 
-At this stage, we focus on clearly defining the type of question we are asking and how it fits into the data science workflow, rather than introducing new modelling details.
+This is an inferential task. We are interested in describing and interpreting relationships between variables, not building a model optimized for prediction. A predictive approach would focus on forecasting a specific student’s expected grade as accurately as possible. Here, we care more about which factors relate to performance and in what direction.
 
-In particular, this is an inferential task. We are interested in describing and interpreting relationships between variables, rather than building a model purely for prediction. A predictive approach would be possible, but our primary objective here is to gain insight into how different factors relate to student performance.
+It is also worth noting that this is an observational dataset. Students were not randomly assigned to different study habits or support conditions, so the relationships we find are associational rather than causal. Observing that higher study time tends to accompany higher grades does not rule out the possibility that a third factor, such as student motivation, influences both.
 
 ## Data Collection and Wrangling
 
@@ -334,7 +341,7 @@ After rescaling, the response variable now lies on the unit interval. The next s
 
 #### 2. Checking for Boundary Values
 
-Beta regression requires that the response variable take values strictly between zero and one. We therefore check whether any rescaled grades are exactly equal to zero or one.
+With the rescaling done, we can now check whether any values land exactly on these boundaries.
 
 ::: {.panel-tabset}
 ## R Code
@@ -351,7 +358,7 @@ print((data["final_grade_prop"] >= 1).sum())
 ```
 :::
 
-Shoot! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.
+Oh no! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
@@ -373,7 +380,7 @@ $$
 
 where $N$ is the sample size and $s$ is a small constant between 0 and 1, often chosen as $s=0.5$.
 
-One way to think about this adjustment is that it spreads the data evenly across the open interval $(0,1)$, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant $s$ can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction.
+One way to think about this adjustment is that it spreads the data evenly across the open interval $(0,1)$, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant $s$ can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction. It is most commonly used when the researcher wants to apply a consistent assumption across all observations, rather than singling out only the boundary cases for special treatment.
 
 Another option is to use **zero–one–inflated Beta models**, which explicitly treat boundary values as arising from a separate process. These models are more flexible and appropriate when zeros or ones occur frequently and carry substantive meaning, but they also introduce additional parameters and complexity.
 
@@ -1100,7 +1107,9 @@ plt.show()
 ```
 :::
 
-The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over or under-prediction. The vertical banding reflects groups of observations with similar fitted means, often arising from categorical predictors. While residual variability increases slightly for fitted means close to one, this behaviour is expected for Beta regression due to the bounded nature of the response. Overall, the diagnostics suggest that the model provides an adequate fit to the data.
+The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over or under-prediction. The vertical banding in the plot is not a warning sign. It appears because categorical predictors group observations at the same fitted mean, so instead of a smooth cloud of points, the plot shows columns. Within each column, the residuals are roughly symmetric around zero with no obvious outliers, which is what matters. While residual variability increases slightly for fitted means close to one, this behaviour is expected for Beta regression due to the bounded nature of the response.
+
+Two other checks are also common in practice, though they are not shown here. A standard Q-Q plot is not well suited for Beta regression because Pearson residuals from this model are not expected to follow a normal distribution. Checking for influential observations using something like Cook's distance is also a good habit, as it can reveal whether any single observation is pulling the fitted coefficients more than it should.
 
 ## Results
 
@@ -1108,7 +1117,7 @@ Great! Nothing seems particularly concerning with goodness of fit. Having establ
 
 > Which aspects of students’ academic and daily routines are associated with differences in final course grades?
 
-Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio, which reflects how the odds of achieving a higher average grade change as a predictor increases, holding all other variables constant.
+Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio that describes how the odds of the mean grade proportion i.e., μ/(1−μ) change multiplicatively as a predictor increases. Unlike in logistic regression, this is not the odds of a binary event such as passing or failing; it describes the expected proportion itself, holding all other variables constant.
 
 Because the logit link is nonlinear, these effects should be interpreted in relative terms rather than as fixed percentage-point increases. The same change in log-odds can correspond to different changes in grade proportions depending on where a student lies on the grade scale.
 
@@ -1125,7 +1134,7 @@ $$
 e^{0.458} \approx 1.58
 $$
 
-This indicates that students who study 1–3 hours have noticeably higher odds of achieving a higher average grade than those in the baseline group.
+This indicates that students who study 1–3 hours have noticeably higher odds of a higher mean grade proportion than those in the baseline group.
 
 - 3–5 hours of study
 With a coefficient of 1.130, the odds ratio increases to
@@ -1207,11 +1216,11 @@ Nevertheless, the results provide a useful evidence-based starting point for dis
 
 ## Conclusion
 
-This chapter has walked through a complete data science workflow using Beta regression, from problem formulation and data preparation to modelling, diagnostics, and interpretation. Along the way, we have seen how Beta regression offers a principled and flexible framework for analyzing outcomes that are continuous, bounded between zero and one, and heteroskedastic.
+And that wraps up the Beta regression chapter. We have walked through a complete data science workflow, from problem formulation and data preparation to modelling, diagnostics, and interpretation and seen how Beta regression offers a principled and flexible framework for outcomes that are continuous, bounded between zero and one, and heteroskedastic.
 
 More importantly, the chapter highlights that the value of Beta regression lies not just in fitting a model, but in using the model thoughtfully within a broader analytical process. Careful study design, appropriate preprocessing, exploratory analysis, model checking, and clear communication are what ultimately turn proportion data into actionable insight.
 
-With these ideas in place, you are now equipped to apply Beta regression to a wide range of real-world problems, from academic performance and completion rates to conversion metrics and coverage proportions, and to communicate your findings in a way that supports informed decision-making.
+With these ideas in place, you are now ready to apply Beta regression confidently and communicate your findings in a way that supports informed decision-making.
 
 
 
@@ -1220,7 +1229,7 @@ With these ideas in place, you are now equipped to apply Beta regression to a wi
 Fun fact!
 ::::
 ::::{.Warning-container}
-**Soup-erb!** Soup that’s so heartwarming it feels like a cozy hug.
+**Beet-a you didn’t know!** The beet plant belongs to the genus *Beta* (*Beta vulgaris*, to be precise). So the next time you run a Beta regression, remember that somewhere in a field, a humble root vegetable is quietly sharing your model’s name.
 ::::
 :::
 
