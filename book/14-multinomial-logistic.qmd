@@ -2322,6 +2322,434 @@ An inferential objective is to estimate how predictors such as `commute_distance
 
 ### Problem 1 {.unnumbered}
 
-Placeholder for the Chapter 14 coding question. This problem will be added later.
+In this problem, you will investigate a dataset of surveyed students and their usual lunch choices on campus.
+Each student was asked about their weekly food budget, the amount of time they usually have between classes, their distance from home, whether they have a campus meal plan, whether they have a dietary restriction, and which lunch option they usually choose. These variables are stored as `weekly_food_budget`, `time_between_classes`, `distance_from_home`, `has_meal_plan`, `dietary_restriction`, and `lunch_choice`, respectively. Below is a full breakdown of the variables:
+
+| **Variable Name** | **Description** |
+|-------------------|-----------------|
+| **weekly_food_budget** | The student's approximate weekly food budget in dollars. Float (e.g. 62.50, 118.20, etc.). |
+| **time_between_classes** | The number of minutes the student usually has between classes around lunch time. Float (e.g. 15.5, 84.0, etc.). |
+| **distance_from_home** | The student's distance from home to campus in kilometers. Float (e.g. 2.4, 18.7, etc.). |
+| **has_meal_plan** | Whether the student has a campus meal plan. Categorical: `Yes` or `No`. |
+| **dietary_restriction** | Whether the student has a dietary restriction. Categorical: `Yes` or `No`. |
+| **lunch_choice** | The student's usual lunch choice. Categorical: `Cafeteria`, `Packed_Lunch`, `Food_Delivery`, or `Fast_Food`. |
+
+A campus dining office wants to understand how student schedules, budgets, and constraints shape lunch choices. They are also interested in whether these variables can be used to predict a student's most likely lunch option.
+
+To answer this, the questions below will guide you through a Multinomial Logistic regression analysis on this data. Specifically, by the end of these questions, you will be able to answer the following concrete questions:
+1. How are `weekly_food_budget`, `has_meal_plan`, and `dietary_restriction` associated with lunch choice?
+2. Can we predict whether a student is most likely to choose `Cafeteria`, `Packed_Lunch`, `Food_Delivery`, or `Fast_Food`?
+3. How should we think about prediction quality when one lunch category is much more common than the others?
+
+### A. Data Collection and Wrangling {.unnumbered}
+
+1. Read in the data from `problem-1-data.csv`, checking for any missing entries.
+2. Convert the categorical variables to factors in `R` or categorical variables in `Python`.
+3. Drop rows with missing entries, then split the dataset into training and test sets.
+4. Check the training-set class counts for `lunch_choice`. Is the response balanced?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+library(readr)
+library(tidyverse)
+library(nnet)
+library(caret)
+library(broom)
+
+df <- read_csv("./14-multinomial-logistic_files/simulations/problem-1-data.csv")
+
+print(colSums(is.na(df)))
+
+df <- df %>%
+  drop_na() %>%
+  mutate(
+    lunch_choice = factor(lunch_choice,
+                          levels = c("Cafeteria", "Packed_Lunch",
+                                     "Food_Delivery", "Fast_Food")),
+    has_meal_plan = factor(has_meal_plan, levels = c("No", "Yes")),
+    dietary_restriction = factor(dietary_restriction, levels = c("No", "Yes"))
+  )
+
+set.seed(1411)
+train_id <- sample(seq_len(nrow(df)), size = floor(0.8 * nrow(df)))
+train_set <- df[train_id, ]
+test_set <- df[-train_id, ]
+
+table(train_set$lunch_choice)
+```
+
+## **`Python` Code**
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import statsmodels.api as sm
+from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, f1_score, log_loss
+from sklearn.utils import resample
+
+df = pd.read_csv("./14-multinomial-logistic_files/simulations/problem-1-data.csv")
+
+print(df.isnull().sum())
+
+levels = ["Cafeteria", "Packed_Lunch", "Food_Delivery", "Fast_Food"]
+df = df.dropna().copy()
+df["lunch_choice"] = pd.Categorical(df["lunch_choice"], categories=levels)
+df["has_meal_plan"] = pd.Categorical(df["has_meal_plan"], categories=["No", "Yes"])
+df["dietary_restriction"] = pd.Categorical(df["dietary_restriction"], categories=["No", "Yes"])
+
+train_set = df.sample(frac=0.8, random_state=1411)
+test_set = df.drop(train_set.index)
+
+print(train_set["lunch_choice"].value_counts())
+```
+
+:::
+There are a small number of missing values in `weekly_food_budget` and `time_between_classes`, so dropping incomplete rows is reasonable here. The training set is not balanced: `Cafeteria` is the most common choice, while `Fast_Food`, `Packed_Lunch`, and `Food_Delivery` are less frequent.
+</details>
+
+### B. Exploratory Data Analysis {.unnumbered}
+
+1. Plot the distribution of `lunch_choice`.
+2. Plot `weekly_food_budget` by `lunch_choice`. Which choices tend to have higher budgets?
+3. Plot lunch choice proportions by `has_meal_plan`.
+4. Plot lunch choice proportions across binned values of `time_between_classes`. Do the patterns look perfectly linear?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+ggplot(train_set, aes(x = lunch_choice, fill = lunch_choice)) +
+  geom_bar() +
+  theme_minimal() +
+  labs(x = "Lunch choice", y = "Count", title = "Distribution of lunch choice")
+
+ggplot(train_set, aes(x = lunch_choice, y = weekly_food_budget, fill = lunch_choice)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_minimal() +
+  labs(x = "Lunch choice", y = "Weekly food budget")
+
+ggplot(train_set, aes(x = has_meal_plan, fill = lunch_choice)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  labs(x = "Has meal plan", y = "Proportion", fill = "Lunch choice")
+
+train_set %>%
+  mutate(time_bin = cut(time_between_classes, breaks = seq(0, 160, by = 20))) %>%
+  count(time_bin, lunch_choice) %>%
+  group_by(time_bin) %>%
+  mutate(prop = n / sum(n)) %>%
+  ggplot(aes(x = time_bin, y = prop, color = lunch_choice, group = lunch_choice)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Time between classes", y = "Proportion", color = "Lunch choice")
+```
+
+## **`Python` Code**
+```{python}
+sns.countplot(data=train_set, x="lunch_choice")
+plt.title("Distribution of lunch choice")
+plt.xlabel("Lunch choice")
+plt.ylabel("Count")
+plt.xticks(rotation=20)
+plt.show()
+
+sns.boxplot(data=train_set, x="lunch_choice", y="weekly_food_budget")
+plt.xlabel("Lunch choice")
+plt.ylabel("Weekly food budget")
+plt.xticks(rotation=20)
+plt.show()
+
+meal_props = pd.crosstab(train_set["has_meal_plan"], train_set["lunch_choice"], normalize="index")
+meal_props[levels].plot(kind="bar", stacked=True)
+plt.xlabel("Has meal plan")
+plt.ylabel("Proportion")
+plt.legend(title="Lunch choice", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.show()
+
+time_bins = pd.cut(train_set["time_between_classes"], bins=np.arange(0, 161, 20))
+time_props = pd.crosstab(time_bins, train_set["lunch_choice"], normalize="index")
+time_props[levels].plot(marker="o")
+plt.xlabel("Time between classes")
+plt.ylabel("Proportion")
+plt.xticks(rotation=45)
+plt.legend(title="Lunch choice", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.show()
+```
+
+:::
+`Cafeteria` is the most common lunch choice. Students choosing `Food_Delivery` and `Fast_Food` tend to have higher food budgets, while `Packed_Lunch` is more common among students with lower budgets or dietary restrictions. Meal-plan students are much more likely to choose `Cafeteria`. The relationship with `time_between_classes` is not perfectly linear, which is common in behavioural data.
+</details>
+
+### C. Data Modelling {.unnumbered}
+
+1. Fit a Multinomial Logistic regression model predicting `lunch_choice` using all other variables. Use `Cafeteria` as the baseline class.
+2. Display a summary of the fitted model.
+3. Exponentiate the coefficients to obtain odds ratios.
+4. Since the outcome classes are imbalanced, create an upsampled training set and fit a second Multinomial Logistic regression model.
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+model1 <- multinom(
+  lunch_choice ~ weekly_food_budget + time_between_classes + distance_from_home +
+    has_meal_plan + dietary_restriction,
+  data = train_set,
+  trace = FALSE
+)
+
+summary(model1)
+exp(coef(model1))
+
+set.seed(1411)
+train_balanced <- upSample(
+  x = train_set[, c("weekly_food_budget", "time_between_classes",
+                    "distance_from_home", "has_meal_plan", "dietary_restriction")],
+  y = train_set$lunch_choice,
+  yname = "lunch_choice"
+)
+
+train_balanced$lunch_choice <- relevel(train_balanced$lunch_choice, ref = "Cafeteria")
+
+model_balanced <- multinom(
+  lunch_choice ~ weekly_food_budget + time_between_classes + distance_from_home +
+    has_meal_plan + dietary_restriction,
+  data = train_balanced,
+  trace = FALSE
+)
+
+summary(model_balanced)
+```
+
+## **`Python` Code**
+```{python}
+predictors = [
+    "weekly_food_budget", "time_between_classes", "distance_from_home",
+    "has_meal_plan", "dietary_restriction"
+]
+
+X_train = pd.get_dummies(train_set[predictors], drop_first=True, dtype=float)
+X_train = sm.add_constant(X_train, has_constant="add")
+y_train = train_set["lunch_choice"].cat.codes
+
+model1 = sm.MNLogit(y_train, X_train).fit(method="newton", maxiter=100, disp=False)
+print(model1.summary())
+
+odds_ratios = np.exp(model1.params)
+odds_ratios.columns = levels[1:]
+print(odds_ratios.round(3))
+
+max_n = train_set["lunch_choice"].value_counts().max()
+balanced_parts = []
+for level in levels:
+    subset = train_set[train_set["lunch_choice"] == level]
+    balanced_parts.append(resample(subset, replace=True, n_samples=max_n, random_state=1411))
+
+train_balanced = pd.concat(balanced_parts)
+
+X_bal = pd.get_dummies(train_balanced[predictors], drop_first=True, dtype=float)
+X_bal = sm.add_constant(X_bal, has_constant="add")
+y_bal = train_balanced["lunch_choice"].cat.codes
+
+model_balanced = sm.MNLogit(y_bal, X_bal).fit(method="newton", maxiter=100, disp=False)
+print(model_balanced.summary())
+```
+
+:::
+The original model is the better choice for interpreting associations because it uses the observed class distribution. The balanced model is useful as a prediction comparison because it gives the minority classes more influence during fitting.
+</details>
+
+### D. Goodness of Fit {.unnumbered}
+
+1. Use the test set to compute predictions from both the original and balanced models.
+2. Create a confusion matrix for each model.
+3. Compare accuracy, macro recall, macro F1, and log-loss.
+4. Which model performs better if the main goal is overall accuracy? Which model performs better if the main goal is recognizing less common lunch choices?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+pred1 <- predict(model1, newdata = test_set)
+cm1 <- confusionMatrix(
+  factor(pred1, levels = levels(test_set$lunch_choice)),
+  factor(test_set$lunch_choice, levels = levels(test_set$lunch_choice))
+)
+
+pred_bal <- predict(model_balanced, newdata = test_set)
+cm_bal <- confusionMatrix(
+  factor(pred_bal, levels = levels(test_set$lunch_choice)),
+  factor(test_set$lunch_choice, levels = levels(test_set$lunch_choice))
+)
+
+print(cm1$table)
+print(cm_bal$table)
+
+probs1 <- predict(model1, newdata = test_set, type = "probs")
+probs_bal <- predict(model_balanced, newdata = test_set, type = "probs")
+
+log_loss <- function(probs, actual) {
+  p <- probs[cbind(seq_along(actual), match(actual, colnames(probs)))]
+  -mean(log(pmax(p, 1e-15)))
+}
+
+metrics <- tibble(
+  Model = c("Original", "Balanced"),
+  Accuracy = c(cm1$overall["Accuracy"], cm_bal$overall["Accuracy"]),
+  Macro_Recall = c(mean(cm1$byClass[, "Recall"], na.rm = TRUE),
+                   mean(cm_bal$byClass[, "Recall"], na.rm = TRUE)),
+  Macro_F1 = c(mean(cm1$byClass[, "F1"], na.rm = TRUE),
+               mean(cm_bal$byClass[, "F1"], na.rm = TRUE)),
+  Log_Loss = c(log_loss(probs1, test_set$lunch_choice),
+               log_loss(probs_bal, test_set$lunch_choice))
+)
+
+print(metrics)
+```
+
+## **`Python` Code**
+```{python}
+def prepare_x(data, columns):
+    x = pd.get_dummies(data[predictors], drop_first=True, dtype=float)
+    x = sm.add_constant(x, has_constant="add")
+    return x.reindex(columns=columns, fill_value=0)
+
+def summarize_predictions(probs, actual, model_name):
+    pred = pd.Categorical([levels[i] for i in probs.idxmax(axis=1)], categories=levels)
+    cm = pd.DataFrame(confusion_matrix(actual, pred, labels=levels),
+                      index=levels, columns=levels)
+    metrics = pd.DataFrame({
+        "Model": [model_name],
+        "Accuracy": [accuracy_score(actual, pred)],
+        "Macro_Recall": [recall_score(actual, pred, labels=levels, average="macro", zero_division=0)],
+        "Macro_F1": [f1_score(actual, pred, labels=levels, average="macro", zero_division=0)],
+        "Log_Loss": [log_loss(actual, probs.values, labels=levels)]
+    })
+    return cm, metrics
+
+X_test1 = prepare_x(test_set, X_train.columns)
+probs1 = model1.predict(X_test1)
+cm1, metrics1 = summarize_predictions(probs1, test_set["lunch_choice"], "Original")
+
+X_test_bal = prepare_x(test_set, X_bal.columns)
+probs_bal = model_balanced.predict(X_test_bal)
+cm_bal, metrics_bal = summarize_predictions(probs_bal, test_set["lunch_choice"], "Balanced")
+
+print(cm1)
+print(cm_bal)
+print(pd.concat([metrics1, metrics_bal]).round(3))
+```
+
+:::
+The original model usually has higher overall accuracy and better log-loss because it respects the true class frequencies. The balanced model often improves macro recall, meaning it is somewhat better at noticing less common lunch choices, but it may do worse at predicting the majority class.
+</details>
+
+### E. Inference {.unnumbered}
+
+1. Using the original model, identify statistically significant predictors for each non-baseline category.
+2. Interpret the odds ratio for `weekly_food_budget` in the `Food_Delivery` versus `Cafeteria` comparison.
+3. Interpret the odds ratio for `has_meal_planYes` in one non-baseline comparison.
+4. Explain why these interpretations are associations rather than causal effects.
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+broom::tidy(model1, conf.int = TRUE, exponentiate = TRUE) %>%
+  mutate_if(is.numeric, round, 3) %>%
+  filter(p.value < 0.05) %>%
+  rename(outcome_class = y.level)
+```
+
+## **`Python` Code**
+```{python}
+results = []
+for j, level in enumerate(levels[1:]):
+    results.append(pd.DataFrame({
+        "outcome_class": level,
+        "term": model1.params.index,
+        "odds_ratio": np.exp(model1.params[j]),
+        "pvalue": model1.pvalues[j]
+    }))
+
+results = pd.concat(results)
+print(results[results["pvalue"] < 0.05].round(3))
+```
+
+:::
+For `Food_Delivery` versus `Cafeteria`, the odds ratio for `weekly_food_budget` is greater than 1. This means that higher weekly food budgets are associated with higher odds of choosing `Food_Delivery` rather than `Cafeteria`, holding other variables fixed. For `has_meal_planYes`, the odds ratios for non-cafeteria choices are below 1, so having a meal plan is associated with lower odds of choosing those options over `Cafeteria`. These are associations because students were not randomly assigned budgets, meal plans, or dietary restrictions.
+</details>
+
+### F. Prediction and Final Evaluation {.unnumbered}
+
+1. Suppose a student has a weekly food budget of 95 dollars, 25 minutes between classes, lives 6 km from campus, does not have a meal plan, and does not have a dietary restriction. Use both models to predict this student's lunch-choice probabilities.
+2. Which lunch choice is most likely under each model?
+3. Returning to the original campus dining question: what have we learned about understanding and predicting student lunch choice?
+
+<details>
+<summary><strong>Click to reveal answer</strong></summary>
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+new_student <- data.frame(
+  weekly_food_budget = 95,
+  time_between_classes = 25,
+  distance_from_home = 6,
+  has_meal_plan = factor("No", levels = levels(train_set$has_meal_plan)),
+  dietary_restriction = factor("No", levels = levels(train_set$dietary_restriction))
+)
+
+predict(model1, newdata = new_student, type = "probs")
+predict(model_balanced, newdata = new_student, type = "probs")
+
+predict(model1, newdata = new_student)
+predict(model_balanced, newdata = new_student)
+```
+
+## **`Python` Code**
+```{python}
+new_student = pd.DataFrame({
+    "weekly_food_budget": [95],
+    "time_between_classes": [25],
+    "distance_from_home": [6],
+    "has_meal_plan": ["No"],
+    "dietary_restriction": ["No"]
+})
+
+new_student["has_meal_plan"] = pd.Categorical(new_student["has_meal_plan"], categories=["No", "Yes"])
+new_student["dietary_restriction"] = pd.Categorical(new_student["dietary_restriction"], categories=["No", "Yes"])
+
+X_new1 = prepare_x(new_student, X_train.columns)
+new_probs1 = model1.predict(X_new1)
+new_probs1.columns = levels
+
+X_new_bal = prepare_x(new_student, X_bal.columns)
+new_probs_bal = model_balanced.predict(X_new_bal)
+new_probs_bal.columns = levels
+
+print(new_probs1.round(3))
+print(new_probs_bal.round(3))
+print(new_probs1.idxmax(axis=1))
+print(new_probs_bal.idxmax(axis=1))
+```
+
+:::
+The original model may still lean toward `Cafeteria`, because that is the majority class in the observed data. The balanced model may assign more probability to minority classes such as `Fast_Food` or `Food_Delivery` for this profile. Overall, the predictors are useful for understanding lunch-choice patterns, especially the roles of food budget and meal plan status, but prediction is only moderate. Accuracy alone is not enough here, because the model can look good while missing less common lunch choices.
+</details>
 
 :::
