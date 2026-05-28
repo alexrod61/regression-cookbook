@@ -2387,7 +2387,6 @@ table(train_set$lunch_choice)
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import statsmodels.api as sm
 from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, f1_score, log_loss
 from sklearn.utils import resample
@@ -2454,21 +2453,34 @@ train_set %>%
 
 ## **`Python` Code**
 ```{python}
-sns.countplot(data=train_set, x="lunch_choice")
+counts = train_set["lunch_choice"].value_counts().reindex(levels)
+plt.figure()
+plt.bar(counts.index, counts.values)
 plt.title("Distribution of lunch choice")
 plt.xlabel("Lunch choice")
 plt.ylabel("Count")
 plt.xticks(rotation=20)
 plt.show()
 
-sns.boxplot(data=train_set, x="lunch_choice", y="weekly_food_budget")
+budget_groups = [
+    train_set.loc[train_set["lunch_choice"] == level, "weekly_food_budget"]
+    for level in levels
+]
+plt.figure()
+plt.boxplot(budget_groups)
+plt.xticks(range(1, len(levels) + 1), levels, rotation=20)
 plt.xlabel("Lunch choice")
 plt.ylabel("Weekly food budget")
-plt.xticks(rotation=20)
 plt.show()
 
 meal_props = pd.crosstab(train_set["has_meal_plan"], train_set["lunch_choice"], normalize="index")
-meal_props[levels].plot(kind="bar", stacked=True)
+x = np.arange(len(meal_props.index))
+bottom = np.zeros(len(meal_props.index))
+plt.figure()
+for level in levels:
+    plt.bar(x, meal_props[level], bottom=bottom, label=level)
+    bottom += meal_props[level].values
+plt.xticks(x, meal_props.index)
 plt.xlabel("Has meal plan")
 plt.ylabel("Proportion")
 plt.legend(title="Lunch choice", bbox_to_anchor=(1.02, 1), loc="upper left")
@@ -2476,7 +2488,9 @@ plt.show()
 
 time_bins = pd.cut(train_set["time_between_classes"], bins=np.arange(0, 161, 20))
 time_props = pd.crosstab(time_bins, train_set["lunch_choice"], normalize="index")
-time_props[levels].plot(marker="o")
+plt.figure()
+for level in levels:
+    plt.plot(time_props.index.astype(str), time_props[level], marker="o", label=level)
 plt.xlabel("Time between classes")
 plt.ylabel("Proportion")
 plt.xticks(rotation=45)
