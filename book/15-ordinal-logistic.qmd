@@ -21,7 +21,44 @@ colourize <- function(x, color) {
       x)
   } else x
 }
+
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr',
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
 ```
+
+::: {.Warning}
+::::{.Warning-header}
+When to Use and Not Use Ordinal Logistic Regression
+::::
+::::{.Warning-container}
+Ordinal logistic regression is a model for ordered categorical outcomes that is appropriately used under the following conditions:
+
+- The outcome variable is **categorical** with **more than two ordered categories**, as illustrated in @fig-regression-ordinal-logistic-regression. The categories have a natural ranking, but the spacing between them is not assumed to be equal. Examples include Likert-scale survey responses (`Strongly Disagree` < `Disagree` < `Neutral` < `Agree` < `Strongly Agree`), customer satisfaction levels, educational achievement bands, and clinical severity scales (`mild` < `moderate` < `severe`).
+- There is one or more **regressors** that may be continuous, ordinal, or nominal (including dichotomous variables).
+- We assume a **linear relationship** between any continuous regressors ($x$s) and the **logit of the cumulative probabilities** of the outcome.
+- Our data points do not exhibit any **correlation structures**, which means there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
+- The **proportional odds (parallel slopes) assumption** holds: the effect of each regressor on the log-odds of being at or below a given category threshold is constant across all thresholds.
+
+However, ordinal logistic regression should not be used in the following scenarios:
+
+- The outcome variable is **unordered (nominal)** rather than ordered. When the categories have no meaningful ranking, you should consult the section on **multinomial logistic regression** (see @sec-multinomial). When the outcome has only **two categories**, the appropriate model is **binary logistic regression** (see @sec-binary-logistic).
+- The outcome variable is **continuous** or a **count**. For continuous and unbounded outcomes, refer to **Ordinary Least-squares regression** (see @sec-ols); for count outcomes, refer to the count regression models such as **Poisson regression** (see @sec-poisson).
+- The data points exhibit **correlation structures**, indicating statistical dependence among the sampled observations (for example, repeated measurements on the same subject).
+::::
+:::
 
 ::: {#fig-regression-ordinal-logistic-regression}
 ```{mermaid}
@@ -76,3 +113,2858 @@ mindmap
             (Logistic <br/>Distributed <br/>Cumulative Outcome <br/>Probability)
 ```
 :::
+
+
+```{r setup-r, include=FALSE}
+# Load required libraries
+library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(broom)
+library(ggplot2)
+library(MASS)
+library(VGAM)
+library(cowplot)
+library(brant)
+library(caret)
+library(reticulate)
+py_config()
+
+py_require("pandas")
+py_require("numpy")
+py_require("seaborn")
+py_require("plotnine")
+py_require("matplotlib")
+py_require("statsmodels")
+py_require("scikit-learn")
+py_require("scipy")
+
+pandas <- import("pandas")
+numpy <- import("numpy")
+seaborn <- import("seaborn")
+matplotlib <- import("matplotlib")
+statsmodels <- import("statsmodels")
+sklearn <- import("sklearn")
+scipy <- import("scipy")
+plotnine <- import("plotnine")
+```
+
+```{python setup-py, include=FALSE}
+import numpy as np
+import pandas as pd
+from plotnine import *
+from statsmodels.formula.api import glm, ols, mnlogit
+from statsmodels.genmod.families import Poisson
+from matplotlib import pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_error, classification_report
+import scipy.stats as stats
+import seaborn as sns
+import matplotlib.gridspec as gridspec
+from matplotlib.ticker import PercentFormatter
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, log_loss, accuracy_score, recall_score, f1_score
+from sklearn.utils import resample
+import statsmodels.api as sm
+```
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- Define an **ordinal variable**, identify its key properties, and recognize examples of ordinal outcomes in practice.
+
+- Describe why ordinary **linear models** and **multinomial logistic regression** are inappropriate for **ordered categorical outcomes**.
+
+- Write down the ordinal regression likelihood and the cumulative logit link functions, express cumulative probabilities, and recover category probabilities.
+
+- Understand the **proportional odds assumption** and how it constrains the model (common slope parameters across cutpoints).
+
+- Understand how coefficient estimation via maximum likelihood works in this model.
+
+- Interpret ordinal regression coefficients in real scenarios.
+
+- Use **ordinal logistic regression** for prediction by computing cumulative and category-specific probabilities.
+
+- Assess and diagnose the proportional odds assumption by the **Brant–Wald** test.
+
+- Formulate and interpret **non-proportional odds models** when the proportional odds assumption is violated.
+
+- Evaluate model performance and construct confidence intervals.
+
+::::
+:::
+
+
+## Introduction
+
+**Ordinal logistic regression** is a statistical modeling technique used to analyze relationships between an ordered multi-class categorical response variable and a set of regressors. Unlike **multinomial logistic regression**, which treats categories as unordered, ordinal logistic regression take into account the natural ranking of response levels. Ignoring this ordering may lead to loss of valuable information in both **inference** and **prediction**.
+
+In ordinal outcomes, the information lies **not only** in category membership **but also** in the relative ordering between categories. This structure is modelled through cumulative probabilities, which form the foundation of the cumulative logit (proportional odds) model. Instead of modeling the log-odds of each category relative to a baseline (as we do in multinomial regression), ordinal logistic regression models the **log-odds of being at or below a given category threshold**. That's right! We are looking at a cumulative probability now.
+
+A key characteristic of the most commonly used ordinal models is the proportional odds model. It asserts that the effect of regressors is assumed to be constant across all cumulative splits of the response. This assumption plays a central role in the modelling framework and interpretation.
+
+
+### Ordinal Logistic Regression Assumptions
+
+The following are the assumptions that we need to be aware of before fitting this model:
+
+- The response or dependent variable should be measured at the ordinal level with more than two ordered categories. This means there is a natural order between the categories in the response variable. For example, Likert scale: Strongly agree / Agree / Neutral / Disagree / Strongly Disagree
+
+- There should be one or more independent variables that are continuous, ordinal, or nominal (including dichotomous variables).
+
+- Logit linearity assumption: There must be a linear relationship between any continuous independent variables and the logit of the cumulative probabilities.
+
+- Independent observations: The observations should be independent and the dependent variable should consist of mutually exclusive and exhaustive ordered categories.
+
+- Proportional odds assumption: The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
+
+- When the proportional odds assumption is violated, a non-proportional odds model may be considered because it allows for some regressors to vary across thresholds.
+
+
+### Use Cases of Ordinal Logistic Regression
+
+Ordinal logistic regression is particularly useful when the outcome has a meaningful ranking and collapsing categories would discard important structure. Some examples of this are:
+
+1. **Likert Scale Survey Responses:** A classic example is agreement levels in surveys (Strongly disagree/ Disagree / Neutral / Agree / Strongly Agree). For example, you may study how regressors such as age, education, or exposure to misinformation influence the probability of showing extreme political ideas. 
+
+2. **Customer Satisfaction Levels:** Marketing analysts may use ordinal regression to understand how service quality, wait time, or pricing influence the likelihood of higher satisfaction ratings.
+
+3. **Educational Achievement Levels:** Educational researchers may study how study time, attendance in lectures and class activities, or prior preparation affects the probability of achieving higher results in exams.
+
+4. **Clinical Severity Scales:** Ordinal models help quantify how treatments or patient characteristics influence the likelihood of more severe disease states. These status are often divided into categories such as mild, moderate, or severe.
+
+5. **Credit Risk Ratings:** Financial institutions often assign borrowers to ordered credit grades (for example, `Poor` / `Fair` / `Good` / `Excellent`). Analysts may use ordinal regression to study how regressors such as income, debt-to-income ratio, or repayment history influence the probability of being assigned a higher credit rating.
+
+6. **Self-Reported Health Status:** Public health surveys frequently measure overall health on an ordered scale (for example, `Poor` / `Fair` / `Good` / `Very Good` / `Excellent`). Researchers may apply ordinal regression to examine how factors such as age, physical activity, smoking status, or income affect the likelihood of reporting better health.
+
+In all these examples, the ordering is essential. Treating these outcomes as nominal would ignore the structured progression between categories, while treating them as numeric would have implications for interpretability. Ordinal logistic regression provides a principled framework that incorporates the ranking of categories while maintaining probabilistic modelling rigor.
+
+## Case Study
+
+We will explore a dataset containing some factors that might influence the decision of college juniors to apply to graduate school. This dataset provides a classic example of an ordinal response, such that the categories are ordered in the response variable. We explore two primary research questions based on this dataset.
+
+- How are a student's GPA, GRE score, and field of study **associated** with their inclination to apply to graduate school?
+- Can we accurately **predict** a student's likelihood of applying to graduate school based on their GPA, GRE score, and field of study?
+
+These questions correspond to two distinct **statistical objectives**:
+
+- **Inference**: Estimate the association between regressors (GPA, GRE score, and field of study) and the likelihood of applying to graduate school.
+- **Prediction**: Develop a classification model that classifies individuals into their most probable ordinal category for the likelihood of applying to graduate school: `Low`, `Medium`, `High`, or `Very High`.
+
+## Data Collection and Wrangling
+
+The dataset contains the following variables:
+
+| Variable | Description | Type | Scale | Model Role | Coding Name |
+|---|---|---|---|---|---|
+| Inclination to Apply to Graduate School | How likely the student will apply to graduate school, with four increasing ordered categories | Discrete | Ordinal (`Low` < `Medium` < `High` < `Very High`) | Response | `inclination_to_apply` |
+| Grade Point Average | The student's current cumulative GPA | Continuous | Unbounded positive | Regressor | `GPA` |
+| GRE Score | The student's most recent Graduate Record Examination score | Continuous | Unbounded positive | Regressor | `GRE_score` |
+| Field of Study | The student's undergraduate field of study | Categorical | Nominal (Arts, Business, Social Sciences, STEM) | Regressor | `field_of_study` |
+
+: Classification table for variables in the college dataset. {#tbl-college-variables}
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+college_data <- read_csv("data/college_data.csv", show_col_types = FALSE)
+cat("There are", nrow(college_data), "observations and", ncol(college_data), "variables in the dataset.")
+head(college_data, n = 100) |>
+  print_as_dt()
+```
+
+### Python Code
+
+```{.python}
+college_data = pd.read_csv("data/college_data.csv")
+print(f"There are {college_data.shape[0]} observations and {college_data.shape[1]} variables in the dataset.")
+print(college_data)
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+college_data <- read_csv("data/college_data.csv", show_col_types = FALSE)
+cat("There are", nrow(college_data), "observations and", ncol(college_data), "variables in the dataset.")
+head(college_data, n = 100) |>
+  print_as_dt()
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+college_data = pd.read_csv("data/college_data.csv")
+print(f"There are {college_data.shape[0]} observations and {college_data.shape[1]} variables in the dataset.")
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+college_data_100 <- as.data.frame(reticulate::py_to_r(reticulate::py_eval("college_data.head(100)")), check.names = FALSE)
+print_as_dt(college_data_100)
+```
+
+:::
+
+In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we must explicitly tell `R` and `Python` that this variable is **ordinal**, not just a set of unordered labels. This matters for two reasons. First, ordinal logistic regression is built on the *cumulative* probability of being at or below each category, so the software needs to know the correct ordering (`Low` < `Medium` < `High` < `Very High`) in order to form those cumulative splits. Second, if the categories were left as plain (nominal) factors, the model would ignore their natural ranking and effectively treat them as unordered, discarding exactly the structure we want to exploit.
+
+By default, both languages order categories **alphabetically**, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually in the substantively meaningful order. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm the ordering is exactly as intended.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+# Convert the response into an ORDERED factor.
+# as.ordered() flags the variable as ordinal so R knows the categories
+# have a ranking rather than being interchangeable labels.
+college_data$inclination_to_apply <- as.ordered(college_data$inclination_to_apply)
+
+# By default, factor levels are sorted alphabetically, which would wrongly
+# place "High" before "Low". fct_relevel() overrides this and fixes the
+# levels in their true substantive order: Low < Medium < High < Very High.
+college_data$inclination_to_apply <- fct_relevel(
+  college_data$inclination_to_apply,
+  c("Low", "Medium", "High", "Very High")
+)
+
+# Print the levels to confirm the ordering is correct before modelling.
+levels(college_data$inclination_to_apply)
+```
+
+### Python Code
+
+```{.python}
+# Define the categories in their true substantive order.
+# Listing them explicitly avoids pandas' default alphabetical sorting,
+# which would wrongly place "High" before "Low".
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+
+# Convert the response into an ORDERED categorical.
+# ordered=True tells pandas the categories have a ranking, so comparisons
+# like "Low" < "High" are meaningful and the model can form cumulative splits.
+college_data["inclination_to_apply"] = pd.Categorical(
+    college_data["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Print the categories to confirm the ordering is correct before modelling.
+print(college_data["inclination_to_apply"].cat.categories.tolist())
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+# Convert the response into an ORDERED factor.
+# as.ordered() flags the variable as ordinal so R knows the categories
+# have a ranking rather than being interchangeable labels.
+college_data$inclination_to_apply <- as.ordered(college_data$inclination_to_apply)
+
+# By default, factor levels are sorted alphabetically, which would wrongly
+# place "High" before "Low". fct_relevel() overrides this and fixes the
+# levels in their true substantive order: Low < Medium < High < Very High.
+college_data$inclination_to_apply <- fct_relevel(
+  college_data$inclination_to_apply,
+  c("Low", "Medium", "High", "Very High")
+)
+
+# Print the levels to confirm the ordering is correct before modelling.
+levels(college_data$inclination_to_apply)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+# Define the categories in their true substantive order.
+# Listing them explicitly avoids pandas' default alphabetical sorting,
+# which would wrongly place "High" before "Low".
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+
+# Convert the response into an ORDERED categorical.
+# ordered=True tells pandas the categories have a ranking, so comparisons
+# like "Low" < "High" are meaningful and the model can form cumulative splits.
+college_data["inclination_to_apply"] = pd.Categorical(
+    college_data["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Print the categories to confirm the ordering is correct before modelling.
+print(college_data["inclination_to_apply"].cat.categories.tolist())
+```
+
+:::
+
+## Exploratory Data Analysis
+
+We will begin by splitting the data into 80% training (800 observations) and 20% test (200 observations), stratified by `inclination_to_apply`. To visualize the relationship between `inclination_to_apply` and each continuous explanatory variable (`GPA` and `GRE_score`), we will use the following side-by-side plots:
+
+- **Boxplots.**
+- **Violin plots.**
+
+To visualize the relationship between `inclination_to_apply` and `field_of_study`, we will use stacked bar charts. Each bar will show the percentages (depicted on the $y$-axis) of college students falling on each ordered category of `inclination_to_apply` with the categories found in `field_of_study` on the $x$-axis.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(MASS)
+library(caret)
+library(ggplot2)
+
+set.seed(42)
+train_idx  <- createDataPartition(college_data$inclination_to_apply, p = 0.8, list = FALSE)
+train_df  <- college_data[train_idx, ]
+test_df   <- college_data[-train_idx, ]
+
+train_df_side_boxplots <- train_df |>
+  ggplot(aes(inclination_to_apply, GPA)) +
+  geom_boxplot(aes(fill = inclination_to_apply)) +
+  labs(y = "GPA", x = "Inclination Apply\nto Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 16),
+    legend.position = "none",
+    plot.margin = margin(5, 15, 5, 5)
+  ) +
+  scale_fill_viridis_d()
+
+train_df_side_violin <- train_df |>
+  ggplot(aes(inclination_to_apply, GPA)) +
+  geom_violin(aes(fill = inclination_to_apply)) +
+  labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, geom = "point",
+    shape = 23, fill = "white", colour = "black", size = 4, stroke = 1
+  ) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 16),
+    legend.position = "none",
+    plot.margin = margin(5, 5, 5, 15)
+  ) +
+  scale_fill_viridis_d()
+
+# Data wrangling
+train_df_prop_summary <- as.data.frame(xtabs(
+  ~ field_of_study +
+    inclination_to_apply,
+  train_df
+) / rowSums(xtabs(
+  ~ field_of_study + inclination_to_apply,
+  train_df
+)), responseName = "prop")
+
+train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
+  x = field_of_study,
+  y = prop, fill = inclination_to_apply
+)) +
+  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
+    position = position_stack(vjust = 0.5), colour = "black", fontface = "bold", size = 5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(y = "Percent", x = "Field of Study", fill = "") +
+  ggtitle("Stacked Bar Charts") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 17, angle = 0),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 18, margin = margin(r = 1, unit = "cm")),
+    legend.title = element_text(size = 17, face = "bold")
+  ) +
+  guides(fill = guide_legend(title = "Inclination to Apply")) +
+  scale_fill_viridis_d()
+
+plot_grid(train_df_side_boxplots, train_df_side_violin, nrow = 1)
+train_df_stacked_bars
+```
+
+### Python Code
+
+```{.py}
+from sklearn.model_selection import train_test_split
+train_df, test_df = train_test_split(
+    college_data, test_size=0.2, random_state=42,
+    stratify=college_data["inclination_to_apply"]
+)
+
+# Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+            palette='viridis', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
+axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GPA', fontsize=17)
+axes[0].tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in axes[0].get_xticklabels():
+    lbl.set_ha('right')
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+               palette='viridis', ax=axes[1], legend=False, dodge=False)
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GPA'].mean()
+xticks = axes[1].get_xticks()
+for i, cat in enumerate(ordered_cats):
+    axes[1].plot(xticks[i], means[cat], marker='D', markerfacecolor='white', markeredgecolor='black', markeredgewidth=1.2,
+                 markersize=10, zorder=5, linestyle='None')
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=20, fontweight='bold')
+axes[1].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GPA', fontsize=17)
+axes[1].tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in axes[1].get_xticklabels():
+    lbl.set_ha('right')
+
+plt.tight_layout()
+plt.show()
+
+# ── 2. Stacked Bar Chart ──────────────────────────────────────────────────────
+
+# Data wrangling (equivalent to xtabs + prop.table)
+pivot = pd.crosstab(
+    train_df['field_of_study'],
+    train_df['inclination_to_apply'],
+    normalize='index'
+)
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 6))
+colors = sns.color_palette('viridis', n_colors=len(pivot.columns))
+pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7,
+           edgecolor='black')
+
+# Add percentage labels
+for bar_group in ax.containers:
+    for bar in bar_group:
+        h = bar.get_height()
+        if h >= 0.05:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + h / 2,
+                f'{h:.0%}',
+                ha='center', va='center',
+                color='black', fontweight='bold', fontsize=12
+            )
+
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+ax.set_title('Stacked Bar Charts', fontsize=16, fontweight='bold')
+ax.set_xlabel('Field of Study', fontsize=18)
+ax.set_ylabel('Percent', fontsize=17)
+ax.tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in ax.get_xticklabels():
+    lbl.set_ha('right')
+ax.tick_params(axis='y', labelsize=17)
+ax.legend(title='Inclination to Apply', fontsize=18, title_fontsize=17,
+          bbox_to_anchor=(1.01, 1), loc='upper left')
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+library(caret)
+library(ggplot2)
+
+set.seed(42)
+train_idx  <- createDataPartition(college_data$inclination_to_apply, p = 0.8, list = FALSE)
+train_df  <- college_data[train_idx, ]
+test_df   <- college_data[-train_idx, ]
+
+train_df_side_boxplots <- train_df |>
+  ggplot(aes(inclination_to_apply, GPA)) +
+  geom_boxplot(aes(fill = inclination_to_apply)) +
+  labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 16),
+    legend.position = "none",
+    plot.margin = margin(5, 15, 5, 5)
+  ) +
+  scale_fill_viridis_d()
+
+train_df_side_violin <- train_df |>
+  ggplot(aes(inclination_to_apply, GPA)) +
+  geom_violin(aes(fill = inclination_to_apply)) +
+  labs(y = "GPA", x = "Inclination to Apply\nto Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, geom = "point",
+    shape = 23, fill = "white", colour = "black", size = 4, stroke = 1
+  ) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 14),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 16),
+    legend.position = "none",
+    plot.margin = margin(5, 5, 5, 15)
+  ) +
+  scale_fill_viridis_d()
+
+# Data wrangling
+train_df_prop_summary <- as.data.frame(xtabs(
+  ~ field_of_study +
+    inclination_to_apply,
+  train_df
+) / rowSums(xtabs(
+  ~ field_of_study + inclination_to_apply,
+  train_df
+)), responseName = "prop")
+
+train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
+  x = field_of_study,
+  y = prop, fill = inclination_to_apply
+)) +
+  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
+    position = position_stack(vjust = 0.5), colour = "black", fontface = "bold", size = 5
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(y = "Percent", x = "Field of Study", fill = "") +
+  ggtitle("Stacked Bar Charts") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 17, angle = 0),
+    axis.title = element_text(size = 18),
+    legend.text = element_text(size = 18, margin = margin(r = 1, unit = "cm")),
+    legend.title = element_text(size = 17, face = "bold")
+  ) +
+  guides(fill = guide_legend(title = "Inclination to Apply")) +
+  scale_fill_viridis_d()
+
+plot_grid(train_df_side_boxplots, train_df_side_violin, nrow = 1)
+train_df_stacked_bars
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.model_selection import train_test_split
+train_df, test_df = train_test_split(
+    college_data, test_size=0.2, random_state=42,
+    stratify=college_data["inclination_to_apply"]
+)
+
+# Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
+
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+            palette='viridis', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
+axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GPA', fontsize=17)
+axes[0].tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in axes[0].get_xticklabels():
+    lbl.set_ha('right')
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
+               palette='viridis', ax=axes[1], legend=False, dodge=False)
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GPA'].mean()
+xticks = axes[1].get_xticks()
+for i, cat in enumerate(ordered_cats):
+    axes[1].plot(xticks[i], means[cat], marker='D', markerfacecolor='white', markeredgecolor='black', markeredgewidth=1.2,
+                 markersize=10, zorder=5, linestyle='None')
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=20, fontweight='bold')
+axes[1].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GPA', fontsize=17)
+axes[1].tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in axes[1].get_xticklabels():
+    lbl.set_ha('right')
+
+plt.tight_layout()
+plt.show()
+
+# ── 2. Stacked Bar Chart ──────────────────────────────────────────────────────
+
+# Data wrangling (equivalent to xtabs + prop.table)
+pivot = pd.crosstab(
+    train_df['field_of_study'],
+    train_df['inclination_to_apply'],
+    normalize='index'
+)
+
+# Plot
+fig, ax = plt.subplots(figsize=(10, 6))
+colors = sns.color_palette('viridis', n_colors=len(pivot.columns))
+pivot.plot(kind='bar', stacked=True, ax=ax, color=colors, width=0.7,
+           edgecolor='black')
+
+# Add percentage labels
+for bar_group in ax.containers:
+    for bar in bar_group:
+        h = bar.get_height()
+        if h >= 0.05:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + h / 2,
+                f'{h:.0%}',
+                ha='center', va='center',
+                color='black', fontweight='bold', fontsize=12
+            )
+
+ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+ax.set_title('Stacked Bar Charts', fontsize=16, fontweight='bold')
+ax.set_xlabel('Field of Study', fontsize=18)
+ax.set_ylabel('Percent', fontsize=17)
+ax.tick_params(axis='x', labelrotation=45, labelsize=17)
+for lbl in ax.get_xticklabels():
+    lbl.set_ha('right')
+ax.tick_params(axis='y', labelsize=17)
+ax.legend(title='Inclination to Apply', fontsize=18, title_fontsize=17,
+          bbox_to_anchor=(1.01, 1), loc='upper left')
+plt.tight_layout()
+plt.show()
+```
+:::
+
+Box and violin plots, along with stacked bar charts, show descriptively how academic performance and field of study relate to a student's likelihood of applying to graduate school.
+
+- Students with `Very High` Inclination to apply tend to have the highest GPAs on average, with a median GPA visibly higher than those in the `Low` or `Medium` categories.
+- The mean GPA, represented by the red diamonds in the violin plots, shows a consistent upward trend as the level of intent increases, suggesting a positive association between academic performance and Inclination to apply to graduate school. 
+- While there is considerable overlap in the GPA distributions of the `Low` and `Medium` groups, the `Very High` group shows a distinct shift toward the higher end of the GPA scale.
+- Differences in the distribution of `inclination_to_apply` across fields of study suggest that a student's field of study may influence their propensity to pursue graduate education.
+
+Next, we examine how `GRE_score` relates to `inclination_to_apply` using the same side-by-side boxplot and violin plot approach.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+train_df_gre_boxplots <- train_df |>
+  ggplot(aes(inclination_to_apply, GRE_score)) +
+  geom_boxplot(aes(fill = inclination_to_apply)) +
+  labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_viridis_d()
+
+train_df_gre_violin <- train_df |>
+  ggplot(aes(inclination_to_apply, GRE_score)) +
+  geom_violin(aes(fill = inclination_to_apply)) +
+  labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, geom = "point",
+    shape = 23, fill = "white", colour = "black", size = 4, stroke = 1
+  ) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_viridis_d()
+
+plot_grid(train_df_gre_boxplots, train_df_gre_violin, nrow = 1)
+```
+
+### Python Code
+
+```{.py}
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+            palette='viridis', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
+axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GRE Score', fontsize=17)
+axes[0].tick_params(axis='x', labelrotation=45)
+for lbl in axes[0].get_xticklabels():
+    lbl.set_ha('right')
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+               palette='viridis', ax=axes[1], legend=False, dodge=False)
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
+xticks = axes[1].get_xticks()
+for i, cat in enumerate(ordered_cats):
+    axes[1].plot(xticks[i], means[cat], marker='D', markerfacecolor='white', markeredgecolor='black', markeredgewidth=1.2,
+                 markersize=10, zorder=5, linestyle='None')
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=20, fontweight='bold')
+axes[1].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GRE Score', fontsize=17)
+axes[1].tick_params(axis='x', labelrotation=45)
+for lbl in axes[1].get_xticklabels():
+    lbl.set_ha('right')
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+train_df_gre_boxplots <- train_df |>
+  ggplot(aes(inclination_to_apply, GRE_score)) +
+  geom_boxplot(aes(fill = inclination_to_apply)) +
+  labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
+  ggtitle("Side-by-Side Boxplots") +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_viridis_d()
+
+train_df_gre_violin <- train_df |>
+  ggplot(aes(inclination_to_apply, GRE_score)) +
+  geom_violin(aes(fill = inclination_to_apply)) +
+  labs(y = "GRE Score", x = "Inclination to Apply to Graduate School") +
+  ggtitle("Side-by-Side Violin Plots") +
+  stat_summary(
+    fun = mean, geom = "point",
+    shape = 23, fill = "white", colour = "black", size = 4, stroke = 1
+  ) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold"),
+    axis.text = element_text(size = 17),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 18),
+    legend.position = "none"
+  ) +
+  scale_fill_viridis_d()
+
+plot_grid(train_df_gre_boxplots, train_df_gre_violin, nrow = 1)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+# --- Boxplot ---
+sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+            palette='viridis', ax=axes[0], legend=False)
+axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
+axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[0].set_ylabel('GRE Score', fontsize=17)
+axes[0].tick_params(axis='x', labelrotation=45)
+for lbl in axes[0].get_xticklabels():
+    lbl.set_ha('right')
+
+# --- Violin Plot with mean point ---
+sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
+               palette='viridis', ax=axes[1], legend=False, dodge=False)
+ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
+    if hasattr(train_df['inclination_to_apply'], 'cat') \
+    else sorted(train_df['inclination_to_apply'].unique())
+means = train_df.groupby('inclination_to_apply', observed=True)['GRE_score'].mean()
+xticks = axes[1].get_xticks()
+for i, cat in enumerate(ordered_cats):
+    axes[1].plot(xticks[i], means[cat], marker='D', markerfacecolor='white', markeredgecolor='black', markeredgewidth=1.2,
+                 markersize=10, zorder=5, linestyle='None')
+axes[1].set_title('Side-by-Side Violin Plots', fontsize=20, fontweight='bold')
+axes[1].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
+axes[1].set_ylabel('GRE Score', fontsize=17)
+axes[1].tick_params(axis='x', labelrotation=45)
+for lbl in axes[1].get_xticklabels():
+    lbl.set_ha('right')
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The GRE score plots mirror the structure of the GPA plots, allowing us to assess whether standardized test performance follows a similar pattern across likelihood-to-apply categories.
+
+- The `Very High` group stands clearly apart from the other three, with a mean GRE score of approximately 154.3, roughly 6 to 8 points higher than the `Low` (148.6), `Medium` (146.5), and `High` (148.0) groups. This separation is visible in both the boxplot and violin plot as a distinct upward shift in the distribution.
+- Unlike GPA, GRE score does **not** increase monotonically across the ordered categories. The `Medium` group has the lowest mean GRE score of all four groups, and the `Low`, `Medium`, and `High` groups show substantially overlapping distributions. This suggests that GRE score may primarily distinguish students in the `Very High` category rather than tracking the full ordinal gradient.
+- The `Low` group exhibits the widest spread in GRE scores (standard deviation ≈ 6.7), while the `High` group is the most tightly clustered (standard deviation ≈ 5.0), indicating greater homogeneity in standardized test performance among students who are likely (but not extremely likely) to apply.
+
+## Data Modeling
+
+We have been discussing the advantages of using a different model in the presence of an **ordinal response variable**. In this section, we go over the details of data modeling for an **ordinal response variable** with a set of discrete or continuous regressors using an ordinal logistic regression model. This type of modeling is the most frequent and popular model for ordinal responses. 
+
+To present the details of the modeling framework, we begin with the concept of **cumulative logits**. We have already encountered the logit function in the context of binary logistic regression. Recall that in logistic regression, the logit function is applied to the odds of an event. Specifically, if 
+
+$$
+p_i = P(Y_i = 1 |x_{i,1}, x_{i,2}, ..., x_{i,K})
+$$
+
+then the odds of the event $Y=1$ given the regressors is:
+
+$$
+\frac{P(Y_i = 1 \mid x_{i,1}, ..., x_{i,K})}{P(Y_i = 0 \mid x_{i,1}, ..., x_{i,K})} = \frac{p_i}{1-p_i}
+$$
+
+and the logit is defined as the logarithm of these odds, i.e. $\log\left(\frac{p_i}{1-p_i}\right)$. In logistic regression modeling, we assume that this log-odds is a linear function of the regressors:
+
+$$
+\log\left(\frac{p_i}{1-p_i}\right) = \beta_0 + \beta_1 x_{i,1} + \beta_2x_{i,2} + \ldots + \beta_K x_{i,K}
+$$
+
+This idea and formulation is the basis for extending the logistic regression framework for an outcome with two categories to ordinal outcomes where there are more than two categories and the order matters as well. In the ordinal case, instead of modeling the log-odds of a single binary event, we model **the cumulative logits**, which compare the probability of being at or below a given category to the probability of being above that category. 
+
+**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,K})$ the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
+
+$$
+\mathbf{x}_i = (x_{i,1},...,x_{i,K})
+$$ 
+
+In simple terms, $\mathbf{x}_i$ is just a vector of size $K$ that bundles all $K$ regressors together into a single object, so we can refer to them all at once instead of listing each one.
+
+and write;
+
+$$
+P(Y_i = 1 \mid \mathbf{x}_i)
+$$
+
+This notation simplifies expressions and improves readability. Let's continue!
+
+Imagine that your ordered response variable has $J$ different categories, such that $J \ge 3$. We start with the category ordering by formally defining the **logits of cumulative probabilities** as follows. Let:
+
+$$
+P(Y_i \leq j \mid \mathbf{x}_i) = p_{i,1} + p_{i,2} + \ldots + p_{i,j} \quad \quad j = 1, 2, \ldots, J-1
+$$
+
+be the cumulative probability. The **logits of cumulative probabilities** are defined as:
+
+$$
+\begin{aligned}
+&\text{logit}(P(Y_i \leq j \mid \mathbf{x}_i)) = \log\left( \frac{P(Y_i \leq j \mid \mathbf{x}_i)}{ 1 - P(Y_i \leq j \mid \mathbf{x}_i)} \right) \\
+&= \log\left( \frac{P(Y_i = 1 \mid \mathbf{x}_i) + P(Y_i = 2 \mid \mathbf{x}_i) + \ldots + P(Y_i = j \mid \mathbf{x}_i)}{ P(Y_i = j+1 \mid \mathbf{x}_i) + P(Y_i = j+2 \mid \mathbf{x}_i) + \ldots + P(Y_i = J \mid \mathbf{x}_i) } \right)
+\end{aligned}
+$$
+
+The logit transformation defined above is the model's **link function**. A link function maps a probability — here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$ — onto the entire real line, so that it can be expressed as a linear function of the regressors. Because it is applied to *cumulative* probabilities, it is known as the **cumulative logit link**, the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
+
+Perfect! We have defined our cumulative logit odds here. At this point, an important modelling decision must be addressed. When working with cumulative logits in ordinal logistic regression, there are two primary modelling approaches based on different assumptions about the relationship between the regressors and the response categories. These two primary modelling approaches are the proportional odds assumption and the non-proportional odds assumption. 
+
+The proportional odds model assumes that the effect of each explanatory variable is constant across all cumulative logits, meaning that the regression coefficients do not depend on the category $j$. In contrast, the non-proportional odds model allows the effects of the regressors to vary across cumulative splits of the response variable. In the following sections, we introduce these two approaches in detail and discuss their interpretation and practical implications. Later in this chapter, we show how to formally test whether the proportional odds assumption holds, using the Brant–Wald test.
+
+
+### The Proportional Odds Modeling
+
+For an ordinal response variable with $J$ ordered categories, we defined the cumulative logits as:
+
+$$
+\text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \frac{ P(Y_i \le j \mid \mathbf{x}_i) }{ P(Y_i \ge j+1 \mid \mathbf{x}_i) }
+$$
+
+for all values of $j = 1, 2, \ldots, J-1$. This means that for an outcome with $J$ categories, we have $J-1$ cumulative logits. A natural question now arises: **how should these cumulative logits depend on the regressors?** The proportional odds model assumes that each cumulative logit is a linear function of the regressors, with the important restriction that the regression coefficients are the same across all cumulative logits. The model is written as:
+
+$$
+\text{logit}( P(Y_i \le j \mid \mathbf{x}_i) ) = \alpha_j + \beta_1 x_{i,1} + \beta_2 x_{i,2} + ... + \beta_K x_{i,K}
+$$
+
+for all values of $j = 1, 2, \ldots, J-1$. Note that in this formula:
+
+- $\alpha_j$ is a category-specific intercept and depends on the category $j$,
+- $\beta_1, ..., \beta_K$ are regression coefficients that do not depend on $j$. 
+
+The essential assumption is that the effect of each explanatory variable on the log-odds is constant across all cumulative splits of the response variable. The slope parameters remain the same whether we compare:
+
+- $P(Y_i \le 1 \mid \mathbf{x}_i)$ versus $P(Y_i > 1 \mid \mathbf{x}_i)$
+- $P(Y_i \le 2 \mid \mathbf{x}_i)$ versus $P(Y_i > 2 \mid \mathbf{x}_i)$
+- $\vdots$
+- $P(Y_i \le J-1 \mid \mathbf{x}_i)$ versus $P(Y_i > J-1 \mid \mathbf{x}_i)$
+
+
+This property of regression coefficients across cumulative logits is known as **the proportional odds assumption**.
+
+
+### The Non-proportional Odds Modeling
+
+While the proportional odds model assumes that the effect of each regressor is the same across all cumulative logits, this assumption may not always hold in practice. When the effect of one or more regressors varies across the cumulative splits of the ordinal response, we use a non-proportional odds model.
+
+Formally speaking, the non-proportional odds model allows the regression coefficients to depend on the cumulative category $j$ as shown below:
+
+$$
+\text{logit}( P(Y_i \le j \mid \mathbf{x}_i) ) = \alpha_j + \beta_{1,j} x_{i,1} + \beta_{2,j} x_{i,2} + \ldots + \beta_{K,j} x_{i,K}
+$$
+
+In this model:
+
+- $\alpha_j$ is the category-specific intercept (the same as before),
+- $\beta_{1,j}, \beta_{2,j}, \ldots , \beta_{K,j}$ are category-specific regression coefficients, meaning that the effect of each explanatory variable can differ across cumulative logits.
+
+At the first glance this seems to be a great flexibility for modeling but this flexibility comes at a cost: **the number of parameters increases with the number of cumulative splits**, making the model more complex and potentially harder to interpret. However, it provides a more accurate representation when the proportional odds assumption is not valid. We will discuss how to assess these assumptions later in this chapter.
+
+
+To help us understand the differences in assumption visually, we have the following plot. The figure below visualizes four cumulative probabilities $P(Y <= 1 \mid x)$, $P(Y <= 2 \mid x)$, $P(Y <= 3 \mid x)$, and $P(Y <= 4 \mid x)$ on the y-axis plotted as a logistic curve against one explanatory variable $x$. Notice that all curves have the same slope (same amount of steepness) but different intercepts. This parallel structure shows the proportional odds assumption: the effect of $x$ on the log-odds scale (which is the coefficient of $x$) is the same across all cumulative logits. In other words, increasing $x$ shifts each cumulative logit by the same amount regardless of which categorical group $j$ we consider. Note that the intercepts in this model are $\alpha_1 = 4$, $\alpha_2 = 5.5$, $\alpha_3 = 6.3$, $\alpha_4 = 10$. The coefficient which measures the effect of $x$ on log-odds is $\beta=12$ and the same for all cumulative probabilities. Thus, the visual parallelism in this plot provides an intuitive way to understand what proportional odds means geometrically
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Borrowed from DSCI 562 lecture notes written by Alexi
+x_grid <- seq(-0.5, 3, length.out = 1200)
+a_vals <- c("k = 4" = 10, "k = 3" = 6.3, "k = 2" = 5.5, "k = 1" = 4)
+
+df <- map_dfr(names(a_vals), \(nm) {
+  a <- a_vals[[nm]]
+  tibble(
+    x = x_grid,
+    y = plogis(a - 12 * x),
+    curve = nm
+  )
+}) |>
+  mutate(curve = factor(curve, levels = names(a_vals)))
+
+eq_df <- tibble(
+  curve = factor(names(a_vals), levels = names(a_vals)),
+  x = 3.1,
+  y = c(0.95, 0.70, 0.45, 0.15),
+  lab = c(
+    "P(Y <= 4 ~ '|' ~ X)==frac(e^{10-12*x},1+e^{10-12*x})",
+    "P(Y <= 3 ~ '|' ~ X)==frac(e^{6.3-12*x},1+e^{6.3-12*x})",
+    "P(Y <= 2 ~ '|' ~ X)==frac(e^{5.5-12*x},1+e^{5.5-12*x})",
+    "P(Y <= 1 ~ '|' ~ X)==frac(e^{4-12*x},1+e^{4-12*x})"
+  )
+)
+
+cb_pal <- c(
+  "k = 4" = "#0072B2",
+  "k = 3" = "#D55E00",
+  "k = 2" = "#009E73",
+  "k = 1" = "#CC79A7"
+)
+
+ggplot(df, aes(x, y, color = curve)) +
+  geom_line(linewidth = 1.1) +
+  geom_text(
+    data = eq_df,
+    aes(x = x, y = y, label = lab, color = curve),
+    hjust = 1, vjust = 0.5, parse = TRUE,
+    size = 7.5,         
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = cb_pal) +
+  coord_cartesian(xlim = c(-0.5, 3), ylim = c(0, 1.05)) +
+  labs(x = "x", y = "Cumulative Probability") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 24),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 21)
+  )
+```
+
+
+If the proportional odds assumption were violated, these curves would no longer be parallel on the logit scale; instead, their slopes would differ, indicating that the effect of $x$ changes depending on which cumulative split of the ordinal outcome is being modeled. The following figure is an example of proportional odds assumption being violated:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Non-proportional odds visualization
+
+x_grid <- seq(-0.5, 3, length.out = 1200)
+
+# Different intercepts and coefficients
+param_vals <- tribble(
+  ~curve,   ~a,   ~b,
+  "k = 4",  10,  -12,
+  "k = 3",  6.3,  -9,
+  "k = 2",  5.5,  -6,
+  "k = 1",  4,    -3
+)
+
+df_np <- param_vals |>
+  mutate(data = map2(a, b, ~tibble(
+    x = x_grid,
+    y = plogis(.x + .y * x_grid)
+  ))) |>
+  unnest(data) |>
+  mutate(curve = factor(curve, levels = param_vals$curve))
+
+eq_df_np <- param_vals |>
+  mutate(
+    x = 3.1,
+    y = c(0.95, 0.70, 0.45, 0.15),
+    lab = paste0(
+      "P(Y <= ", 4:1, " ~ '|' ~ X)==",
+      "frac(e^{", a, ifelse(b >= 0, "+", ""), b, "*x},",
+      "1+e^{", a, ifelse(b >= 0, "+", ""), b, "*x})"
+    )
+  )
+
+cb_pal <- c(
+  "k = 4" = "#0072B2",
+  "k = 3" = "#D55E00",
+  "k = 2" = "#009E73",
+  "k = 1" = "#CC79A7"
+)
+
+ggplot(df_np, aes(x, y, color = curve)) +
+  geom_line(linewidth = 1.1) +
+  geom_text(
+    data = eq_df_np,
+    aes(x = x, y = y, label = lab, color = curve),
+    hjust = 1, vjust = 0.5, parse = TRUE,
+    size = 7.5,
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = cb_pal) +
+  coord_cartesian(xlim = c(-0.5, 3), ylim = c(0, 1.05)) +
+  labs(x = "x", y = "Cumulative Probability") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(size = 24),
+    axis.text = element_text(size = 17),
+    axis.title = element_text(size = 21)
+  )
+```
+### The Log-Likelihood Function
+
+The ordinal logistic regression model describes the cumulative probabilities $P(Y_i \le j \mid \mathbf{x}_i)$, that is, the chance of falling in category $j$ or any lower category. To estimate the model, however, we need the category-specific probability $p_{i,j} = P(Y_i = j \mid \mathbf{x}_i)$, the chance of landing in exactly one category. We recover it by a simple differencing step: the probability of being in category $j$ alone is the probability of being at or below $j$, minus the probability of being at or below the category just beneath it,
+
+$$
+p_{i,j} = P(Y_i = j \mid \mathbf{x}_i) = P(Y_i \le j \mid \mathbf{x}_i) - P(Y_i \le j-1 \mid \mathbf{x}_i), \qquad j = 1, \ldots, J.
+$$
+
+The two endpoints are fixed by convention: nothing can fall below the first category, so $P(Y_i \le 0 \mid \mathbf{x}_i) = 0$, and everything falls at or below the last, so $P(Y_i \le J \mid \mathbf{x}_i) = 1$.
+
+To write this in terms of the model parameters, recall the **logistic cumulative function**
+
+$$
+F(\eta) = \frac{e^{\eta}}{1 + e^{\eta}}, \qquad \text{with systematic component} \quad \eta_{i,j} = \alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i,
+$$
+
+so that $P(Y_i \le j \mid \mathbf{x}_i) = F(\eta_{i,j})$. Substituting into the differencing formula gives the category probability in closed form,
+
+$$
+p_{i,j} = F(\eta_{i,j}) - F(\eta_{i,j-1}) = \frac{e^{\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i}}{1 + e^{\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i}} - \frac{e^{\alpha_{j-1} - \boldsymbol{\beta}^\top \mathbf{x}_i}}{1 + e^{\alpha_{j-1} - \boldsymbol{\beta}^\top \mathbf{x}_i}}.
+$$
+
+Each $p_{i,j}$ is guaranteed to be a valid (non-negative) probability. As the thresholds are strictly increasing, such that $\alpha_{j-1} < \alpha_j$, the cumulative function $F$ is also increasing, so $F(\eta_{i,j}) \ge F(\eta_{i,j-1})$ and the difference can never be negative. Intuitively, adding one more category to the running total can only ever increase the cumulative probability, so each individual slice we carve out is positive.
+
+To estimate the model, we need a way to measure how well a given set of parameters explains the observed data. The **likelihood function** does exactly this: it expresses the probability of the data we actually observed as a function of the unknown parameters, and estimation amounts to finding the parameter values that make this probability as large as possible.
+
+We first encode each individual's observed category using an **indicator variable**. Let $y_{i,j} = 1$ if the $i$th individual falls in category $j$, and $y_{i,j} = 0$ otherwise. Because every individual falls in exactly one of the $J$ categories, for each person $i$ precisely one of the values $y_{i,1}, y_{i,2}, \ldots, y_{i,J}$ equals $1$ and the rest are $0$. This indicator simply acts as a switch that "selects" the category each individual actually landed in. The likelihood function for the ordinal logistic regression model is then:
+
+$$
+\mathcal{L}(\boldsymbol{\alpha}, \boldsymbol{\beta} \mid y) = \prod_{i=1}^n \prod_{j=1}^J p_{i,j}^{y_{i,j}},
+$$
+
+where $n$ is the number of individuals in the sample, $J$ is the number of ordered categories, and $p_{i,j} = P(Y_i = j \mid \mathbf{x}_i)$ is the model-implied probability that individual $i$ (with regressor values $\mathbf{x}_i$) falls in category $j$, as derived earlier by differencing the cumulative probabilities. The two unknown parameter sets being estimated are collected in $\boldsymbol{\alpha} = (\alpha_1, \alpha_2, \ldots, \alpha_{J-1})^\top$, the vector of thresholds (the category-specific intercepts), and $\boldsymbol{\beta} = (\beta_1, \beta_2, \ldots, \beta_K)^\top$, the vector of $K$ shared slopes that apply across all cumulative splits.
+
+The two products have intuitive roles. The **inner product** over $j$ runs across the $J$ categories for a single individual: because of the indicator $y_{i,j}$ in the exponent, every term equals $1$ except the one matching the individual's true category, so the inner product collapses to just $p_{i,j}$ for that observed category. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
+
+Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the log-likelihood:
+
+$$
+\ell(\boldsymbol{\alpha}, \boldsymbol{\beta}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_{i,j}.
+$$
+
+Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$, the parameter values under which the observed data are most probable. Unlike ordinary least squares, however, there is no closed-form algebraic expression for the values of $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$ that maximize $\ell$: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the logistic function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice here is the **Newton–Raphson** method, which we describe next.
+
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Newton–Raphson Method
+::::
+::::{.Tip-container}
+The parameters we ultimately estimate are the thresholds $\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_{J-1})^\top$ and the shared slopes $\boldsymbol{\beta} = (\beta_1, \ldots, \beta_K)^\top$. Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\alpha}$ and $\boldsymbol{\beta}$ jointly by iterating with the score function and Hessian matrix of the log-likelihood.
+
+**Score function.** The partial derivative of the log-likelihood with respect to each threshold $\alpha_j$ is:
+
+$$
+\frac{\partial \ell}{\partial \alpha_j} = \sum_{i=1}^n \left[ \frac{y_{i,j}}{p_{i,j}} - \frac{y_{i,j+1}}{p_{i,j+1}} \right] f(\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i),
+$$
+
+where $f(\cdot) = F(\cdot)(1 - F(\cdot))$ is the logistic density. The partial derivative with respect to each shared slope $\beta_k$ is:
+
+$$
+\frac{\partial \ell}{\partial \beta_k} = -\sum_{i=1}^n x_{i,k} \sum_{j=1}^{J} y_{i,j} \left[ \frac{f(\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i)}{p_{i,j}} - \frac{f(\alpha_{j-1} - \boldsymbol{\beta}^\top \mathbf{x}_i)}{p_{i,j}} \right].
+$$
+
+The key difference from the multinomial case is that the slopes $\beta_k$ appear in **all** $J-1$ cumulative logits simultaneously, so their score components aggregate information across every cumulative split.
+
+**Hessian matrix.** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of $\ell$ with respect to the thresholds and slopes. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+K) \times (J-1+K)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, see @agresti2010analysis, Chapter 3.
+
+**Iteration.** Collecting the thresholds and slopes into the stacked parameter pair $(\boldsymbol{\alpha}, \boldsymbol{\beta})$, the Newton–Raphson update at step $t$ is:
+
+$$
+\begin{pmatrix} \boldsymbol{\alpha}^{(t+1)} \\ \boldsymbol{\beta}^{(t+1)} \end{pmatrix} \leftarrow \begin{pmatrix} \boldsymbol{\alpha}^{(t)} \\ \boldsymbol{\beta}^{(t)} \end{pmatrix} - \left[ H\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right) \right]^{-1} S\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right),
+$$
+
+where $S(\boldsymbol{\alpha}, \boldsymbol{\beta})$ is the stacked score vector holding the threshold derivatives followed by the slope derivatives. The algorithm is initialized at $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeats until changes in $\ell$, $\boldsymbol{\alpha}$, and $\boldsymbol{\beta}$ fall below a convergence tolerance.
+
+The full Newton–Raphson/IRLS procedure is:
+
+1. Initialize $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (the thresholds and slopes).
+2. Repeat until convergence:
+   - Compute the systematic components $\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i$ for all $i$ and $j$.
+   - Compute cumulative probabilities $P(Y_i \le j \mid \mathbf{x}_i)$ and category probabilities $p_{i,j}$.
+   - Compute the log-likelihood $\ell(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$, score $S(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$, and Hessian $H(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)})$.
+   - Update $(\boldsymbol{\alpha}^{(t+1)}, \boldsymbol{\beta}^{(t+1)})$ using the Newton–Raphson step above.
+   - Check convergence.
+::::
+:::
+
+## Estimation
+
+We now turn to the question of how the parameters of the ordinal logistic regression model are estimated from data. We summarise the key estimation steps in mathematical terms below, working with one observation at a time before generalizing to the full sample.
+
+Recall that the proportional odds model for an ordinal response $Y$ with $J$ ordered categories and $K$ regressors is:
+
+$$
+\text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \alpha_j - (\beta_1 x_{i,1} + \beta_2 x_{i,2} + \ldots + \beta_K x_{i,K}), \quad j = 1, \ldots, J-1,
+$$
+
+where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_K$ are the shared slope coefficients. Note the sign convention: the regressor terms are subtracted from the intercept, such that that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
+
+The model therefore comprises $(J - 1) + K$ parameters: $J - 1$ threshold parameters $(\alpha_1, \alpha_2, \ldots, \alpha_{J-1})$ and $K$ regression coefficients $(\beta_1, \beta_2, \ldots, \beta_K)$ shared across all cumulative splits.
+
+### Fitting the Proportional Odds Model
+
+We now fit the proportional odds model to the college dataset using `inclination_to_apply` as the ordinal response with four levels (`Low < Medium < High < Very High`) and `GPA`, `GRE_score`, and `field_of_study` as regressors. In `R`, we use `polr()` from the `MASS` package; in `Python`, we use `OrderedModel` from `statsmodels`.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(MASS)
+library(broom)
+
+# Ensure inclination_to_apply is an ordered factor with correct level order
+train_df$inclination_to_apply <- factor(
+  train_df$inclination_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+# Fit the proportional odds model
+# Note: polr() uses the sign convention logit P(Y <= j) = alpha_j - beta * X
+ordinal_fit <- polr(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_df,
+  Hess = TRUE   # return the Hessian for inference
+)
+
+tidy(ordinal_fit)
+```
+
+### Python Code
+
+```{.python}
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+# Ensure inclination_to_apply is an ordered categorical
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Fit the proportional odds model (logit link)
+X = pd.get_dummies(train_df[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
+ordinal_fit = OrderedModel(
+    train_df["inclination_to_apply"],
+    X,
+    distr="logit"
+)
+ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
+print(ordinal_result.summary())
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+
+train_df$inclination_to_apply <- factor(
+  train_df$inclination_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+ordinal_fit <- polr(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_df,
+  Hess = TRUE
+)
+
+tidy(ordinal_fit)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+X = pd.get_dummies(train_df[["GPA", "GRE_score", "field_of_study"]], columns=["field_of_study"], drop_first=True, dtype=float)
+ordinal_fit = OrderedModel(
+    train_df["inclination_to_apply"],
+    X,
+    distr="logit"
+)
+ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
+print(ordinal_result.summary())
+```
+
+:::
+
+The output reports the estimated parameters: the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ (one per regressor), each with its standard error and $t$-value, together with the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
+
+In the case study model with regressors $x_{i,\texttt{GPA}}$, $x_{i,\texttt{GRE}}$, and the `field-of-study` dummy variables $\mathbf{Z}_{i,\texttt{field}}$, the fitted proportional odds model can be written as:
+
+$$
+\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right), \quad j = 1, 2, 3,
+$$
+
+where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ from the coefficients block of the output.
+
+### Fitting the Non-Proportional Odds Model
+
+When the proportional odds assumption is violated for one or more regressors, we allow each cumulative logit to have its own set of regression coefficients. Recall the non-proportional odds model introduced in the Data Modeling section:
+
+$$
+\text{logit}( P(Y_i \le j \mid \mathbf{x}_i) ) = \alpha_j - (\beta_{1,j} x_{i,1} + \beta_{2,j} x_{i,2} + \ldots + \beta_{K,j} x_{i,K}), \quad j = 1, \ldots, J-1,
+$$
+
+where every slope $\beta_{k,j}$ now depends on the cumulative split $j$. The total number of parameters grows from $(J-1) + K$ in the proportional odds model to $(J-1) \times (1 + K)$ in the fully non-proportional model, with one intercept and $K$ slopes for each of the $J-1$ cumulative logits. For our case study with $J = 4$ categories and $K$ regressors, this is a substantial increase, which is why the non-proportional model should only be preferred if the data clearly support it.
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Log-Likelihood and Estimation under Non-Proportional Odds
+::::
+::::{.Tip-container}
+The likelihood has the same multinomial form as before:
+
+$$
+\ell(\boldsymbol{\alpha}, \boldsymbol{B}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_{i,j},
+$$
+
+but now the category probabilities $p_{i,j}$ are computed from cumulative probabilities that use split-specific slopes $\boldsymbol{\beta}_j = (\beta_{1,j}, \ldots, \beta_{K,j})^\top$:
+
+$$
+P(Y_i \le j \mid \mathbf{x}_i) = \frac{e^{\alpha_j - \boldsymbol{\beta}_j^\top \mathbf{x}_i}}{1 + e^{\alpha_j - \boldsymbol{\beta}_j^\top \mathbf{x}_i}}.
+$$
+
+The parameter matrix $\boldsymbol{B} = [\boldsymbol{\beta}_1 \mid \ldots \mid \boldsymbol{\beta}_{J-1}]$ replaces the single shared vector $\boldsymbol{\beta}$. Newton–Raphson proceeds identically to the proportional odds case, but the score and Hessian are now computed with respect to all $(J-1)(K+1)$ free parameters. As the cumulative logits are no longer coupled through a single $\boldsymbol{\beta}$, the Hessian has a more favourable block structure. In principle, each cumulative logit can be optimized independently, although software typically optimizes all parameters jointly.
+::::
+:::
+
+In `R`, we fit the fully non-proportional model using `vglm()` from the `VGAM` package. Setting `parallel = FALSE` removes the proportional odds constraint entirely. Setting `parallel = TRUE` would recover the proportional odds model, and passing a named logical vector (e.g. `parallel = c(GPA = TRUE, GRE_score = FALSE)`) fits the partial proportional odds model.
+
+In `Python`, `statsmodels` does not currently provide a built-in non-proportional ordinal model. A practical approach is to reframe the $J-1$ cumulative binary splits as separate binary logistic regression models (one model per cutpoint) and fit each independently using `LogisticRegression` or `sm.Logit`.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(VGAM)
+
+# Fully non-proportional odds model (parallel = FALSE relaxes the constraint
+# for all regressors; each cumulative logit gets its own set of slopes)
+ordinal_fit_np <- vglm(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
+  data = train_df
+)
+
+summary(ordinal_fit_np)
+```
+
+### Python Code
+
+```{.python}
+# statsmodels has no built-in non-proportional ordinal model, so we fit
+# J-1 = 3 separate binary logistic regressions, one per cumulative split.
+# Each models P(Y <= j) vs P(Y > j) for j = 1, 2, 3. Using sm.Logit (rather
+# than sklearn) lets us report standard errors and z-values, matching the
+# coefficient table that R's vglm() summary produces.
+
+import statsmodels.api as sm
+import numpy as np
+
+cats      = ["Low", "Medium", "High", "Very High"]
+X_np      = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]],
+    drop_first=True
+).astype(float)
+X_np      = sm.add_constant(X_np)              # add the intercept term
+y_ord     = train_df["inclination_to_apply"].cat.codes  # 0,1,2,3
+
+cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
+np_models = {}
+
+for j, label in enumerate(cutpoints):
+    # binary target: 1 if Y <= j, 0 if Y > j
+    y_bin = (y_ord <= j).astype(int)
+    model = sm.Logit(y_bin, X_np).fit(disp=False)
+    np_models[label] = model
+
+    # Coefficient table: estimate, standard error, and z-value per regressor
+    coef_table = pd.DataFrame({
+        "coef":    model.params,
+        "std err": model.bse,
+        "z":       model.tvalues,
+    }).round(3)
+    print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
+    print(coef_table.to_string())
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(VGAM)
+
+ordinal_fit_np <- vglm(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  family = cumulative(link = "logitlink", parallel = FALSE, reverse = FALSE),
+  data = train_df
+)
+
+summary(ordinal_fit_np)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import statsmodels.api as sm
+import numpy as np
+
+cats  = ["Low", "Medium", "High", "Very High"]
+X_np  = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]],
+    drop_first=True
+).astype(float)
+X_np  = sm.add_constant(X_np)
+y_ord = train_df["inclination_to_apply"].cat.codes
+
+cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
+np_models = {}
+
+for j, label in enumerate(cutpoints):
+    y_bin = (y_ord <= j).astype(int)
+    model = sm.Logit(y_bin, X_np).fit(disp=False)
+    np_models[label] = model
+    coef_table = pd.DataFrame({
+        "coef":    model.params,
+        "std err": model.bse,
+        "z":       model.tvalues,
+    }).round(3)
+    print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
+    print(coef_table.to_string())
+```
+
+:::
+
+Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, and z-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we obtain the equivalent information by fitting one binary logistic regression per cutpoint with `sm.Logit` and printing a matching table for each. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
+
+## Goodness of Fit
+
+Let us assess how well the fitted proportional odds model explains the observed `inclination_to_apply` categories on the training set. We consider two complementary perspectives: (1) likelihood-based measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale, and (2) classification-based measures that evaluate how accurately the model assigns observations to their correct ordinal category.
+
+### Likelihood-Based Measures
+
+#### Residual deviance and null deviance {.unnumbered .unlisted}
+
+The **null deviance** measures how well the intercept-only model (no regressors, only the $J-1$ thresholds) fits the data:
+
+$$
+D_{\text{null}} = -2\,\ell(\hat{\boldsymbol{\alpha}}_{\text{null}}),
+$$
+
+where $\hat{\boldsymbol{\alpha}}_{\text{null}}$ are the thresholds estimated without any regressor. The **residual deviance** is the analogous quantity for the fitted model:
+
+$$
+D_{\text{resid}} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}).
+$$
+
+A well-fitting model should have a substantially smaller residual deviance than the null deviance. The reduction $D_{\text{null}} - D_{\text{resid}}$ is the **likelihood-ratio (LR) statistic**, which under $H_0$ (all slope coefficients are zero) follows a $\chi^2$ distribution with degrees of freedom equal to the number of slope parameters $K$:
+
+$$
+G^2 = D_{\text{null}} - D_{\text{resid}} = -2\bigl(\ell_{\text{null}} - \ell_{\text{fitted}}\bigr) \;\overset{H_0}{\sim}\; \chi^2(K).
+$$
+
+**McFadden's pseudo-$R^2$** expresses the proportional reduction in log-likelihood relative to the null model:
+
+$$
+R^2_{\text{McFadden}} = 1 - \frac{\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}})}{\ell(\hat{\boldsymbol{\alpha}}_{\text{null}})}.
+$$
+
+Unlike OLS $R^2$, McFadden's $R^2$ does not have a natural upper bound of 1, and values in the range 0.2–0.4 are generally considered to indicate good model fit.
+
+**AIC and BIC** penalise the log-likelihood for model complexity:
+
+$$
+\text{AIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + p\log n,
+$$
+
+where $p = (J-1) + K$ is the total number of parameters and $n$ is the sample size. Lower AIC and BIC indicate better fit, and they are most useful for **comparing competing models** (e.g., proportional vs. partial proportional odds).
+
+We compute all of these measures below.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(MASS)
+
+# ── Likelihood-based measures ────────────────────────────────────────────────
+ll_fitted <- logLik(ordinal_fit)          # log-likelihood of fitted model
+
+# Null model: intercepts only, no regressors
+ordinal_null <- polr(
+  inclination_to_apply ~ 1,
+  data  = train_df,
+  Hess  = TRUE
+)
+ll_null <- logLik(ordinal_null)
+
+null_deviance   <- -2 * as.numeric(ll_null)
+resid_deviance  <- -2 * as.numeric(ll_fitted)
+mcfadden_r2     <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat         <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df           <- ordinal_fit$edf - ordinal_null$edf   # slope params only
+lr_pval         <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("LR statistic:       ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(ordinal_fit), 2), "\n")
+cat("BIC:                ", round(BIC(ordinal_fit), 2), "\n")
+```
+
+### Python Code
+
+```{.python}
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+# ── Likelihood-based measures ────────────────────────────────────────────────
+ll_fitted = ordinal_result.llf
+
+# Null log-likelihood from marginal category proportions
+y_codes  = train_df["inclination_to_apply"].cat.codes.values
+props    = np.array([(y_codes == j).mean() for j in range(4)])
+ll_null  = np.sum(np.log(props[y_codes]))
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = ordinal_result.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"LR statistic:       {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {ordinal_result.aic:.2f}")
+print(f"BIC:                {ordinal_result.bic:.2f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+
+ordinal_null <- polr(
+  inclination_to_apply ~ 1,
+  data  = train_df,
+  Hess  = TRUE
+)
+ll_null   <- logLik(ordinal_null)
+ll_fitted <- logLik(ordinal_fit)
+
+null_deviance  <- -2 * as.numeric(ll_null)
+resid_deviance <- -2 * as.numeric(ll_fitted)
+mcfadden_r2    <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat        <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df          <- ordinal_fit$edf - ordinal_null$edf
+lr_pval        <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("LR statistic:       ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(ordinal_fit), 2), "\n")
+cat("BIC:                ", round(BIC(ordinal_fit), 2), "\n")
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+ll_fitted = ordinal_result.llf
+
+y_codes = train_df["inclination_to_apply"].cat.codes.values
+props   = np.array([(y_codes == j).mean() for j in range(4)])
+ll_null = np.sum(np.log(props[y_codes]))
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = ordinal_result.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"LR statistic:       {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {ordinal_result.aic:.2f}")
+print(f"BIC:                {ordinal_result.bic:.2f}")
+```
+
+:::
+
+The residual deviance (1828.48) is substantially smaller than the null deviance (2205.58), a reduction of 377.10 units. This reduction is captured by the likelihood-ratio statistic $G^2 = 377.10$ on 6 degrees of freedom ($p < 0.001$), providing very strong evidence that at least one regressor improves on the null model. McFadden's $R^2 = 0.171$ falls within the 0.2 range commonly associated with acceptable fit for ordinal models, indicating that GPA, GRE score, and field of study together explain a meaningful share of the variation in `inclination_to_apply` on the log-likelihood scale.
+
+### Classification-Based Measures
+
+While likelihood-based measures evaluate the model on the probability scale, classification-based measures assess how well the model assigns each observation to its correct ordinal category by taking the category with the highest predicted probability as the point prediction. We use the same three metrics as in Chapter 14: overall accuracy, macro recall, and macro F1.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(caret)
+
+# Predict on training set
+y_pred_train <- predict(ordinal_fit, newdata = train_df)
+
+conf_matrix_train <- confusionMatrix(
+  factor(y_pred_train,            levels = levels(train_df$inclination_to_apply)),
+  factor(train_df$inclination_to_apply, levels = levels(train_df$inclination_to_apply))
+)
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix_train$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Low -> Very High), and
+# Actual increases top -> bottom (Low -> Very High). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Low" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+
+# Metrics
+overall_accuracy <- conf_matrix_train$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+### Python Code
+
+```{.python}
+from sklearn.metrics import (confusion_matrix, ConfusionMatrixDisplay,
+                             accuracy_score, recall_score, f1_score)
+import matplotlib.pyplot as plt
+
+# Predict on training set
+pred_probs_train = ordinal_result.model.predict(
+    ordinal_result.params, exog=X.values
+)
+pred_codes_train = pred_probs_train.argmax(axis=1)
+true_codes_train = train_df["inclination_to_apply"].cat.codes.values
+
+# Confusion matrix
+cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
+
+# Metrics
+acc    = accuracy_score(true_codes_train, pred_codes_train)
+recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
+f1     = f1_score(true_codes_train,       pred_codes_train, average="macro")
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(caret)
+
+y_pred_train <- predict(ordinal_fit, newdata = train_df)
+
+conf_matrix_train <- confusionMatrix(
+  factor(y_pred_train,                  levels = levels(train_df$inclination_to_apply)),
+  factor(train_df$inclination_to_apply, levels = levels(train_df$inclination_to_apply))
+)
+
+cm_df <- as.data.frame(as.table(conf_matrix_train$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Low -> Very High), and
+# Actual increases top -> bottom (Low -> Very High). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Low" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+
+overall_accuracy <- conf_matrix_train$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.metrics import (confusion_matrix, ConfusionMatrixDisplay,
+                             accuracy_score, recall_score, f1_score)
+import matplotlib.pyplot as plt
+
+pred_probs_train = ordinal_result.model.predict(
+    ordinal_result.params, exog=X.values
+)
+pred_codes_train = pred_probs_train.argmax(axis=1)
+true_codes_train = train_df["inclination_to_apply"].cat.codes.values
+
+cm_train = confusion_matrix(true_codes_train, pred_codes_train, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm_train,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
+
+acc    = accuracy_score(true_codes_train, pred_codes_train)
+recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
+f1     = f1_score(true_codes_train,       pred_codes_train, average="macro")
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+On the training set, the model achieves an overall accuracy of **44.5%**, a macro recall of **41.9%**, and a macro F1 of **40.6%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model meaningfully outperforms chance, but leaves substantial room for improvement.
+
+The confusion matrix reveals the characteristic ordinal error pattern: most misclassifications fall into **adjacent categories** rather than opposite ends of the scale. For instance, `Low` observations are most often misclassified as `Medium`, and `High` observations are most often confused with `Very High` or `Medium`, rarely with `Low`. This near-diagonal structure is desirable for an ordinal model because it indicates that the model incorporates the relative order of response categories, even when it does not predict the exact category correctly.
+
+The `Very High` category is the best-predicted class (recall = 0.78, F1 = 0.68), consistent with the finding that both GPA and GRE score create the sharpest separation at the top of the ordinal scale. The `High` category is the most difficult to classify correctly (recall = 0.15, F1 = 0.19), as it sits between two better-separated groups and receives predictions pulled in both directions. Macro recall (0.419) is noticeably lower than accuracy (0.445), indicating mild imbalance in how well the model performs across the four categories, a pattern that persists on the held-out test set and is discussed further in the Results section.
+
+## Inference
+
+After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors, we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results more interpretable, we exponentiate a regression coefficient (or its confidence thresholds) to obtain a **proportional odds ratio**, which describes how the cumulative odds of being at or below any category threshold change for a one-unit increase in the regressor, holding other variables fixed.
+
+A key advantage of the proportional odds model compared to the multinomial model is parsimony: as the proportional odds assumption constrains each regressor to a single shared slope across all $J - 1$ cumulative logits, there is exactly one odds ratio to interpret per regressor rather than one per outcome category. This single number summarises the regressor's effect on the entire scale of the response variable.
+
+We can determine whether a regressor is statistically associated with the cumulative log-odds through hypothesis testing for the parameters $\beta_k$. Define the Wald statistic $z_k$ as:
+
+$$
+z_k = \frac{\hat{\beta}_k}{\widehat{\text{se}}\!\left(\hat{\beta}_k\right)}
+$$
+
+and we test the hypotheses:
+
+$$
+\begin{gather*}
+H_0: \beta_k = 0 \\
+H_a: \beta_k \neq 0.
+\end{gather*}
+$$
+
+Assuming that the sample size $n$ is large enough, $z_k$ follows an approximately Standard Normal distribution under $H_0$. Note that `polr()` in `R` labels this column `t value` in its summary output, but the inference is based on the Normal approximation.
+
+The corresponding $p$-values for each $\hat{\beta}_k$ can be computed. The smaller the $p$-value, the stronger the evidence against $H_0$. As in previous regression models, we set a predetermined significance level (usually $\alpha = 0.05$): if the $p$-value is smaller than $\alpha$, we claim there is evidence to reject the null hypothesis. Hence, small $p$-values indicate that the data support an association between the ordinal response and the $k$th regressor, after adjusting for all other regressors in the model.
+
+Given a significance level $\alpha$, we construct approximate $(1-\alpha)\times 100\%$ confidence intervals for the true $\beta_k$:
+
+$$
+\hat{\beta}_k \pm z_{\alpha/2}\,\widehat{\text{se}}\!\left(\hat{\beta}_k\right),
+$$
+
+where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution. Exponentiating the endpoints of this interval gives a $(1-\alpha)\times 100\%$ confidence interval for the proportional odds ratio $e^{\beta_k}$.
+
+We compute the 95% confidence intervals, odds ratios, and $p$-values below, and filter the significant coefficients at the 5% significance level.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(MASS)
+library(broom)
+
+# polr() does not return p-values directly. tidy() gives the coefficient
+# table (estimates, standard errors, and t-values), from which we compute
+# the Normal-approximation p-values. We keep the slope coefficients only
+# (the thresholds are nuisance parameters here) and exponentiate the
+# profile-likelihood confidence intervals (conf.int = TRUE) to obtain
+# proportional odds ratios.
+inference_table <- tidy(ordinal_fit, conf.int = TRUE) |>
+  filter(term %in% names(coef(ordinal_fit))) |>
+  mutate(
+    p_value  = 2 * pnorm(abs(statistic), lower.tail = FALSE),
+    or       = exp(estimate),
+    ci_lower = exp(conf.low),
+    ci_upper = exp(conf.high)
+  ) |>
+  dplyr::select(term, estimate, std_error = std.error, statistic,
+                p_value, or, ci_lower, ci_upper) |>
+  mutate(across(where(is.numeric), \(x) round(x, 4)))
+
+# Print all coefficients
+print(inference_table)
+
+# Filter: significant regressors at the 5% level
+cat("\nSignificant regressors (p < 0.05):\n")
+print(inference_table[inference_table$p_value < 0.05, ])
+```
+
+### Python Code
+
+```{.python}
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+# Extract estimates, SEs, and compute Wald z-statistics and p-values
+params    = ordinal_result.params
+std_errs  = ordinal_result.bse
+z_stats   = params / std_errs
+p_values  = 2 * stats.norm.sf(np.abs(z_stats))
+
+# Confidence intervals on the log-odds scale
+ci = ordinal_result.conf_int()
+
+# In statsmodels OrderedModel the threshold parameters contain "/"
+# in their names; keep only the slope (regressor) parameters
+slope_mask = ~params.index.str.contains("/")
+
+inference_table = pd.DataFrame({
+    "term"      : params[slope_mask].index,
+    "estimate"  : params[slope_mask].values,
+    "std_error" : std_errs[slope_mask].values,
+    "statistic" : z_stats[slope_mask].values,
+    "p_value"   : p_values[slope_mask],
+    "or"        : np.exp(params[slope_mask].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, 0].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, 1].values),
+}).round(4)
+
+print("All slope coefficients:")
+print(inference_table.to_string(index=False))
+
+print("\nSignificant regressors (p < 0.05):")
+print(inference_table[inference_table["p_value"] < 0.05].to_string(index=False))
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(MASS)
+library(broom)
+
+inference_table <- tidy(ordinal_fit, conf.int = TRUE) |>
+  filter(term %in% names(coef(ordinal_fit))) |>
+  mutate(
+    p_value  = 2 * pnorm(abs(statistic), lower.tail = FALSE),
+    or       = exp(estimate),
+    ci_lower = exp(conf.low),
+    ci_upper = exp(conf.high)
+  ) |>
+  dplyr::select(term, estimate, std_error = std.error, statistic,
+                p_value, or, ci_lower, ci_upper) |>
+  mutate(across(where(is.numeric), \(x) round(x, 4)))
+
+print(inference_table)
+
+cat("\nSignificant regressors (p < 0.05):\n")
+print(inference_table[inference_table$p_value < 0.05, ])
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+params    = ordinal_result.params
+std_errs  = ordinal_result.bse
+z_stats   = params / std_errs
+p_values  = 2 * stats.norm.sf(np.abs(z_stats))
+ci        = ordinal_result.conf_int()
+
+slope_mask = ~params.index.str.contains("/")
+
+inference_table = pd.DataFrame({
+    "term"      : params[slope_mask].index,
+    "estimate"  : params[slope_mask].values,
+    "std_error" : std_errs[slope_mask].values,
+    "statistic" : z_stats[slope_mask].values,
+    "p_value"   : p_values[slope_mask],
+    "or"        : np.exp(params[slope_mask].values),
+    "ci_lower"  : np.exp(ci.loc[slope_mask, 0].values),
+    "ci_upper"  : np.exp(ci.loc[slope_mask, 1].values),
+}).round(4)
+
+print("All slope coefficients:")
+print(inference_table.to_string(index=False))
+
+print("\nSignificant regressors (p < 0.05):")
+print(inference_table[inference_table["p_value"] < 0.05].to_string(index=False))
+```
+
+:::
+
+In the proportional odds model, each coefficient $\hat{\beta}_k$ describes the association between regressor $x_{i,k}$ and the cumulative log-odds of being at or below any category threshold $j$, with the other regressors held fixed. We interpret each significant coefficient through its exponentiated form, the **proportional odds ratio** $e^{\hat{\beta}_k}$.
+
+Recall the sign convention used by `polr()` in `R` (and `OrderedModel` in `Python`):
+
+$$
+\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \hat{\boldsymbol{\beta}}^\top \mathbf{x}_i.
+$$
+
+Because of the sign convention, a positive $\hat{\beta}_k$ means higher values of $x_{i,k}$ are associated with **lower** cumulative probability of being in the lower categories, i.e., a shift of probability mass toward **higher** ordinal categories. The proportional odds ratio $e^{\hat{\beta}_k} > 1$ therefore means that the odds of being in a *higher* category (i.e., $Y_i > j$) increases with $x_{i,k}$.
+
+Before interpreting these results, however, we should verify that the proportional odds assumption actually holds for each regressor. We do this formally in the next subsection using the Brant–Wald test.
+
+### Brant–Wald Test for Proportional Odds
+
+The **Brant–Wald test** provides a formal check of the proportional odds assumption. The idea is to fit $J - 1 = 3$ separate binary logistic regression models (one per cumulative split) and test whether the slope estimates are "statistically equal" across splits for each regressor. If a regressor's slope varies significantly across cutpoints, the proportional odds assumption is violated for that regressor.
+
+For each regressor $x_{i,k}$, let $\hat{\beta}_{k,j}$ be the estimated slope from the binary logistic regression for cutpoint $j$, and let $\hat{\beta}_k^{\text{pool}}$ be the inverse-variance weighted pooled estimate. The Brant statistic for regressor $k$ is:
+
+$$
+B_k = \sum_{j=1}^{J-1} \frac{(\hat{\beta}_{k,j} - \hat{\beta}_k^{\text{pool}})^2}{\widehat{\text{Var}}(\hat{\beta}_{k,j})},
+$$
+
+which follows a $\chi^2$ distribution with $J - 2$ degrees of freedom under $H_0$ (proportional odds holds for $x_{i,k}$). An omnibus version of the test aggregates across all $K$ regressors, giving a $\chi^2$ statistic with $(J-2) \times K$ degrees of freedom.
+
+In `R`, the `brant()` function from the `brant` package computes this test directly on a `polr` object. In `Python`, we implement it manually by fitting three binary logistic regression models and comparing their slopes.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(brant)
+
+# Brant-Wald test applied to the fitted proportional odds model
+# H0 for each regressor: slope is equal across all J-1 cumulative splits
+brant(ordinal_fit)
+```
+
+### Python Code
+
+```{.python}
+from scipy.special import expit
+from scipy.stats import chi2
+from scipy.optimize import minimize
+
+# Design matrix (no intercept) and ordinal response (0-indexed)
+X_brant = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_ord = train_df["inclination_to_apply"].cat.codes.values
+cols  = X_brant.columns.tolist()
+X     = X_brant.values
+n, K  = X.shape
+J     = int(y_ord.max()) + 1            # number of ordinal categories
+
+def fit_binary_logit(X, y_bin):
+    """Binary logit with intercept; returns (beta_full, vcov_full, pi_hat)."""
+    X_aug = np.column_stack([np.ones(len(y_bin)), X])
+    def nll(p):
+        eta = X_aug @ p
+        pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
+        return -np.sum(y_bin * np.log(pr) + (1 - y_bin) * np.log(1 - pr))
+    def grd(p):
+        return X_aug.T @ (expit(X_aug @ p) - y_bin)
+    res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
+                   options={"maxiter": 10000, "gtol": 1e-10})
+    beta  = res.x
+    p_hat = expit(X_aug @ beta)
+    vcov  = np.linalg.inv((X_aug * (p_hat * (1 - p_hat))[:, None]).T @ X_aug)
+    return beta, vcov, p_hat
+
+# Fit J-1 binary logits with z_m = 1[y > m] (R brant()'s convention)
+beta_full = np.zeros((J-1, K+1))
+vcov_full = []
+pi_hat    = np.zeros((n, J-1))           # pi_hat[:, m] = P(Y > m | X)
+for m in range(J-1):
+    z_m = (y_ord > m).astype(float)
+    b, V, p = fit_binary_logit(X, z_m)
+    beta_full[m, :] = b
+    vcov_full.append(V)
+    pi_hat[:, m] = p
+
+# Joint covariance matrix of all slopes across cumulative splits.
+# Off-diagonal blocks use Brant (1990)'s formula; diagonals use vcov of each fit.
+X_aug   = np.column_stack([np.ones(n), X])
+varBeta = np.zeros(((J-1)*K, (J-1)*K))
+for m in range(J-2):
+    for l in range(m+1, J-1):
+        Wml = pi_hat[:, l] - pi_hat[:, m] * pi_hat[:, l]
+        Wm  = pi_hat[:, m] * (1 - pi_hat[:, m])
+        Wl  = pi_hat[:, l] * (1 - pi_hat[:, l])
+        XtWmX_inv = np.linalg.inv((X_aug * Wm[:, None]).T @ X_aug)
+        XtWlX_inv = np.linalg.inv((X_aug * Wl[:, None]).T @ X_aug)
+        XtWmlX    = (X_aug * Wml[:, None]).T @ X_aug
+        cov_block = (XtWmX_inv @ XtWmlX @ XtWlX_inv)[1:, 1:]   # drop intercept
+        varBeta[m*K:(m+1)*K, l*K:(l+1)*K] = cov_block
+        varBeta[l*K:(l+1)*K, m*K:(m+1)*K] = cov_block.T
+for m in range(J-1):
+    varBeta[m*K:(m+1)*K, m*K:(m+1)*K] = vcov_full[m][1:, 1:]
+
+# Stack the slope estimates across the J-1 cumulative splits
+betaStar = beta_full[:, 1:].flatten()
+
+# Contrast matrix D enforcing equal slopes across splits: shape ((J-2)K, (J-1)K)
+I_K, Z_K = np.eye(K), np.zeros((K, K))
+D = np.vstack([
+    np.hstack([I_K if j == 0 else (-I_K if j == i+1 else Z_K)
+               for j in range(J-1)])
+    for i in range(J-2)
+])
+
+# Omnibus Wald statistic
+Dbeta   = D @ betaStar
+omnibus = Dbeta @ np.linalg.inv(D @ varBeta @ D.T) @ Dbeta
+omni_df = (J-2) * K
+omni_p  = chi2.sf(omnibus, omni_df)
+
+# Per-regressor Wald statistics
+rows = []
+for k, name in enumerate(cols):
+    s   = np.arange(k, K*(J-1), K)        # positions of regressor k in betaStar
+    Ds  = D[:, s]
+    Ds  = Ds[~np.all(Ds == 0, axis=1), :] # drop all-zero rows
+    Vs  = varBeta[np.ix_(s, s)]
+    x2k = Ds @ betaStar[s] @ np.linalg.inv(Ds @ Vs @ Ds.T) @ Ds @ betaStar[s]
+    rows.append((name, float(x2k), J-2, chi2.sf(x2k, J-2)))
+
+# Print in R brant()-style format
+sep = "-" * 60
+print(sep)
+print(f"{'Test for':30s} {'X2':>8s}  {'df':>3s}  {'probability':>11s}")
+print(sep)
+print(f"{'Omnibus':30s} {omnibus:8.2f}  {omni_df:>3d}  {omni_p:>11.2f}")
+for name, x2, df, p in rows:
+    print(f"{name:30s} {x2:8.2f}  {df:>3d}  {p:>11.2f}")
+print(sep)
+print("\nH0: Parallel Regression Assumption holds")
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(brant)
+brant(ordinal_fit)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from scipy.special import expit
+from scipy.stats import chi2
+from scipy.optimize import minimize
+
+X_brant = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_ord = train_df["inclination_to_apply"].cat.codes.values
+cols  = X_brant.columns.tolist()
+X     = X_brant.values
+n, K  = X.shape
+J     = int(y_ord.max()) + 1
+
+def fit_binary_logit(X, y_bin):
+    X_aug = np.column_stack([np.ones(len(y_bin)), X])
+    def nll(p):
+        eta = X_aug @ p
+        pr  = np.clip(expit(eta), 1e-15, 1 - 1e-15)
+        return -np.sum(y_bin * np.log(pr) + (1 - y_bin) * np.log(1 - pr))
+    def grd(p):
+        return X_aug.T @ (expit(X_aug @ p) - y_bin)
+    res = minimize(nll, np.zeros(X_aug.shape[1]), jac=grd, method="BFGS",
+                   options={"maxiter": 10000, "gtol": 1e-10})
+    beta  = res.x
+    p_hat = expit(X_aug @ beta)
+    vcov  = np.linalg.inv((X_aug * (p_hat * (1 - p_hat))[:, None]).T @ X_aug)
+    return beta, vcov, p_hat
+
+beta_full = np.zeros((J-1, K+1))
+vcov_full = []
+pi_hat    = np.zeros((n, J-1))
+for m in range(J-1):
+    z_m = (y_ord > m).astype(float)
+    b, V, p = fit_binary_logit(X, z_m)
+    beta_full[m, :] = b
+    vcov_full.append(V)
+    pi_hat[:, m] = p
+
+X_aug   = np.column_stack([np.ones(n), X])
+varBeta = np.zeros(((J-1)*K, (J-1)*K))
+for m in range(J-2):
+    for l in range(m+1, J-1):
+        Wml = pi_hat[:, l] - pi_hat[:, m] * pi_hat[:, l]
+        Wm  = pi_hat[:, m] * (1 - pi_hat[:, m])
+        Wl  = pi_hat[:, l] * (1 - pi_hat[:, l])
+        XtWmX_inv = np.linalg.inv((X_aug * Wm[:, None]).T @ X_aug)
+        XtWlX_inv = np.linalg.inv((X_aug * Wl[:, None]).T @ X_aug)
+        XtWmlX    = (X_aug * Wml[:, None]).T @ X_aug
+        cov_block = (XtWmX_inv @ XtWmlX @ XtWlX_inv)[1:, 1:]
+        varBeta[m*K:(m+1)*K, l*K:(l+1)*K] = cov_block
+        varBeta[l*K:(l+1)*K, m*K:(m+1)*K] = cov_block.T
+for m in range(J-1):
+    varBeta[m*K:(m+1)*K, m*K:(m+1)*K] = vcov_full[m][1:, 1:]
+
+betaStar = beta_full[:, 1:].flatten()
+
+I_K, Z_K = np.eye(K), np.zeros((K, K))
+D = np.vstack([
+    np.hstack([I_K if j == 0 else (-I_K if j == i+1 else Z_K)
+               for j in range(J-1)])
+    for i in range(J-2)
+])
+
+Dbeta   = D @ betaStar
+omnibus = Dbeta @ np.linalg.inv(D @ varBeta @ D.T) @ Dbeta
+omni_df = (J-2) * K
+omni_p  = chi2.sf(omnibus, omni_df)
+
+rows = []
+for k, name in enumerate(cols):
+    s   = np.arange(k, K*(J-1), K)
+    Ds  = D[:, s]
+    Ds  = Ds[~np.all(Ds == 0, axis=1), :]
+    Vs  = varBeta[np.ix_(s, s)]
+    x2k = Ds @ betaStar[s] @ np.linalg.inv(Ds @ Vs @ Ds.T) @ Ds @ betaStar[s]
+    rows.append((name, float(x2k), J-2, chi2.sf(x2k, J-2)))
+
+sep = "-" * 60
+print(sep)
+print(f"{'Test for':30s} {'X2':>8s}  {'df':>3s}  {'probability':>11s}")
+print(sep)
+print(f"{'Omnibus':30s} {omnibus:8.2f}  {omni_df:>3d}  {omni_p:>11.2f}")
+for name, x2, df, p in rows:
+    print(f"{name:30s} {x2:8.2f}  {df:>3d}  {p:>11.2f}")
+print(sep)
+print("\nH0: Parallel Regression Assumption holds")
+```
+
+:::
+
+According to the Brant–Wald test results, `GPA` satisfies the proportional odds assumption ($\chi^2(2) = 0.37$, $p = 0.832$), as do all four `field-of-study` dummy variables (all $p > 0.24$). GRE score violates the proportional odds assumption ($\chi^2(2) = 91.47$, $p < 0.001$): its per-cutpoint slopes grow steadily from $-0.05$ at the `Low|Medium` split to $-0.15$ at `Medium|High` and $-0.28$ at `High|Very High`, confirming the EDA finding that `GRE_score` mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. As the violation of proportional odds assumption is confined to a single regressor, a partial proportional odds model, which frees only GRE score's slope across cutpoints while keeping all other slopes shared, is the appropriate approach.
+
+In many real-world datasets, the proportional odds assumption holds for some regressors but not others. Rather than defaulting to either extreme (the fully proportional odds model or the fully non-proportional odds model), a **partial proportional odds model** constrains the slopes for "well-behaved" regressors to be shared across cutpoints, while freeing the slopes for regressors that violate the proportional odds assumption. This is the most common approach in practice and is supported by the `VGAM` package in `R` via the `vglm()` function with the `cumulative` family.
+
+### Fitting the Partial Proportional Odds Model
+
+In the partial proportional odds model, GRE score receives a separate slope at each of the $J - 1 = 3$ cumulative logits, while GPA and `field_of_study` retain shared slopes. The model is:
+
+$$
+\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \alpha_j - \left(\beta_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \beta_{\texttt{GRE},j}\, x_{i,\texttt{GRE}} + \boldsymbol{\beta}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right), \quad j = 1, 2, 3,
+$$
+
+where $\beta_{\texttt{GPA}}$ and each element of $\boldsymbol{\beta}_{\texttt{field}}$ are shared across all three cumulative splits, but $\beta_{\texttt{GRE},j}$ varies freely with $j$. The total parameter count is $(J - 1) + 1 + (J - 1) + (F - 1) = 3 + 1 + 3 + 4 = 11$, compared with 9 in the fully proportional model.
+
+In `R`, this is straightforward using `vglm()` from the `VGAM` package with a named `parallel` vector. In `Python`, we implement the likelihood directly and optimize using `scipy`.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(VGAM)
+
+# Partial proportional odds model:
+# GPA and field_of_study are constrained (parallel = TRUE)
+# GRE_score is freed across cutpoints (parallel = FALSE)
+ordinal_fit_ppo <- vglm(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
+                       reverse = FALSE),
+  data    = train_df
+)
+
+summary(ordinal_fit_ppo)
+```
+
+### Python Code
+
+```{.python}
+from scipy.optimize import minimize
+from scipy.special import expit
+from scipy.stats import norm
+
+y_ppo   = train_df["inclination_to_apply"].cat.codes.values
+X_ppo   = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float).values
+n_ppo   = len(y_ppo)
+
+# Standardise GPA and GRE for numerical stability
+gpa_m, gpa_s = X_ppo[:, 0].mean(), X_ppo[:, 0].std()
+gre_m, gre_s = X_ppo[:, 1].mean(), X_ppo[:, 1].std()
+X_sc = X_ppo.copy()
+X_sc[:, 0] = (X_ppo[:, 0] - gpa_m) / gpa_s
+X_sc[:, 1] = (X_ppo[:, 1] - gre_m) / gre_s
+
+# Reparameterised, standardised NLL using sign convention logit(P(Y<=j)) = a_j - b*X
+# params: alpha1, log(a2-a1), log(a3-a2),
+#         b_gpa_s, b_gre_j1_s, b_gre_j2_s, b_gre_j3_s, b_field[4]
+def ppo_neg_ll(p):
+    a1=p[0]; a2=a1+np.exp(p[1]); a3=a2+np.exp(p[2])
+    es = p[3]*X_sc[:,0] + X_sc[:,2:]@p[7:11]
+    e1=es+p[4]*X_sc[:,1]; e2=es+p[5]*X_sc[:,1]; e3=es+p[6]*X_sc[:,1]
+    F0=expit(a1-e1); F1=expit(a2-e2); F2=expit(a3-e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p0 = np.array([0.0, np.log(2.0), np.log(2.0),
+               3.6*gpa_s, 0.05*gre_s, 0.15*gre_s, 0.28*gre_s,
+               0.47, 0.22, 0.34, 0.25])
+r1 = minimize(ppo_neg_ll, p0, method="Nelder-Mead",
+              options={"maxiter": 1000000, "xatol": 1e-12, "fatol": 1e-12,
+                       "adaptive": True})
+r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
+              options={"maxiter": 200000, "gtol": 1e-13})
+ppo_params = r2.x
+
+# Convert standardised parameters back to original scale (under the "-b*X" sign convention)
+a1_sc, a2_sc, a3_sc = (ppo_params[0],
+                       ppo_params[0]+np.exp(ppo_params[1]),
+                       ppo_params[0]+np.exp(ppo_params[1])+np.exp(ppo_params[2]))
+b_gpa_o     = ppo_params[3] / gpa_s
+b_gre_o     = ppo_params[4:7] / gre_s
+b_field_o   = ppo_params[7:11]
+a1_o = a1_sc + b_gpa_o*gpa_m + b_gre_o[0]*gre_m
+a2_o = a2_sc + b_gpa_o*gpa_m + b_gre_o[1]*gre_m
+a3_o = a3_sc + b_gpa_o*gpa_m + b_gre_o[2]*gre_m
+
+# Refit in original-scale space at the optimum to obtain a clean numerical Hessian.
+# Then flip slope signs to match vglm()'s "+b*X" convention used in R's summary().
+def ppo_neg_ll_orig_plus(p):
+    a1, a2, a3 = p[0], p[1], p[2]
+    b_gpa, b_g1, b_g2, b_g3 = p[3], p[4], p[5], p[6]
+    b_field = p[7:11]
+    es = b_gpa*X_ppo[:,0] + X_ppo[:,2:]@b_field
+    e1=es+b_g1*X_ppo[:,1]; e2=es+b_g2*X_ppo[:,1]; e3=es+b_g3*X_ppo[:,1]
+    F0=expit(a1+e1); F1=expit(a2+e2); F2=expit(a3+e3)   # +b*X convention
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+# Coefficients in R's "+b*X" sign convention (slopes flipped)
+p_R = np.array([a1_o, a2_o, a3_o, -b_gpa_o,
+                -b_gre_o[0], -b_gre_o[1], -b_gre_o[2],
+                -b_field_o[0], -b_field_o[1], -b_field_o[2], -b_field_o[3]])
+
+# Numerical Hessian → vcov → standard errors
+def num_hess(f, x, eps=1e-5):
+    K = len(x); H = np.zeros((K, K))
+    for i in range(K):
+        for j in range(i, K):
+            xpp = x.copy(); xpp[i]+=eps; xpp[j]+=eps
+            xpm = x.copy(); xpm[i]+=eps; xpm[j]-=eps
+            xmp = x.copy(); xmp[i]-=eps; xmp[j]+=eps
+            xmm = x.copy(); xmm[i]-=eps; xmm[j]-=eps
+            H[i,j] = H[j,i] = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4*eps*eps)
+    return H
+
+H   = num_hess(ppo_neg_ll_orig_plus, p_R)
+se  = np.sqrt(np.diag(np.linalg.inv(H)))
+log_lik = -ppo_neg_ll_orig_plus(p_R)
+res_dev = -2 * log_lik
+res_df  = n_ppo*3 - len(p_R)
+
+labels = ["(Intercept):1", "(Intercept):2", "(Intercept):3", "GPA",
+          "GRE_score:1", "GRE_score:2", "GRE_score:3",
+          "field_of_studyBusiness", "field_of_studyHumanities",
+          "field_of_studySocial Sciences", "field_of_studySTEM"]
+# Reorder field dummies to R's alphabetical order (Business, Humanities, Social Sciences, STEM)
+# pd.get_dummies output is already alphabetical; reorder p_R/se to match label order above
+field_order_in_data = ["Business", "Humanities", "STEM", "Social Sciences"]
+field_order_R       = ["Business", "Humanities", "Social Sciences", "STEM"]
+perm = [field_order_in_data.index(f) for f in field_order_R]
+p_R_ord = np.concatenate([p_R[:7], p_R[7:11][perm]])
+se_ord  = np.concatenate([se[:7],  se[7:11][perm]])
+
+def stars(p):
+    if p < 0.001: return "***"
+    if p < 0.01:  return "** "
+    if p < 0.05:  return "*  "
+    if p < 0.1:   return ".  "
+    return "   "
+
+print("Call:")
+print("ordinal_fit_ppo = vglm(inclination_to_apply ~ GPA + GRE_score + field_of_study,")
+print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
+print("                                           GRE_score, reverse = FALSE),")
+print("                       data = train_df)\n")
+print("Coefficients:")
+print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
+for lbl, est, s in zip(labels, p_R_ord, se_ord):
+    z = est / s
+    p_two = 2 * (1 - norm.cdf(abs(z)))
+    print(f"{lbl:30s} {est:>10.3e} {s:>10.3e} {z:>9.3f} {p_two:>9.0e} {stars(p_two)}")
+print("---")
+print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+print("Names of systematic components: logitlink(P[Y<=1]), logitlink(P[Y<=2]),")
+print("                            logitlink(P[Y<=3])\n")
+print(f"Residual deviance: {res_dev:.3f} on {res_df} degrees of freedom\n")
+print(f"Log-likelihood: {log_lik:.3f} on {res_df} degrees of freedom\n")
+print("Number of BFGS iterations:", r2.nit, "\n")
+
+# Exponentiated coefficients (slopes only, two columns)
+print("Exponentiated coefficients:")
+slope_lbls = labels[3:]
+slope_exp  = np.exp(p_R_ord[3:])
+for i in range(0, len(slope_lbls), 2):
+    if i + 1 < len(slope_lbls):
+        print(f"{slope_lbls[i]:>30s} {slope_lbls[i+1]:>30s}")
+        print(f"{slope_exp[i]:>30.8f} {slope_exp[i+1]:>30.8f}")
+    else:
+        print(f"{slope_lbls[i]:>30s}")
+        print(f"{slope_exp[i]:>30.8f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(VGAM)
+
+ordinal_fit_ppo <- vglm(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score,
+                       reverse = FALSE),
+  data    = train_df
+)
+
+summary(ordinal_fit_ppo)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from scipy.optimize import minimize
+from scipy.special import expit
+from scipy.stats import norm
+
+y_ppo   = train_df["inclination_to_apply"].cat.codes.values
+X_ppo   = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float).values
+n_ppo   = len(y_ppo)
+
+gpa_m, gpa_s = X_ppo[:, 0].mean(), X_ppo[:, 0].std()
+gre_m, gre_s = X_ppo[:, 1].mean(), X_ppo[:, 1].std()
+X_sc = X_ppo.copy()
+X_sc[:, 0] = (X_ppo[:, 0] - gpa_m) / gpa_s
+X_sc[:, 1] = (X_ppo[:, 1] - gre_m) / gre_s
+
+def ppo_neg_ll(p):
+    a1=p[0]; a2=a1+np.exp(p[1]); a3=a2+np.exp(p[2])
+    es = p[3]*X_sc[:,0] + X_sc[:,2:]@p[7:11]
+    e1=es+p[4]*X_sc[:,1]; e2=es+p[5]*X_sc[:,1]; e3=es+p[6]*X_sc[:,1]
+    F0=expit(a1-e1); F1=expit(a2-e2); F2=expit(a3-e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p0 = np.array([0.0, np.log(2.0), np.log(2.0),
+               3.6*gpa_s, 0.05*gre_s, 0.15*gre_s, 0.28*gre_s,
+               0.47, 0.22, 0.34, 0.25])
+r1 = minimize(ppo_neg_ll, p0, method="Nelder-Mead",
+              options={"maxiter": 1000000, "xatol": 1e-12, "fatol": 1e-12, "adaptive": True})
+r2 = minimize(ppo_neg_ll, r1.x, method="BFGS",
+              options={"maxiter": 200000, "gtol": 1e-13})
+ppo_params = r2.x
+
+# Unstandardise and rebuild parameters in original scale (-b*X convention)
+a1_sc, a2_sc, a3_sc = (ppo_params[0],
+                       ppo_params[0]+np.exp(ppo_params[1]),
+                       ppo_params[0]+np.exp(ppo_params[1])+np.exp(ppo_params[2]))
+b_gpa_o   = ppo_params[3] / gpa_s
+b_gre_o   = ppo_params[4:7] / gre_s
+b_field_o = ppo_params[7:11]
+a1_o = a1_sc + b_gpa_o*gpa_m + b_gre_o[0]*gre_m
+a2_o = a2_sc + b_gpa_o*gpa_m + b_gre_o[1]*gre_m
+a3_o = a3_sc + b_gpa_o*gpa_m + b_gre_o[2]*gre_m
+
+# Refit-able NLL in "+b*X" convention (R vglm's parallel = FALSE ~ GRE_score with reverse = FALSE)
+def ppo_neg_ll_orig_plus(p):
+    a1, a2, a3 = p[0], p[1], p[2]
+    b_gpa, b_g1, b_g2, b_g3 = p[3], p[4], p[5], p[6]
+    b_field = p[7:11]
+    es = b_gpa*X_ppo[:,0] + X_ppo[:,2:]@b_field
+    e1=es+b_g1*X_ppo[:,1]; e2=es+b_g2*X_ppo[:,1]; e3=es+b_g3*X_ppo[:,1]
+    F0=expit(a1+e1); F1=expit(a2+e2); F2=expit(a3+e3)
+    pp=np.column_stack([np.clip(F0,1e-15,1), np.clip(F1-F0,1e-15,1),
+                        np.clip(F2-F1,1e-15,1), np.clip(1-F2,1e-15,1)])
+    return -np.sum(np.log(pp[np.arange(n_ppo), y_ppo]))
+
+p_R = np.array([a1_o, a2_o, a3_o, -b_gpa_o,
+                -b_gre_o[0], -b_gre_o[1], -b_gre_o[2],
+                -b_field_o[0], -b_field_o[1], -b_field_o[2], -b_field_o[3]])
+
+# Numerical Hessian → vcov → standard errors
+def num_hess(f, x, eps=1e-5):
+    K = len(x); H = np.zeros((K, K))
+    for i in range(K):
+        for j in range(i, K):
+            xpp = x.copy(); xpp[i]+=eps; xpp[j]+=eps
+            xpm = x.copy(); xpm[i]+=eps; xpm[j]-=eps
+            xmp = x.copy(); xmp[i]-=eps; xmp[j]+=eps
+            xmm = x.copy(); xmm[i]-=eps; xmm[j]-=eps
+            H[i,j] = H[j,i] = (f(xpp) - f(xpm) - f(xmp) + f(xmm)) / (4*eps*eps)
+    return H
+
+H   = num_hess(ppo_neg_ll_orig_plus, p_R)
+se  = np.sqrt(np.diag(np.linalg.inv(H)))
+log_lik = -ppo_neg_ll_orig_plus(p_R)
+res_dev = -2 * log_lik
+res_df  = n_ppo*3 - len(p_R)
+
+labels = ["(Intercept):1", "(Intercept):2", "(Intercept):3", "GPA",
+          "GRE_score:1", "GRE_score:2", "GRE_score:3",
+          "field_of_studyBusiness", "field_of_studyHumanities",
+          "field_of_studySocial Sciences", "field_of_studySTEM"]
+field_order_in_data = ["Business", "Humanities", "STEM", "Social Sciences"]
+field_order_R       = ["Business", "Humanities", "Social Sciences", "STEM"]
+perm = [field_order_in_data.index(f) for f in field_order_R]
+p_R_ord = np.concatenate([p_R[:7], p_R[7:11][perm]])
+se_ord  = np.concatenate([se[:7],  se[7:11][perm]])
+
+def stars(p):
+    if p < 0.001: return "***"
+    if p < 0.01:  return "** "
+    if p < 0.05:  return "*  "
+    if p < 0.1:   return ".  "
+    return "   "
+
+print("Call:")
+print("ordinal_fit_ppo = vglm(inclination_to_apply ~ GPA + GRE_score + field_of_study,")
+print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
+print("                                           GRE_score, reverse = FALSE),")
+print("                       data = train_df)\n")
+print("Coefficients:")
+print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
+for lbl, est, s in zip(labels, p_R_ord, se_ord):
+    z = est / s
+    p_two = 2 * (1 - norm.cdf(abs(z)))
+    print(f"{lbl:30s} {est:>10.3e} {s:>10.3e} {z:>9.3f} {p_two:>9.0e} {stars(p_two)}")
+print("---")
+print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+print("Names of systematic components: logitlink(P[Y<=1]), logitlink(P[Y<=2]),")
+print("                            logitlink(P[Y<=3])\n")
+print(f"Residual deviance: {res_dev:.3f} on {res_df} degrees of freedom\n")
+print(f"Log-likelihood: {log_lik:.3f} on {res_df} degrees of freedom\n")
+print("Number of BFGS iterations:", r2.nit, "\n")
+
+print("Exponentiated coefficients:")
+slope_lbls = labels[3:]
+slope_exp  = np.exp(p_R_ord[3:])
+for i in range(0, len(slope_lbls), 2):
+    if i + 1 < len(slope_lbls):
+        print(f"{slope_lbls[i]:>30s} {slope_lbls[i+1]:>30s}")
+        print(f"{slope_exp[i]:>30.8f} {slope_exp[i+1]:>30.8f}")
+    else:
+        print(f"{slope_lbls[i]:>30s}")
+        print(f"{slope_exp[i]:>30.8f}")
+```
+
+:::
+
+### Interpreting the Partial Proportional Odds Coefficients
+
+The partial proportional odds model yields the following estimated coefficients. The sign convention is the same as before: a positive $\hat{\beta}$ corresponds to higher values of that regressor being associated with higher ordinal categories.
+
+**GPA (`GPA`), shared slope.** GPA retains a single slope across all three cumulative splits ($\hat{\beta}_{\texttt{GPA}} = 3.87$, $z = 16.23$, $p < 0.001$, OR = 47.80, 95% CI: 29.97, 76.25). The interpretation is unchanged from the proportional odds model:
+
+> *Holding GRE score and field of study constant, a one-unit increase in GPA is associated with 47.80 times higher cumulative odds of falling in a higher likelihood-to-apply category, at every cumulative threshold simultaneously.*
+
+**GRE Score (`GRE_score`), cutpoint-specific slopes.** GRE score now has three separate slopes, one per cumulative split, all statistically significant:
+
+| Cutpoint | $\hat{\beta}_{\texttt{GRE},j}$ | OR ($e^{\hat\beta}$) | 95% CI | 5-pt OR ($e^{5\hat\beta}$) |
+|---|---|---|---|---|
+| `Low\|Medium` ($j=1$) | 0.044 | 1.045 | (1.019, 1.072) | 1.249 |
+| `Medium\|High` ($j=2$) | 0.155 | 1.167 | (1.138, 1.198) | 2.168 |
+| `High\|Very High` ($j=3$) | 0.277 | 1.319 | (1.275, 1.364) | 3.994 |
+
+The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.045 times higher odds of being above `Low`, a modest effect. But at the `High|Very High` split, the same one-point increase is associated with 1.319 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is even starker: a 5-point GRE advantage multiplies the odds by only 1.25 at the lowest split, but by nearly 4.0 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform regressor across the full range.
+
+**Field of Study (`field_of_study`), shared slopes.** The field-of-study coefficients are nearly identical to those from the proportional odds model. Only **Business** is statistically significant ($\hat{\beta}_{\texttt{Business}} = 0.45$, $z = 2.04$, $p = 0.041$, OR = 1.57, 95% CI: 1.02, 2.43):
+
+> *Holding GPA and GRE score constant, Business students have 1.57 times the cumulative odds of being in a higher `inclination_to_apply` category compared with Arts students, at every cumulative threshold.*
+
+The coefficients for Humanities ($p = 0.321$), STEM ($p = 0.130$), and Social Sciences ($p = 0.333$) remain non-significant, indicating no statistically significant difference in Inclination to apply relative to Arts after adjusting for academic performance.
+
+## Results
+
+The partial proportional odds model, in which `GPA` and `field_of_study` are constrained to shared coefficients while `GRE_score` is allowed cutpoint-specific coefficients, is the model selected for this case study, based on the Brant–Wald test results from the Inference section. Using the sign convention $\text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \alpha_j - \hat{\boldsymbol{\beta}}^\top \mathbf{x}_i$, the fitted model is:
+
+$$
+\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE},j}\, x_{i,\texttt{GRE}} + \hat{\beta}_{\texttt{Business}}\, Z_{i,\texttt{Business}} + \hat{\beta}_{\texttt{Hum}}\, Z_{i,\texttt{Hum}} + \hat{\beta}_{\texttt{STEM}}\, Z_{i,\texttt{STEM}} + \hat{\beta}_{\texttt{SocSci}}\, Z_{i,\texttt{SocSci}}\right),
+$$
+
+for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`). The estimated thresholds and slopes from the full proportional odds model (the baseline from which inference and the Brant test were conducted) are summarised below:
+
+| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
+|---|---|---|---|---|---|---|
+| $\hat{\alpha}_1$ (`Low\|Medium`) | 31.71 | — | — | — | — | — |
+| $\hat{\alpha}_2$ (`Medium\|High`) | 0.42 | — | — | — | — | — |
+| $\hat{\alpha}_3$ (`High\|Very High`) | 0.28 | — | — | — | — | — |
+| $\hat{\beta}_{\texttt{GPA}}$ | 3.63 | 0.23 | 15.96 | $< 0.001$ | 37.55 | (24.05, 58.61) |
+| $\hat{\beta}_{\texttt{GRE}}$ (shared) | 0.15 | 0.01 | 13.54 | $< 0.001$ | 1.16 | (1.13, 1.18) |
+| $\hat{\beta}_{\texttt{Business}}$ | 0.47 | 0.22 | 2.19 | 0.029 | 1.60 | (1.05, 2.44) |
+| $\hat{\beta}_{\texttt{Humanities}}$ | 0.23 | 0.21 | 1.06 | 0.291 | 1.25 | (0.82, 1.91) |
+| $\hat{\beta}_{\texttt{STEM}}$ | 0.34 | 0.20 | 1.68 | 0.094 | 1.41 | (0.94, 2.10) |
+| $\hat{\beta}_{\texttt{Social Sciences}}$ | 0.25 | 0.21 | 1.17 | 0.241 | 1.28 | (0.85, 1.93) |
+
+After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in `R`) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.044$, $\hat{\beta}_{\texttt{GRE},2} = 0.155$, and $\hat{\beta}_{\texttt{GRE},3} = 0.277$ at the three cumulative splits respectively, with all other slope coefficients remaining shared. The interpretation of each significant coefficient is:
+
+- **GPA** ($\hat{\beta} = 3.63$, OR = 37.55, 95% CI: 24.05–58.61): Holding GRE score and field of study constant, each additional GPA point is associated with 37.55 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
+- **GRE Score** (cutpoint-specific): The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with a 4.5% increase in the odds of being above `Low` (OR = 1.045 at $j=1$), rising to a 16.7% increase in the odds of being above `Medium` (OR = 1.167 at $j=2$), and a 31.9% increase in the odds of being in the `Very High` category (OR = 1.319 at $j=3$). This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
+- **Business field of study** ($\hat{\beta} = 0.47$, OR = 1.60, 95% CI: 1.05–2.44, $p = 0.029$): Holding academic performance constant, Business students have 1.60 times higher cumulative odds of being in a higher likelihood-to-apply category compared to Arts students. No other field of study shows a statistically significant difference from Arts.
+
+### Prediction
+
+Let's fit the proportional odds model on the training set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+library(MASS)
+library(caret)
+library(ggplot2)
+
+# Fit on training set
+ordinal_fit_train <- polr(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_df, Hess = TRUE
+)
+
+# Predict on test set
+y_pred <- predict(ordinal_fit_train, newdata = test_df)
+
+# Confusion matrix
+conf_matrix <- confusionMatrix(
+  factor(y_pred,          levels = levels(test_df$inclination_to_apply)),
+  factor(test_df$inclination_to_apply, levels = levels(test_df$inclination_to_apply))
+)
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Low -> Very High), and
+# Actual increases top -> bottom (Low -> Very High). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Low" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+```
+
+### Python Code
+
+```{.python}
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
+)
+
+X_train = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_test  = pd.get_dummies(
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_train = train_df["inclination_to_apply"]
+y_test  = test_df["inclination_to_apply"]
+
+# Fit on training set
+train_model  = OrderedModel(y_train, X_train, distr="logit")
+train_result = train_model.fit(method="bfgs", disp=False)
+
+# Predict on test set
+pred_probs = train_result.model.predict(train_result.params, exog=X_test.values)
+pred_codes = pred_probs.argmax(axis=1)
+true_codes = y_test.cat.codes.values
+
+# Confusion matrix
+cm   = confusion_matrix(true_codes, pred_codes, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+ordinal_fit_train <- polr(
+  inclination_to_apply ~ GPA + GRE_score + field_of_study,
+  data = train_df, Hess = TRUE
+)
+
+y_pred <- predict(ordinal_fit_train, newdata = test_df)
+
+conf_matrix <- confusionMatrix(
+  factor(y_pred,                   levels = levels(test_df$inclination_to_apply)),
+  factor(test_df$inclination_to_apply, levels = levels(test_df$inclination_to_apply))
+)
+
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Low -> Very High), and
+# Actual increases top -> bottom (Low -> Very High). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Low" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import matplotlib.pyplot as plt
+
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+train_df["inclination_to_apply"] = pd.Categorical(
+    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
+)
+
+train_df, test_df = train_test_split(
+    train_df, test_size=0.2, random_state=42,
+    stratify=train_df["inclination_to_apply"]
+)
+
+X_train = pd.get_dummies(
+    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+X_test  = pd.get_dummies(
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+).astype(float)
+y_train = train_df["inclination_to_apply"]
+y_test  = test_df["inclination_to_apply"]
+
+train_model  = OrderedModel(y_train, X_train, distr="logit")
+train_result = train_model.fit(method="bfgs", disp=False)
+
+pred_probs = train_result.model.predict(train_result.params, exog=X_test.values)
+pred_codes = pred_probs.argmax(axis=1)
+true_codes = y_test.cat.codes.values
+
+cm   = confusion_matrix(true_codes, pred_codes, labels=range(4))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=ordered_categories)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The corresponding performance metrics are computed below.
+
+::: {.panel-tabset}
+
+### R Code
+
+```{.r}
+overall_accuracy <- conf_matrix$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+### Python Code
+
+```{.python}
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
+acc    = accuracy_score(true_codes, pred_codes)
+recall = recall_score(true_codes, pred_codes, average="macro")
+f1     = f1_score(true_codes, pred_codes, average="macro")
+
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+### R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+overall_accuracy <- conf_matrix$overall["Accuracy"]
+macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
+macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:",     round(macro_recall,     3), "\n")
+cat("Macro F1:",         round(macro_f1,         3), "\n")
+```
+
+### Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
+acc    = accuracy_score(true_codes, pred_codes)
+recall = recall_score(true_codes, pred_codes, average="macro")
+f1     = f1_score(true_codes, pred_codes, average="macro")
+
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall:     {recall:.3f}")
+print(f"Macro F1:         {f1:.3f}")
+```
+
+:::
+
+On the test set, the model achieves an overall accuracy of **46.0%**, a macro recall of **43.6%**, and a macro F1 of **42.1%**. While these figures are modest in absolute terms, they should be interpreted in the context of a four-class ordinal prediction problem where random guessing would yield 25% accuracy. The confusion matrix reveals a clear ordinal pattern in the errors: most misclassifications land in adjacent categories rather than opposite ends of the scale. For example, the model rarely confuses `Low` with `Very High` or vice versa; mistakes tend to be one step off, which is an important property for an ordinal outcome.
+
+The `Very High` category is predicted most reliably, with a recall of 0.70 and F1 of 0.61, consistent with the inference finding that both GPA and GRE score most sharply distinguish students at the very high end of the ordinal scale. In contrast, the `High` category is the hardest to classify correctly (recall = 0.16, F1 = 0.22), likely because it sits between two well-separated groups (`Medium` and `Very High`) and receives predictions pulled toward both. This pattern reinforces the inferential finding that the regressors create a clearer separation at the extremes of the ordinal scale than in the middle.
+
+## Storytelling
+
+
+
