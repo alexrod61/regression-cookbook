@@ -118,6 +118,7 @@ mindmap
 ```{r setup-r, include=FALSE}
 # Load required libraries
 library(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(broom)
 library(ggplot2)
 library(MASS)
 library(VGAM)
@@ -1297,6 +1298,7 @@ We now fit the proportional odds model to the college dataset using `inclination
 
 ```{.r}
 library(MASS)
+library(broom)
 
 # Ensure inclination_to_apply is an ordered factor with correct level order
 train_df$inclination_to_apply <- factor(
@@ -1313,7 +1315,7 @@ ordinal_fit <- polr(
   Hess = TRUE   # return the Hessian for inference
 )
 
-summary(ordinal_fit)
+tidy(ordinal_fit)
 ```
 
 ### Python Code
@@ -1364,7 +1366,7 @@ ordinal_fit <- polr(
   Hess = TRUE
 )
 
-summary(ordinal_fit)
+tidy(ordinal_fit)
 ```
 
 ### Python Output
@@ -1394,7 +1396,7 @@ print(ordinal_result.summary())
 
 :::
 
-The output reports two blocks of estimates. The first block contains the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ (one per regressor) along with their standard errors and $t$-values. The second block contains the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
+The output reports the estimated parameters: the shared slope coefficients $\hat{\beta}_1, \ldots, \hat{\beta}_K$ (one per regressor), each with its standard error and $t$-value, together with the estimated thresholds $\hat{\alpha}_1 < \hat{\alpha}_2 < \hat{\alpha}_3$, which correspond to the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`. The fact that the thresholds are strictly increasing confirms that the monotonicity constraint on cumulative probabilities is satisfied by the fitted model.
 
 In the case study model with regressors $x_{i,\texttt{GPA}}$, $x_{i,\texttt{GRE}}$, and the `field-of-study` dummy variables $\mathbf{Z}_{i,\texttt{field}}$, the fitted proportional odds model can be written as:
 
@@ -1940,30 +1942,25 @@ We compute the 95% confidence intervals, odds ratios, and $p$-values below, and 
 
 ```{.r}
 library(MASS)
+library(broom)
 
-# polr() does not return p-values directly; compute them from the t-values
-# using the Normal approximation
-coef_table <- coef(summary(ordinal_fit))
-p_values   <- 2 * pnorm(abs(coef_table[, "t value"]), lower.tail = FALSE)
-
-# Combine into a tidy inference table for the slope coefficients only
-# (thresholds are not included; they are nuisance parameters here)
-slope_idx <- rownames(coef_table) %in% names(coef(ordinal_fit))
-
-inference_table <- data.frame(
-  term      = rownames(coef_table)[slope_idx],
-  estimate  = coef_table[slope_idx, "Value"],
-  std_error = coef_table[slope_idx, "Std. Error"],
-  statistic = coef_table[slope_idx, "t value"],
-  p_value   = p_values[slope_idx]
-) |>
+# polr() does not return p-values directly. tidy() gives the coefficient
+# table (estimates, standard errors, and t-values), from which we compute
+# the Normal-approximation p-values. We keep the slope coefficients only
+# (the thresholds are nuisance parameters here) and exponentiate the
+# profile-likelihood confidence intervals (conf.int = TRUE) to obtain
+# proportional odds ratios.
+inference_table <- tidy(ordinal_fit, conf.int = TRUE) |>
+  filter(term %in% names(coef(ordinal_fit))) |>
+  mutate(
+    p_value  = 2 * pnorm(abs(statistic), lower.tail = FALSE),
+    or       = exp(estimate),
+    ci_lower = exp(conf.low),
+    ci_upper = exp(conf.high)
+  ) |>
+  dplyr::select(term, estimate, std_error = std.error, statistic,
+                p_value, or, ci_lower, ci_upper) |>
   mutate(across(where(is.numeric), \(x) round(x, 4)))
-
-# Add 95% confidence intervals on the log-odds scale, then exponentiate
-ci <- confint(ordinal_fit)   # profile-likelihood CIs (more accurate than Wald)
-inference_table$or       <- round(exp(inference_table$estimate), 4)
-inference_table$ci_lower <- round(exp(ci[inference_table$term, "2.5 %"]),  4)
-inference_table$ci_upper <- round(exp(ci[inference_table$term, "97.5 %"]), 4)
 
 # Print all coefficients
 print(inference_table)
@@ -2022,25 +2019,19 @@ print(inference_table[inference_table["p_value"] < 0.05].to_string(index=False))
 #| message: false
 #| warning: false
 library(MASS)
+library(broom)
 
-coef_table <- coef(summary(ordinal_fit))
-p_values   <- 2 * pnorm(abs(coef_table[, "t value"]), lower.tail = FALSE)
-
-slope_idx <- rownames(coef_table) %in% names(coef(ordinal_fit))
-
-inference_table <- data.frame(
-  term      = rownames(coef_table)[slope_idx],
-  estimate  = coef_table[slope_idx, "Value"],
-  std_error = coef_table[slope_idx, "Std. Error"],
-  statistic = coef_table[slope_idx, "t value"],
-  p_value   = p_values[slope_idx]
-) |>
+inference_table <- tidy(ordinal_fit, conf.int = TRUE) |>
+  filter(term %in% names(coef(ordinal_fit))) |>
+  mutate(
+    p_value  = 2 * pnorm(abs(statistic), lower.tail = FALSE),
+    or       = exp(estimate),
+    ci_lower = exp(conf.low),
+    ci_upper = exp(conf.high)
+  ) |>
+  dplyr::select(term, estimate, std_error = std.error, statistic,
+                p_value, or, ci_lower, ci_upper) |>
   mutate(across(where(is.numeric), \(x) round(x, 4)))
-
-ci <- confint(ordinal_fit)
-inference_table$or       <- round(exp(inference_table$estimate), 4)
-inference_table$ci_lower <- round(exp(ci[inference_table$term, "2.5 %"]),  4)
-inference_table$ci_upper <- round(exp(ci[inference_table$term, "97.5 %"]), 4)
 
 print(inference_table)
 
