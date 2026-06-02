@@ -1966,7 +1966,6 @@ In practice, software such as `lm()` in R computes these estimates automatically
 
 To estimate the regression coefficients, we fit the OLS model to the training data using Python (`statsmodels`) or R (`lm`). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions.
 
-TO DO LIST: ADD a tip box here and convert the Year_of_study to ordinal and apply a contrast here similar to 554. Also use cross equation and add equation numbers in the chapter. 
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -1974,9 +1973,20 @@ A note on ordinal regressors
 ::::
 ::::{.Tip-container}
 
+Some regressors are ordered categories. In this example, `Year_of_Study` and `Goes_Out_Spends_Money` are ordinal variables because their values have a natural ordering. For instance, year 4 comes after year 3, and a spending-frequency score of 5 represents more frequent spending than a score of 4.
+
+In this model, we treat these ordinal variables as numeric regressors. This is a modeling choice. It means that we assume a one-unit increase has a constant linear association with the response variable, holding the other regressors fixed. For example, the model assumes that the expected change in `Net_Money` from year 1 to year 2 is the same as the expected change from year 3 to year 4.
+
+This approach keeps the model simpler and easier to interpret. Instead of estimating a separate coefficient for each level of an ordinal variable, we estimate one coefficient that summarizes the average linear change across the ordered scale.
+
+For example, suppose the estimated coefficient for `Year_of_Study` is $-100.14$. Then, holding all other regressors fixed, moving up by one academic year is associated with an estimated decrease of 100.14 CAD in predicted financial balance, on average.
+
+Similarly, suppose the estimated coefficient for `Goes_Out_Spends_Money` is $-47.85$. Since this variable is treated as numeric, a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 47.85 CAD in predicted financial balance, on average, holding the other regressors fixed.
+
+This numeric treatment is appropriate when a linear trend across the ordered categories is a reasonable approximation. If we do not want to assume a constant one-unit effect, we could instead represent the ordinal variable using dummy variables and compare each level to a baseline category.
+
 ::::
 :::
-
 
 In R, we can fit the regression model using the `lm()` function:
 
@@ -2025,40 +2035,71 @@ print(ols_model.summary())
 
 ### Interpreting the Coefficients
 
-After fitting the model, we examine the estimated coefficients to understand their impact. Each coefficient obtained from the OLS regression represents the expected change in Net_Money for a one-unit increase in the corresponding predictor, holding all other variables constant. The estimated regression equation can be expressed as:
+Once we have fitted an OLS model, the estimated coefficients help us describe how each regressor is associated with the response variable, after accounting for the other regressors included in the model. In this example, the response variable is `Net_Money`, so each coefficient represents an estimated change in financial balance.
+
+Using the notation introduced earlier, the fitted regression equation can be written as:
 
 <div style="overflow-x: auto; white-space: nowrap;">
 
 $$
 \begin{align*}
-\text{Net\_Money} &= -647.24 \\
-&\quad + 91.24 \times \text{Has\_Job} \\
-&\quad - 488.10 \times \text{Financially\_Dependent} \\
-&\quad - 100.14 \times \text{Year\_of\_Study} \\
-&\quad - 47.85 \times \text{Goes\_Out\_Spends\_Money} \\
-&\quad - 139.96 \times \text{Drinks\_Alcohol} \\
-&\quad + 1.52 \times \text{Monthly\_Allowance} \\
-&\quad + 0.92 \times \text{Monthly\_Earnings} \\
-&\quad + 107.92 \times \text{Living\_Situation} \\
-&\quad + 57.78 \times \text{Housing\_Type} \\
-&\quad - 86.39 \times \text{Cooks\_at\_Home} \\
-&\quad + \epsilon
+\widehat{Y}_i
+&=
+-647.24
++
+91.24x_{i,1}
+-
+100.14x_{i,2}
+-
+488.10x_{i,3}
++
+1.52x_{i,4}
+-
+86.39x_{i,5} \\
+&\quad
+-
+47.85x_{i,6}
+-
+139.96x_{i,7}
++
+0.92x_{i,8}
++
+\hat{\beta}_9x_{i,9}
++
+\hat{\beta}_{10}x_{i,10}
++
+\hat{\beta}_{11}x_{i,11}
++
+\hat{\beta}_{12}x_{i,12}.
 \end{align*}
 $$
 
 </div>
 
+Here, $\widehat{Y}_i$ represents the predicted financial balance for the $i$-th student. We use $\widehat{Y}_i$ instead of $Y_i$ because the fitted equation gives the model's predicted value, not the exact observed value. The difference between the observed value $Y_i$ and the fitted value $\widehat{Y}_i$ is called the residual.
 
-For example:
+Each coefficient should be interpreted conditionally on the other regressors in the model. In other words, $\hat{\beta}_j$ describes the estimated association between the regressor $x_{i,j}$ and the response variable, while holding the remaining regressors fixed.
 
-- The intercept ($\beta_0 = -647.24$) represents the expected financial balance for a student in the reference group—i.e., a student who has no job, is not financially dependent, does not go out to spend money or drink alcohol, receives no allowance or earnings, and is in the baseline category for all categorical variables.
-- A 1 dollar increase in `Monthly_Allowance` ($\beta$ = 1.52$) is associated with a $1.52 increase in `Net_Money`, suggesting that students with larger allowances tend to have a higher financial balance, all else being equal.
+For example, $x_{i,4}$ represents `Monthly_Allowance`. The estimated coefficient for this regressor is $1.52$. This means that, among students with the same values for the other regressors in the model, a one-dollar increase in monthly allowance is associated with an estimated increase of 1.52 CAD in predicted financial balance, on average.
 
-These estimates provide an initial understanding of the direction and magnitude of relationships between predictors and financial balance. However, before drawing conclusions, we need to validate model assumptions and evaluate the statistical significance of each coefficient.
+Similarly, $x_{i,8}$ represents `Monthly_Earnings`. The estimated coefficient for this regressor is $0.92$. Holding the other regressors fixed, a one-dollar increase in monthly earnings is associated with an estimated increase of 0.92 CAD in predicted financial balance, on average.
+
+The interpretation of binary regressors is slightly different. For example, $x_{i,1}$ represents `Has_Job`, where $x_{i,1}=1$ if the student has a job and $x_{i,1}=0$ otherwise. The estimated coefficient is $91.24$. Therefore, holding the other regressors fixed, students with a job are estimated to have a financial balance that is 91.24 CAD higher, on average, than students without a job.
+
+The coefficient of $x_{i,3}$ is $-488.10$. Since $x_{i,3}$ represents `Financially_Dependent`, this estimate compares students who are financially dependent to students who are not financially dependent. Holding the other regressors fixed, financially dependent students are estimated to have a financial balance that is 488.10 CAD lower, on average, than students who are not financially dependent.
+
+In this model, the ordinal variables `Year_of_Study` and `Goes_Out_Spends_Money` are treated as numeric regressors. Therefore, their coefficients are interpreted as linear one-unit changes. For example, $x_{i,2}$ represents `Year_of_Study`, and its estimated coefficient is $-100.14$. This means that, holding the other regressors fixed, moving up by one academic year is associated with an estimated decrease of 100.14 CAD in predicted financial balance, on average. Similarly, $x_{i,6}$ represents `Goes_Out_Spends_Money`, and its estimated coefficient is $-47.85$. This means that a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 47.85 CAD in predicted financial balance, on average, holding the other regressors fixed.
+
+For categorical variables represented using dummy variables, each coefficient is interpreted relative to the baseline category. For `Living_Situation`, the baseline category is *Family*. Therefore, the coefficients of $x_{i,9}$ and $x_{i,10}$ compare students living in shared housing and students living alone, respectively, to students living with family, after controlling for the other regressors.
+
+Similarly, for `Housing_Type`, the baseline category is *Rent*. Therefore, the coefficients of $x_{i,11}$ and $x_{i,12}$ compare students living in owned housing and students living in dormitory housing, respectively, to students living in rented housing, after controlling for the other regressors.
+
+The intercept also has a mathematical interpretation, but it is not always substantively meaningful. Here, the intercept is $-647.24$. It represents the predicted financial balance for a student whose numerical regressors are equal to zero and whose categorical regressors are in their baseline categories. In this example, that would correspond to a student with zero monthly allowance, zero monthly earnings, and the baseline category for all categorical variables. Depending on the context, this combination may not describe a realistic student. Therefore, the intercept is often best viewed as the baseline value needed to construct the fitted regression equation, rather than as a quantity of direct practical interest.
+
+These coefficient estimates provide an initial summary of the direction and magnitude of the associations in the data. Positive coefficients indicate that larger values of a regressor are associated with larger predicted values of `Net_Money`, while negative coefficients indicate the opposite. However, these interpretations are descriptive at this stage. Before drawing stronger conclusions, we need to examine the model assumptions, quantify uncertainty around the estimates, and assess which coefficients provide meaningful evidence of association.
+
 
 ## Goodness of Fit
-
-
 
 After estimating the regression coefficients, the next step is to assess how well the model fits the data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation ensures that the model is not only statistically valid but also generalizes well to unseen data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are violated, model estimates may be biased, leading to misleading conclusions.
 
