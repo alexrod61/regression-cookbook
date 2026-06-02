@@ -137,7 +137,6 @@ This is why probability belongs near the beginning of a regression cookbook. A r
 :::: {.Tip-header}
 Tip on further reading on probability and statistical modelling!
 ::::
-
 :::: {.Tip-container}
 This chapter provides the probability and frequentist inference we need to move comfortably through the regression models in the rest of the cookbook. It is not meant to replace a full probability or mathematical statistics course. Readers who want a concise but deeper mathematical treatment of **probability**, **estimation**, and **frequentist inference** can consult @wasserman2004 and @casella2024, especially for topics such as random variables, sampling distributions, likelihood-based estimation, confidence intervals, and hypothesis testing.
 
@@ -2473,7 +2472,7 @@ $$
 \sqrt{\pi(1 - \pi)}.
 $$
 
-This expression has an interesting interpretation. For a Bernoulli variable, uncertainty is largest when the two outcomes are equally likely. **If $\pi = 0.5$**, then chocolate and vanilla are balanced, so the outcome is hardest to anticipate. **As $\pi$ moves closer to $0$ or $1$**, one outcome dominates, and the spread of the $0$--$1$ variable becomes smaller. @fig-bernoulli-standard-deviation shows this relationship across the full range $\pi \in [0,1]$. The vertical purple line marks the simulated demand-query value $\pi = 0.65$.
+This expression has an interesting interpretation. For a Bernoulli variable, uncertainty is largest when the two outcomes are equally likely. **If $\pi = 0.5$**, then chocolate and vanilla are balanced, so the outcome is hardest to anticipate. **As $\pi$ moves closer to $0$ or $1$** (as in $\pi = 0.1, 0.9$), one outcome dominates, and the spread of the $0$--$1$ variable becomes smaller. @fig-bernoulli-standard-deviation shows this relationship across the full range $\pi \in [0,1]$. The vertical purple line marks the simulated demand-query value $\pi = 0.65$.
 
 ```{r}
 #| label: fig-bernoulli-standard-deviation
@@ -2498,10 +2497,10 @@ bernoulli_sd_plot <- ggplot2::ggplot() +
     strip.text = ggplot2::element_text(size = 20)
   ) +
   ggplot2::labs(
-    x = expression(pi),
-    y = expression(SD(D[i]))
+    x = expression(atop("", pi)),
+    y = expression(SD(D[i]) * phantom("."))
   ) +
-  ggplot2::geom_vline(xintercept = c(0.5, 0.7, 0.9), colour = "darkorange1", linetype = "longdash") +
+  ggplot2::geom_vline(xintercept = c(0.1, 0.5, 0.9), colour = "darkorange1", linetype = "longdash") +
   ggplot2::geom_vline(xintercept = 0.65, colour = "darkorchid4", linetype = "solid") +
   ggplot2::scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1))
 
@@ -2669,8 +2668,8 @@ exponential_sd_plot <- ggplot2::ggplot() +
     strip.text = ggplot2::element_text(size = 20)
   ) +
   ggplot2::labs(
-    x = expression(mu * " (minutes)"),
-    y = expression(SD(T[j]) * " in minutes")
+    x = expression(atop("", mu * " (minutes)")),
+    y = expression(SD(T[j]) * " in minutes" * phantom("."))
   ) +
   ggplot2::geom_vline(xintercept = c(5, 45), colour = "darkorange1", linetype = "longdash") +
   ggplot2::geom_vline(xintercept = 10, colour = "darkorchid4", linetype = "solid") +
@@ -4302,8 +4301,8 @@ ggplot(
     panel.grid.minor = element_blank()
   ) +
   labs(
-    x = "Sample Mean Waiting Time (minutes)",
-    y = "Absolute \nFrequency "
+    x = "\n Sample mean waiting time (minutes)",
+    y = expression("Absolute \nfrequency" * phantom("."))
   ) +
   coord_cartesian(ylim = c(0, 800))
 ```
@@ -4626,8 +4625,8 @@ ggplot(
     legend.box.spacing = unit(2.5, "cm")
   ) +
   labs(
-    x = "Number of chocolate preferences out of 10 children",
-    y = expression(paste(p[Y], "(y; n, ", pi, ")"))
+    x = "\n Number of chocolate preferences out of 10 children",
+    y = expression(paste(p[Y], "(y; n, ", pi, ")") * phantom("."))
   )
 ```
 
@@ -4665,8 +4664,8 @@ The likelihood curve in @fig-binomial-likelihood-y-7-10 shows the value of this 
 plot_binomial_likelihood_pi <- ggplot(data = data.frame(x = c(0, 1)), aes(x)) +
   stat_function(fun = dbinom, args = list(x = 7, size = 10), colour = "navyblue") +
   labs(
-    x = expression(pi),
-    y = expression(paste("L(", pi, "; ", y[obs], " = 7, n = 10)"))
+    x = expression(atop("", pi)),
+    y = expression(atop(paste("L(", pi, "; ", y[obs], " = 7, n = 10)"), ""))
   ) +
   theme_bw() +
   theme(
@@ -6085,7 +6084,523 @@ After fitting a model, we still need to ask whether the model captures the main 
 
 This section has shown why the sample proportion and sample mean used earlier are not just convenient summaries. Under the Bernoulli and Exponential models, they arise as maximum likelihood estimates. The same likelihood logic will support many of the regression models in later chapters, even when the estimates must be obtained numerically rather than analytically.
 
-We are now ready to complete the modelling loop. MLE gives us fitted parameter values, and the CLT-based ideas from @sec-clt-pivot help us understand why large-sample uncertainty summaries will be useful for inference. But before reporting confidence intervals and hypothesis tests, we should first ask whether the fitted probability model is adequate for the question at hand. That is the role of the next section on **goodness-of-fit**.
+We are now ready to complete the modelling loop. MLE gives us fitted parameter values, and the CLT-based ideas from @sec-clt-pivot help us understand why large-sample uncertainty summaries will be useful for inference. But before reporting confidence intervals and hypothesis tests, we should first ask whether the fitted probability model is adequate for the question at hand. That is the role of the next section on **goodness of fit**.
+
+## Goodness of Fit: Does the Fitted Probability Model Look Adequate? {#sec-goodness-of-fit}
+
+MLE gives us fitted parameter values. For the ice cream case, it gave us an estimated chocolate-preference probability for the demand query and an estimated average waiting time for the time query. However, estimation alone does not tell us whether the probability model is a good working description of the observed data. This is where **goodness of fit** enters the workflow. In @sec-ds-workflow-goodness-of-fit, goodness of fit was introduced as the stage after estimation and before results. The idea was that a fitted model should pass through a kind of **quality-control stage** before we rely on it for interpretation, prediction, confidence intervals, or hypothesis tests. In this section, we now give that workflow stage its probability foundation.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-presentation-3704067/).](img/label.png){width="330"}
+
+The key question **is not** whether the model is literally true. Statistical models are simplified representations of populations and systems. The key question is whether the fitted model captures the **main patterns** in the observed data well enough for the purpose of the analysis.
+
+::: {#Definition-goodness-of-fit .definition}
+:::: {.definition-header}
+Definition of goodness of fit
+::::
+:::: {.definition-container}
+**Goodness of fit** refers to the process of assessing whether a fitted probability model is compatible with the main patterns in the observed data. A goodness-of-fit assessment does not prove that the model is true. Instead, it asks whether the fitted model is adequate enough for the inferential or predictive purpose of the analysis.
+::::
+:::
+
+Goodness of fit acts as a bridge between **estimation** and **inference**. Once parameters have been estimated, we should still ask whether the fitted probability model is plausible enough to support the conclusions we plan to report. If the fitted model is visibly inconsistent with the observed data, then standard errors, confidence intervals, and hypothesis tests based on that model may be misleading. For the ice cream case, this means asking two concrete questions:
+
+1. For the **demand query**, does a Bernoulli model with fitted probability $\hat{\pi}_{\operatorname{MLE,obs}}$ (as in @eq-mle-demand) give a reasonable summary of chocolate versus vanilla preferences?
+2. For the **time query**, does an Exponential model with fitted scale $\hat{\mu}_{\operatorname{MLE,obs}}$ (as in @eq-mle-demand) give a reasonable summary of the observed waiting-time distribution?
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on adequacy, not truth!
+::::
+:::: {.Heads-up-container}
+A satisfactory goodness-of-fit check does not prove that a probability model is true. It only suggests that the model is not obviously inconsistent with the observed data according to the checks we used.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-pressure-6230208/).](img/surprise.png){width="475"}
+
+This distinction is crucial throughout the cookbook. Regression models are **modelling stories**, not exact copies of reality. Goodness-of-fit checks help us decide whether the story is useful and transparent enough for the question at hand.
+::::
+:::
+
+### From Fitted Parameters to Fitted Distributions {#sec-fitted-parameters-to-distributions}
+
+A fitted parameter estimate becomes useful for model checking once we translate it back into the fitted probability distribution. For the **demand query**, the fitted Bernoulli model is
+
+$$
+D_i \sim \operatorname{Bernoulli}
+\left(
+\hat{\pi}_{\operatorname{MLE,obs}}
+\right).
+$$
+
+This fitted model assigns probability $\hat{\pi}_{\operatorname{MLE,obs}}$ to chocolate and probability $1-\hat{\pi}_{\operatorname{MLE,obs}}$ to vanilla.
+
+For the **time query**, the fitted Exponential model is
+
+$$
+T_j \sim \operatorname{Exponential}
+\left(
+\hat{\mu}_{\operatorname{MLE,obs}}
+\right),
+$$
+
+where $\hat{\mu}_{\operatorname{MLE,obs}}$ is the fitted scale parameter. This model implies that the fitted mean and fitted standard deviation are both equal to $\hat{\mu}_{\operatorname{MLE,obs}}$:
+
+$$
+\widehat{\mathbb{E}}(T_j)
+=
+\hat{\mu}_{\operatorname{MLE,obs}}
+\quad \text{and} \quad
+\widehat{\operatorname{SD}}(T_j)
+=
+\hat{\mu}_{\operatorname{MLE,obs}}.
+$$
+
+These fitted distributions give us something to compare against the data. Goodness of fit asks whether the observed sample behaves like a plausible sample from the fitted distribution.
+
+| **Step** | **Demand Query** | **Time Query** |
+|:---------:|:-----------------:|:---------------:|
+| **Probability model** | $D_i \sim \operatorname{Bernoulli}(\pi)$ | $T_j \sim \operatorname{Exponential}(\mu)$ |
+| **MLE from the observed sample** | $\hat{\pi}_{\operatorname{MLE,obs}} = \bar{d}$ | $\hat{\mu}_{\operatorname{MLE,obs}} = \bar{t}$ |
+| **Fitted distribution** | $D_i \sim \operatorname{Bernoulli}(\hat{\pi}_{\operatorname{MLE,obs}})$ | $T_j \sim \operatorname{Exponential}(\hat{\mu}_{\operatorname{MLE,obs}})$ |
+| **Model-implied pattern** | The chocolate proportion should be stable within comparable groups. | Waiting times should be positive, right-skewed, and have mean roughly equal to standard deviation. |
+| **Goodness-of-fit question** | Does the fitted Bernoulli probability give an adequate summary of the binary preference data? | Does the fitted Exponential distribution describe the shape and spread of the waiting-time data well enough? |
+
+: Translating maximum likelihood estimates into fitted distributions for goodness-of-fit assessment. {#tbl-fitted-distributions-ice-cream .striped .hover}
+
+### Three Layers of Goodness-of-fit Assessment {#sec-gof-layers}
+
+Goodness-of-fit checks can be **graphical**, **numerical**, or **formal**. In applied work, these layers usually complement one another. A single number can be convenient, but plots often reveal where a model fails. A **formal hypothesis test** can be useful, but it should be interpreted in light of sample size, study design, and the practical purpose of the analysis.
+
+| **Layer** | **Examples** | **Main Role** |
+|:----------:|:-------------:|:--------------:|
+| **Graphical checks** | Histograms with fitted curves, QQ-plots, residual plots, observed-versus-expected plots, calibration plots. | Reveal shape mismatch, outliers, skewness, tail behaviour, systematic structure, and lack of calibration. |
+| **Numerical summaries** | Observed-versus-expected counts, residual deviance, Pearson statistics, dispersion ratios, summary-statistic comparisons. | Provide compact summaries of model-data mismatch. |
+| **Formal tests** | Chi-square goodness-of-fit tests, likelihood-ratio tests, residual-based tests, distributional tests. | Quantify evidence against a model or a simpler structure under a reference distribution. |
+
+: Three complementary layers of goodness-of-fit assessment. {#tbl-gof-layers .striped .hover}
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-digital-3704070/).](img/pinned-notes.png){width="500"}
+
+In this section, we keep the checks simple and connected to the ice cream case. The goal is not to give a full diagnostics toolkit for every model. Instead, the goal is to establish the habit: **after fitting a probability model, compare what the model expects with what the data show**.
+
+### Goodness of Fit for the Demand Query {#sec-gof-demand-query}
+
+For the **demand query**, each sampled child contributes a binary response. The fitted **Bernoulli model** assigns probability $\hat{\pi}_{\operatorname{MLE,obs}}$ to chocolate and probability $1 - \hat{\pi}_{\operatorname{MLE,obs}}$ to vanilla.
+
+A natural first step is to compare the observed counts with the fitted expected counts using the sample size $n_d$. Since $\hat{\pi}_{\operatorname{MLE,obs}}$ is the sample proportion as shown in @eq-mle-demand, the fitted expected number of chocolate preferences is
+
+$$
+n_d \times \hat{\pi}_{\operatorname{MLE,obs}}.
+$$
+
+The fitted expected number of vanilla preferences is
+
+$$
+n_d \times
+\left(
+1 - \hat{\pi}_{\operatorname{MLE,obs}}
+\right).
+$$
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| message: false
+
+demand_gof_summary <- children_sample |>
+  mutate(
+    flavour_binary = if_else(fav_flavour == "chocolate", 1, 0)
+  ) |>
+  summarize(
+    n = n(),
+    observed_chocolate = sum(flavour_binary),
+    observed_vanilla = n - observed_chocolate,
+    fitted_pi = pi_hat_MLE_obs,
+    expected_chocolate = n * fitted_pi,
+    expected_vanilla = n * (1 - fitted_pi)
+  )
+
+demand_gof_summary
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+
+children_sample["flavour_binary"] = (
+    children_sample["fav_flavour"] == "chocolate"
+).astype(int)
+
+demand_gof_summary = pd.DataFrame({
+    "n": [len(children_sample)],
+    "observed_chocolate": [children_sample["flavour_binary"].sum()],
+    "observed_vanilla": [
+        len(children_sample) - children_sample["flavour_binary"].sum()
+    ],
+    "fitted_pi": [pi_hat_MLE_obs],
+    "expected_chocolate": [len(children_sample) * pi_hat_MLE_obs],
+    "expected_vanilla": [len(children_sample) * (1 - pi_hat_MLE_obs)]
+})
+
+demand_gof_summary
+```
+
+:::
+
+This comparison makes the fitted Bernoulli model concrete: **it shows what the model predicts in terms of counts**. However, it also reveals an important limitation. Because $\hat{\pi}_{\operatorname{MLE,obs}}$ is the sample proportion, the fitted expected number of chocolate preferences matches the observed number of chocolate preferences before rounding:
+
+$$
+\begin{align*}
+n_d \times \hat{\pi}_{\operatorname{MLE,obs}}
+&=
+n_d \times \frac{\text{number of chocolate preferences}}{n_d} \\
+&=
+\text{number of chocolate preferences}.
+\end{align*}
+$$
+
+The same is true for vanilla preferences. Therefore, this **observed-versus-expected** comparison is mainly a transparent summary of the fitted model, **not a strong goodness-of-fit check**. @fig-demand-observed-expected visualizes the same comparison.
+
+```{r}
+#| label: fig-demand-observed-expected
+#| fig-cap: "Observed and fitted expected flavour counts for the demand query. Because the Bernoulli probability is estimated by the sample proportion, the fitted expected counts match the observed counts by construction, up to rounding."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+demand_observed_expected <- tibble(
+  flavour = c("Chocolate", "Vanilla"),
+  observed = c(
+    demand_gof_summary$observed_chocolate,
+    demand_gof_summary$observed_vanilla
+  ),
+  expected = c(
+    demand_gof_summary$expected_chocolate,
+    demand_gof_summary$expected_vanilla
+  )
+) |>
+  pivot_longer(
+    cols = c(observed, expected),
+    names_to = "quantity",
+    values_to = "count"
+  ) |>
+  mutate(
+    quantity = case_when(
+      quantity == "observed" ~ "Observed count",
+      quantity == "expected" ~ "Fitted expected count"
+    ),
+    quantity = factor(
+      quantity,
+      levels = c("Observed count", "Fitted expected count")
+    ),
+    flavour = factor(
+      flavour,
+      levels = c("Chocolate", "Vanilla")
+    ),
+    bar_type = factor(
+      paste(flavour, quantity, sep = " — "),
+      levels = c(
+        "Chocolate — Observed count",
+        "Chocolate — Fitted expected count",
+        "Vanilla — Observed count",
+        "Vanilla — Fitted expected count"
+      )
+    )
+  )
+
+ggplot(
+  demand_observed_expected,
+  aes(x = flavour, y = count, fill = bar_type)
+) +
+  geom_col(
+    position = position_dodge(width = 0.75),
+    width = 0.65,
+    colour = "grey25",
+    linewidth = 0.25
+  ) +
+  scale_fill_manual(
+    values = c(
+      "Chocolate — Observed count" = "#5C3317",
+      "Chocolate — Fitted expected count" = "#A67B5B",
+      "Vanilla — Observed count" = "#E8C547",
+      "Vanilla — Fitted expected count" = "#F6EBC1"
+    )
+  ) +
+  labs(
+    x = "\nFavourite flavour",
+    y = "Count\n",
+    fill = "Quantity"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 16),
+    legend.text = element_text(size = 16),
+    panel.grid.minor = element_blank()
+  )
+```
+
+This is where the connection to a classical **chi-squared goodness-of-fit test** becomes useful. We often compare **observed category counts** to **expected counts** under a proposed probability model. For a binary response, a Pearson-style discrepancy has the form
+
+$$
+X^2
+=
+\frac{
+\left(
+O_{\text{chocolate}} - E_{\text{chocolate}}
+\right)^2
+}{
+E_{\text{chocolate}}
+}
++
+\frac{
+\left(
+O_{\text{vanilla}} - E_{\text{vanilla}}
+\right)^2
+}{
+E_{\text{vanilla}}
+}.
+$${#eq-chi-squared-statistic}
+
+In @eq-chi-squared-statistic, $O$ denotes an observed count and $E$ denotes an expected count under the model being checked. This statistic $X^2$ is small when the observed counts are close to the expected counts, and larger when the observed counts differ more strongly from what the model predicts. However, for the **fitted one-parameter Bernoulli model** in this example, this calculation does not give us a useful test. The reason is that the probability $\pi$ was estimated from the same two counts we are trying to check. With **two categories** and **one estimated parameter**, there is no remaining flexibility left for a standalone goodness-of-fit test. The model has already used the sample proportion to match the overall chocolate-versus-vanilla split.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on fitted Bernoulli goodness of fit!
+::::
+:::: {.Heads-up-container}
+For a single Bernoulli sample with no explanatory variables, a goodness-of-fit check based only on the two observed counts is very limited. Once we estimate $\pi$ using the sample proportion, the fitted model matches the overall number of chocolate and vanilla preferences by construction.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-feedback-to-learn-3699331/).](img/thumbs-up-down.png){width="500"}
+
+A chi-squared goodness-of-fit test would make more sense if the probability were specified in advance, such as checking the data against $\pi = 0.50$, or if we had additional structure such as city, age group, or survey day.
+::::
+:::
+
+For a **richer demand analysis**, we would want additional information beyond the overall binary response. For example, if the sample recorded city, age group, or day of survey, we could examine whether the chocolate-preference probability appears stable across comparable groups. If the overall sample proportion is $0.65$, but one city has a chocolate-preference proportion near $0.30$ and another near $0.90$, then a single Bernoulli probability may be hiding important heterogeneity. That kind of pattern would motivate a regression model, such as Binary Logistic regression in @sec-binary-logistic, where the event probability can depend on explanatory variables. In this current chapter, the main lesson is more modest: the fitted Bernoulli model gives a clear summary of the overall demand pattern, but a meaningful goodness-of-fit assessment requires either an external reference probability or additional structure in the data.
+
+### Goodness of Fit for the Time Query {#sec-gof-time-query}
+
+For the **time query**, the fitted Exponential model has more visible distributional implications. Waiting times should be positive and right-skewed. The fitted mean and fitted standard deviation should also be approximately equal because, under the Exponential model,
+
+$$
+\mathbb{E}(T_j) = \mu
+\quad \text{and} \quad
+\operatorname{SD}(T_j) = \mu.
+$$
+
+Since $\hat{\mu}_{\operatorname{MLE,obs}}=\bar{t}$, as in @eq-mle-time, the fitted Exponential distribution would match the sample mean by construction. However, it does not automatically match the sample standard deviation, the shape of the histogram, or the tail behaviour. These features make the time query a more informative setting for goodness-of-fit checks. Note that the column `sd_to_mean_ratio` is a **compact diagnostic** for the Exponential model. Values near $1$ are consistent with the Exponential mean-standard-deviation relationship. Values far above or below $1$ would suggest that the Exponential model may not be capturing the spread of the observed waiting times well.
+
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| message: false
+
+time_gof_summary <- waiting_sample |>
+  summarize(
+    n = n(),
+    sample_mean = mean(waiting_time),
+    sample_sd = sd(waiting_time),
+    fitted_mu = mu_hat_MLE_obs,
+    sd_to_mean_ratio = sample_sd / sample_mean
+  ) |>
+  mutate(
+    across(
+      c(sample_mean, sample_sd, fitted_mu, sd_to_mean_ratio),
+      ~ round(.x, 2)
+    )
+  )
+
+time_gof_summary
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+
+time_gof_summary = pd.DataFrame({
+    "n": [len(waiting_sample)],
+    "sample_mean": [waiting_sample["waiting_time"].mean()],
+    "sample_sd": [waiting_sample["waiting_time"].std(ddof = 1)],
+    "fitted_mu": [mu_hat_MLE_obs]
+})
+
+time_gof_summary["sd_to_mean_ratio"] = (
+    time_gof_summary["sample_sd"] /
+    time_gof_summary["sample_mean"]
+)
+
+time_gof_summary = time_gof_summary.round({
+    "sample_mean": 2,
+    "sample_sd": 2,
+    "fitted_mu": 2,
+    "sd_to_mean_ratio": 2
+})
+
+time_gof_summary
+```
+
+:::
+
+In @fig-time-exponential-gof, a graphical check compares the histogram of the observed waiting times with the **fitted Exponential density**. The histogram summarizes the waiting times in the sample by grouping them into bins and scaling the vertical axis as a density, rather than as raw counts. This scaling makes it possible to compare the histogram to a **probability density curve** on the same plot. The smooth red curve is the fitted Exponential density. It is obtained by taking the Exponential model introduced earlier and plugging in the observed maximum likelihood estimate $\hat{\mu}_{\operatorname{MLE,obs}}$ (as in @eq-mle-time) for the **mean waiting time**. In other words, the curve is the density of an Exponential distribution with rate
+
+$$
+
+\frac{1}{\hat{\mu}_{\operatorname{MLE,obs}}}.
+
+$$
+
+Therefore, the figure compares two objects: the empirical shape of the sampled waiting times, shown by the histogram, and the shape expected under the fitted Exponential model, shown by the red density curve.
+
+This is a **visual goodness-of-fit check**, so it should be read as a diagnostic comparison rather than as a formal test. We are asking whether the fitted Exponential curve captures the main pattern in the observed waiting times: many short waits, fewer long waits, and a right-skewed distribution. Since we generated the time population from an Exponential model for simulation purposes, we expect the fitted curve and histogram to look reasonably consistent apart from **ordinary sampling variability**. In a real application, stronger departures might appear as too many very short waits, a heavier tail than expected, multiple peaks, or a distribution that looks more symmetric than an Exponential distribution allows.
+
+```{r}
+#| label: fig-time-exponential-gof
+#| fig-cap: "Goodness-of-fit check for the time query. The histogram shows the observed waiting times, while the curve shows the fitted Exponential density using the MLE of the scale parameter."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+waiting_density_grid <- tibble(
+  waiting_time = seq(
+    0,
+    max(waiting_sample$waiting_time),
+    length.out = 300
+  ),
+  fitted_density = dexp(
+    waiting_time,
+    rate = 1 / mu_hat_MLE_obs
+  )
+)
+
+ggplot(waiting_sample, aes(x = waiting_time)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 30,
+    boundary = 0,
+    fill = "#E69F00",
+    colour = "white",
+    linewidth = 0.25
+  ) +
+  geom_line(
+    data = waiting_density_grid,
+    aes(x = waiting_time, y = fitted_density),
+    colour = "firebrick",
+    linewidth = 1.35
+  ) +
+  labs(
+    x = "\nWaiting time between customers (minutes)",
+    y = "Density\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    panel.grid.minor = element_blank()
+  )
+```
+
+Another useful graphical check compares the **empirical cumulative distribution function (ECDF)** with the **fitted Exponential CDF** as in @fig-time-ecdf-gof. The ECDF shows, for each time value $t$, the observed proportion of sampled waiting times less than or equal to $t$. The fitted CDF shows what the Exponential model predicts for that same cumulative probability after estimating the mean waiting time from the observed sample.
+
+The density and CDF checks in @fig-time-exponential-gof and @fig-time-ecdf-gof, respectively, are complementary. The histogram in @fig-time-exponential-gof focuses on the shape of the distribution, while the ECDF in @fig-time-ecdf-gof focuses on cumulative probability. If both checks indicate substantial systematic disagreement graphically, our Exponential model may be too simple for the waiting-time process. Possible next steps could include adding explanatory variables, considering a different positive continuous distribution, or modelling different operating periods separately.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on formal goodness-of-fit tests for continuous models!
+::::
+:::: {.Tip-container}
+The checks in @fig-time-exponential-gof and @fig-time-ecdf-gof are graphical diagnostics, but the same idea can also be formalized with goodness-of-fit tests. For a **continuous probability model**, common choices include the Kolmogorov-Smirnov, Cramér-von Mises, and Anderson-Darling tests. These tests compare the **empirical distribution of the observed data** with the **cumulative distribution implied by a proposed probability model**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
+There is one important subtlety in our **time query**. We are not comparing the sample to a fully specified Exponential distribution with a known value of $\mu$. Instead, we first estimate $\mu$ from the same observed data and then check the fitted Exponential model. This changes the reference distribution of many classical goodness-of-fit test statistics. As a result, standard textbook critical values for the Kolmogorov--Smirnov test should not be used directly when model parameters have been estimated from the data.
+
+For Exponential models with an estimated mean, specialized adjustments are available. **Lilliefors-type tests** modify the Kolmogorov-Smirnov approach for cases where the Exponential mean is unknown and estimated from the sample [@lilliefors1969]. More broadly, empirical-distribution-function tests such as Anderson-Darling and Cramér-von Mises are widely used for continuous goodness-of-fit assessment, with the Anderson-Darling statistic giving extra weight to discrepancies in the tails [@stephens1974; @dagostino1986]. These formal tests are useful, but they should complement rather than replace graphical diagnostics.
+::::
+:::
+
+```{r}
+#| label: fig-time-ecdf-gof
+#| fig-cap: "Observed empirical cumulative distribution function (ECDF) and fitted Exponential cumulative distribution function (CDF) for the time query. Large systematic gaps would suggest lack of fit."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+cdf_colours <- c(
+  "Observed empirical CDF" = "#6B3E26",
+  "Fitted Exponential CDF" = "#D99A2B"
+)
+waiting_cdf_grid <- tibble(
+  waiting_time = seq(
+    0,
+    max(waiting_sample$waiting_time),
+    length.out = 300
+  ),
+  fitted_cdf = pexp(
+    waiting_time,
+    rate = 1 / mu_hat_MLE_obs
+  )
+)
+ggplot(waiting_sample, aes(x = waiting_time)) +
+  stat_ecdf(
+    aes(colour = "Observed empirical CDF"),
+    linewidth = 1
+  ) +
+  geom_line(
+    data = waiting_cdf_grid,
+    aes(
+      y = fitted_cdf,
+      colour = "Fitted Exponential CDF"
+    ),
+    linewidth = 1.2,
+    linetype = "dashed"
+  ) +
+  scale_colour_manual(
+    values = cdf_colours,
+    name = "CDF"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 16),
+    legend.text = element_text(size = 16),
+    legend.key.width = unit(2.2, "cm"),
+    legend.box.margin = margin(0, 12, 0, 12),
+    legend.margin = margin(6, 12, 6, 12),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = "\n Waiting time between customers (minutes)",
+    y = "Cumulative probability\n"
+  )
+```
+
+
+
 
 
 
