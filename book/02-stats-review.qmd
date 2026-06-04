@@ -44,14 +44,14 @@ print_as_dt <- function(x){
 
 ::: {.Warning}
 ::::{.Warning-header}
-The Importance of This Chapter
+The Importance of this Chapter
 ::::
 ::::{.Warning-container}
 In @sec-intro, we introduced regression analysis as a **structured data science workflow**: we begin with a question, define a response variable and explanatory variables, choose a probability model, estimate unknown parameters, assess model adequacy, and communicate results to stakeholders. This chapter now slows down and reviews the **probability** and **frequentist inference** ideas that make that workflow possible.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464611/).](img/children-2.png){width="500"}
 
-Rather than treating probability, likelihood, goodness of fit, confidence intervals, and hypothesis tests as isolated formulas, we will use them as ingredients in a coherent inferential recipe. The main running example will continue to be a made-up ice cream business case with two operational queries: a **demand query** about children's flavour preferences and a **time query** about customer waiting times. These two queries let us connect probability models, random sampling, maximum likelihood estimation, the Central Limit Theorem, goodness-of-fit checks, and hypothesis testing.
+Rather than treating probability, likelihood, goodness of fit, confidence intervals, and hypothesis tests as isolated formulas, we will use them as ingredients in a coherent recipe. The main running example will continue to be a made-up ice cream business case with two operational queries: a **demand query** about children's flavour preferences and a **time query** about customer waiting times. These two queries let us connect probability models, random sampling, maximum likelihood estimation, the Central Limit Theorem, goodness-of-fit checks, and hypothesis testing.
 ::::
 :::
 
@@ -6599,8 +6599,82 @@ ggplot(waiting_sample, aes(x = waiting_time)) +
   )
 ```
 
+### Goodness of Fit Depends on the Model Family {#sec-gof-model-family}
 
+**Different probability models** imply **different expectations** about the data they are meant to describe. A Bernoulli model is built for binary outcomes and event probabilities. A Poisson model is built for counts and carries assumptions about the relationship between the mean and variance. A Normal model represents variation around a mean using a symmetric distribution. A survival model represents event-time behaviour while accounting for censoring. Goodness-of-fit checks should therefore be tailored to the model family. 
 
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
+
+@tbl-gof-later-models previews a recurring theme. In each later chapter, fitting the model is only one part of the workflow from @fig-ds-workflow. We also need to check whether the fitted model behaves in a way that is consistent with the response type, distributional assumptions, and scientific or practical question.
+
+| **Chapter** | **Model family** | **Probability ingredient** | **Main goodness-of-fit concern** |
+|:------------:|:-----------------:|:---------------------------:|:---------------------------------:|
+| @sec-ols | OLS regression | Normal PDF for the response around a conditional mean, under the classical Normal-error formulation. | Residual structure, nonlinearity, non-constant variance, influential observations, and Normal-error adequacy when using classical inference. |
+| @sec-gamma | Gamma regression | Gamma PDF for positive, right-skewed continuous responses. | Whether the response is positive, the right tail is plausible, and the mean-variance relationship is adequate. |
+| @sec-beta | Beta regression | Beta PDF for continuous proportions in $(0,1)$. | Boundary values at $0$ or $1$, poor shape fit, precision structure, and calibration across fitted values. |
+| @sec-parametric-survival | Parametric survival regression | Time-to-event PDF, CDF, survival function, and hazard function. | Distributional shape, tail behaviour, censoring patterns, and whether the chosen event-time family is plausible. |
+| @sec-semiparametric-survival | Semiparametric survival regression | Cox proportional hazards structure and partial likelihood. | Proportional hazards, influential observations, functional form of covariate effects, and censoring assumptions. |
+| @sec-binary-logistic | Binary logistic regression | Bernoulli PMF for ungrouped binary responses. | Calibration of predicted probabilities, separation, influential observations, and systematic misclassification patterns. |
+| @sec-classical-poisson | Classical Poisson regression | Poisson PMF for count responses. | Overdispersion, underdispersion, excess zeros, and whether the log-linked mean captures systematic count patterns. |
+| @sec-negative-binomial | Negative Binomial regression | Negative Binomial PMF for overdispersed count responses. | Whether the dispersion structure is adequate and whether remaining zero inflation or tail mismatch persists. |
+| @sec-zero-inflated-poisson | Zero-inflated Poisson regression | Mixture likelihood combining a structural-zero process and a Poisson count process. | Whether zeros are adequately separated into structural and sampling zeros, and whether the count component still shows dispersion issues. |
+| @sec-generalized-poisson | Generalized Poisson regression | Generalized Poisson PMF for counts with flexible dispersion. | Whether the flexible dispersion structure captures overdispersion or underdispersion without masking other misspecification. |
+| @sec-multinomial-logistic | Multinomial logistic regression | Multinomial PMF for nominal categorical outcomes. | Calibration of category probabilities, sparse categories, influential observations, and systematic category-level errors. |
+| @sec-ordinal-logistic | Ordinal logistic regression | Likelihood for ordered categorical outcomes, often built from cumulative probabilities. | Whether the ordering is meaningful, whether proportional-odds-type assumptions are suitable, and whether category probabilities are calibrated. |
+
+: Goodness-of-fit concerns across later regression model families in the cookbook. {#tbl-gof-later-models .striped .hover}
+
+### Goodness of Fit versus Prediction {#sec-gof-versus-prediction}
+
+**Goodness of fit** and **predictive performance** are related, but they are **not identical**. Goodness of fit asks whether the fitted model captures important patterns in the data used to fit or assess the model. Predictive performance asks whether the model performs well on new or unseen data.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/laptop-games-jigsaw-puzzle-puzzle-7426707/).](img/generative-model.png){width="300"}
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on goodness of fit versus predictive performance!
+::::
+
+:::: {.Heads-up-container}
+A model can fit the training data closely but predict poorly if it overfits. Conversely, a simple model may miss some details of the observed data but still provide stable and useful predictions. For **inferential work**, goodness of fit is especially important because model-based standard errors, confidence intervals, and hypothesis tests depend on the modelling assumptions being reasonable for the purpose at hand.
+::::
+:::
+
+The main point of @tbl-gof-model-checking-questions is that a fitted model can pass one kind of assessment while still raising concerns under another. A **parameter estimate** can be computable even when the model family is not a good description of the data. A **hypothesis test** can be mechanically valid under its assumptions even when those assumptions deserve scrutiny. A **model** can also predict reasonably well while still being too simplified for the inferential question at hand. Goodness of fit therefore plays a **diagnostic role**: it helps us decide whether the fitted probability model is adequate enough to support the conclusions we want to draw.
+
+| **Question** | **Main Concern** | **Typical Tools** |
+|:-------------:|:-----------------:|:------------------:|
+| Can we **estimate** the **parameter**? | Estimation | Estimators, likelihood, numerical optimization. |
+| How variable is the **estimator** across **repeated samples**? | Sampling variability | Sampling distributions, standard errors, and CLT-based approximations. |
+| Does the **fitted model** describe the **observed data** reasonably well? | Goodness of fit | Observed-versus-expected checks, histograms with fitted curves, ECDF comparisons, residual plots, deviance, and dispersion summaries. |
+| Is there evidence against a **null value** or simpler structure? | Frequentist inference | Hypothesis tests, $p$-values, likelihood-ratio tests, and confidence intervals. |
+| Does the model perform well on **unseen data**? | Generalization | Test error, cross-validation, predictive calibration, and out-of-sample diagnostics. |
+
+: Distinguishing estimation, sampling variability, goodness of fit, inference, and prediction. {#tbl-gof-model-checking-questions .striped .hover}
+
+In the data science workflow, **goodness of fit** is the gate between **estimation** and **results**. In the probability-and-inference workflow of this chapter, it is the gate between fitted models and formal inference. This placement is extremely crucial. If the fitted model is not adequate, then a confidence interval may be precise but misleading, and a hypothesis test may be mathematically valid under assumptions that are not reasonable for the observed data.
+
+### Wrapping Up Goodness of Fit {#sec-gof-wrap-up}
+
+The ice cream queries show the basic logic. For the **demand query**, the fitted **Bernoulli model** gives a transparent summary of the overall chocolate-preference proportion, but stronger checks would require additional structure such as groups or regressors. For the **time query**, the fitted Exponential model can be compared against observed waiting-time summaries, histograms, and cumulative distribution patterns.
+
+The broader lesson is that goodness of fit is not a decorative final check. It is a workflow decision point. If the fitted model looks adequate for the analysis goal, we can proceed to inference with more confidence. If the fitted model shows important mismatch, we should return to the modelling stage, revise the probability model, add relevant structure, or reconsider the inferential claims we are willing to make.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on what to do when goodness of fit is poor!
+::::
+
+:::: {.Tip-container}
+A poor goodness-of-fit check does not mean the data modelling has failed. It means the fitted model has taught us something useful about the data.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/aha.png){width="300"}
+
+Possible next steps include revising the distributional family, adding explanatory variables, transforming variables, modelling groups separately, using a different link function, adding a dispersion component, or changing the inferential target. This is exactly why the data science workflow in @sec-ds-workflow-goodness-of-fit allows the analysis to loop back to data modelling and estimation.
+::::
+:::
+
+We are now ready to move into the full frequentist inference workflow. MLE has given us fitted parameter values, and the CLT-based ideas from @sec-clt-pivot help explain why large-sample uncertainty summaries can be useful. Goodness of fit reminds us to pause before reporting confidence intervals and hypothesis tests: first, we should ask whether the fitted probability model is adequate for the question at hand.
 
 
 
