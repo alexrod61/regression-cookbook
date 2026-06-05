@@ -1256,10 +1256,10 @@ Each $p_{i,j}$ is guaranteed to be a valid (non-negative) probability. As the th
 
 To estimate the model, we need a way to measure how well a given set of parameters explains the observed data. The **likelihood function** does exactly this: it expresses the probability of the data we actually observed as a function of the unknown parameters, and estimation amounts to finding the parameter values that make this probability as large as possible.
 
-We first encode each individual’s observed response category using indicator variables. Let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. Since each individual belongs to exactly one of the (J) possible categories, the vector $(y_{i,1}, y_{i,2}, \ldots, y_{i,J})$ contains exactly one entry equal to (1), with all remaining entries equal to (0). This representation is often called a one-hot encoding of the response category. The likelihood function for the ordinal logistic regression model is the following:
+We first encode each individual’s observed response category using indicator variables. Let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. Since each individual belongs to exactly one of the (J) possible categories, the vector $\mathbf{y}=(y_{i,1}, y_{i,2}, \ldots, y_{i,J})$ contains exactly one entry equal to (1), with all remaining entries equal to (0). This representation is often called a one-hot encoding of the response category. The likelihood function for the ordinal logistic regression model is the following:
 
 $$
-\mathcal{L}(\boldsymbol{\alpha}, \boldsymbol{\beta} \mid y) = \prod_{i=1}^n \prod_{j=1}^J p_{i,j}^{y_{i,j}},
+\mathcal{L}(\boldsymbol{\alpha}, \boldsymbol{\beta};mathbf{y}) = \prod_{i=1}^n \prod_{j=1}^J p_{i,j}^{y_{i,j}},
 $$
 
 where $n$ is the number of individuals in the sample, $J$ is the number of ordered categories, and $p_{i,j} = P(Y_i = j \mid \mathbf{x}_i)$ is the model-implied probability that individual $i$ (with regressor values $\mathbf{x}_i$) falls in category $j$, as derived earlier by differencing the cumulative probabilities. The two unknown parameter sets being estimated are collected in $\boldsymbol{\alpha} = (\alpha_1, \alpha_2, \ldots, \alpha_{J-1})^\top$, the vector of thresholds (the category-specific intercepts), and $\boldsymbol{\beta} = (\beta_1, \beta_2, \ldots, \beta_k)^\top$, the vector of $k$ shared slopes that apply across all cumulative splits.
@@ -1269,7 +1269,7 @@ The two products have intuitive roles. The **inner product** over $j$ runs acros
 Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the log-likelihood:
 
 $$
-\ell(\boldsymbol{\alpha}, \boldsymbol{\beta}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_{i,j}.
+\ell(\boldsymbol{\alpha}, \boldsymbol{\beta};mathbf{y}) = \sum_{i=1}^n \sum_{j=1}^J y_{i,j} \log p_{i,j}.
 $$
 
 Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$, the parameter values under which the observed data are most probable. Unlike ordinary least squares, however, there is no closed-form algebraic expression for the values of $\hat{\boldsymbol{\alpha}}$ and $\hat{\boldsymbol{\beta}}$ that maximize $\ell$: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the logistic function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice here is the **Newton–Raphson** method, which we describe next.
