@@ -1532,7 +1532,25 @@ ordinal_fit_np <- vglm(
   data = train_df
 )
 
-tidy_vgam(ordinal_fit_np) |> mutate_if(is.numeric, round, 3)
+# One coefficient table per cumulative logit, matching the Python layout:
+# estimate (coef), standard error, z-statistic, and p-value per regressor.
+np_tidy   <- tidy_vgam(ordinal_fit_np)
+cutpoints <- c("Low|Medium", "Medium|High", "High|Very High")
+groups    <- sort(unique(np_tidy$group))
+
+for (i in seq_along(groups)) {
+  rows       <- np_tidy[np_tidy$group == groups[i], ]
+  coef_table <- data.frame(
+    coef        = round(rows$estimate,  3),
+    `std err`   = round(rows$std.error, 3),
+    z           = round(rows$statistic, 3),
+    `p-value`   = round(rows$p.value,   3),
+    row.names   = rows$term,
+    check.names = FALSE
+  )
+  cat(sprintf("\nCutpoint %s  (P(Y <= j) vs P(Y > j))\n", cutpoints[i]))
+  print(coef_table)
+}
 ```
 
 ### Python Code
@@ -1564,11 +1582,12 @@ for j, label in enumerate(cutpoints):
     model = sm.Logit(y_bin, X_np).fit(disp=False)
     np_models[label] = model
 
-    # Coefficient table: estimate, standard error, and z-value per regressor
+    # Coefficient table: estimate, standard error, z-value, and p-value per regressor
     coef_table = pd.DataFrame({
         "coef":    model.params,
         "std err": model.bse,
         "z":       model.tvalues,
+        "p-value": model.pvalues,
     }).round(3)
     print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
     print(coef_table.to_string())
@@ -1593,7 +1612,25 @@ ordinal_fit_np <- vglm(
   data = train_df
 )
 
-tidy_vgam(ordinal_fit_np) |> mutate_if(is.numeric, round, 3)
+# One coefficient table per cumulative logit, matching the Python layout:
+# estimate (coef), standard error, z-statistic, and p-value per regressor.
+np_tidy   <- tidy_vgam(ordinal_fit_np)
+cutpoints <- c("Low|Medium", "Medium|High", "High|Very High")
+groups    <- sort(unique(np_tidy$group))
+
+for (i in seq_along(groups)) {
+  rows       <- np_tidy[np_tidy$group == groups[i], ]
+  coef_table <- data.frame(
+    coef        = round(rows$estimate,  3),
+    `std err`   = round(rows$std.error, 3),
+    z           = round(rows$statistic, 3),
+    `p-value`   = round(rows$p.value,   3),
+    row.names   = rows$term,
+    check.names = FALSE
+  )
+  cat(sprintf("\nCutpoint %s  (P(Y <= j) vs P(Y > j))\n", cutpoints[i]))
+  print(coef_table)
+}
 ```
 
 ### Python Output
@@ -1624,6 +1661,7 @@ for j, label in enumerate(cutpoints):
         "coef":    model.params,
         "std err": model.bse,
         "z":       model.tvalues,
+        "p-value": model.pvalues,
     }).round(3)
     print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
     print(coef_table.to_string())
@@ -1631,7 +1669,7 @@ for j, label in enumerate(cutpoints):
 
 :::
 
-Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, and z-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we obtain the equivalent information by fitting one binary logistic regression per cutpoint with `sm.Logit` and printing a matching table for each. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
+Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, z-value, and p-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we obtain the equivalent information by fitting one binary logistic regression per cutpoint with `sm.Logit` and printing a matching table for each. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
 
 ## Goodness of Fit
 
@@ -1980,7 +2018,7 @@ The `Very High` category is the best-predicted class (recall = 0.78, F1 = 0.68),
 
 ## Inference
 
-After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors, we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results more interpretable, we exponentiate a regression coefficient (or its confidence thresholds) to obtain a **proportional odds ratio**, which describes how the cumulative odds of being at or below any category threshold change for a one-unit increase in the regressor, holding other variables fixed. This one-unit reading applies to continuous regressors; for a categorical regressor, the odds ratio instead contrasts a given level against the reference (baseline) level, describing how the cumulative odds change for that category relative to the baseline rather than for a one-unit increase.
+After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors, we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results more interpretable, we exponentiate a regression coefficient (or its confidence thresholds) to obtain a **proportional odds ratio**, which describes how the cumulative odds of being at or below any category threshold change for a one-unit increase in the regressor, holding other variables fixed.
 
 A key advantage of the proportional odds model compared to the multinomial model is parsimony: as the proportional odds assumption constrains each regressor to a single shared slope across all $J - 1$ cumulative logits, there is exactly one odds ratio to interpret per regressor rather than one per outcome category. This single number summarises the regressor's effect on the entire scale of the response variable.
 
