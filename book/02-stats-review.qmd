@@ -3398,7 +3398,7 @@ Now, a **standard error** summarizes the spread of this sampling distribution on
 
 ::: {#Definition-standard-error .definition}
 :::: {.definition-header}
-Definition of standard error
+Definition of standard error in estimation
 ::::
 :::: {.definition-container}
 The **standard error** of an estimator is the standard deviation of its sampling distribution. It quantifies how much the estimator would vary across repeated random samples.
@@ -6676,5 +6676,1462 @@ Possible next steps include revising the distributional family, adding explanato
 
 We are now ready to move into the full frequentist inference workflow. MLE has given us fitted parameter values, and the CLT-based ideas from @sec-clt-pivot help explain why large-sample uncertainty summaries can be useful. Goodness of fit reminds us to pause before reporting confidence intervals and hypothesis tests: first, we should ask whether the fitted probability model is adequate for the question at hand.
 
+## Frequentist Statistical Inference Through an Inferential Workflow {#sec-frequentist-inference-workflow}
 
+We have now built the main ingredients needed for **frequentist inference**. Earlier in this chapter, we introduced **probability models** for the ice cream demand and time queries, described random sampling, studied sampling variability, introduced CLT-based approximations, obtained point estimates through MLE, and checked whether the fitted probability models looked adequate enough for the purpose of the analysis. These steps were not separate fragments. Together, they prepare us for the **results** stage (as shown in @fig-ds-workflow-results-2) of the data science workflow from @sec-ds-workflow-results.
+
+::: {#fig-ds-workflow-results-2}
+![](img/results.png){width="1000"}
+
+*Results* stage from the data science workflow in @fig-ds-workflow. This stage is directly followed by *storytelling* and preceded by *goodness of fit*.
+:::
+
+From our data science workflow in @fig-ds-workflow, the **results** stage is where the analysis begins to move from fitted models to evidence-based conclusions. However, this stage should not be interpreted as a place where we simply print a coefficient table, report a $p$-value, and declare that the analysis is complete. In an inferential analysis, results need to be organized around a specific question. We need to know what parameter is being studied, what benchmark or target matters, how variable the estimate would be across repeated samples, and what kinds of conclusions are justified under the modelling and sampling assumptions.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-proud-6230200/).](img/king.png){width="400"}
+
+This point is crucial because the previous sections already answered the first version of the ice cream queries. For the **demand query**, we estimated the population probability that a randomly selected child prefers chocolate. For the **time query**, we estimated the population average waiting time between consecutive customers. Those were **estimation inquiries**. They asked:
+
+> **What is the value of the unknown quantity?** 
+
+Frequentist inference takes the next step by asking whether the sample provides evidence for a claim about the parameter and by quantifying **uncertainty** around the **estimate**.
+
+In @sec-intro, the results stage follows **goodness of fit**. That ordering is necessary because if a fitted probability model is visibly inconsistent with the observed data, then standard errors, confidence intervals, and hypothesis tests based on that model can become misleading. The data science workflow reminds us that inference should be built on a fitted model that has at least passed reasonable model-checking scrutiny for the purpose of the analysis. Goodness of fit does not prove that the model is true, but it gives us a reason to proceed cautiously into formal inference.
+
+::: {#fig-classical-hypothesis-testing-workflow}
+![](img/classical-hypothesis-testing-workflow.png){width="1500"}
+
+A classical hypothesis-testing workflow structured in four substages: *general settings*, *hypotheses definitions*, *test flavour and components*, and *inferential conclusions*.
+:::
+
+The workflow in @fig-classical-hypothesis-testing-workflow gives us a more detailed view of the inferential route inside the results stage of the data science workflow. The workflow begins with **general settings**, where we reconnect the test to the study design, model, parameter, and significance level. It then moves to **hypotheses definitions**, where the stakeholder inquiry is translated into a null and alternative hypothesis. After that, the **test flavour and components** stage specifies the test statistic, standard error, and null distribution. Finally, the **inferential conclusions** stage turns the numerical result into a careful statement about evidence. This section follows this structure, but it also adds confidence intervals.
+
+Note that hypothesis tests and confidence intervals are connected, but they do not play identical roles. A hypothesis test answers a benchmark question such as:
+
+> **Is the parameter larger than this value?** 
+
+or
+
+> **Is the parameter below this target?** 
+
+On the the other hand, a confidence interval answers an uncertainty question such as:
+
+> **What range of parameter values is still plausible, given the observed estimate and sampling variability?**
+
+In the ice cream case, we will need both hypothesis tests and confidence intervals, but we should first separate the stakeholder questions from their statistical translations.
+
+From a stakeholder perspective, the new questions are fairly natural. The **demand team** does not only want to know the estimated chocolate-preference probability; they want to know whether the data provide evidence that chocolate is preferred by a majority of children. Similarly, the **operations team** does not only want to know the estimated average waiting time; they want to know whether the data provide evidence that the average waiting time is below a service target.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-help-assistance-3974184/).](img/fixing.png){width="550"}
+
+At the same time, both teams need **uncertainty summaries**. A point estimate is useful, but it does not show how much the estimate could vary from sample to sample. A confidence interval helps translate sampling variability into a range of plausible parameter values. This is especially critical for **decision-making**: *a point estimate slightly above or below a benchmark may tell a very different story depending on how wide the uncertainty interval is*. Therefore, we can organize these stakeholder-facing questions into the more statistical inquiries in @tbl-ice-cream-inferential-inquiries.
+
+| **Query** | **Point estimate already obtained** | **One-sided hypothesis-test inquiry** | **Two-sided confidence-interval inquiry** |
+|:----------:|:------------------------------------:|:--------------------------------------:|:------------------------------------------:|
+| **Demand query** | Estimate the chocolate-preference probability $\pi$ using $\hat{\pi}_{\operatorname{MLE,obs}}$. | Does the sample provide evidence that $\pi > 0.50$? | What range of plausible values summarizes uncertainty around $\hat{\pi}_{\operatorname{MLE,obs}}$ (see @eq-mle-demand)? |
+| **Time query** | Estimate the population average waiting time $\mu$ using $\hat{\mu}_{\operatorname{MLE,obs}}$. | Does the sample provide evidence that $\mu < 12$ minutes? | What range of plausible values summarizes uncertainty around $\hat{\mu}_{\operatorname{MLE,obs}}$ (see @eq-mle-time)? |
+
+: New inferential inquiries for the ice cream demand and time queries. {#tbl-ice-cream-inferential-inquiries .striped .hover}
+
+The organization in @tbl-ice-cream-inferential-inquiries is deliberate:
+
+- The hypothesis-test inquiries are **one-sided** because the stakeholder questions have directions. The demand team wants evidence that chocolate is preferred by more than half of children, not merely evidence that the chocolate-preference probability differs from one half in either direction. The operations team wants evidence that the mean waiting time is below the service target, not merely evidence that it differs from the target.
+- The confidence-interval inquiries are **two-sided** because they summarize uncertainty around point estimates in both directions. A $95\%$ two-sided confidence interval for $\pi$ helps us understand how much uncertainty surrounds the estimated chocolate-preference probability. A $95\%$ two-sided confidence interval for $\mu$ helps us understand how much uncertainty surrounds the estimated average waiting time. These intervals should be interpreted alongside the one-sided tests, not as replacements for them.
+
+### General Settings {#sec-hypothesis-workflow-general-settings}
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-blended-learning-6230153/).](img/blender.png){width="400"}
+
+The **general settings** stage, shown in @fig-hypothesis-workflow-general-settings, prevents hypothesis testing from becoming a mechanical calculation detached from the data science inquiry. Before writing down hypotheses, we should be able to answer several basic questions:
+
+> **What population or system is being studied?** 
+
+> **Which parameter answers the question?** 
+
+> **What estimator was used? What model or sampling approximation justifies the uncertainty calculation?** 
+
+> **Was the fitted model checked for adequacy?** 
+
+> **What significance level will be used for the test?**
+
+::: {#fig-hypothesis-workflow-general-settings}
+![](img/general-settings.png){width="1000"}
+
+*General settings* substage from the classical hypothesis-testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly followed by *hypotheses definitions*.
+:::
+
+For the ice cream case, the population and system were established earlier. The **demand query** concerns children in the target population and their flavour preferences. The **time query** concerns the operating system that generates waiting times between consecutive customers. The parameters are also familiar:
+
+$$
+\pi
+=
+\Pr(D_i = 1),
+$$
+
+where $D_i = 1$ means that the $i$th sampled child prefers chocolate, and
+
+$$
+\mu
+=
+\mathbb{E}(T_j),
+$$
+
+where $T_j$ is a waiting time in minutes between consecutive customers.
+
+The point estimates were obtained by MLE:
+
+$$
+\hat{\pi}_{\operatorname{MLE,obs}}
+=
+\bar{d},
+\qquad
+\hat{\mu}_{\operatorname{MLE,obs}}
+=
+\bar{t}.
+$$
+
+The inference in this section is **frequentist**. Under this view, $\pi$ and $\mu$ are fixed but unknown quantities. The randomness comes from the sampling process, which means that the estimates, standard errors, test statistics, and confidence intervals would change if we repeated the sampling process. This viewpoint matches the sequence we have been building throughout the chapter. We first defined random variables and probability models, then described random sampling, then studied how estimators vary across repeated samples. In that repeated-sampling framework, a confidence interval is not interpreted as assigning probability to the parameter itself. Instead, the **confidence level** describes the long-run performance of the interval-building procedure across repeated samples.
+
+::: {#Definition-frequentist-statistics .definition}
+:::: {.definition-header}
+Definition of frequentist statistics
+::::
+:::: {.definition-container}
+**Frequentist statistics** treats unknown parameters as fixed but unknown quantities. Randomness comes from the data-generating process, the sampling process, or the experimental assignment mechanism. Under this view, probabilities describe the long-run behaviour of random quantities under **repeated use of the same procedure**. For example, a standard error describes how much an estimator would vary across repeated random samples, and a confidence level describes the long-run coverage behaviour of an interval procedure.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/question.png){width="230"}
+::::
+:::
+
+The definition above gives the frequentist interpretation we will use throughout this section. It is worth pausing, however, because many of us have also seen Bayesian language in data science settings, and the two frameworks can sound similar at first. Both use probability models and likelihoods, but they assign different roles to parameters, data, and probability. The following tip provides a brief contrast to make the frequentist workflow below easier to interpret.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on frequentist and Bayesian inference!
+::::
+:::: {.Tip-container}
+Frequentist and Bayesian inference both use probability models, but they organize uncertainty differently. In the **frequentist** framework used in this cookbook, an unknown parameter such as $\pi$ or $\mu$ is treated as fixed but unknown. The data are random because they could have been different under repeated sampling. This is why frequentist inference focuses on sampling distributions, standard errors, confidence intervals with long-run coverage, and $p$-values computed under a null hypothesis.
+
+![The unique known portrait of Reverend Thomas Bayes according to @odonnell1936, even though @bellhouse2004 argues it might not be a Bayes' portrait.](img/thomas-bayes.jpg){width="300"}
+
+In a **Bayesian** framework, uncertainty about an unknown parameter is represented directly using probability distributions. Here, let $\theta$ denote a generic unknown parameter, such as $\pi$ in the demand query or $\mu$ in the time query. Let $\mathbf{y}$ denote the observed data vector, such as the observed flavour-preference sample or the observed waiting-time sample. We begin with a **prior distribution** $p(\theta)$, which represents uncertainty about $\theta$ before observing the current data. We then combine this prior with the **likelihood** $p(\mathbf{y}\mid\theta)$, which summarizes how compatible the observed data are with different possible values of $\theta$ under the model. The result is the **posterior distribution** $p(\theta\mid\mathbf{y})$, which summarizes uncertainty about $\theta$ after observing the data. The update from prior to posterior is based on **Bayes' rule**. The basic structure is
+
+$$
+\text{posterior}
+\propto
+\text{likelihood}
+\times
+\text{prior},
+$$
+
+or more explicitly,
+
+$$
+p(\theta \mid \mathbf{y})
+\propto
+p(\mathbf{y} \mid \theta)p(\theta).
+$$
+
+This chapter focuses on the frequentist route because it prepares the standard-error, confidence-interval, and hypothesis-testing tools used throughout many classical regression models. For a friendly and applied introduction to the Bayesian route, see the *Bayes Rules!* textbook by @johnson2022
+::::
+:::
+
+Under a frequentist approach, this is where the CLT work from @sec-clt-pivot becomes essential. Earlier, we used the CLT to approximate the sampling distributions of estimators such as $\hat{\pi}$ and $\hat{\mu}$. Now, those approximations become the engine behind hypothesis tests and confidence intervals. The CLT lets us compare an observed estimate with a benchmark by measuring the gap in standard-error units:
+
+- For the **demand query**, the CLT gives an approximate Normal sampling distribution for the sample proportion. 
+- For the **time query**, the CLT gives an approximate Normal sampling distribution for the sample mean. 
+
+This does not mean that the original data are Normal. The demand data are binary, and the waiting-time data are positive and right-skewed. The CLT is about the sampling distribution of the estimator, not the distribution of the individual observations.
+
+Having said all this, the general settings for this subsection are summarized in @tbl-inference-general-settings.
+
+| **Component** | **Demand Query** | **Time Query** |
+|:--------------:|:-----------------:|:---------------:|
+| **Population or system** | Children in the target population for the flavour-preference study. | Customer waiting-time system for the ice cream carts. |
+| **Random variable** | $D_i$, where $D_i=1$ if the $i$th child prefers chocolate and $D_i=0$ otherwise. | $T_j$, the waiting time in minutes between consecutive customers. |
+| **Parameter** | $\pi=\Pr(D_i=1)$ | $\mu=\mathbb{E}(T_j)$ |
+| **Point estimate** | $\hat{\pi}_{\operatorname{MLE,obs}}=\bar{d}$ | $\hat{\mu}_{\operatorname{MLE,obs}}=\bar{t}$ |
+| **Inferential approximation** | CLT approximation for a sample proportion. | CLT approximation for a sample mean. |
+| **Significance level for tests** | $\alpha=0.05$ | $\alpha=0.05$ |
+| **Confidence level for intervals** | $95\%$ | $95\%$ |
+
+: General settings for the two ice cream inferential inquiries. {#tbl-inference-general-settings .striped .hover}
+
+A **statistical hypothesis** is the formal way to turn an inquiry into a statement about parameters. The definition below is written generally because later regression chapters will often involve several parameters at once. For now, the ice cream examples involve one parameter at a time.
+
+::: {#Definition-hypothesis .definition}
+:::: {.definition-header}
+Definition of statistical hypothesis
+::::
+:::: {.definition-container}
+A **statistical hypothesis** is a statement about an unknown population or system parameter. Suppose a probability model contains a parameter vector
+
+$$
+\boldsymbol{\theta}
+=
+(\theta_1,\theta_2,\ldots,\theta_k)^{\top},
+$$
+
+with parameter space $\Theta$. A statistical hypothesis restricts the possible values of $\boldsymbol{\theta}$ to a subset of that parameter space:
+
+$$
+H \text{: }
+\boldsymbol{\theta}
+\in
+\Theta^*,
+\qquad
+\Theta^* \subseteq \Theta.
+$$
+
+In applied work, this mathematical statement should also have a plain-language interpretation connected to the data science inquiry.
+::::
+:::
+
+Once we have the general idea of a statistical hypothesis, we can distinguish the two hypotheses used in a classical hypothesis test. The **null hypothesis** provides the reference claim, while the **alternative hypothesis** describes the kind of departure from that reference claim that we want the test to detect. At this stage of the workflow, we only need the general definitions. The ice cream-specific hypotheses will be written in the next subsection, where we translate the stakeholder inquiries into parameter statements.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-pixel-cells-pedagogy-3699345/).](img/argument.png){width="300"}
+
+::: {#Definition-null-hypothesis .definition}
+:::: {.definition-header}
+Definition of null hypothesis
+::::
+:::: {.definition-container}
+The **null hypothesis**, denoted by $H_0$, is the reference statement about a population or system parameter. It often represents a status quo, benchmark value, absence of effect, or simpler model. Mathematically, if the parameter vector is $\boldsymbol{\theta}\in\Theta$, the null hypothesis can be written as
+
+$$
+H_0 \text{: }
+\boldsymbol{\theta}
+\in
+\Theta_0,
+\qquad
+\Theta_0 \subseteq \Theta.
+$$
+
+In practice, the null hypothesis should be translated into plain language so that the statistical test remains connected to the original inquiry.
+::::
+:::
+
+The null hypothesis is **not necessarily** the claim we believe is true. It is the claim we use as the reference condition for the test. This distinction is necessary because the $p$-value, the critical value, and the null distribution are all computed under this reference condition.
+
+::: {#Definition-alternative-hypothesis .definition}
+:::: {.definition-header}
+Definition of alternative hypothesis
+::::
+:::: {.definition-container}
+The **alternative hypothesis**, denoted by $H_1$ or $H_a$, is the competing statement about the parameter. It describes the kind of departure from the null hypothesis that the test is designed to detect. If the null hypothesis restricts the parameter to $\Theta_0$, the alternative hypothesis often restricts it to another part of the parameter space:
+
+$$
+H_1 \text{: }
+\boldsymbol{\theta}
+\in
+\Theta_1,
+\qquad
+\Theta_1 \subseteq \Theta.
+$$
+
+For **one-sided tests**, $\Theta_1$ specifies a direction, such as values greater than a benchmark or values less than a target. On the other hand, for **two-sided tests**, $\Theta_1$ specifies departures from the null value in either direction, such as values that are either smaller or larger than the benchmark.
+
+Note that the alternative hypothesis determines what counts as "*more extreme*" evidence: 
+
+- For a **right-tailed test**, large positive values of the test statistic support the alternative hypothesis. 
+- For a **left-tailed test**, large negative values support the alternative hypothesis.
+- For a **two-sided test**, values far from the null value in either direction support the alternative hypothesis.
+::::
+:::
+
+Now, a **hypothesis test** is then the procedure that uses data to evaluate evidence against a reference hypothesis. Note that a frequentist test does not compute the probability that the null hypothesis is true. Instead, it asks whether the observed data are unusual when the null hypothesis is used as the reference condition. This is why hypothesis testing needs a clear workflow. Before we compute anything, we first decide what claim will serve as the reference point, what kind of departure would matter, and how much evidence we will require before rejecting the reference claim. Without these choices, a test statistic or $p$-value is just a number without an inferential role.
+
+::: {#Definition-hypothesis-testing .definition}
+:::: {.definition-header}
+Definition of hypothesis testing
+::::
+:::: {.definition-container}
+**Hypothesis testing** is a frequentist decision procedure that uses sample data to assess evidence against a null hypothesis. 
+
+A hypothesis test compares the observed data with what would be expected under the null hypothesis. The outcome is not a statement that the null hypothesis is true or false with certainty. Instead, it is a conclusion about whether the observed evidence is strong enough, according to the chosen significance level and test procedure, to reject the null hypothesis.
+::::
+:::
+
+Because a hypothesis test makes **a decision from a random sample**, the decision can be wrong. This is not a flaw in the workflow; it is a consequence of using sample data to reason about an unknown population or system parameter. Frequentist testing makes these possible errors explicit: 
+
+- A **Type I error** happens when the test rejects the null hypothesis even though the null hypothesis is true. 
+- A **Type II error** happens when the test fails to reject the null hypothesis even though the alternative hypothesis is true in a scientifically or practically relevant way.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-nerd-3699334/).](img/feature.png){width="350"}
+
+::: {#Definition-type-I-error .definition}
+:::: {.definition-header}
+Definition of Type I error
+::::
+:::: {.definition-container}
+A **Type I error** occurs when a test **rejects** the null hypothesis $H_0$ even though $H_0$ is true. In plain language, this is a **false positive**: the test concludes that there is enough evidence against the null hypothesis, but the null hypothesis is actually true.
+::::
+:::
+
+::: {#Definition-type-II-error .definition}
+:::: {.definition-header}
+Definition of Type II error
+::::
+:::: {.definition-container}
+A **Type II error** occurs when a test **fails to reject** the null hypothesis $H_0$ even though $H_0$ is false in a scientifically or practically relevant way. In plain language, this is a **false negative**: the test does not detect a departure from the null hypothesis, even though such a departure is actually present.
+::::
+:::
+
+@tbl-errors makes clear that Type I and Type II errors are about the relationship between the test decision and the unknown truth about $H_0$. Since we only observe a random sample, we cannot know from a single study which cell of the table we are actually in. Instead, frequentist testing studies the long-run behaviour of the testing procedure.
+
+|       | **$H_0$ is true** | **$H_0$ is false** |
+|:-----:|:-----:|:-----:|
+| **Reject $H_0$** | Type I error (*False positive*) | Correct |
+| **Fail to reject $H_0$** | Correct | Type II error (*False negative*) |
+
+: Types of inferential conclusions in frequentist hypothesis testing. {#tbl-errors .striped .hover}
+
+Once a hypothesis test has been framed, the next question is how strict the decision rule should be. In practice, we need to decide how much evidence is enough before we are willing to reject the null hypothesis, namely $H_0$. This is where the **significance level** enters, it focuses on the first column of @tbl-errors. It controls how often the testing procedure would reject $H_0$ when $H_0$ is true. This is why the significance level is chosen before the test result is inspected. Moreover, it is important to stress that the significance level must not be chosen after seeing whether the inferential result is convenient.
+
+::: {#Definition-significance-level .definition}
+:::: {.definition-header}
+Definition of significance level
+::::
+:::: {.definition-container}
+The **significance level**, denoted by $\alpha$, is the long-run probability of rejecting the null hypothesis ($H_0$) when the null hypothesis is true:
+
+$$
+\alpha
+=
+\Pr(\text{Reject } H_0 \mid H_0 \text{ is true}).
+$$
+
+In plain language, $\alpha$ is the test procedure's tolerated **Type I error rate**. A smaller $\alpha$ makes it harder to reject $H_0$ and reduces the long-run probability of a Type I error, at the cost of making the test less sensitive to some alternatives.
+::::
+:::
+
+For the ice cream case, choosing a significance level also has a practical interpretation. In the **demand query**, for example, rejecting 
+
+$$
+H_0 \text{: } \pi=0.50
+$$ 
+
+could influence inventory decisions by encouraging the company to stock more chocolate. In the **time query**, for instance, rejecting 
+
+$$
+H_0 \text{: } \mu=12
+$$
+
+could support the claim that the service target is being met on average. In both cases, rejecting too easily could lead to an overconfident business decision. Choosing $\alpha$ is therefore not just a mathematical convention; it reflects how cautious we want the testing procedure to be.
+
+
+Making $\alpha$ smaller reduces the chance of rejecting **a true null hypothesis**, but it also makes the test more conservative. A more conservative test may miss departures from the null that are practically meaningful. This trade-off is one of the reasons hypothesis testing should be connected back to the original data science question rather than treated as a purely automatic calculation. This leads naturally to **power**. While the significance level describes the behaviour of the test when the null hypothesis is true, power describes the behaviour of the test when a particular alternative hypothesis is true. In other words, power asks whether the study has a good chance of detecting **a signal of a given size** if that signal is really present:
+
+- For the **demand query**, a power question might be: *how many children would we need to survey to have a high probability of detecting that $\pi=0.60$ rather than $\pi=0.50$?* 
+- For the **time query**, a power question might be: *how many waiting times would we need to observe to have a high probability of detecting that $\mu=11$ minutes rather than the service target $\mu=12$ minutes?* 
+
+The above questions are not answered by the observed $p$-value after the fact. They belong to the study-design side of the workflow.
+
+::: {#Definition-power .definition}
+:::: {.definition-header}
+Definition of power
+::::
+:::: {.definition-container}
+The **power** (also known as the **true positive rate**) of a hypothesis test is the probability of rejecting the null hypothesis ($H_0$) when a particular alternative is true:
+
+$$
+\operatorname{Power}
+=
+\Pr(\text{Reject } H_0 \mid H_1 \text{ is true in a specified way}).
+$$
+
+If $\beta$ denotes the probability of a Type II error for a specified alternative, then
+
+$$
+\operatorname{Power}
+=
+1-\beta.
+$$
+
+Power depends on the sample size, significance level, variability, test direction, and effect size that the study aims to detect.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-download-data-transfer-3947910/).](img/pulling.png){width="600"}
+::::
+:::
+
+Note that power focuses on the second column of @tbl-errors. It asks how often the test would correctly reject $H_0$ when a specified alternative is true. Since Type II error is the failure to reject in that situation, power is the complement of the Type II error probability. Furthermore, power is not a single universal property of a test. It depends on the alternative hypothesis we care about. A test might have high power to detect a large departure from the null but low power to detect a smaller departure. This is why power calculations require an **effect size**: we need to specify how large a difference would matter in the scientific, operational, or business context. In the ice cream case, this distinction is important for stakeholder communication. For example, a tiny increase above one-half in chocolate preference might be statistically detectable with a very large sample, but not large enough to justify major inventory changes. Conversely, a practically important difference might fail to reach statistical significance if the sample is too small or too variable. Power analysis helps connect these statistical and practical concerns before data collection.
+
+In the ice cream case, power belongs to the **planning** side of the workflow. Before collecting flavour-preference or waiting-time data, the team would ideally decide what kind of signal would be practically meaningful, how much Type I error risk is acceptable, and how likely the study should be to detect that signal if it is really present. Only after those choices are made should the team determine the required sample size.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on choosing power before collecting data!
+::::
+:::: {.Tip-container}
+Power is usually chosen **before** data collection as part of study planning. A common target is
+
+$$
+\operatorname{Power}=0.80,
+$$
+
+which means that the test is designed to reject $H_0$ in about $80\%$ of repeated studies when a specified practically meaningful alternative is true:
+
+- For the ice cream **demand query**, this would mean choosing a meaningful departure from $\pi=0.50$, such as $\pi=0.60$, before deciding how many children to survey. 
+- For the **time query**, it could mean choosing a meaningful departure from the 12-minute target, such as $\mu=11$ minutes, before deciding how many waiting times to observe.
+
+The key point is that power is not something we choose after seeing the observed $p$-value. It is part of the design logic that helps determine whether the study is capable of answering the inferential inquiry.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-fear-expression-6230192/).](img/curious.png){width="250"}
+::::
+:::
+
+Once a target power has been chosen, **power analysis** turns the planning question into a sample-size question. It asks how much data are needed for the test to have the desired probability of detecting the specified effect. In this chapter, we will not carry out a full power analysis for the ice cream case. Our goal is to understand how CLT-based hypothesis tests and confidence intervals work once the data have already been collected. Still, power analysis belongs in the general settings stage because it reminds us that inference is shaped by design choices made before the test is computed. A well-executed test cannot fully compensate for a study design that was too small or too noisy to answer the original question.
+
+::: {#Definition-power-analysis .definition}
+:::: {.definition-header}
+Definition of power analysis
+::::
+:::: {.definition-container}
+
+**Power analysis** is a planning tool used before data collection to determine how large a sample should be for a hypothesis test to have a desired probability of detecting a practically meaningful effect. A power analysis typically requires a significance level, a target power, a test flavour, and an effect size. It belongs in the planning side of the workflow because it helps decide whether the study design is capable of answering the inferential inquiry before the data are collected.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
+::::
+:::
+
+Finally, with all these general settings in place, we can now move from abstract hypothesis-testing language to the ice cream case. The next subsection translates the stakeholder inquiries into **concrete null and alternative hypotheses** for the demand and time queries.
+
+### Hypotheses Definitions {#sec-hypothesis-workflow-hypotheses-definitions}
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-protocol-exchange-3947913/).](img/test.png){width="420"}
+
+The **hypotheses definitions** stage, shown in @fig-hypothesis-workflow-hypotheses-definitions, is where we translate the stakeholder inquiries into statistical statements about **parameters**. The general language of $H_0$ and $H_1$ is now in place. Therefore, we can focus on the ice cream case itself: 
+
+> **What claim should be treated as the reference condition, and what kind of departure would answer the stakeholder's question?**
+
+This translation step is more important than it might look. A stakeholder will usually ask a question in plain language, such as 
+
+> *Do children prefer chocolate?* 
+
+or 
+
+> *Are wait times below our target?* 
+
+A statistical hypothesis test requires a sharper version of that question. We need a parameter, a benchmark value, and a direction of evidence. Without this sharpening, the test statistic and $p$-value will not have a clear interpretation.
+
+::: {#fig-hypothesis-workflow-hypotheses-definitions}
+![](img/hypotheses-definitions.png){width="1000"}
+
+*Hypotheses definitions* substage from the classical hypothesis-testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *general settings* and followed by *test flavour and components*.
+:::
+
+As indicated in @tbl-ice-cream-inferential-inquiries, or the **demand query**, the stakeholder is not asking whether the chocolate-preference probability is merely different from one half. The business question has a direction: the company wants evidence that chocolate is preferred by **more than half** of the target population. This makes the alternative hypothesis right-sided:
+
+$$
+H_0 \text{: } \pi = 0.50
+\qquad
+\text{versus}
+\qquad
+H_1 \text{: } \pi > 0.50.
+$$
+
+For the **time query**, the stakeholder is not asking whether the mean waiting time merely differs from the service target. The operational question also has a direction: the team wants evidence that the average waiting time is **below** the 12-minute target. This makes the alternative hypothesis left-sided:
+
+$$
+H_0 \text{: } \mu = 12
+\qquad
+\text{versus}
+\qquad
+H_1 \text{: } \mu < 12.
+$$
+
+In both cases, the null hypothesis is written with equality because it provides the precise reference value used to construct the null distribution. The alternative hypothesis then determines which tail of the null distribution will be used to compute the $p$-value. This is why the direction in $H_1$ is not just cosmetic; it changes the inferential calculation.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why $H_0$ is not written as the full complement of $H_1$!
+::::
+:::: {.Heads-up-container}
+At first glance, it might seem that the null hypothesis, $H_0$, should be the exact complement of the alternative hypothesis, $H_1$. For example, if
+
+$$
+H_1 \text{: } \pi > 0.50,
+$$
+
+then one might expect the null hypothesis to be
+
+$$
+H_0 \text{: } \pi \leq 0.50.
+$$
+
+However, in many classical hypothesis tests, we write the null hypothesis using the **boundary value**:
+
+$$
+H_0 \text{: } \pi = 0.50.
+$$
+
+This boundary value provides the **sharp reference point** used to construct the null distribution. For the **demand query**, the test asks whether the observed sample proportion is unusually large compared with what we would expect if $\pi=0.50$. If the sample is unusual relative to this boundary value, it will also be unusual relative to smaller values of $\pi$ for a right-tailed test.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
+
+Similarly, for the **time query**, we write
+
+$$
+H_0 \text{: } \mu = 12
+$$
+
+rather than
+
+$$
+H_0 \text{: } \mu \geq 12.
+$$
+
+The value $\mu=12$ is the boundary between meeting and not meeting the service target. It gives us the reference distribution for judging whether the observed average waiting time is unusually small. Thus, the equality null is a practical and mathematical way to test evidence at the boundary between the null-side and alternative-side claims.
+
+::::
+:::
+
+| **Query** | **Stakeholder inquiry** | **Parameter** | **Hypotheses** | **Test direction** |
+|:----------:|:------------------------:|:--------------:|:---------------:|:-------------------:|
+| **Demand query** | Is chocolate preferred by more than half of children in the target population? | $\pi = \Pr(D_i=1)$ | $\begin{gather} H_0\text{: }\pi=0.50 \\ \text{versus} \\ H_1\text{: }\pi>0.50 \end{gather}$ | Right-tailed |
+| **Time query** | Is the average waiting time below the 12-minute service target? | $\mu=\mathbb{E}(T_j)$ | $\begin{gather} H_0\text{: }\mu=12 \\ \text{versus} \\ H_1\text{: }\mu<12 \end{gather}$ | Left-tailed |
+
+: Translating stakeholder inquiries into one-sided hypothesis tests for the ice cream case. {#tbl-ice-cream-hypotheses .striped .hover}
+
+@tbl-ice-cream-hypotheses also makes clear why both tests are one-sided. For the demand query, evidence in favour of the alternative means observing an estimated chocolate-preference probability sufficiently above $0.50$. For the time query, evidence in favour of the alternative means observing an estimated average waiting time sufficiently below 12 minutes. These directions determine which tail of the null distribution will be used when we compute the corresponding $p$-values.
+
+Now, the confidence-interval inquiries (from @tbl-ice-cream-ci-inquiries) are organized separately because they are not directional tests. A confidence interval is used to quantify **uncertainty around a point estimate**. For the **demand query**, we will build a two-sided interval for $\pi$ around $\hat{\pi}_{\operatorname{MLE,obs}}$. For the **time query**, we will build a two-sided interval for $\mu$ around $\hat{\mu}_{\operatorname{MLE,obs}}$. This separation avoids a common source of confusion:
+
+- The **one-sided tests** answer decision-oriented questions about whether the data provide evidence in a specific direction. 
+- The **two-sided confidence intervals** answer estimation-oriented questions about how much uncertainty surrounds the point estimates. Both are useful, but they are not the same inferential object.
+
+| **Query** | **Point estimate** | **Confidence-interval target** | **Interpretive role** |
+|:----------:|:-------------------:|:-------------------------------:|:----------------------:|
+| **Demand query** | $\hat{\pi}_{\operatorname{MLE,obs}}$ (as in @eq-mle-demand) | A two-sided interval for $\pi$. | Quantifies uncertainty around the estimated chocolate-preference probability. |
+| **Time query** | $\hat{\mu}_{\operatorname{MLE,obs}}$ (see @eq-mle-time) | A two-sided interval for $\mu$. | Quantifies uncertainty around the estimated average waiting time. |
+
+: Two-sided confidence-interval inquiries for the ice cream case. {#tbl-ice-cream-ci-inquiries .striped .hover}
+
+The next step is to choose the **test flavour** and identify the **components needed to carry out these tests**. Because this is Chapter 2, we will use the CLT-based Normal approximations developed in @sec-clt-pivot. Later regression chapters will use the same workflow with model-specific test statistics and standard errors.
+
+### Test Flavour and Components {#sec-hypothesis-workflow-test-flavour-components}
+
+The **test flavour and components** stage, from @fig-hypothesis-workflow-test-flavour-components, specifies how the hypotheses will be tested. For the ice cream case, both tests use CLT-based Normal approximations. This choice follows directly from @sec-clt-pivot, where we studied how sample proportions and sample means can have approximately Normal sampling distributions even when the original observations are not Normal.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-college-3702064/).](img/plug.png){width="500"}
+
+That said, note that the demand observations are binary, and the waiting-time observations are positive and right-skewed. We are not pretending that individual observations are Normal. Instead, we are using the CLT to approximate the sampling distribution of the estimator. In other words, the Normal curve below will describe the behaviour of a standardized estimator across repeated samples, not the shape of the raw data.
+
+::: {#fig-hypothesis-workflow-test-flavour-components}
+![](img/test-flavour-components.png){width="1000"}
+
+*Test flavour and components* substage from the classical hypothesis-testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *hypotheses definitions* and followed by *inferential conclusions*.
+:::
+
+The generic CLT-based test statistic has the form
+
+$$
+\text{test statistic}
+=
+\frac{
+\text{observed estimate} - \text{null value}
+}{
+\text{standard error}
+}.
+$$
+
+The numerator is the **observed effect**: how far the observed estimate is from the null value. Then, the denominator is the **standard error**: the scale of sampling variability. Dividing by the standard error expresses the observed effect in **standard-error units**. This is what allows us to place the result on a reference distribution such as the standard Normal distribution.
+
+::: {#Definition-observed-effect .definition}
+:::: {.definition-header}
+Definition of observed effect
+::::
+:::: {.definition-container}
+An **observed effect** is the difference between an observed estimate and the value of the parameter specified by the null hypothesis. For a scalar parameter $\theta$, an observed effect often has the form
+
+$$
+\hat{\theta}_{\operatorname{obs}} - \theta_0,
+$$
+
+where $\hat{\theta}_{\operatorname{obs}}$ is the estimate computed from the observed sample and $\theta_0$ is the null value.
+::::
+:::
+
+The observed effect alone is not enough to judge evidence. For example, a difference of $0.03$ may be large in a very precise study and small in a noisy study. This is why the standard error is central. It tells us the repeated-sampling scale on which the observed effect should be evaluated.
+
+::: {#Definition-standard-error-inference .definition}
+:::: {.definition-header}
+Definition of standard error in inference
+::::
+:::: {.definition-container}
+A **standard error** measures the repeated-sampling variability of an estimator. In hypothesis testing, the standard error is used to judge whether the **observed effect** is large or small relative to the variability expected under the sampling process.
+
+For CLT-based tests, the standard error is the scaling quantity that converts an observed effect into a standardized test statistic.
+::::
+:::
+
+Once the test statistic has been standardized, we compare it with its **null distribution**. The null distribution acts like a reference map. It tells us where **test statistics** would tend to fall if the null hypothesis were the correct reference condition. Values near the centre are ordinary under $H_0$. Values far into the tail specified by $H_1$ are unusual under $H_0$.
+
+::: {#Definition-null-distribution .definition}
+:::: {.definition-header}
+Definition of null distribution
+::::
+:::: {.definition-container}
+The **null distribution** is the **probability distribution** of a **test statistic** computed under the assumption that the **null hypothesis** is true. It tells us what values of the test statistic would be ordinary or unusual if the null hypothesis were the correct reference condition.
+::::
+:::
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/tablet-games-tetris-building-blocks-7426706/).](img/tablet.png){width="300"}
+
+::: {#Definition-test-statistic .definition}
+:::: {.definition-header}
+Definition of test statistic
+::::
+:::: {.definition-container}
+A **test statistic** is a numerical summary of the observed sample used to measure how far the observed evidence is from the reference behaviour implied by the null hypothesis.
+
+A common CLT-based test statistic has the form
+
+$$
+\text{Test statistic}
+=
+\frac{
+\text{observed estimate} - \text{null value}
+}{
+\text{standard error}
+}.
+$$
+
+When the CLT approximation is appropriate, this statistic is often compared to a standard Normal distribution under the null hypothesis.
+::::
+:::
+
+For the **demand query**, the null value is $\pi_0=0.50$. Since we are testing a claim about the **population chocolate-preference probability**, the CLT suggests standardizing the difference between the **observed sample proportion** $\hat{\pi}_{\operatorname{MLE,obs}}$ and the reference value $\pi_0$ by its standard error. Under the null hypothesis, the reference value is
+
+$$
+\pi_0 = 0.50.
+$$
+
+Because the demand response is modelled as Bernoulli,
+
+$$
+D_i \sim \operatorname{Bernoulli}(\pi),
+$$
+
+we have
+
+$$
+\mathbb{E}(D_i)=\pi
+\qquad
+\text{and}
+\qquad
+\operatorname{Var}(D_i)=\pi(1-\pi).
+$$
+
+Since
+
+$$
+\hat{\pi}
+=
+\frac{1}{n_d}
+\sum_{i=1}^{n_d}D_i,
+$$
+
+the null-implied standard error of the sample proportion is
+
+$$
+\sqrt{
+\frac{
+\pi_0(1-\pi_0)
+}{n_d}
+}.
+$$
+
+This gives the CLT-based test statistic
+
+$$
+Z_{\pi}
+=
+\frac{
+\hat{\pi}-\pi_0
+}{
+\sqrt{\pi_0(1-\pi_0)/n_d}
+}
+\ \dot{\sim}\
+\operatorname{Normal}(0,1)
+\quad
+\text{under } H_0.
+$${#eq-demand-clt-test-statistic}
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why we use the null standard error for the demand test!
+::::
+:::: {.Heads-up-container}
+For the demand query, the standard error in the hypothesis test is already **model-based under the null hypothesis**. Since the Bernoulli variance is
+
+$$
+\operatorname{Var}(D_i)=\pi(1-\pi),
+$$
+
+the null hypothesis
+
+$$
+H_0 \text{: }\pi=\pi_0
+$$
+
+directly implies the null standard error
+
+$$
+\sqrt{
+\frac{
+\pi_0(1-\pi_0)
+}{n_d}
+}.
+$$
+
+This is why the one-proportion CLT-based test uses $\pi_0$ in the denominator, not the observed estimate $\hat{\pi}_{\operatorname{MLE,obs}}$. The test is asking what kinds of sample proportions would be expected if the null value were true.
+
+Later, when we build a confidence interval for $\pi$, the goal changes. We are no longer testing a specific null value. Instead, we are quantifying uncertainty around the observed estimate, so the confidence interval uses the plug-in standard error based on $\hat{\pi}_{\operatorname{MLE,obs}}$.
+::::
+:::
+
+For the **time query**, the null value is $\mu_0=12$ minutes. Since we are testing a claim about the **population mean waiting time**, the CLT suggests standardizing the difference between the **observed sample mean** $\hat{\mu}_{\operatorname{MLE,obs}}$ and the reference value $\mu_0$ by its standard error.
+
+Under the null hypothesis, the reference value is
+
+$$
+\mu_0 = 12.
+$$
+
+In a general mean-based test, the standard error of the sample mean is estimated using the sample standard deviation $s_T$:
+
+$$
+\frac{s_T}{\sqrt{n_t}}.
+$$
+
+This gives the CLT-based test statistic
+
+$$
+Z_{\mu}
+=
+\frac{
+\hat{\mu}-\mu_0
+}{
+s_T/\sqrt{n_t}
+}
+\ \dot{\sim}\
+\operatorname{Normal}(0,1)
+\quad
+\text{under } H_0.
+$${#eq-time-clt-test-statistic}
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on the Exponential model and the standard error!
+::::
+:::: {.Heads-up-container}
+The time query has a special characteristic because we previously modelled the waiting times using an Exponential distribution with scale parameter $\mu$. Under that model,
+
+$$
+\mathbb{E}(T_j)=\mu
+\qquad
+\text{and}
+\qquad
+\operatorname{SD}(T_j)=\mu.
+$$
+
+Therefore, if the Exponential model is taken literally under the null hypothesis $\mu_0=12$, the model-implied standard error of the sample mean would be
+
+$$
+\frac{\mu_0}{\sqrt{n_t}}
+=
+\frac{12}{\sqrt{n_t}}.
+$$
+
+In this section, we instead use the more general CLT-based plug-in standard error
+
+$$
+\frac{s_T}{\sqrt{n_t}},
+$$
+
+where $s_T$ is the sample standard deviation of the observed waiting times. This choice keeps the test aligned with the general mean-inference workflow: **estimate the sampling variability of the sample mean from the observed data**.
+
+For the simulated ice cream data, both approaches are connected. If the Exponential model fits well and the sample size is reasonably large, $s_T$ should be close to the fitted mean scale $\hat{\mu}_{\operatorname{MLE,obs}}$, and the two standard errors should be similar. Large disagreement between $s_T$ and $\hat{\mu}_{\operatorname{MLE,obs}}$ would itself be a useful warning sign for goodness of fit.
+::::
+:::
+
+In both @eq-demand-clt-test-statistic and @eq-time-clt-test-statistic, the notation $\dot{\sim}$ is the same practical approximation notation used in @sec-clt-pivot. It reminds us that these are CLT-based approximations rather than exact finite-sample distributions. Finally, @tbl-ice-cream-test-components shows why the two tests have the same general structure but different directions. The demand query looks for unusually large values of $Z_{\pi}$, while the time query looks for unusually small values of $Z_{\mu}$. This direction will determine the shaded tail in the null-distribution plots.
+
+| **Component** | **Demand Query** | **Time Query** |
+|:--------------:|:-----------------:|:---------------:|
+| **Null value** | $\pi_0=0.50$ | $\mu_0=12$ minutes |
+| **Observed estimate** | $\hat{\pi}_{\operatorname{MLE,obs}}$ | $\hat{\mu}_{\operatorname{MLE,obs}}$ |
+| **Observed effect** | $\hat{\pi}_{\operatorname{MLE,obs}}-\pi_0$ | $\hat{\mu}_{\operatorname{MLE,obs}}-\mu_0$ |
+| **Standard error used in the test** | $\sqrt{\pi_0(1-\pi_0)/n_d}$ | $s_T/\sqrt{n_t}$ |
+| **CLT-based null distribution** | Approximately standard Normal for $Z_{\pi}$ under $H_0$ (as in @eq-demand-clt-test-statistic). | Approximately standard Normal for $Z_{\mu}$ under $H_0$ (as in @eq-time-clt-test-statistic). |
+| **Alternative direction** | Right-tailed: $H_1\text{: }\pi>0.50$. | Left-tailed: $H_1\text{: }\mu<12$. |
+
+: Test components for the two one-sided ice cream hypothesis tests. {#tbl-ice-cream-test-components .striped .hover}
+
+### Inferential Conclusions {#sec-inferential-conclusions}
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-digital-3704070/).](img/pinned-notes.png){width="500"}
+
+Let us proceed with the next stage in our inferential workflow, as shown in @fig-hypothesis-workflow-inferential-conclusions. Once we have a **test statistic** and its **null distribution**, we can compute a $p$-value. This concept is often confusing because the $p$-value **is not** a probability about whether the null hypothesis is true. It is a probability about the test statistic, computed under the null hypothesis.
+
+::: {#fig-hypothesis-workflow-inferential-conclusions}
+![](img/inferential-conclusions.png){width="1000"}
+
+*Inferential conclusions* substage from the classical hypothesis-testing workflow in @fig-classical-hypothesis-testing-workflow. This substage is directly preceded by *test flavour and components* and followed by the corresponding delivery of a significance conclusion within the *results* stage of the data science workflow, as shown in @fig-ds-workflow-results-2.
+:::
+
+::: {#Definition-p-value .definition}
+:::: {.definition-header}
+Definition of $p$-value
+::::
+:::: {.definition-container}
+A **$p$-value** is the probability, computed under the null hypothesis, of observing a test statistic as extreme as or more extreme than the one obtained from the observed sample, in the direction specified by the alternative hypothesis. The $p$-value is not the probability that the null hypothesis is true. It is a probability about the test statistic under the null hypothesis.
+::::
+:::
+
+A useful way to read a $p$-value is to imagine a **repeated-sampling world** where the **null distribution**, $H_0$, is used as the reference condition. In that world, each repeated sample would produce a new test statistic. The null distribution describes where those test statistics would tend to fall. The $p$-value asks how often that null-world process would produce a statistic as extreme as the one we observed. Note that the phrase "*as extreme as*" depends on the **alternative hypothesis**. For the **demand query**, the alternative is $H_1\text{: }\pi>0.50$, so large positive values of the test statistic support the alternative. Therefore, the $p$-value is a right-tail probability:
+
+$$
+p\text{-value}
+=
+\Pr(Z_{\pi} \geq z_{\operatorname{obs_{\pi}}})
+\quad
+\text{under } H_0.
+$$
+
+For the **time query**, the alternative is $H_1\text{: }\mu<12$, so large negative values of the test statistic support the alternative. Therefore, the $p$-value is a left-tail probability:
+
+$$
+p\text{-value}
+=
+\Pr(Z_{\mu} \leq z_{\operatorname{obs_{\mu}}})
+\quad
+\text{under } H_0.
+$$
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on what a $p$-value is not!
+::::
+:::: {.Heads-up-container}
+A $p$-value **is not** the probability that $H_0$ is true. It is also not the probability that the result was caused by chance. In this frequentist workflow, $H_0$ is used as the reference condition. Hence, the $p$-value asks **how unusual** the observed test statistic would be if that reference condition were true.
+
+![Image by [*Manfred Stege*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-pressure-6230208/).](img/surprise.png){width="475"}
+::::
+:::
+
+The $p$-value decision rule is consistent across test directions:
+
+$$
+\text{Reject } H_0
+\quad
+\text{if}
+\quad
+p\text{-value}\leq \alpha.
+$$
+
+If the $p$-value is larger than the significance level $\alpha$, we fail to reject $H_0$:
+
+$$
+\text{Fail to reject } H_0
+\quad
+\text{if}
+\quad
+p\text{-value}>\alpha.
+$$
+
+The phrase "*fail to reject*" is intentionally cautious. It means that the observed sample **did not provide enough evidence to reject the null hypothesis under the chosen test**. It does not mean that the null hypothesis has been proven true!
+
+Now, an equivalent decision can be made using **critical values**. In the critical-value approach, the significance level $\alpha$ is used to define a rejection region in the tail of the null distribution.
+
+::: {#Definition-critical-value .definition}
+:::: {.definition-header}
+Definition of critical value
+::::
+:::: {.definition-container}
+A **critical value** is a cutoff from the null distribution used to decide whether the observed test statistic falls in the rejection region. For a test with significance level $\alpha$, the critical value is chosen so that the rejection region has probability $\alpha$ under the null hypothesis.
+::::
+:::
+
+The same inferential decision logic can be expressed in two equivalent ways:
+
+1. The **$p$-value rule** compares the observed tail probability with the significance level $\alpha$. 2. The **critical-value rule** compares the observed test statistic with a cutoff from the null distribution. 
+
+These two approaches lead to the same reject-or-fail-to-reject decision when they are based on the same null distribution, alternative hypothesis, and significance level. @tbl-pvalue-critical-rules summarizes the decision rules for common Normal-approximation tests. The important detail is that the rejection region depends on the direction of the alternative hypothesis. A right-tailed test looks for unusually large positive values of $z_{\operatorname{obs}}$, a left-tailed test looks for unusually small negative values, and a two-sided test looks for values far from zero in either direction.
+
+| **Test direction** | **Alternative hypothesis** | **$p$-value rule** | **Critical-value rule** |
+|:-------------------:|:---------------------------:|:-------------------:|:------------------------:|
+| **Right-tailed** | $\theta > \theta_0$ | Reject $H_0$ if $p\text{-value}\leq \alpha$. | Reject $H_0$ if $z_{\operatorname{obs}} \geq z_{1-\alpha}$. |
+| **Left-tailed** | $\theta < \theta_0$ | Reject $H_0$ if $p\text{-value}\leq \alpha$. | Reject $H_0$ if $z_{\operatorname{obs}} \leq z_{\alpha}$. |
+| **Two-sided** | $\theta \neq \theta_0$ | Reject $H_0$ if $p\text{-value}\leq \alpha$. | Reject $H_0$ if $|z_{\operatorname{obs}}| \geq z_{1-\alpha/2}$. |
+
+: Decision rules for common Normal-approximation tests. Here, $\theta$ denotes a generic parameter, $\theta_0$ denotes the null value, $z_{\operatorname{obs}}$ denotes the observed value of the standardized test statistic, and $z_q$ denotes the $q$th quantile of the standard Normal distribution. {#tbl-pvalue-critical-rules .striped .hover}
+
+For the ice cream case, we will use the first two rows of @tbl-pvalue-critical-rules. The **demand query** is right-tailed because the alternative is $H_1 \text{: }\pi>0.50$. On the other hand, the **time query** is left-tailed because the alternative is $H_1 \text{: }\mu<12$. The two-sided row will become useful when we discuss confidence intervals and, later in the cookbook, two-sided tests for regression coefficients.
+
+The next two subsections compute the ice cream hypothesis tests. The numerical computations are shown in both `R` and `Python` because the simulated observed samples differ across languages in this chapter (see @sec-expectation-variance).
+
+#### Demand Query: Testing Whether Chocolate Preference Exceeds One Half
+
+For the **demand query**, the one-sided inferential inquiry is:
+
+> **Does the sample provide evidence that the population chocolate-preference probability is larger than one half?**
+
+The hypotheses are
+
+$$
+H_0\text{: }\pi = 0.50
+$$
+
+versus
+
+$$
+H_1\text{: }\pi > 0.50.
+$$
+
+Under $H_0$, the CLT-based test statistic is
+
+$$
+Z_{\pi}
+=
+\frac{
+\hat{\pi}_{\operatorname{MLE,obs}}-0.50
+}{
+\sqrt{0.50(1-0.50)/n_d}
+}.
+$$
+
+The numerator is the observed difference between the estimated chocolate-preference probability and one half. The denominator is the null standard error of the sample proportion. We use the null standard error here because the test asks what kinds of sample proportions would be expected if $\pi_0=0.50$ were true.
+
+The following code, via @lst-clt-based-demand-r and @lst-clt-based-demand-py, computes the **test statistic** and **one-sided $p$-value** using the **observed demand sample**. The calculation uses the unrounded sample proportion, even if rounded values are displayed elsewhere for presentation.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| lst-label: lst-clt-based-demand-r
+#| lst-cap: "Code to perform the Central Limit Theorem (CLT)-based hypothesis for the demand query."
+#| echo: true
+#| message: false
+
+alpha <- 0.05
+
+demand_null_pi <- 0.50
+
+demand_inference <- children_sample |>
+  summarize(
+    n_d = n(),
+    chocolate_count = sum(fav_flavour == "chocolate"),
+    pi_hat_obs = mean(fav_flavour == "chocolate"),
+    se_null = sqrt(demand_null_pi * (1 - demand_null_pi) / n_d),
+    z_obs = (pi_hat_obs - demand_null_pi) / se_null,
+    p_value = 1 - pnorm(z_obs),
+    critical_value = qnorm(1 - alpha),
+    reject_h0 = p_value <= alpha
+  ) |>
+  mutate(
+    across(
+      c(pi_hat_obs, se_null, z_obs, p_value, critical_value),
+      ~ round(.x, 4)
+    )
+  )
+
+demand_inference
+```
+
+## **`Python`**
+
+```{python}
+#| lst-label: lst-clt-based-demand-py
+#| lst-cap: "Code to perform the Central Limit Theorem (CLT)-based hypothesis for the demand query."
+#| echo: true
+#| message: false
+
+from scipy.stats import norm
+
+alpha = 0.05
+
+demand_null_pi = 0.50
+
+n_d = len(children_sample)
+chocolate_count = (children_sample["fav_flavour"] == "chocolate").sum()
+pi_hat_obs = (children_sample["fav_flavour"] == "chocolate").mean()
+se_null = np.sqrt(demand_null_pi * (1 - demand_null_pi) / n_d)
+z_obs = (pi_hat_obs - demand_null_pi) / se_null
+p_value = 1 - norm.cdf(z_obs)
+critical_value = norm.ppf(1 - alpha)
+
+demand_inference = pd.DataFrame({
+    "n_d": [n_d],
+    "chocolate_count": [chocolate_count],
+    "pi_hat_obs": [pi_hat_obs],
+    "se_null": [se_null],
+    "z_obs": [z_obs],
+    "p_value": [p_value],
+    "critical_value": [critical_value],
+    "reject_h0": [p_value <= alpha]
+})
+
+demand_inference = demand_inference.round({
+    "pi_hat_obs": 4,
+    "se_null": 4,
+    "z_obs": 4,
+    "p_value": 4,
+    "critical_value": 4
+})
+
+demand_inference
+```
+
+:::
+
+The above code output provides the numerical details of the test. The plot in @fig-demand-null-distribution shows the same information, for the **`R`-based observed sample**, but graphically. The centre of the curve at $0$, on the horizontal axis, corresponds to **values of the test statistic** that are ordinary under $H_0$. The right tail corresponds to values that support the alternative $H_1:\pi>0.50$. The dashed vertical line marks the **observed test statistic**, the dotted vertical line marks the **critical value**, and the **shaded area (practically non-visible)** represents the $p$-value.
+
+```{r}
+#| label: fig-demand-null-distribution
+#| fig-cap: "Null distribution for the demand-query test. The shaded right tail represents the p-value for the one-sided alternative that the chocolate-preference probability is larger than one half. Inferential results correspond to the R-based observed."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+demand_z_obs <- (mean(children_sample$fav_flavour == "chocolate") - demand_null_pi) /
+  sqrt(demand_null_pi * (1 - demand_null_pi) / nrow(children_sample))
+demand_critical_value <- qnorm(1 - alpha)
+normal_grid_demand <- tibble(
+  z = seq(-4, 10, length.out = 800),
+  density = dnorm(z)
+) |>
+  mutate(
+    tail_region = z >= demand_z_obs
+  )
+
+ggplot(normal_grid_demand, aes(x = z, y = density)) +
+  geom_area(
+    data = normal_grid_demand |> filter(tail_region),
+    aes(y = density),
+    fill = "#D55E00",
+    alpha = 0.35
+  ) +
+  geom_line(
+    colour = "#0072B2",
+    linewidth = 1.1
+  ) +
+  geom_vline(
+    xintercept = 0,
+    colour = "#0072B2",
+    linewidth = 1
+  ) +
+  geom_vline(
+    xintercept = demand_z_obs,
+    colour = "#D55E00",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    xintercept = demand_critical_value,
+    colour = "#009E73",
+    linewidth = 1,
+    linetype = "dotted"
+  ) +
+  annotate(
+    "text",
+    x = demand_z_obs,
+    y = 0.31,
+    label = "Observed\ntest statistic",
+    colour = "#D55E00",
+    hjust = -0.05,
+    size = 6.5
+  ) +
+  annotate(
+    "text",
+    x = demand_critical_value,
+    y = 0.22,
+    label = "Critical\nvalue",
+    colour = "#009E73",
+    hjust = -0.05,
+    size = 6.5
+  ) +
+  coord_cartesian(
+    xlim = c(-4, 10),
+    ylim = c(0, 0.43)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(
+      size = 20,
+      vjust = 0.5,
+      margin = margin(r = 12)
+    ),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = expression(z),
+    y = "Density"
+  )
+```
+
+As indicated in @tbl-pvalue-critical-rules, if the $p$-value is less than or equal to $\alpha=0.05$, we reject $H_0$ and conclude that the sample provides evidence that the chocolate-preference probability is larger than one half. On the other hand, if the $p$-value is greater than $\alpha=0.05$, we fail to reject $H_0$. In that case, we say that the sample does not provide enough evidence, under this test, to conclude that chocolate is preferred by more than half of children in the target population.
+
+For this demand query, the technical interpretation should be tied directly to the **null distribution** in @fig-demand-null-distribution. The observed test statistic $z_{\operatorname{obs_{\pi}}}$ measures how many null standard errors the observed sample proportion $\hat{\pi}_{\operatorname{MLE,obs}}$ is above the benchmark value $\pi_0=0.50$. The right-tail $p$-value then measures how often, under the reference condition $H_0:\pi=0.50$, we would observe a standardized sample proportion at least as large as the one obtained from the sample. Thus, a small right-tail $p$-value **(and less than $\alpha = 0.05$, such as in this query)** means that the observed chocolate-preference proportion is unusually large relative to what the null hypothesis would lead us to expect. Since we reject $H_0$ at $\alpha=0.05$, the evidence supports the directional claim that $\pi>0.50$ under the Bernoulli sampling model and CLT approximation. 
+
+#### Time Query: Testing Whether Average Waiting Time Is Below the Service Target 
+
+For the **time query**, the one-sided inferential inquiry is:
+
+> **Does the sample provide evidence that the population average waiting time is below the service target of 12 minutes?**
+
+The hypotheses are
+
+$$
+H_0\text{: }\mu = 12
+$$
+
+versus
+
+$$
+H_1\text{: }\mu < 12.
+$$
+
+Under $H_0$, the CLT-based test statistic is
+
+$$
+Z_{\mu}
+=
+\frac{
+\hat{\mu}_{\operatorname{MLE,obs}}-12
+}{
+s_T/\sqrt{n_t}
+},
+$$
+
+where $s_T$ is the sample standard deviation of the observed waiting times. In this test, smaller values of the sample mean support the alternative hypothesis. Therefore, the relevant tail area is on the left side of the null distribution.
+
+The following code, via @lst-clt-based-time-r and @lst-clt-based-time-py, computes the **test statistic** and **one-sided $p$-value** using the **observed waiting-time sample**.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| lst-label: lst-clt-based-time-r
+#| lst-cap: "Code to perform the Central Limit Theorem (CLT)-based hypothesis for the time query."
+#| echo: true
+#| message: false
+
+time_null_mu <- 12
+
+time_inference <- waiting_sample |>
+  summarize(
+    n_t = n(),
+    mu_hat_obs = mean(waiting_time),
+    sample_sd = sd(waiting_time),
+    se_est = sample_sd / sqrt(n_t),
+    z_obs = (mu_hat_obs - time_null_mu) / se_est,
+    p_value = pnorm(z_obs),
+    critical_value = qnorm(alpha),
+    reject_h0 = p_value <= alpha
+  ) |>
+  mutate(
+    across(
+      c(mu_hat_obs, sample_sd, se_est, z_obs, p_value, critical_value),
+      ~ round(.x, 4)
+    )
+  )
+
+time_inference
+```
+
+## **`Python`**
+
+```{python}
+#| lst-label: lst-clt-based-time-py
+#| lst-cap: "Code to perform the Central Limit Theorem (CLT)-based hypothesis for the time query."
+#| echo: true
+#| message: false
+
+time_null_mu = 12
+
+n_t = len(waiting_sample)
+mu_hat_obs = waiting_sample["waiting_time"].mean()
+sample_sd = waiting_sample["waiting_time"].std(ddof = 1)
+se_est = sample_sd / np.sqrt(n_t)
+z_obs = (mu_hat_obs - time_null_mu) / se_est
+p_value = norm.cdf(z_obs)
+critical_value = norm.ppf(alpha)
+
+time_inference = pd.DataFrame({
+    "n_t": [n_t],
+    "mu_hat_obs": [mu_hat_obs],
+    "sample_sd": [sample_sd],
+    "se_est": [se_est],
+    "z_obs": [z_obs],
+    "p_value": [p_value],
+    "critical_value": [critical_value],
+    "reject_h0": [p_value <= alpha]
+})
+
+time_inference = time_inference.round({
+    "mu_hat_obs": 4,
+    "sample_sd": 4,
+    "se_est": 4,
+    "z_obs": 4,
+    "p_value": 4,
+    "critical_value": 4
+})
+
+time_inference
+```
+
+:::
+
+The above code output reports the observed statistic and the left-tail $p$-value. The plot in @fig-time-null-distribution shows the corresponding null distribution for the **`R`-based observed sample**. The centre of the curve at $0$, on the horizontal axis, corresponds to **values of the test statistic** that are ordinary under $H_0$. Here, the shaded tail is on the left because values far below the target support the alternative $H_1\text{: }\mu<12$. The dashed vertical line marks the **observed test statistic**, the dotted vertical line marks the **critical value**, and the **shaded area** represents the $p$-value.
+
+```{r}
+#| label: fig-time-null-distribution
+#| fig-cap: "Null distribution for the time-query test. The shaded left tail represents the p-value for the one-sided alternative that the average waiting time is below 12 minutes. Inferential results correspond to the R-based observed sample."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+time_z_obs <- (
+  mean(waiting_sample$waiting_time) - time_null_mu
+) / (
+  sd(waiting_sample$waiting_time) / sqrt(nrow(waiting_sample))
+)
+time_critical_value <- qnorm(alpha)
+normal_grid_time <- tibble(
+  z = seq(-10, 4, length.out = 800),
+  density = dnorm(z)
+) |>
+  mutate(
+    tail_region = z <= time_z_obs
+  )
+ggplot(normal_grid_time, aes(x = z, y = density)) +
+  geom_area(
+    data = normal_grid_time |> filter(tail_region),
+    aes(y = density),
+    fill = "#D55E00",
+    alpha = 0.35
+  ) +
+  geom_line(
+    colour = "#0072B2",
+    linewidth = 1.1
+  ) +
+  geom_vline(
+    xintercept = 0,
+    colour = "#0072B2",
+    linewidth = 1
+  ) +
+  geom_vline(
+    xintercept = time_z_obs,
+    colour = "#D55E00",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    xintercept = time_critical_value,
+    colour = "#009E73",
+    linewidth = 1,
+    linetype = "dotted"
+  ) +
+  annotate(
+    "text",
+    x = time_z_obs,
+    y = 0.31,
+    label = "Observed\ntest statistic",
+    colour = "#D55E00",
+    hjust = 1.05,
+    size = 6.5
+  ) +
+  annotate(
+    "text",
+    x = time_critical_value,
+    y = 0.22,
+    label = "Critical\nvalue",
+    colour = "#009E73",
+    hjust = 1.05,
+    size = 6.5
+  ) +
+  coord_cartesian(
+    xlim = c(-10, 4),
+    ylim = c(0, 0.43)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(
+      size = 20,
+      vjust = 0.5,
+      margin = margin(r = 12)
+    ),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = expression(z),
+    y = "Density"
+  )
+```
+
+As indicated in @tbl-pvalue-critical-rules, if the $p$-value is less than or equal to $\alpha=0.05$, we reject $H_0$ and conclude that the sample provides evidence that the population average waiting time is below the 12-minute service target. On the other hand, if the $p$-value is greater than $\alpha=0.05$, we fail to reject $H_0$. In that case, we say that the sample does not provide enough evidence, under this test, to conclude that the average waiting time is below 12 minutes.
+
+For this time query, the technical interpretation should be tied directly to the **null distribution** in @fig-time-null-distribution. The observed test statistic $z_{\operatorname{obs_{\mu}}}$ measures how many estimated standard errors the observed sample mean $\hat{\mu}_{\operatorname{MLE,obs}}$ is below the benchmark value $\mu_0=12$ minutes. The left-tail $p$-value then measures how often, under the reference condition $H_0:\mu=12$, we would observe a standardized sample mean at least as small as the one obtained from the sample.
+
+Thus, a small left-tail $p$-value **(and less than $\alpha = 0.05$, such as in this query)** means that the observed average waiting time is unusually small relative to what the null hypothesis would lead us to expect. Since we reject $H_0$ at $\alpha=0.05$, the evidence supports the directional claim that $\mu<12$ minutes under the CLT approximation and the mean-inference workflow used here.
+
+#### Confidence Intervals as Uncertainty Quantification
+
+The previous hypothesis tests answered **two directional benchmark questions**. The demand test asked whether $\pi$ is larger than $0.50$, and the time test asked whether $\mu$ is below 12 minutes. Confidence intervals answer a different kind of question: 
+
+> **How much uncertainty surrounds the point estimates?**
+
+This distinction is important for communication. A hypothesis test can say whether a directional claim is supported at a chosen significance level, but it does not show the full range of plausible parameter values. A confidence interval gives stakeholders a more nuanced view. It helps them see whether the **estimate** is far from the benchmark or close to it, and **whether the uncertainty is small or large enough to affect decisions**.
+
+::: {#Definition-confidence-interval .definition}
+:::: {.definition-header}
+Definition of confidence interval
+::::
+:::: {.definition-container}
+A **confidence interval** is an interval computed from sample data using a procedure designed to capture the unknown parameter a specified proportion of the time across repeated random samples. For example, a 95% confidence interval procedure is one that, under its assumptions, would produce intervals containing the true parameter in about 95% of repeated samples. For a single observed interval, we do not say that there is a 95% probability that the fixed frequentist parameter lies inside the interval. Instead, we say that the interval was produced by a procedure with 95% long-run coverage.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-etherpad-group-work-3683373/).](img/interval.png){width="500"}
+::::
+:::
+
+For the **demand query**, the CLT-based 95% confidence interval for $\pi$ is
+
+$$
+\hat{\pi}_{\operatorname{MLE,obs}}
+\pm
+z_{0.975}
+\sqrt{
+\frac{
+\hat{\pi}_{\operatorname{MLE,obs}}
+\left(
+1-\hat{\pi}_{\operatorname{MLE,obs}}
+\right)
+}{n_d}
+},
+$$
+
+$z_q$ denotes the $q$th quantile of the standard Normal distribution. This interval uses the **estimated standard error** because the goal is uncertainty quantification around the estimate, **not testing a specific null value**. That is why the standard error here uses $\hat{\pi}_{\operatorname{MLE,obs}}$ rather than $\pi_0=0.50$.
+
+For the **time query**, the CLT-based 95% confidence interval for $\mu$ is
+
+$$
+\hat{\mu}_{\operatorname{MLE,obs}}
+\pm
+z_{0.975}
+\frac{s_T}{\sqrt{n_t}},
+$$
+
+where $z_q$ denotes the $q$th quantile of the standard Normal distribution.
+
+Note that both intervals are two-sided because they measure uncertainty above and below the observed estimates. The following code computes both intervals from the observed samples.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| message: false
+
+confidence_level <- 0.95
+z_star <- qnorm(1 - (1 - confidence_level) / 2)
+
+demand_ci <- children_sample |>
+  summarize(
+    query = "Demand query",
+    parameter = "pi",
+    estimate = mean(fav_flavour == "chocolate"),
+    standard_error = sqrt(estimate * (1 - estimate) / n()),
+    lower = estimate - z_star * standard_error,
+    upper = estimate + z_star * standard_error
+  )
+
+time_ci <- waiting_sample |>
+  summarize(
+    query = "Time query",
+    parameter = "mu",
+    estimate = mean(waiting_time),
+    standard_error = sd(waiting_time) / sqrt(n()),
+    lower = estimate - z_star * standard_error,
+    upper = estimate + z_star * standard_error
+  )
+
+ice_cream_confidence_intervals <- bind_rows(
+  demand_ci,
+  time_ci
+) |>
+  mutate(
+    confidence_level = confidence_level,
+    across(
+      c(estimate, standard_error, lower, upper),
+      ~ round(.x, 4)
+    )
+  ) |>
+  select(
+    query,
+    parameter,
+    confidence_level,
+    estimate,
+    standard_error,
+    lower,
+    upper
+  )
+
+ice_cream_confidence_intervals
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+
+confidence_level = 0.95
+z_star = norm.ppf(1 - (1 - confidence_level) / 2)
+
+pi_estimate = (children_sample["fav_flavour"] == "chocolate").mean()
+pi_standard_error = np.sqrt(pi_estimate * (1 - pi_estimate) / len(children_sample))
+
+mu_estimate = waiting_sample["waiting_time"].mean()
+mu_standard_error = waiting_sample["waiting_time"].std(ddof = 1) / np.sqrt(len(waiting_sample))
+
+ice_cream_confidence_intervals = pd.DataFrame({
+    "query": ["Demand query", "Time query"],
+    "parameter": ["pi", "mu"],
+    "confidence_level": [confidence_level, confidence_level],
+    "estimate": [pi_estimate, mu_estimate],
+    "standard_error": [pi_standard_error, mu_standard_error],
+    "lower": [
+        pi_estimate - z_star * pi_standard_error,
+        mu_estimate - z_star * mu_standard_error
+    ],
+    "upper": [
+        pi_estimate + z_star * pi_standard_error,
+        mu_estimate + z_star * mu_standard_error
+    ]
+})
+
+ice_cream_confidence_intervals = ice_cream_confidence_intervals.round({
+    "estimate": 4,
+    "standard_error": 4,
+    "lower": 4,
+    "upper": 4
+})
+
+ice_cream_confidence_intervals
+```
+
+:::
 
