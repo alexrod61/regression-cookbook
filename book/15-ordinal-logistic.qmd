@@ -492,9 +492,10 @@ train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
   x = field_of_study,
   y = prop, fill = inclination_to_apply
 )) +
-  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_bar(stat = "identity", width = 0.7, colour = "black",
+           position = position_stack(reverse = TRUE)) +
   geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
-    position = position_stack(vjust = 0.5), colour = "black", fontface = "bold", size = 5
+    position = position_stack(vjust = 0.5, reverse = TRUE), colour = "black", fontface = "bold", size = 5
   ) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(y = "Percent", x = "Field of Study", fill = "") +
@@ -517,11 +518,19 @@ train_df_stacked_bars
 ### Python Code
 
 ```{.py}
-from sklearn.model_selection import train_test_split
-train_df, test_df = train_test_split(
-    college_data, test_size=0.2, random_state=42,
-    stratify=college_data["inclination_to_apply"]
-)
+# The train/test split is created once in R (caret::createDataPartition; see the
+# R tab) and pulled into Python via reticulate's `r` object, so both languages
+# use identical train and test sets throughout the chapter.
+train_df = r.train_df.reset_index(drop=True)
+test_df  = r.test_df.reset_index(drop=True)
+
+# reticulate may import R factors as plain columns, so restore the ordered
+# categorical dtype for the response (Low < Medium < High < Very High).
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+for _df in (train_df, test_df):
+    _df["inclination_to_apply"] = pd.Categorical(
+        _df["inclination_to_apply"], categories=ordered_categories, ordered=True
+    )
 
 # Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
 
@@ -529,7 +538,7 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
 sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
-            palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[0], legend=False)
+            palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
 axes[0].set_ylabel('GPA', fontsize=17)
@@ -539,7 +548,7 @@ for lbl in axes[0].get_xticklabels():
 
 # --- Violin Plot with mean point ---
 sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
-               palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[1], legend=False, dodge=False)
+               palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[1], legend=False, dodge=False)
 ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
     if hasattr(train_df['inclination_to_apply'], 'cat') \
     else sorted(train_df['inclination_to_apply'].unique())
@@ -667,9 +676,10 @@ train_df_stacked_bars <- ggplot(train_df_prop_summary, aes(
   x = field_of_study,
   y = prop, fill = inclination_to_apply
 )) +
-  geom_bar(stat = "identity", width = 0.7, colour = "black") +
+  geom_bar(stat = "identity", width = 0.7, colour = "black",
+           position = position_stack(reverse = TRUE)) +
   geom_text(aes(label = ifelse(prop >= 0.05, paste0(sprintf("%.0f", prop * 100), "%"), "")),
-    position = position_stack(vjust = 0.5), colour = "black", fontface = "bold", size = 5
+    position = position_stack(vjust = 0.5, reverse = TRUE), colour = "black", fontface = "bold", size = 5
   ) +
   scale_y_continuous(labels = scales::percent_format()) +
   labs(y = "Percent", x = "Field of Study", fill = "") +
@@ -695,11 +705,19 @@ train_df_stacked_bars
 #| echo: false
 #| message: false
 #| warning: false
-from sklearn.model_selection import train_test_split
-train_df, test_df = train_test_split(
-    college_data, test_size=0.2, random_state=42,
-    stratify=college_data["inclination_to_apply"]
-)
+# The train/test split is created once in R (caret::createDataPartition; see the
+# R tab) and pulled into Python via reticulate's `r` object, so both languages
+# use identical train and test sets throughout the chapter.
+train_df = r.train_df.reset_index(drop=True)
+test_df  = r.test_df.reset_index(drop=True)
+
+# reticulate may import R factors as plain columns, so restore the ordered
+# categorical dtype for the response (Low < Medium < High < Very High).
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+for _df in (train_df, test_df):
+    _df["inclination_to_apply"] = pd.Categorical(
+        _df["inclination_to_apply"], categories=ordered_categories, ordered=True
+    )
 
 # Side-by-Side Boxplots & Violin Plots ──────────────────────────────────
 
@@ -707,7 +725,7 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
 sns.boxplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
-            palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[0], legend=False)
+            palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
 axes[0].set_ylabel('GPA', fontsize=17)
@@ -717,7 +735,7 @@ for lbl in axes[0].get_xticklabels():
 
 # --- Violin Plot with mean point ---
 sns.violinplot(data=train_df, x='inclination_to_apply', y='GPA', hue='inclination_to_apply',
-               palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[1], legend=False, dodge=False)
+               palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[1], legend=False, dodge=False)
 ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
     if hasattr(train_df['inclination_to_apply'], 'cat') \
     else sorted(train_df['inclination_to_apply'].unique())
@@ -835,7 +853,7 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
 sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
-            palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[0], legend=False)
+            palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
 axes[0].set_ylabel('GRE Score', fontsize=17)
@@ -846,7 +864,7 @@ for lbl in axes[0].get_xticklabels():
 
 # --- Violin Plot with mean point ---
 sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
-               palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[1], legend=False, dodge=False)
+               palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[1], legend=False, dodge=False)
 ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
     if hasattr(train_df['inclination_to_apply'], 'cat') \
     else sorted(train_df['inclination_to_apply'].unique())
@@ -922,7 +940,7 @@ fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
 # --- Boxplot ---
 sns.boxplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
-            palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[0], legend=False)
+            palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[0], legend=False)
 axes[0].set_title('Side-by-Side Boxplots', fontsize=20, fontweight='bold')
 axes[0].set_xlabel('Inclination to Apply to Graduate School', fontsize=18)
 axes[0].set_ylabel('GRE Score', fontsize=17)
@@ -933,7 +951,7 @@ for lbl in axes[0].get_xticklabels():
 
 # --- Violin Plot with mean point ---
 sns.violinplot(data=train_df, x='inclination_to_apply', y='GRE_score', hue='inclination_to_apply',
-               palette=['#E69F00', '#56B4E9', '#009E73', '#FF7F7F'], ax=axes[1], legend=False, dodge=False)
+               palette={'Low': '#E69F00', 'Medium': '#56B4E9', 'High': '#009E73', 'Very High': '#FF7F7F'}, ax=axes[1], legend=False, dodge=False)
 ordered_cats = list(train_df['inclination_to_apply'].cat.categories) \
     if hasattr(train_df['inclination_to_apply'], 'cat') \
     else sorted(train_df['inclination_to_apply'].unique())
@@ -2939,9 +2957,17 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-train_df["inclination_to_apply"] = pd.Categorical(
-    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
-)
+field_categories   = ["Arts", "Business", "Social Sciences", "STEM", "Humanities"]
+# Apply identical category definitions to train and test so the design matrices
+# (and y) line up; the fixed field levels keep get_dummies consistent even if a
+# category is absent from the test set.
+for _df in (train_df, test_df):
+    _df["inclination_to_apply"] = pd.Categorical(
+        _df["inclination_to_apply"], categories=ordered_categories, ordered=True
+    )
+    _df["field_of_study"] = pd.Categorical(
+        _df["field_of_study"], categories=field_categories
+    )
 
 X_train = pd.get_dummies(
     train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
@@ -3020,19 +3046,21 @@ cm_df |>
 #| echo: false
 #| message: false
 #| warning: false
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
 ordered_categories = ["Low", "Medium", "High", "Very High"]
-train_df["inclination_to_apply"] = pd.Categorical(
-    train_df["inclination_to_apply"], categories=ordered_categories, ordered=True
-)
-
-train_df, test_df = train_test_split(
-    train_df, test_size=0.2, random_state=42,
-    stratify=train_df["inclination_to_apply"]
-)
+field_categories   = ["Arts", "Business", "Social Sciences", "STEM", "Humanities"]
+# Apply identical category definitions to train and test so the design matrices
+# (and y) line up; the fixed field levels keep get_dummies consistent even if a
+# category is absent from the test set.
+for _df in (train_df, test_df):
+    _df["inclination_to_apply"] = pd.Categorical(
+        _df["inclination_to_apply"], categories=ordered_categories, ordered=True
+    )
+    _df["field_of_study"] = pd.Categorical(
+        _df["field_of_study"], categories=field_categories
+    )
 
 X_train = pd.get_dummies(
     train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
