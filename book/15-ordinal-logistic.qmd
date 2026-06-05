@@ -2425,6 +2425,20 @@ In `R`, this is straightforward using `vglm()` from the `VGAM` package with a na
 
 ```{.r}
 library(VGAM)
+library(broom.helpers)
+
+# Ensure inclination_to_apply is an ordered factor with correct level order
+test_df$inclination_to_apply <- factor(
+  train_df$inclination_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+# Ensure field_of_study is a factor with a fixed reference level (Arts)
+test_df$field_of_study <- factor(
+  train_df$field_of_study,
+  levels = c("Arts", "Business", "Social Sciences", "STEM", "Humanities")
+)
 
 # Partial proportional odds model:
 # GPA and field_of_study are constrained (parallel = TRUE)
@@ -2432,7 +2446,7 @@ library(VGAM)
 ordinal_fit_ppo <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score),
-  data    = train_df
+  data    = test_df
 )
 
 tidy_vgam(ordinal_fit_ppo) |> mutate_if(is.numeric, round, 3)
@@ -2445,9 +2459,24 @@ from scipy.optimize import minimize
 from scipy.special import expit
 from scipy.stats import norm
 
-y_ppo   = train_df["inclination_to_apply"].cat.codes.values
+# Ensure inclination_to_apply is an ordered categorical
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+test_df["inclination_to_apply"] = pd.Categorical(
+    test_df["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Ensure field_of_study is a categorical with a fixed reference level (Arts)
+field_categories = ["Arts", "Business", "Social Sciences", "STEM", "Humanities"]
+test_df["field_of_study"] = pd.Categorical(
+    test_df["field_of_study"],
+    categories=field_categories
+)
+
+y_ppo   = test_df["inclination_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
-    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float).values
 n_ppo   = len(y_ppo)
 
@@ -2550,7 +2579,7 @@ print("Call:")
 print("ordinal_fit_ppo = vglm(inclination_to_apply ~ GPA + GRE_score + field_of_study,")
 print("                       family = cumulative(link = 'logitlink', parallel = FALSE ~")
 print("                                           GRE_score),")
-print("                       data = train_df)\n")
+print("                       data = test_df)\n")
 print("Coefficients:")
 print(f"{'':30s} {'Estimate':>10s} {'Std. Error':>10s} {'z value':>9s} {'Pr(>|z|)':>9s}")
 for lbl, est, s in zip(labels, p_R_ord, se_ord):
@@ -2591,13 +2620,26 @@ for i in range(0, len(slope_lbls), 2):
 library(VGAM)
 library(broom.helpers)
 
+# Ensure inclination_to_apply is an ordered factor with correct level order
+test_df$inclination_to_apply <- factor(
+  test_df$inclination_to_apply,
+  levels = c("Low", "Medium", "High", "Very High"),
+  ordered = TRUE
+)
+
+# Ensure field_of_study is a factor with a fixed reference level (Arts)
+test_df$field_of_study <- factor(
+  test_df$field_of_study,
+  levels = c("Arts", "Business", "Social Sciences", "STEM", "Humanities")
+)
+
 ordinal_fit_ppo <- vglm(
   inclination_to_apply ~ GPA + GRE_score + field_of_study,
   family  = cumulative(link = "logitlink", parallel = FALSE ~ GRE_score),
-  data    = train_df
+  data    = test_df
 )
 
-tidy_vgam(ordinal_fit_ppo)
+tidy_vgam(ordinal_fit_ppo) |> mutate_if(is.numeric, round, 3)
 ```
 
 ### Python Output
@@ -2610,9 +2652,24 @@ from scipy.optimize import minimize
 from scipy.special import expit
 from scipy.stats import norm
 
-y_ppo   = train_df["inclination_to_apply"].cat.codes.values
+# Ensure inclination_to_apply is an ordered categorical
+ordered_categories = ["Low", "Medium", "High", "Very High"]
+test_df["inclination_to_apply"] = pd.Categorical(
+    test_df["inclination_to_apply"],
+    categories=ordered_categories,
+    ordered=True
+)
+
+# Ensure field_of_study is a categorical with a fixed reference level (Arts)
+field_categories = ["Arts", "Business", "Social Sciences", "STEM", "Humanities"]
+test_df["field_of_study"] = pd.Categorical(
+    test_df["field_of_study"],
+    categories=field_categories
+)
+
+y_ppo   = test_df["inclination_to_apply"].cat.codes.values
 X_ppo   = pd.get_dummies(
-    train_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
+    test_df[["GPA", "GRE_score", "field_of_study"]], drop_first=True
 ).astype(float).values
 n_ppo   = len(y_ppo)
 
