@@ -982,37 +982,6 @@ print(fit_py.summary())
 ```
 :::
 
-::: {.Heads-up}
-::::{.Heads-up-header}
-Notes on Precision
-::::
-::::{.Heads-up-container}
-If you pay close attention, you'll notice that the R output has a **phi coefficient** and the Python output has a **precision coefficient**.
-
-Recall from our earlier discussion that Beta regression can be expressed in terms of two quantities:
-
-1. the average proportion, denoted by $\mu$, and
-2. the precision parameter, denoted by $\phi$, which describes how tightly observations cluster around the average proportion.
-
-The regression coefficients shown above correspond to the mean model, describing how the predictors affect $\mu$. The phi (or precision) coefficient corresponds to the second component of the model and quantifies the amount of variability remaining around the fitted mean.
-
-The two software packages report this parameter differently:
-
-- **R (`betareg`)** reports $\phi$ directly.
-- **Python (`statsmodels`)** reports $log(\phi)$, so the value must be exponentiated to obtain $\phi$.
-
-For example, the Python output reports a precision coefficient of 3.7837. Exponentiating this value gives
-
-$$
-\phi = e^{3.7837} \approx 43.98,
-$$
-
-which matches the phi coefficient reported by R.
-
-Larger values of $\phi$ indicate that observations are more tightly clustered around the predicted mean, while smaller values indicate greater variability in the response.
-::::
-:::
-
 ### Interpreting the Coefficients
 
 Based on the output, the (partially shown) fitted equation is:
@@ -1020,7 +989,7 @@ Based on the output, the (partially shown) fitted equation is:
 <div style="overflow-x: auto; white-space: nowrap;">
 $$
 \begin{aligned}
-\text{logit}(\mu_i) &= \0.6665 \\
+\text{logit}(\mu_i) &= 0.6665 \\
 &\quad - 0.0008 \times \text{part\_time\_work\_hours}_i \\
 &\quad - 0.0145 \times \text{hours\_of\_sleep}_i \\
 &\quad + \text{(terms for Study Time)} \\
@@ -1078,29 +1047,35 @@ In contrast, Python’s `statsmodels.BetaModel` does not report a pseudo-$R^2$ b
 
 ### Precision Parameter
 
-Beta regression models not only the mean of the response but also its dispersion through a precision parameter, commonly denoted by $\phi$. As a result, assessing goodness of fit involves evaluating not only how well the model captures the mean structure, but also whether it represents the variability in the data reasonably. Under the standard mean–precision parameterization, the conditional variance of the response is given by:
+Unlike linear regression, Beta regression models not only the average response but also how much the observations vary around that average. This variability is summarized by the **precision parameter**, commonly denoted by $\phi$.
 
-$$
-\mathrm{Var}(Y_i \mid X_i) = \dfrac{\mu_i (1 - \mu_i)}{1 + \phi}
-$$
+You can think of the precision parameter as describing how tightly the data cluster around the fitted mean:
 
-Larger values of $\phi$ indicate that observations are more tightly concentrated around the fitted mean, while smaller values correspond to greater variability. A poorly estimated precision parameter may suggest that the model does not fully capture the dispersion in the response, even if the fitted means appear reasonable.
+- Larger values of $\phi$ indicate that observations are more tightly concentrated around the predicted mean.
+- Smaller values of $\phi$ indicate greater variability in the response.
 
-In R’s `betareg()`, the precision parameter is estimated directly. In this example, the fitted model reports:
+Recall from our earlier discussion that Beta regression can be expressed in terms of two quantities:
+
+1. the average proportion ($\mu$), and
+2. the precision parameter ($\phi$).
+
+The regression coefficients estimate how the predictors affect the average proportion, while the precision parameter describes how much variability remains around those fitted values.
+
+In R's `betareg()`, the precision parameter is estimated directly. In this example, the fitted model reports:
 
 $$
 \hat{\phi}=43.98
 $$
 
-In contrast, Python’s `statsmodels.BetaModel` reports the precision parameter on a transformed (log) scale. The reported value of 3.78 corresponds to:
+Python's `statsmodels.BetaModel` reports the precision parameter on the log scale instead. The reported value of 3.78 corresponds to:
 
 $$
-\exp(3.78) = 43.98
+\exp(3.78)=43.98
 $$
 
-which aligns closely with the estimate obtained from `betareg()`. Thus, although the numerical values appear different, both implementations are estimating the same underlying precision parameter, and the fitted models are consistent.
+which matches the estimate reported by `betareg()`.
 
-Once the precision parameter $\phi$ has been estimated, we can substitute it into the conditional variance formula to assess whether the implied variability is reasonable for the observed data. In practice, the precision parameter is best interpreted alongside residual diagnostics rather than judged by an absolute threshold.
+A precision estimate of approximately 44 suggests that the observed grades are relatively tightly clustered around the values predicted by the model. In practice, the precision parameter is typically interpreted together with residual diagnostics rather than evaluated against a specific cutoff value.
 
 ### Residual Diagnostics
 
@@ -1125,21 +1100,26 @@ abline(h = 0, lty = 2)
 
 ## Python Code
 ```{python}
+#| results: hide
+
 import matplotlib.pyplot as plt
 
 mu_hat = fit_py.fittedvalues
 pearson_resid = fit_py.resid_pearson
 
-plt.scatter(mu_hat, pearson_resid)
-plt.axhline(0, linestyle="--")
-plt.xlabel("Fitted mean")
-plt.ylabel("Pearson residual")
-plt.title("Pearson residuals vs fitted")
+_ = plt.scatter(mu_hat, pearson_resid)
+_ = plt.axhline(0, linestyle="--")
+_ = plt.xlabel("Fitted mean")
+_ = plt.ylabel("Pearson residual")
+_ = plt.title("Pearson residuals vs fitted")
+
 plt.show()
 ```
 :::
 
 The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over or under-prediction. The vertical banding in the plot is not a warning sign. It appears because categorical predictors group observations at the same fitted mean, so instead of a smooth cloud of points, the plot shows columns. Within each column, the residuals are roughly symmetric around zero with no obvious outliers, which is what matters. While residual variability increases slightly for fitted means close to one, this behaviour is expected for Beta regression due to the bounded nature of the response.
+
+### Others
 
 Two other checks are also common in practice, though they are not shown here. A standard Q-Q plot is not well suited for Beta regression because Pearson residuals from this model are not expected to follow a normal distribution. Checking for influential observations using something like Cook's distance is also a good habit, as it can reveal whether any single observation is pulling the fitted coefficients more than it should.
 
@@ -1149,7 +1129,7 @@ Great! Nothing seems particularly concerning with goodness of fit. Having establ
 
 > Which aspects of students’ academic and daily routines are associated with differences in final course grades?
 
-Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio that describes how the odds of the mean grade proportion i.e., μ/(1−μ) change multiplicatively as a predictor increases. Unlike in logistic regression, this is not the odds of a binary event such as passing or failing; it describes the expected proportion itself, holding all other variables constant.
+Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio that describes how the odds of the mean grade proportion i.e., $\mu/(1-\mu)$ change multiplicatively as a predictor increases. Unlike in logistic regression, this is not the odds of a binary event such as passing or failing; it describes the expected proportion itself, holding all other variables constant.
 
 Because the logit link is nonlinear, these effects should be interpreted in relative terms rather than as fixed percentage-point increases. The same change in log-odds can correspond to different changes in grade proportions depending on where a student lies on the grade scale.
 
@@ -1159,8 +1139,7 @@ Among all variables included in the model, *Study Time* stands out as the domina
 
 Using students who study less than one hour as the reference group, we observe a clear and increasing association between reported study time and average grades:
 
-- 1–3 hours of study
-The estimated coefficient is 0.458, corresponding to an odds ratio of
+- **1–3 hours of study**: The estimated coefficient is 0.458, corresponding to an odds ratio of
 
 $$
 e^{0.458} \approx 1.58
@@ -1168,8 +1147,7 @@ $$
 
 This indicates that students who study 1–3 hours have noticeably higher odds of a higher mean grade proportion than those in the baseline group.
 
-- 3–5 hours of study
-With a coefficient of 1.130, the odds ratio increases to
+- **3–5 hours of study**: With a coefficient of 1.130, the odds ratio increases to
 
 $$
 e^{1.130} \approx 3.10
@@ -1177,8 +1155,7 @@ $$
 
 This suggests that students in this category have roughly three times the odds of a higher mean grade compared to the reference group.
 
-- 5+ hours of study
-The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of
+- **5+ hours of study**: The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of
 
 $$
 e^{1.706} \approx 5.51
