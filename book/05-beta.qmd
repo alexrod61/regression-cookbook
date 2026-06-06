@@ -822,6 +822,8 @@ par(mfrow = c(1, 1))
 
 ## Python Code
 ```{python}
+#| results: hide
+
 import matplotlib.pyplot as plt
 
 categorical_vars = [
@@ -850,11 +852,9 @@ for i, var in enumerate(categorical_vars):
   axes[i].set_ylabel("Final Grade (Proportion)")
 
 # Turn off unused panel
-
 for j in range(len(categorical_vars), len(axes)):
-  axes[j].axis("off")
+  _ = axes[j].axis("off")
 
-plt.suptitle("")
 plt.tight_layout()
 plt.show()
 ```
@@ -880,7 +880,7 @@ Equally important, our goal is not to predict future grades as accurately as pos
 
 Taken together, these considerations point toward Beta regression as an appropriate modeling choice. Beta regression is designed specifically for proportion data and naturally respects the bounds of the response. It allows the mean of the response to depend on predictors while accommodating heteroskedasticity, which is common in proportional outcomes.
 
-By contrast, Ordinary Least Squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.
+By contrast, ordinary least squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.
 
 ### Defining Modelling Parameters
 
@@ -937,7 +937,7 @@ With the model structure defined, we are now ready to estimate the model paramet
 
 ## Estimation
 
-With the model structure clearly defined, we now move on to estimation. In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.
+In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -982,6 +982,37 @@ print(fit_py.summary())
 ```
 :::
 
+::: {.Heads-up}
+::::{.Heads-up-header}
+Notes on Precision
+::::
+::::{.Heads-up-container}
+If you pay close attention, you'll notice that the R output has a **phi coefficient** and the Python output has a **precision coefficient**.
+
+Recall from our earlier discussion that Beta regression can be expressed in terms of two quantities:
+
+1. the average proportion, denoted by $\mu$, and
+2. the precision parameter, denoted by $\phi$, which describes how tightly observations cluster around the average proportion.
+
+The regression coefficients shown above correspond to the mean model, describing how the predictors affect $\mu$. The phi (or precision) coefficient corresponds to the second component of the model and quantifies the amount of variability remaining around the fitted mean.
+
+The two software packages report this parameter differently:
+
+- **R (`betareg`)** reports $\phi$ directly.
+- **Python (`statsmodels`)** reports $log(\phi)$, so the value must be exponentiated to obtain $\phi$.
+
+For example, the Python output reports a precision coefficient of 3.7837. Exponentiating this value gives
+
+$$
+\phi = e^{3.7837} \approx 43.98,
+$$
+
+which matches the phi coefficient reported by R.
+
+Larger values of $\phi$ indicate that observations are more tightly clustered around the predicted mean, while smaller values indicate greater variability in the response.
+::::
+:::
+
 ### Interpreting the Coefficients
 
 Based on the output, the (partially shown) fitted equation is:
@@ -989,9 +1020,9 @@ Based on the output, the (partially shown) fitted equation is:
 <div style="overflow-x: auto; white-space: nowrap;">
 $$
 \begin{aligned}
-\text{logit}(\mu_i) &= \beta_0 \\
-&\quad + \beta_1 \times \text{part\_time\_work\_hours}_i \\
-&\quad + \beta_2 \times \text{hours\_of\_sleep}_i \\
+\text{logit}(\mu_i) &= \0.6665 \\
+&\quad - 0.0008 \times \text{part\_time\_work\_hours}_i \\
+&\quad - 0.0145 \times \text{hours\_of\_sleep}_i \\
 &\quad + \text{(terms for Study Time)} \\
 &\quad + \text{(terms for Café Location)} \\
 &\quad + \text{(terms for Year in School)} \\
