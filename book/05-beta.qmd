@@ -38,6 +38,7 @@ library(betareg)
 
 # Setting up Python dependencies
 library(reticulate)
+
 py_require("pandas") 
 py_require("numpy")
 py_require("matplotlib")
@@ -69,37 +70,44 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
+- Explain what **Beta regression** is and identify when it is the appropriate modelling choice for proportion data.
+- Describe why **Ordinary Least Squares** is not suitable for proportion outcomes and how Beta regression addresses these limitations.
+- Describe the **Beta distribution** and how its shape flexibility allows it to represent a wide variety of proportion data.
+- Understand the role of the **logit link function** in Beta regression and how it connects the linear predictor to the mean proportion.
+- Fit a Beta regression model using `R` or `Python` and interpret coefficients as **odds ratios** for the mean proportion.
+- Evaluate model fit using **log-likelihood**, **AIC**, the **precision parameter**, and **residual diagnostics**.
+
 ::::
 :::
 
 ## Introduction
 
-Many real world problems involve modeling proportions. A common example is a website conversion rate, where each page is associated with a value between zero and one that represents the fraction of visitors who complete a purchase. Some pages convert only a small share of visitors, while others perform much better. Although these values are numerical and continuous, they are also restricted to a fixed range. A suitable model must respect these limits and reflect the fact that variability often changes depending on the average level of the proportion.
+Many real world problems involve modelling proportions. A common example is a website conversion rate, where each page is associated with a value between zero and one that represents the fraction of visitors who complete a purchase. Some pages convert only a small share of visitors, while others perform much better. Although these values are numerical and continuous, they are also restricted to a fixed range. A suitable model must respect these limits and reflect the fact that variability often changes depending on the average level of the proportion.
 
-Traditional linear regression is not well suited for this type of data. It can produce predictions outside the valid range and assumes that variability is constant across all observations. Problems like this call for a regression approach that is designed specifically for proportion outcomes. This is exactly where Beta regression comes to shine.
+Traditional linear regression is not well suited for this type of data. It produces predictions outside the valid range and assumes that variability is constant across all observations. Problems like this call for a regression approach that is designed specifically for proportion outcomes. This is exactly where Beta regression comes to shine.
 
 ## What is Beta Regression
 
-Beta regression is a regression model designed for situations where the response variable is a proportion that takes values on the open interval between zero and one. Instead of modeling the response directly as a straight line, Beta regression assumes that the response follows a Beta distribution. This distribution is defined only on the zero to one interval and is flexible enough to represent many different shapes.
+Beta regression is a regression model for response variables that are proportions, meaning they take values strictly between zero and one. It works by assuming the response follows a Beta distribution and modelling how the expected value of that distribution changes with the predictors.
 
-Because of this flexibility, Beta regression is well suited for data such as conversion rates, completion rates, coverage percentages, or any outcome that represents a fraction of a whole. The model naturally respects the bounds of the data and avoids unrealistic predictions.
+A key advantage of this approach is that the Beta distribution can take many different shapes depending on the data. It can be symmetric, skewed to the left or right, or concentrated near the boundaries. This shape flexibility means the model can fit a wide variety of proportion data without needing to force it into a rigid template.
 
 ## The Beta Distribution
 
 The Beta distribution is a continuous probability distribution defined on the interval between zero and one. A key feature of this distribution is its flexibility. Depending on its parameter values, it can take many shapes, including symmetric, left skewed, or right skewed forms, as well as distributions that place more mass near the boundaries.
 
-```{python beta-distribution}
+```{python}
+#| label: beta-distribution
 #| echo: false
 #| message: false
+#| results: hide
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import beta
 
-# Create values between 0 and 1
 x = np.linspace(0.001, 0.999, 500)
 
-# Different (alpha, beta) combinations
 parameters = [
     (0.5, 0.5),
     (2, 2),
@@ -109,31 +117,31 @@ parameters = [
     (3, 1),
 ]
 
-# Plot Beta distributions
-plt.figure(figsize=(9, 5))
+fig, ax = plt.subplots(figsize=(9, 5))
 
 for a, b in parameters:
     y = beta.pdf(x, a, b)
-    plt.plot(x, y, label=f"alpha = {a}, beta = {b}")
+    ax.plot(x, y, label=f"alpha = {a}, beta = {b}")
 
-plt.title("Examples of Beta Distributions on (0, 1)")
-plt.xlabel("Proportion")
-plt.ylabel("Density")
-plt.xlim(0, 1);   # Suppress additional output
-_ = plt.legend(frameon=False)
-plt.tight_layout()
-plt.show()
+ax.set_title("Examples of Beta Distributions on (0, 1)")
+ax.set_xlabel("Proportion")
+ax.set_ylabel("Density")
+ax.set_xlim(0, 1)
+ax.legend(frameon=False)
+
+fig.tight_layout()
+fig
 ```
 
-The figure above shows several examples of Beta distributions with different parameter choices. Although the shapes vary widely, all distributions remain within the zero to one range, making the Beta distribution a natural choice for modeling proportion data.
+The figure above shows several examples of Beta distributions with different parameter choices. Although the shapes vary widely, all distributions remain within the zero to one range, making the Beta distribution a natural choice for modelling proportion data.
 
-The shape of a Beta distribution is controlled by two parameters, commonly called alpha and beta. When alpha is larger than beta, values tend to be closer to one. When beta is larger than alpha, values tend to be closer to zero. When the two parameters are similar, values cluster around the middle of the range. Together, alpha and beta also influence how spread out the data are, with smaller values producing more variability and larger values leading to tighter concentration around the average.
+The shape of a Beta distribution is controlled by two parameters, commonly called **alpha** and **beta**. When alpha is larger than beta, values tend to be closer to one. When beta is larger than alpha, values tend to be closer to zero. When the two parameters are similar, values cluster around the middle of the range. Together, alpha and beta also influence how spread out the data are, with smaller values producing more variability and larger values leading to tighter concentration around the average.
 
-In practice, working directly with alpha and beta is not very convenient for regression modeling. These parameters describe the shape of the distribution, but they do not directly tell us how the average proportion changes when a predictor changes. To address this, Beta regression rewrites the distribution in terms of quantities that are easier to interpret, such as the **average proportion** and **how tightly the data cluster around that average**. This reexpression allows the model to relate the average proportion to predictor variables while still ensuring that all fitted values remain between zero and one. We explore this idea in more detail in the next section.
+In practice, working directly with alpha and beta is not very convenient for regression modelling. These parameters describe the shape of the distribution, but they do not directly tell us how the average proportion changes when a predictor changes. To address this, Beta regression rewrites the distribution in terms of quantities that are easier to interpret, such as the **average proportion** and **how tightly the data cluster around that average**. This reexpression allows the model to relate the average proportion to predictor variables while still ensuring that all fitted values remain between zero and one. We explore this idea in more detail in the next section.
 
 ## Linking the Average Proportion to Predictors
 
-In the [Gamma regression chapter](book/05-beta.qmd), we introduced generalized linear models as a way to extend linear regression to response variables that do not follow a normal distribution. Beta regression follows the same framework and is another example of a generalized linear model, designed specifically for proportion data.
+In the [Gamma regression chapter](04-gamma.qmd), we introduced generalized linear models as a way to extend linear regression to response variables that do not follow a normal distribution. Beta regression follows the same framework and is another example of a generalized linear model, designed specifically for proportion data.
 
 As with other generalized linear models, Beta regression does not model the response directly. Instead, it models the average of the response through a transformation that allows predictor variables to be related to the outcome using a familiar linear structure. This approach is especially important for proportion data, since the average must always remain between zero and one.
 
@@ -142,7 +150,7 @@ As with other generalized linear models, Beta regression does not model the resp
 A Quick Refresh on GLMs
 ::::
 ::::{.Tip-container}
-Generalized linear models are built from three components.
+Generalized linear models are built from three components:
 
 - **Random component** describes the distribution of the response variable  
 - **Systematic component** combines predictor variables through a linear predictor  
@@ -152,7 +160,7 @@ These three pieces work together to extend linear regression to a wide range of 
 ::::
 :::
 
-For Beta regression, the three components of GLM take the following form.
+For Beta regression, the three components of GLM take the following form:
 
 - **Random component**: The response variable is assumed to follow a Beta distribution. This choice reflects the fact that the outcome is continuous and bounded between zero and one.
 
@@ -183,7 +191,7 @@ $$
 
 Here, $\beta_0$ is the intercept and represents the baseline value of the transformed average proportion when all predictors are set to zero. The remaining coefficients $\beta_1, ..., \beta_p$ describe the association between each predictor and the average proportion on the logit scale, holding all other predictors constant. A positive coefficient indicates that larger values of the predictor are associated with a higher average proportion, while a negative coefficient indicates the opposite.
 
-This formulation follows the same generalized linear model structure introduced in the [Gamma regression chapter](book/05-beta.qmd). The random component specifies the distribution of the response, the systematic component combines predictors through a linear predictor, and the link function connects the linear predictor to the average of the response. Together, these components allow Beta regression to model proportion data in a flexible and interpretable way, while ensuring that fitted values always remain between zero and one.
+This formulation follows the same generalized linear model structure introduced in the [Gamma regression chapter](04-gamma.qmd). The random component specifies the distribution of the response, the systematic component combines predictors through a linear predictor, and the link function connects the linear predictor to the average of the response. Together, these components allow Beta regression to model proportion data in a flexible and interpretable way, while ensuring that fitted values always remain between zero and one.
 
 ## Case Study: Modeling Student Academic Performance
 
@@ -191,7 +199,7 @@ To demonstrate Beta regression in action, we will walk through a case study usin
 
 Because grades represent proportions that lie between zero and one hundred percent, they are naturally suited for Beta regression after being rescaled to the unit interval. Our goal is to understand how different aspects of a student’s academic life and daily habits are associated with their overall performance.
 
-We will approach this case study using the data science workflow introduced in the [first chapter](book/01-intro.qmd). This ensures a structured approach to framing the problem, exploring the data, selecting an appropriate model, and interpreting the results.
+We will approach this case study using the data science workflow introduced in the [first chapter](01-intro.qmd). This ensures a structured approach to framing the problem, exploring the data, selecting an appropriate model, and interpreting the results.
 
 ### The Dataset
 
@@ -226,7 +234,7 @@ Here is a snapshot of the dataset:
 </div>
 
 
-This dataset allows us to examine how academic behaviors and lifestyle choices are associated with student performance, while respecting the proportional nature of the outcome.
+The dataset includes students across multiple academic years and a variety of living and working arrangements, giving a realistic cross-section of student life.
 
 ### The Problem We’re Trying to Solve
 
@@ -240,15 +248,15 @@ Rather than focusing only on prediction, we are interested in understanding how 
 
 ## Study Design
 
-Just like we discussed above, our goal is to understand how academic and lifestyle factors are associated with students’ final grades.
+Knowing what we want to learn, the next step is to be clear about the type of question we are asking.
 
-At this stage, we focus on clearly defining the type of question we are asking and how it fits into the data science workflow, rather than introducing new modeling details.
+This is an inferential task. We are interested in describing and interpreting relationships between variables, not building a model optimized for prediction. A predictive approach would focus on forecasting a specific student’s expected grade as accurately as possible. Here, we care more about which factors relate to performance and in what direction.
 
-In particular, this is an inferential task. We are interested in describing and interpreting relationships between variables, rather than building a model purely for prediction. A predictive approach would be possible, but our primary objective here is to gain insight into how different factors relate to student performance.
+It is also worth noting that this is an observational dataset. Students were not randomly assigned to different study habits or support conditions, so the relationships we find are associational rather than causal. Observing that higher study time tends to accompany higher grades does not rule out the possibility that a third factor, such as student motivation, influences both.
 
 ## Data Collection and Wrangling
 
-With our statistical question clearly defined, the next step is to ensure that the data is suitable for analysis. Although the dataset is already provided, it is still useful to reflect briefly on how this type of data might have been collected. Doing so helps clarify what the data represents and highlights potential limitations before moving on to preparation and modeling.
+With our statistical question clearly defined, the next step is to ensure that the data is suitable for analysis. Although the dataset is already provided, it is still useful to reflect briefly on how this type of data might have been collected. Doing so helps clarify what the data represents and highlights potential limitations before moving on to preparation and modelling.
 
 ### Data Collection
 
@@ -264,14 +272,14 @@ Each of these sources comes with trade-offs. Academic records are objective but 
 
 ### Data Wrangling
 
-Once the data has been collected, the next step is to prepare it for modeling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.
+Once the data has been collected, the next step is to prepare it for modelling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.
 
 For Beta regression, data wrangling typically involves:
 
 - Validating that the response variable represents a proportion.
 - Rescaling the response variable so that it lies strictly between zero and one.
 - Checking for boundary values such as exact zeros or ones.
-- Converting categorical variables into numerical formats suitable for modeling.
+- Converting categorical variables into numerical formats suitable for modelling.
 - Inspecting missing values and potential inconsistencies in self-reported data.
 
 Based on the data, there can, of course, be other things you may have to do but for now, let's walk through these steps using our student performance dataset, demonstrating each step in both R and Python.
@@ -334,7 +342,7 @@ After rescaling, the response variable now lies on the unit interval. The next s
 
 #### 2. Checking for Boundary Values
 
-Beta regression requires that the response variable take values strictly between zero and one. We therefore check whether any rescaled grades are exactly equal to zero or one.
+With the rescaling done, we can now check whether any values land exactly on these boundaries.
 
 ::: {.panel-tabset}
 ## R Code
@@ -351,7 +359,7 @@ print((data["final_grade_prop"] >= 1).sum())
 ```
 :::
 
-Shoot! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.
+Oh no! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
@@ -373,7 +381,7 @@ $$
 
 where $N$ is the sample size and $s$ is a small constant between 0 and 1, often chosen as $s=0.5$.
 
-One way to think about this adjustment is that it spreads the data evenly across the open interval $(0,1)$, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant $s$ can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction.
+One way to think about this adjustment is that it spreads the data evenly across the open interval $(0,1)$, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant $s$ can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction. It is most commonly used when the researcher wants to apply a consistent assumption across all observations, rather than singling out only the boundary cases for special treatment.
 
 Another option is to use **zero–one–inflated Beta models**, which explicitly treat boundary values as arising from a separate process. These models are more flexible and appropriate when zeros or ones occur frequently and carry substantive meaning, but they also introduce additional parameters and complexity.
 
@@ -550,7 +558,7 @@ The histogram, once again, shows that grades are continuous and bounded between 
 
 ### Distribution of Predictor Variables
 
-Let’s also examine the distributions of the predictor variables. This helps us understand the range, balance, and structure of the inputs before moving on to modeling. For continuous predictors, we stick to histograms to inspect their spread and shape. For categorical predictors, bar charts are sufficient to show how observations are distributed across categories.
+Let’s also examine the distributions of the predictor variables. This helps us understand the range, balance, and structure of the inputs before moving on to modelling. For continuous predictors, we stick to histograms to inspect their spread and shape. For categorical predictors, bar charts are sufficient to show how observations are distributed across categories.
 
 #### Continuous Predictors
 
@@ -630,11 +638,11 @@ plt.show()
 Heads-up!
 ::::
 ::::{.Heads-up-container}
-The R code for Hours of Sleep per Night is intentionally more detailed than usual. This alternative approach ensures that the histogram uses the same bin boundaries and bin-assignment rules as Python, so the two plots are directly comparable. In practice, R’s default hist() function is usually sufficient.
+The R code for Hours of Sleep per Night is intentionally more detailed than usual. This alternative approach ensures that the histogram uses the same bin boundaries and bin-assignment rules as Python, so the two plots are directly comparable. In practice, R’s default `hist()` function is usually sufficient.
 ::::
 :::
 
-Overall, both hours of sleep per night and part-time work hours appear to be approximately uniformly distributed, with no strong skewness or extreme concentration in specific ranges. This suggests that neither predictor is dominated by a narrow subset of values, which is helpful for subsequent regression modeling.
+Overall, both hours of sleep per night and part-time work hours appear to be approximately uniformly distributed, with no strong skewness or extreme concentration in specific ranges. This suggests that neither predictor is dominated by a narrow subset of values, which is helpful for subsequent regression modelling.
 
 #### Categorical Predictors
 
@@ -814,6 +822,8 @@ par(mfrow = c(1, 1))
 
 ## Python Code
 ```{python}
+#| results: hide
+
 import matplotlib.pyplot as plt
 
 categorical_vars = [
@@ -842,11 +852,9 @@ for i, var in enumerate(categorical_vars):
   axes[i].set_ylabel("Final Grade (Proportion)")
 
 # Turn off unused panel
-
 for j in range(len(categorical_vars), len(axes)):
-  axes[j].axis("off")
+  _ = axes[j].axis("off")
 
-plt.suptitle("")
 plt.tight_layout()
 plt.show()
 ```
@@ -856,11 +864,11 @@ From the plots, we observe that study time is the only predictor with a clearly 
 
 At the same time, it is somewhat unexpected that the remaining categorical variables show little evidence of a strong marginal relationship with the response. Factors such as tutoring status, study group participation, living arrangement, or extracurricular interests might reasonably be expected to influence academic performance, yet no clear or consistent differences emerge when these variables are examined in isolation.
 
-These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modeling is conducted, where the effects of multiple predictors can be assessed simultaneously.
+These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modelling is conducted, where the effects of multiple predictors can be assessed simultaneously.
 
 ## Data Modeling
 
-After exploring the data and developing initial intuition through EDA, we now turn to the modeling stage. The purpose of this step is to formalize the relationships we observed and assess how different academic and lifestyle factors are associated with students’ final grades when considered jointly.
+After exploring the data and developing initial intuition through EDA, we now turn to the modelling stage. The purpose of this step is to formalize the relationships we observed and assess how different academic and lifestyle factors are associated with students’ final grades when considered jointly.
 
 ### Choosing a Suitable Regression Model
 
@@ -872,17 +880,17 @@ Equally important, our goal is not to predict future grades as accurately as pos
 
 Taken together, these considerations point toward Beta regression as an appropriate modeling choice. Beta regression is designed specifically for proportion data and naturally respects the bounds of the response. It allows the mean of the response to depend on predictors while accommodating heteroskedasticity, which is common in proportional outcomes.
 
-By contrast, Ordinary Least Squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.
+By contrast, ordinary least squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.
 
-### Defining Modeling Parameters
+### Defining Modelling Parameters
 
-With the modeling framework selected, the next step is to specify which variables to include. In this case study, we include all available predictors to capture a broad and realistic picture of student life.
+With the modelling framework selected, the next step is to specify which variables to include. In this case study, we include all available predictors to capture a broad and realistic picture of student life.
 
 The predictors reflect multiple dimensions of a student’s experience, including time allocation (such as study time, sleep, and part-time work hours), academic context (such as year in school), and sources of support (such as tutoring and study group participation), as well as several categorical variables describing personal routines and preferences.
 
-Including the full set of predictors allows us to examine the association between each factor and the average final grade while holding other variables constant. This multivariable perspective is especially important given that most predictors showed weak marginal relationships during EDA but may still play a role once considered together.
+Including the full set of predictors allows us to examine the association between each factor and the average final grade while holding the other variables constant. This multivariable perspective is especially important given that most predictors showed weak marginal relationships during EDA but may still play a role once considered together.
 
-### Setting Up the Modeling Equation
+### Setting Up the Modelling Equation
 
 Using Beta regression with a logit link, we model the average final grade proportion as a function of the predictors.
 
@@ -929,7 +937,7 @@ With the model structure defined, we are now ready to estimate the model paramet
 
 ## Estimation
 
-With the model structure clearly defined, we now move on to estimation. In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.
+In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -942,7 +950,7 @@ Like Gamma regression, Beta regression is typically estimated using maximum like
 
 ### Fitting the Model
 
-In R, Beta regression can be fit using the `betareg()` function, which is designed specifically for proportion outcomes. In Python, Beta regression is available through `statsmodels`, allowing us to specify the same link function and modeling structure.
+In R, Beta regression can be fit using the `betareg()` function, which is designed specifically for proportion outcomes. In Python, Beta regression is available through `statsmodels`, allowing us to specify the same link function and modelling structure.
 
 ::: {.panel-tabset}
 ## R Code
@@ -981,9 +989,9 @@ Based on the output, the (partially shown) fitted equation is:
 <div style="overflow-x: auto; white-space: nowrap;">
 $$
 \begin{aligned}
-\text{logit}(\mu_i) &= 0.665 \\
-&\quad + -0.0008 \times \text{part_time_work_hours}_i \\
-&\quad + -0.0145 \times \text{hours_of_sleep}_i \\
+\text{logit}(\mu_i) &= 0.6665 \\
+&\quad - 0.0008 \times \text{part\_time\_work\_hours}_i \\
+&\quad - 0.0145 \times \text{hours\_of\_sleep}_i \\
 &\quad + \text{(terms for Study Time)} \\
 &\quad + \text{(terms for Café Location)} \\
 &\quad + \text{(terms for Year in School)} \\
@@ -1039,30 +1047,36 @@ In contrast, Python’s `statsmodels.BetaModel` does not report a pseudo-$R^2$ b
 
 ### Precision Parameter
 
-Beta regression models not only the mean of the response but also its dispersion through a precision parameter, commonly denoted by $\phi$. As a result, assessing goodness of fit involves evaluating not only how well the model captures the mean structure, but also whether it represents the variability in the data reasonably. Under the standard mean–precision parameterization, the conditional variance of the response is given by:
+Unlike linear regression, Beta regression models not only the average response but also how much the observations vary around that average. This variability is summarized by the **precision parameter**, commonly denoted by $\phi$.
 
-$$
-\mathrm{Var}(Y_i \mid X_i) = \dfrac{\mu_i (1 - \mu_i)}{1 + \phi}
-$$
+You can think of the precision parameter as describing how tightly the data cluster around the fitted mean:
 
-Larger values of $\phi$ indicate that observations are more tightly concentrated around the fitted mean, while smaller values correspond to greater variability. A poorly estimated precision parameter may suggest that the model does not fully capture the dispersion in the response, even if the fitted means appear reasonable.
+- Larger values of $\phi$ indicate that observations are more tightly concentrated around the predicted mean.
+- Smaller values of $\phi$ indicate greater variability in the response.
 
-In R’s `betareg()`, the precision parameter is estimated directly. In this example, the fitted model reports:
+Recall from our earlier discussion that Beta regression can be expressed in terms of two quantities:
+
+1. the average proportion ($\mu$), and
+2. the precision parameter ($\phi$).
+
+The regression coefficients estimate how the predictors affect the average proportion, while the precision parameter describes how much variability remains around those fitted values.
+
+In R's `betareg()`, the precision parameter is estimated directly. In this example, the fitted model reports:
 
 $$
 \hat{\phi}=43.98
 $$
 
-In contrast, Python’s `statsmodels.BetaModel` reports the precision parameter on a transformed (log) scale. The reported value of 3.78 corresponds to:
+Python's `statsmodels.BetaModel` reports the precision parameter on the log scale instead. The reported value of 3.78 corresponds to:
 
 $$
-\exp(3.78) = 43.98
+\exp(3.78)=43.98
 $$
 
-which aligns closely with the estimate obtained from `betareg()`. Thus, although the numerical values appear different, both implementations are estimating the same underlying precision parameter, and the fitted models are consistent.
+which matches the estimate reported by `betareg()`.
 
-Once the precision parameter $\phi$ has been estimated, we can substitute it into the conditional variance formula to assess whether the implied variability is reasonable for the observed data. In practice, the precision parameter is best interpreted alongside residual diagnostics rather than judged by an absolute threshold.
-​
+A precision estimate of approximately 44 suggests that the observed grades are relatively tightly clustered around the values predicted by the model. In practice, the precision parameter is typically interpreted together with residual diagnostics rather than evaluated against a specific cutoff value.
+
 ### Residual Diagnostics
 
 As with other generalized linear models, residual diagnostics help us check whether a Beta regression model is capturing the main patterns in the data. In this section, we focus on Pearson residuals, which compare the observed values to the fitted mean values on a standardized scale.
@@ -1086,21 +1100,28 @@ abline(h = 0, lty = 2)
 
 ## Python Code
 ```{python}
+#| results: hide
+
 import matplotlib.pyplot as plt
 
 mu_hat = fit_py.fittedvalues
 pearson_resid = fit_py.resid_pearson
 
-plt.scatter(mu_hat, pearson_resid)
-plt.axhline(0, linestyle="--")
-plt.xlabel("Fitted mean")
-plt.ylabel("Pearson residual")
-plt.title("Pearson residuals vs fitted")
+_ = plt.scatter(mu_hat, pearson_resid)
+_ = plt.axhline(0, linestyle="--")
+_ = plt.xlabel("Fitted mean")
+_ = plt.ylabel("Pearson residual")
+_ = plt.title("Pearson residuals vs fitted")
+
 plt.show()
 ```
 :::
 
-The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over- or under-prediction. The vertical banding reflects groups of observations with similar fitted means, often arising from categorical predictors. While residual variability increases slightly for fitted means close to one, this behavior is expected for Beta regression due to the bounded nature of the response. Overall, the diagnostics suggest that the model provides an adequate fit to the data.
+The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over or under-prediction. The vertical banding in the plot is not a warning sign. It appears because categorical predictors group observations at the same fitted mean, so instead of a smooth cloud of points, the plot shows columns. Within each column, the residuals are roughly symmetric around zero with no obvious outliers, which is what matters. While residual variability increases slightly for fitted means close to one, this behaviour is expected for Beta regression due to the bounded nature of the response.
+
+### Others
+
+Two other checks are also common in practice, though they are not shown here. A standard Q-Q plot is not well suited for Beta regression because Pearson residuals from this model are not expected to follow a normal distribution. Checking for influential observations using something like Cook's distance is also a good habit, as it can reveal whether any single observation is pulling the fitted coefficients more than it should.
 
 ## Results
 
@@ -1108,7 +1129,7 @@ Great! Nothing seems particularly concerning with goodness of fit. Having establ
 
 > Which aspects of students’ academic and daily routines are associated with differences in final course grades?
 
-Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio, which reflects how the odds of achieving a higher average grade change as a predictor increases, holding all other variables constant.
+Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio that describes how the odds of the mean grade proportion i.e., $\mu/(1-\mu)$ change multiplicatively as a predictor increases. Unlike in logistic regression, this is not the odds of a binary event such as passing or failing; it describes the expected proportion itself, holding all other variables constant.
 
 Because the logit link is nonlinear, these effects should be interpreted in relative terms rather than as fixed percentage-point increases. The same change in log-odds can correspond to different changes in grade proportions depending on where a student lies on the grade scale.
 
@@ -1118,29 +1139,26 @@ Among all variables included in the model, *Study Time* stands out as the domina
 
 Using students who study less than one hour as the reference group, we observe a clear and increasing association between reported study time and average grades:
 
-- 1–3 hours of study
-The estimated coefficient is 0.458, corresponding to an odds ratio of
+- **1–3 hours of study**: The estimated coefficient is 0.458, corresponding to an odds ratio of
 
 $$
-e^0.458 \approx 1.58
+e^{0.458} \approx 1.58
 $$
 
-This indicates that students who study 1–3 hours have noticeably higher odds of achieving a higher average grade than those in the baseline group.
+This indicates that students who study 1–3 hours have noticeably higher odds of a higher mean grade proportion than those in the baseline group.
 
-- 3–5 hours of study
-With a coefficient of 1.130, the odds ratio increases to
+- **3–5 hours of study**: With a coefficient of 1.130, the odds ratio increases to
 
 $$
-e^1.130 \approx 3.10
+e^{1.130} \approx 3.10
 $$
 
 This suggests that students in this category have roughly three times the odds of a higher mean grade compared to the reference group.
 
-- 5+ hours of study
-The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of
+- **5+ hours of study**: The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of
 
 $$
-e^1.706 \approx 5.51
+e^{1.706} \approx 5.51
 $$
 
 Students who study five or more hours are therefore predicted to have substantially higher average grades than those who study less than one hour.
@@ -1184,7 +1202,7 @@ In this case study, the Beta regression model helps us understand how different 
 ### Key Insights From the Model
 
 Study time stands out as the primary driver of academic performance.
-Across all model specifications, higher reported study time is consistently associated with higher average grades. The relationship is not only statistically significant, but also monotonic: students who study more tend to achieve better outcomes, even after accounting for sleep, work commitments, and other lifestyle factors. This reinforces a simple but powerful message—sustained study effort plays a central role in academic success.
+Across all model specifications, higher reported study time is consistently associated with higher average grades. The relationship is not only statistically significant, but also monotonic: students who study more tend to achieve better outcomes, even after accounting for sleep, work commitments, and other lifestyle factors. This reinforces a simple but powerful message: sustained study effort plays a central role in academic success.
 
 From a practical perspective, this suggests that interventions aimed at improving time management, study planning, and sustained engagement with course material are likely to yield meaningful benefits. Academic advisors and instructors might focus less on where or how students study, and more on helping them build realistic, consistent study routines.
 
@@ -1207,11 +1225,11 @@ Nevertheless, the results provide a useful evidence-based starting point for dis
 
 ## Conclusion
 
-This chapter has walked through a complete data science workflow using Beta regression, from problem formulation and data preparation to modeling, diagnostics, and interpretation. Along the way, we have seen how Beta regression offers a principled and flexible framework for analyzing outcomes that are continuous, bounded between zero and one, and heteroskedastic.
+And that wraps up the Beta regression chapter. We have walked through a complete data science workflow, from problem formulation and data preparation to modelling, diagnostics, and interpretation and seen how Beta regression offers a principled and flexible framework for outcomes that are continuous, bounded between zero and one, and heteroskedastic.
 
 More importantly, the chapter highlights that the value of Beta regression lies not just in fitting a model, but in using the model thoughtfully within a broader analytical process. Careful study design, appropriate preprocessing, exploratory analysis, model checking, and clear communication are what ultimately turn proportion data into actionable insight.
 
-With these ideas in place, you are now equipped to apply Beta regression to a wide range of real-world problems, from academic performance and completion rates to conversion metrics and coverage proportions, and to communicate your findings in a way that supports informed decision-making.
+With these ideas in place, you are now ready to apply Beta regression confidently and communicate your findings in a way that supports informed decision-making.
 
 
 
@@ -1220,7 +1238,7 @@ With these ideas in place, you are now equipped to apply Beta regression to a wi
 Fun fact!
 ::::
 ::::{.Warning-container}
-**Soup-erb!** Soup that’s so heartwarming it feels like a cozy hug.
+**Beet-a you didn’t know!** The beet plant belongs to the genus *Beta* (*Beta vulgaris*, to be precise). So the next time you run a Beta regression, remember that somewhere in a field, a humble root vegetable is quietly sharing your model’s name.
 ::::
 :::
 
