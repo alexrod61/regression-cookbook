@@ -444,8 +444,8 @@ window.Quarto = {
 <a href="#data-modeling" id="toc-data-modeling" class="nav-link" data-scroll-target="#data-modeling"><span class="header-section-number">5.10</span> Data Modeling</a>
   <ul>
 <li><a href="#choosing-a-suitable-regression-model" id="toc-choosing-a-suitable-regression-model" class="nav-link" data-scroll-target="#choosing-a-suitable-regression-model"><span class="header-section-number">5.10.1</span> Choosing a Suitable Regression Model</a></li>
-  <li><a href="#defining-modeling-parameters" id="toc-defining-modeling-parameters" class="nav-link" data-scroll-target="#defining-modeling-parameters"><span class="header-section-number">5.10.2</span> Defining Modeling Parameters</a></li>
-  <li><a href="#setting-up-the-modeling-equation" id="toc-setting-up-the-modeling-equation" class="nav-link" data-scroll-target="#setting-up-the-modeling-equation"><span class="header-section-number">5.10.3</span> Setting Up the Modeling Equation</a></li>
+  <li><a href="#defining-modelling-parameters" id="toc-defining-modelling-parameters" class="nav-link" data-scroll-target="#defining-modelling-parameters"><span class="header-section-number">5.10.2</span> Defining Modelling Parameters</a></li>
+  <li><a href="#setting-up-the-modelling-equation" id="toc-setting-up-the-modelling-equation" class="nav-link" data-scroll-target="#setting-up-the-modelling-equation"><span class="header-section-number">5.10.3</span> Setting Up the Modelling Equation</a></li>
   </ul>
 </li>
   <li>
@@ -461,6 +461,8 @@ window.Quarto = {
 <li><a href="#log-likelihood-aic-and-bic" id="toc-log-likelihood-aic-and-bic" class="nav-link" data-scroll-target="#log-likelihood-aic-and-bic"><span class="header-section-number">5.12.1</span> Log-likelihood, AIC, and BIC</a></li>
   <li><a href="#pseudo-r2" id="toc-pseudo-r2" class="nav-link" data-scroll-target="#pseudo-r2"><span class="header-section-number">5.12.2</span> Pseudo-<span class="math inline">\(R^2\)</span></a></li>
   <li><a href="#precision-parameter" id="toc-precision-parameter" class="nav-link" data-scroll-target="#precision-parameter"><span class="header-section-number">5.12.3</span> Precision Parameter</a></li>
+  <li><a href="#residual-diagnostics" id="toc-residual-diagnostics" class="nav-link" data-scroll-target="#residual-diagnostics"><span class="header-section-number">5.12.4</span> Residual Diagnostics</a></li>
+  <li><a href="#others" id="toc-others" class="nav-link" data-scroll-target="#others"><span class="header-section-number">5.12.5</span> Others</a></li>
   </ul>
 </li>
   <li>
@@ -507,23 +509,28 @@ window.Quarto = {
 </div>
 <div class="LO-container">
 <p>By the end of this chapter, you will be able to:</p>
+<ul>
+<li>Explain what <strong>Beta regression</strong> is and identify when it is the appropriate modelling choice for proportion data.</li>
+<li>Describe why <strong>Ordinary Least Squares</strong> is not suitable for proportion outcomes and how Beta regression addresses these limitations.</li>
+<li>Describe the <strong>Beta distribution</strong> and how its shape flexibility allows it to represent a wide variety of proportion data.</li>
+<li>Understand the role of the <strong>logit link function</strong> in Beta regression and how it connects the linear predictor to the mean proportion.</li>
+<li>Fit a Beta regression model using <code>R</code> or <code>Python</code> and interpret coefficients as <strong>odds ratios</strong> for the mean proportion.</li>
+<li>Evaluate model fit using <strong>log-likelihood</strong>, <strong>AIC</strong>, the <strong>precision parameter</strong>, and <strong>residual diagnostics</strong>.</li>
+</ul>
 </div>
 </div>
 <section id="introduction" class="level2" data-number="5.1"><h2 data-number="5.1" class="anchored" data-anchor-id="introduction">
 <span class="header-section-number">5.1</span> Introduction</h2>
-<p>Many real world problems involve modeling proportions. A common example is a website conversion rate, where each page is associated with a value between zero and one that represents the fraction of visitors who complete a purchase. Some pages convert only a small share of visitors, while others perform much better. Although these values are numerical and continuous, they are also restricted to a fixed range. A suitable model must respect these limits and reflect the fact that variability often changes depending on the average level of the proportion.</p>
-<p>Traditional linear regression is not well suited for this type of data. It can produce predictions outside the valid range and assumes that variability is constant across all observations. Problems like this call for a regression approach that is designed specifically for proportion outcomes. This is exactly where Beta regression comes to shine.</p>
+<p>Many real world problems involve modelling proportions. A common example is a website conversion rate, where each page is associated with a value between zero and one that represents the fraction of visitors who complete a purchase. Some pages convert only a small share of visitors, while others perform much better. Although these values are numerical and continuous, they are also restricted to a fixed range. A suitable model must respect these limits and reflect the fact that variability often changes depending on the average level of the proportion.</p>
+<p>Traditional linear regression is not well suited for this type of data. It produces predictions outside the valid range and assumes that variability is constant across all observations. Problems like this call for a regression approach that is designed specifically for proportion outcomes. This is exactly where Beta regression comes to shine.</p>
 </section><section id="what-is-beta-regression" class="level2" data-number="5.2"><h2 data-number="5.2" class="anchored" data-anchor-id="what-is-beta-regression">
 <span class="header-section-number">5.2</span> What is Beta Regression</h2>
-<p>Beta regression is a regression model designed for situations where the response variable is a proportion that takes values on the open interval between zero and one. Instead of modeling the response directly as a straight line, Beta regression assumes that the response follows a Beta distribution. This distribution is defined only on the zero to one interval and is flexible enough to represent many different shapes.</p>
-<p>Because of this flexibility, Beta regression is well suited for data such as conversion rates, completion rates, coverage percentages, or any outcome that represents a fraction of a whole. The model naturally respects the bounds of the data and avoids unrealistic predictions.</p>
+<p>Beta regression is a regression model for response variables that are proportions, meaning they take values strictly between zero and one. It works by assuming the response follows a Beta distribution and modelling how the expected value of that distribution changes with the predictors.</p>
+<p>A key advantage of this approach is that the Beta distribution can take many different shapes depending on the data. It can be symmetric, skewed to the left or right, or concentrated near the boundaries. This shape flexibility means the model can fit a wide variety of proportion data without needing to force it into a rigid template.</p>
 </section><section id="the-beta-distribution" class="level2" data-number="5.3"><h2 data-number="5.3" class="anchored" data-anchor-id="the-beta-distribution">
 <span class="header-section-number">5.3</span> The Beta Distribution</h2>
 <p>The Beta distribution is a continuous probability distribution defined on the interval between zero and one. A key feature of this distribution is its flexibility. Depending on its parameter values, it can take many shapes, including symmetric, left skewed, or right skewed forms, as well as distributions that place more mass near the boundaries.</p>
 <div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>(0.0, 1.0)</code></pre>
-</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/beta-distribution-1.png" class="img-fluid figure-img" width="864"></p>
@@ -531,19 +538,19 @@ window.Quarto = {
 </div>
 </div>
 </div>
-<p>The figure above shows several examples of Beta distributions with different parameter choices. Although the shapes vary widely, all distributions remain within the zero to one range, making the Beta distribution a natural choice for modeling proportion data.</p>
-<p>The shape of a Beta distribution is controlled by two parameters, commonly called alpha and beta. When alpha is larger than beta, values tend to be closer to one. When beta is larger than alpha, values tend to be closer to zero. When the two parameters are similar, values cluster around the middle of the range. Together, alpha and beta also influence how spread out the data are, with smaller values producing more variability and larger values leading to tighter concentration around the average.</p>
-<p>In practice, working directly with alpha and beta is not very convenient for regression modeling. These parameters describe the shape of the distribution, but they do not directly tell us how the average proportion changes when a predictor changes. To address this, Beta regression rewrites the distribution in terms of quantities that are easier to interpret, such as the <strong>average proportion</strong> and <strong>how tightly the data cluster around that average</strong>. This reexpression allows the model to relate the average proportion to predictor variables while still ensuring that all fitted values remain between zero and one. We explore this idea in more detail in the next section.</p>
+<p>The figure above shows several examples of Beta distributions with different parameter choices. Although the shapes vary widely, all distributions remain within the zero to one range, making the Beta distribution a natural choice for modelling proportion data.</p>
+<p>The shape of a Beta distribution is controlled by two parameters, commonly called <strong>alpha</strong> and <strong>beta</strong>. When alpha is larger than beta, values tend to be closer to one. When beta is larger than alpha, values tend to be closer to zero. When the two parameters are similar, values cluster around the middle of the range. Together, alpha and beta also influence how spread out the data are, with smaller values producing more variability and larger values leading to tighter concentration around the average.</p>
+<p>In practice, working directly with alpha and beta is not very convenient for regression modelling. These parameters describe the shape of the distribution, but they do not directly tell us how the average proportion changes when a predictor changes. To address this, Beta regression rewrites the distribution in terms of quantities that are easier to interpret, such as the <strong>average proportion</strong> and <strong>how tightly the data cluster around that average</strong>. This reexpression allows the model to relate the average proportion to predictor variables while still ensuring that all fitted values remain between zero and one. We explore this idea in more detail in the next section.</p>
 </section><section id="linking-the-average-proportion-to-predictors" class="level2" data-number="5.4"><h2 data-number="5.4" class="anchored" data-anchor-id="linking-the-average-proportion-to-predictors">
 <span class="header-section-number">5.4</span> Linking the Average Proportion to Predictors</h2>
-<p>In the <a href="book/05-beta.qmd">Gamma regression chapter</a>, we introduced generalized linear models as a way to extend linear regression to response variables that do not follow a normal distribution. Beta regression follows the same framework and is another example of a generalized linear model, designed specifically for proportion data.</p>
+<p>In the <a href="../book/04-gamma.html">Gamma regression chapter</a>, we introduced generalized linear models as a way to extend linear regression to response variables that do not follow a normal distribution. Beta regression follows the same framework and is another example of a generalized linear model, designed specifically for proportion data.</p>
 <p>As with other generalized linear models, Beta regression does not model the response directly. Instead, it models the average of the response through a transformation that allows predictor variables to be related to the outcome using a familiar linear structure. This approach is especially important for proportion data, since the average must always remain between zero and one.</p>
 <div class="Tip">
 <div class="Tip-header">
 <p>A Quick Refresh on GLMs</p>
 </div>
 <div class="Tip-container">
-<p>Generalized linear models are built from three components.</p>
+<p>Generalized linear models are built from three components:</p>
 <ul>
 <li>
 <strong>Random component</strong> describes the distribution of the response variable<br>
@@ -557,7 +564,7 @@ window.Quarto = {
 <p>These three pieces work together to extend linear regression to a wide range of response types.</p>
 </div>
 </div>
-<p>For Beta regression, the three components of GLM take the following form.</p>
+<p>For Beta regression, the three components of GLM take the following form:</p>
 <ul>
 <li><p><strong>Random component</strong>: The response variable is assumed to follow a Beta distribution. This choice reflects the fact that the outcome is continuous and bounded between zero and one.</p></li>
 <li><p><strong>Systematic component</strong>: Predictor variables are combined through a linear predictor. This part of the model describes how changes in the predictors are associated with changes in the average proportion.</p></li>
@@ -578,12 +585,12 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 \end{aligned}
 \]</span></p>
 <p>Here, <span class="math inline">\(\beta_0\)</span> is the intercept and represents the baseline value of the transformed average proportion when all predictors are set to zero. The remaining coefficients <span class="math inline">\(\beta_1, ..., \beta_p\)</span> describe the association between each predictor and the average proportion on the logit scale, holding all other predictors constant. A positive coefficient indicates that larger values of the predictor are associated with a higher average proportion, while a negative coefficient indicates the opposite.</p>
-<p>This formulation follows the same generalized linear model structure introduced in the <a href="book/05-beta.qmd">Gamma regression chapter</a>. The random component specifies the distribution of the response, the systematic component combines predictors through a linear predictor, and the link function connects the linear predictor to the average of the response. Together, these components allow Beta regression to model proportion data in a flexible and interpretable way, while ensuring that fitted values always remain between zero and one.</p>
+<p>This formulation follows the same generalized linear model structure introduced in the <a href="../book/04-gamma.html">Gamma regression chapter</a>. The random component specifies the distribution of the response, the systematic component combines predictors through a linear predictor, and the link function connects the linear predictor to the average of the response. Together, these components allow Beta regression to model proportion data in a flexible and interpretable way, while ensuring that fitted values always remain between zero and one.</p>
 </section><section id="case-study-modeling-student-academic-performance" class="level2" data-number="5.6"><h2 data-number="5.6" class="anchored" data-anchor-id="case-study-modeling-student-academic-performance">
 <span class="header-section-number">5.6</span> Case Study: Modeling Student Academic Performance</h2>
 <p>To demonstrate Beta regression in action, we will walk through a case study using a toy dataset that captures student academic performance. In this case study, our response variable is a final course grade, expressed as a percentage.</p>
 <p>Because grades represent proportions that lie between zero and one hundred percent, they are naturally suited for Beta regression after being rescaled to the unit interval. Our goal is to understand how different aspects of a student’s academic life and daily habits are associated with their overall performance.</p>
-<p>We will approach this case study using the data science workflow introduced in the <a href="book/01-intro.qmd">first chapter</a>. This ensures a structured approach to framing the problem, exploring the data, selecting an appropriate model, and interpreting the results.</p>
+<p>We will approach this case study using the data science workflow introduced in the <a href="../book/01-intro.html">first chapter</a>. This ensures a structured approach to framing the problem, exploring the data, selecting an appropriate model, and interpreting the results.</p>
 <section id="the-dataset" class="level3" data-number="5.6.1"><h3 data-number="5.6.1" class="anchored" data-anchor-id="the-dataset">
 <span class="header-section-number">5.6.1</span> The Dataset</h3>
 <p>The toy dataset used in this case study represents a group of university students. Each row corresponds to a single student and includes information about study habits, lifestyle factors, and academic support. Below is a summary of the variables included in the dataset.</p>
@@ -728,7 +735,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </tbody>
 </table>
 </div>
-<p>This dataset allows us to examine how academic behaviors and lifestyle choices are associated with student performance, while respecting the proportional nature of the outcome.</p>
+<p>The dataset includes students across multiple academic years and a variety of living and working arrangements, giving a realistic cross-section of student life.</p>
 </section><section id="the-problem-were-trying-to-solve" class="level3" data-number="5.6.2"><h3 data-number="5.6.2" class="anchored" data-anchor-id="the-problem-were-trying-to-solve">
 <span class="header-section-number">5.6.2</span> The Problem We’re Trying to Solve</h3>
 <p>In this case study, our goal is to understand what factors are associated with higher or lower final grades. Since grades are continuous, bounded, and naturally interpreted as proportions, Beta regression is a suitable modeling choice.</p>
@@ -739,12 +746,12 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <p>Rather than focusing only on prediction, we are interested in understanding how study habits, support systems, and daily routines relate to academic outcomes. In the next section, we clarify our study design and begin applying the data science workflow to this problem.</p>
 </section></section><section id="study-design" class="level2" data-number="5.7"><h2 data-number="5.7" class="anchored" data-anchor-id="study-design">
 <span class="header-section-number">5.7</span> Study Design</h2>
-<p>Just like we discussed above, our goal is to understand how academic and lifestyle factors are associated with students’ final grades.</p>
-<p>At this stage, we focus on clearly defining the type of question we are asking and how it fits into the data science workflow, rather than introducing new modeling details.</p>
-<p>In particular, this is an inferential task. We are interested in describing and interpreting relationships between variables, rather than building a model purely for prediction. A predictive approach would be possible, but our primary objective here is to gain insight into how different factors relate to student performance.</p>
+<p>Knowing what we want to learn, the next step is to be clear about the type of question we are asking.</p>
+<p>This is an inferential task. We are interested in describing and interpreting relationships between variables, not building a model optimized for prediction. A predictive approach would focus on forecasting a specific student’s expected grade as accurately as possible. Here, we care more about which factors relate to performance and in what direction.</p>
+<p>It is also worth noting that this is an observational dataset. Students were not randomly assigned to different study habits or support conditions, so the relationships we find are associational rather than causal. Observing that higher study time tends to accompany higher grades does not rule out the possibility that a third factor, such as student motivation, influences both.</p>
 </section><section id="data-collection-and-wrangling" class="level2" data-number="5.8"><h2 data-number="5.8" class="anchored" data-anchor-id="data-collection-and-wrangling">
 <span class="header-section-number">5.8</span> Data Collection and Wrangling</h2>
-<p>With our statistical question clearly defined, the next step is to ensure that the data is suitable for analysis. Although the dataset is already provided, it is still useful to reflect briefly on how this type of data might have been collected. Doing so helps clarify what the data represents and highlights potential limitations before moving on to preparation and modeling.</p>
+<p>With our statistical question clearly defined, the next step is to ensure that the data is suitable for analysis. Although the dataset is already provided, it is still useful to reflect briefly on how this type of data might have been collected. Doing so helps clarify what the data represents and highlights potential limitations before moving on to preparation and modelling.</p>
 <section id="data-collection" class="level3" data-number="5.8.1"><h3 data-number="5.8.1" class="anchored" data-anchor-id="data-collection">
 <span class="header-section-number">5.8.1</span> Data Collection</h3>
 <p>For a study examining student academic performance, data like this could reasonably be collected through several common sources:</p>
@@ -756,13 +763,13 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <p>Each of these sources comes with trade-offs. Academic records are objective but limited to performance outcomes, while survey-based variables may be noisy but offer insight into behaviors and lifestyle factors. Recognizing these limitations helps guide both exploratory analysis and interpretation later on.</p>
 </section><section id="data-wrangling" class="level3" data-number="5.8.2"><h3 data-number="5.8.2" class="anchored" data-anchor-id="data-wrangling">
 <span class="header-section-number">5.8.2</span> Data Wrangling</h3>
-<p>Once the data has been collected, the next step is to prepare it for modeling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.</p>
+<p>Once the data has been collected, the next step is to prepare it for modelling. Even small, well-structured datasets often require preprocessing before they can be analyzed effectively.</p>
 <p>For Beta regression, data wrangling typically involves:</p>
 <ul>
 <li>Validating that the response variable represents a proportion.</li>
 <li>Rescaling the response variable so that it lies strictly between zero and one.</li>
 <li>Checking for boundary values such as exact zeros or ones.</li>
-<li>Converting categorical variables into numerical formats suitable for modeling.</li>
+<li>Converting categorical variables into numerical formats suitable for modelling.</li>
 <li>Inspecting missing values and potential inconsistencies in self-reported data.</li>
 </ul>
 <p>Based on the data, there can, of course, be other things you may have to do but for now, let’s walk through these steps using our student performance dataset, demonstrating each step in both R and Python.</p>
@@ -777,7 +784,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <div class="tab-content">
 <div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">`Final Grade (%)`</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html">summary</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">`Final Grade (%)`</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
   50.30   70.10   79.00   78.63   87.17  100.00 </code></pre>
@@ -786,9 +793,23 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </div>
 <div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Summary statistics for the response variable</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data.columns.tolist())</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"Final Grade (%)"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Summary statistics for the response variable</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data.columns.tolist())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>['Final Grade (%)', 'Café Location', 'Study Time', 'Year in School', 'Hobbies', 'Primary Sport', 'Living Arrangement', 'Part-time Work Hours', 'Study Group Participation', 'Hours of Sleep per Night', 'Has a Tutor']</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"Final Grade (%)"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>count    1000.000000
+mean       78.631818
+std        10.759821
+min        50.298057
+25%        70.097604
+50%        79.000879
+75%        87.165882
+max       100.000000
+Name: Final Grade (%), dtype: float64</code></pre>
+</div>
 </div>
 </div>
 </div>
@@ -802,7 +823,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <div class="tab-content">
 <div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">`Final Grade (%)`</span> <span class="op">/</span> <span class="fl">100</span></span>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">`Final Grade (%)`</span> <span class="op">/</span> <span class="fl">100</span></span>
 <span></span>
 <span><span class="co"># Drop original percentage column</span></span>
 <span><span class="va">data</span><span class="op">$</span><span class="va">`Final Grade (%)`</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
@@ -816,13 +837,24 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </div>
 <div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Rescale grades to proportions</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"final_grade_prop"</span>] <span class="op">=</span> data[<span class="st">"Final Grade (%)"</span>] <span class="op">/</span> <span class="dv">100</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop original percentage column</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.drop(columns<span class="op">=</span>[<span class="st">"Final Grade (%)"</span>])</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"final_grade_prop"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Rescale grades to proportions</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"final_grade_prop"</span>] <span class="op">=</span> data[<span class="st">"Final Grade (%)"</span>] <span class="op">/</span> <span class="dv">100</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop original percentage column</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> data.drop(columns<span class="op">=</span>[<span class="st">"Final Grade (%)"</span>])</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"final_grade_prop"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>count    1000.000000
+mean        0.786318
+std         0.107598
+min         0.502981
+25%         0.700976
+50%         0.790009
+75%         0.871659
+max         1.000000
+Name: final_grade_prop, dtype: float64</code></pre>
+</div>
 </div>
 </div>
 </div>
@@ -837,7 +869,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </div>
 <p>After rescaling, the response variable now lies on the unit interval. The next step is to check whether any values are exactly zero or one, since standard Beta regression assumes outcomes are strictly between these boundaries.</p>
 </section><section id="checking-for-boundary-values" class="level4"><h4 class="anchored" data-anchor-id="checking-for-boundary-values">2. Checking for Boundary Values</h4>
-<p>Beta regression requires that the response variable take values strictly between zero and one. We therefore check whether any rescaled grades are exactly equal to zero or one.</p>
+<p>With the rescaling done, we can now check whether any values land exactly on these boundaries.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist">
 <li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">R Code</a></li>
@@ -846,11 +878,11 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <div class="tab-content">
 <div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&lt;=</span> <span class="fl">0</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&lt;=</span> <span class="fl">0</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0</code></pre>
 </div>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&gt;=</span> <span class="fl">1</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&gt;=</span> <span class="fl">1</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 6</code></pre>
 </div>
@@ -858,14 +890,20 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </div>
 <div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for boundary values</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((data[<span class="st">"final_grade_prop"</span>] <span class="op">&lt;=</span> <span class="dv">0</span>).<span class="bu">sum</span>())</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((data[<span class="st">"final_grade_prop"</span>] <span class="op">&gt;=</span> <span class="dv">1</span>).<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for boundary values</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((data[<span class="st">"final_grade_prop"</span>] <span class="op">&lt;=</span> <span class="dv">0</span>).<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>0</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>((data[<span class="st">"final_grade_prop"</span>] <span class="op">&gt;=</span> <span class="dv">1</span>).<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>6</code></pre>
 </div>
 </div>
 </div>
 </div>
-<p>Shoot! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.</p>
+</div>
+<p>Oh no! The checks reveal that there are several observations with values equal to one. While this is not unusual for percentage-based data, it poses a problem for standard Beta regression, which assumes the response lies strictly between zero and one.</p>
 <div class="Heads-up">
 <div class="Heads-up-header">
 <p>Heads-up!</p>
@@ -879,7 +917,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 x' = \frac{x (N - 1) + s}{N}
 \]</span></p>
 <p>where <span class="math inline">\(N\)</span> is the sample size and <span class="math inline">\(s\)</span> is a small constant between 0 and 1, often chosen as <span class="math inline">\(s=0.5\)</span>.</p>
-<p>One way to think about this adjustment is that it spreads the data evenly across the open interval <span class="math inline">\((0,1)\)</span>, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant <span class="math inline">\(s\)</span> can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction.</p>
+<p>One way to think about this adjustment is that it spreads the data evenly across the open interval <span class="math inline">\((0,1)\)</span>, ensuring that no observation lies exactly on the boundaries. From a Bayesian perspective (for the Bayesianists out there), the constant <span class="math inline">\(s\)</span> can be interpreted as introducing a weak prior that prevents extreme values from being taken at face value. In practice, this approach is often viewed as more principled than manually nudging boundary values, though it also adds an extra layer of abstraction. It is most commonly used when the researcher wants to apply a consistent assumption across all observations, rather than singling out only the boundary cases for special treatment.</p>
 <p>Another option is to use <strong>zero–one–inflated Beta models</strong>, which explicitly treat boundary values as arising from a separate process. These models are more flexible and appropriate when zeros or ones occur frequently and carry substantive meaning, but they also introduce additional parameters and complexity.</p>
 <p>Finally, boundary observations can be <strong>excluded</strong>, though this is generally discouraged unless there is a strong substantive justification, as it removes potentially informative data.</p>
 </div>
@@ -893,7 +931,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">epsilon</span> <span class="op">&lt;-</span> <span class="fl">0.001</span></span>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="va">epsilon</span> <span class="op">&lt;-</span> <span class="fl">0.001</span></span>
 <span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span><span class="op">[</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&gt;=</span> <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">-</span> <span class="va">epsilon</span></span>
 <span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span><span class="op">[</span><span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span> <span class="op">&lt;=</span> <span class="fl">0</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">epsilon</span></span>
 <span></span>
@@ -906,11 +944,22 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>epsilon <span class="op">=</span> <span class="fl">0.001</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>data.loc[data[<span class="st">"final_grade_prop"</span>] <span class="op">&gt;=</span> <span class="dv">1</span>, <span class="st">"final_grade_prop"</span>] <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> epsilon</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>data.loc[data[<span class="st">"final_grade_prop"</span>] <span class="op">&lt;=</span> <span class="dv">0</span>, <span class="st">"final_grade_prop"</span>] <span class="op">=</span> epsilon</span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"final_grade_prop"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>epsilon <span class="op">=</span> <span class="fl">0.001</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>data.loc[data[<span class="st">"final_grade_prop"</span>] <span class="op">&gt;=</span> <span class="dv">1</span>, <span class="st">"final_grade_prop"</span>] <span class="op">=</span> <span class="dv">1</span> <span class="op">-</span> epsilon</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>data.loc[data[<span class="st">"final_grade_prop"</span>] <span class="op">&lt;=</span> <span class="dv">0</span>, <span class="st">"final_grade_prop"</span>] <span class="op">=</span> epsilon</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data[<span class="st">"final_grade_prop"</span>].describe())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>count    1000.000000
+mean        0.786312
+std         0.107586
+min         0.502981
+25%         0.700976
+50%         0.790009
+75%         0.871659
+max         0.999000
+Name: final_grade_prop, dtype: float64</code></pre>
+</div>
 </div>
 </div>
 </div>
@@ -927,7 +976,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Convert categorical variables to factors</span></span>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Convert categorical variables to factors</span></span>
 <span><span class="va">categorical_vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span></span>
 <span>  <span class="st">"Café Location"</span>,</span>
 <span>  <span class="st">"Study Time"</span>,</span>
@@ -1010,41 +1059,200 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
-<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
-<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>]</span>
-<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> data[<span class="st">"Study Time"</span>].astype(<span class="st">"string"</span>)</span>
-<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace en dash/em dash/minus with normal hyphen</span></span>
-<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> s.<span class="bu">str</span>.replace(<span class="vs">r"[–—−]"</span>, <span class="st">"-"</span>, regex<span class="op">=</span><span class="va">True</span>).<span class="bu">str</span>.strip()</span>
-<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>study_time_order <span class="op">=</span> [<span class="st">"&lt;1 hour"</span>, <span class="st">"1-3 hours"</span>, <span class="st">"3-5 hours"</span>, <span class="st">"5+ hours"</span>]</span>
-<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"Study Time"</span>] <span class="op">=</span> pd.Categorical(</span>
-<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>    s,</span>
-<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>study_time_order,</span>
-<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>    ordered<span class="op">=</span><span class="va">True</span></span>
-<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a><span class="co"># One-hot encode</span></span>
-<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>data_encoded <span class="op">=</span> pd.get_dummies(</span>
-<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>    data,</span>
-<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>categorical_vars,</span>
-<span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>    drop_first<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb18-32"><a href="#cb18-32" aria-hidden="true" tabindex="-1"></a>    dtype<span class="op">=</span><span class="bu">float</span>  <span class="co"># or dtype=int</span></span>
-<span id="cb18-33"><a href="#cb18-33" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb18-34"><a href="#cb18-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-35"><a href="#cb18-35" aria-hidden="true" tabindex="-1"></a>data_encoded.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> data[<span class="st">"Study Time"</span>].astype(<span class="st">"string"</span>)</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Replace en dash/em dash/minus with normal hyphen</span></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>s <span class="op">=</span> s.<span class="bu">str</span>.replace(<span class="vs">r"[–—−]"</span>, <span class="st">"-"</span>, regex<span class="op">=</span><span class="va">True</span>).<span class="bu">str</span>.strip()</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>study_time_order <span class="op">=</span> [<span class="st">"&lt;1 hour"</span>, <span class="st">"1-3 hours"</span>, <span class="st">"3-5 hours"</span>, <span class="st">"5+ hours"</span>]</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>data[<span class="st">"Study Time"</span>] <span class="op">=</span> pd.Categorical(</span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>    s,</span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>study_time_order,</span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>    ordered<span class="op">=</span><span class="va">True</span></span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a><span class="co"># One-hot encode</span></span>
+<span id="cb25-28"><a href="#cb25-28" aria-hidden="true" tabindex="-1"></a>data_encoded <span class="op">=</span> pd.get_dummies(</span>
+<span id="cb25-29"><a href="#cb25-29" aria-hidden="true" tabindex="-1"></a>    data,</span>
+<span id="cb25-30"><a href="#cb25-30" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>categorical_vars,</span>
+<span id="cb25-31"><a href="#cb25-31" aria-hidden="true" tabindex="-1"></a>    drop_first<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb25-32"><a href="#cb25-32" aria-hidden="true" tabindex="-1"></a>    dtype<span class="op">=</span><span class="bu">float</span>  <span class="co"># or dtype=int</span></span>
+<span id="cb25-33"><a href="#cb25-33" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-34"><a href="#cb25-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-35"><a href="#cb25-35" aria-hidden="true" tabindex="-1"></a>data_encoded.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+
+<table class="dataframe caption-top table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead><tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Part-time Work Hours</th>
+<th data-quarto-table-cell-role="th">Hours of Sleep per Night</th>
+<th data-quarto-table-cell-role="th">final_grade_prop</th>
+<th data-quarto-table-cell-role="th">Café Location_Bean Around the World</th>
+<th data-quarto-table-cell-role="th">Café Location_Ike's Café</th>
+<th data-quarto-table-cell-role="th">Café Location_Koerner's Pub</th>
+<th data-quarto-table-cell-role="th">Café Location_The Loop Café</th>
+<th data-quarto-table-cell-role="th">Study Time_1-3 hours</th>
+<th data-quarto-table-cell-role="th">Study Time_3-5 hours</th>
+<th data-quarto-table-cell-role="th">Study Time_5+ hours</th>
+<th data-quarto-table-cell-role="th">Year in School_2nd Year</th>
+<th data-quarto-table-cell-role="th">Year in School_3rd Year</th>
+<th data-quarto-table-cell-role="th">Year in School_4th Year</th>
+<th data-quarto-table-cell-role="th">Hobbies_Music</th>
+<th data-quarto-table-cell-role="th">Hobbies_Reading</th>
+<th data-quarto-table-cell-role="th">Hobbies_Sports</th>
+<th data-quarto-table-cell-role="th">Primary Sport_None</th>
+<th data-quarto-table-cell-role="th">Primary Sport_Soccer</th>
+<th data-quarto-table-cell-role="th">Living Arrangement_At Home</th>
+<th data-quarto-table-cell-role="th">Living Arrangement_With Friends</th>
+<th data-quarto-table-cell-role="th">Study Group Participation_Yes</th>
+<th data-quarto-table-cell-role="th">Has a Tutor_Yes</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>15.0</td>
+<td>5.4</td>
+<td>0.969968</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>7.0</td>
+<td>5.4</td>
+<td>0.946232</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>6.0</td>
+<td>5.6</td>
+<td>0.902982</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>10.0</td>
+<td>7.8</td>
+<td>0.867653</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>6.0</td>
+<td>9.0</td>
+<td>0.934911</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>0.0</td>
+<td>1.0</td>
+<td>1.0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -1060,7 +1268,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-6-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-6-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Check for missing values in each column</span></span>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="co"># Check for missing values in each column</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html">colSums</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>            Café Location                Study Time            Year in School 
@@ -1076,8 +1284,22 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for missing values in each column</span></span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data.isna().<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for missing values in each column</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(data.isna().<span class="bu">sum</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Café Location                0
+Study Time                   0
+Year in School               0
+Hobbies                      0
+Primary Sport                0
+Living Arrangement           0
+Part-time Work Hours         0
+Study Group Participation    0
+Hours of Sleep per Night     0
+Has a Tutor                  0
+final_grade_prop             0
+dtype: int64</code></pre>
+</div>
 </div>
 </div>
 </div>
@@ -1105,7 +1327,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html">hist</a></span><span class="op">(</span></span>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html">hist</a></span><span class="op">(</span></span>
 <span>  <span class="va">data</span><span class="op">$</span><span class="va">final_grade_prop</span>,</span>
 <span>  breaks <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  main <span class="op">=</span> <span class="st">"Distribution of Final Grades"</span>,</span>
@@ -1123,17 +1345,17 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>plt.hist(</span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  bins<span class="op">=</span><span class="dv">10</span></span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
-<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Frequency"</span>)</span>
-<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Distribution of Final Grades"</span>)</span>
-<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>plt.hist(</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  bins<span class="op">=</span><span class="dv">10</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Frequency"</span>)</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Distribution of Final Grades"</span>)</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
@@ -1147,7 +1369,7 @@ x' = \frac{x (N - 1) + s}{N}
 <p>The histogram, once again, shows that grades are continuous and bounded between zero and one, with the overall distribution being slightly left skewed. Great to see that students are mostly doing well here!</p>
 </section><section id="distribution-of-predictor-variables" class="level3" data-number="5.9.2"><h3 data-number="5.9.2" class="anchored" data-anchor-id="distribution-of-predictor-variables">
 <span class="header-section-number">5.9.2</span> Distribution of Predictor Variables</h3>
-<p>Let’s also examine the distributions of the predictor variables. This helps us understand the range, balance, and structure of the inputs before moving on to modeling. For continuous predictors, we stick to histograms to inspect their spread and shape. For categorical predictors, bar charts are sufficient to show how observations are distributed across categories.</p>
+<p>Let’s also examine the distributions of the predictor variables. This helps us understand the range, balance, and structure of the inputs before moving on to modelling. For continuous predictors, we stick to histograms to inspect their spread and shape. For categorical predictors, bar charts are sufficient to show how observations are distributed across categories.</p>
 <section id="continuous-predictors" class="level4"><h4 class="anchored" data-anchor-id="continuous-predictors">Continuous Predictors</h4>
 <p>We begin with the continuous predictors: hours of sleep per night and part-time work hours.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
@@ -1158,7 +1380,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">`Hours of Sleep per Night`</span></span>
 <span><span class="va">br</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html">seq</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html">min</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html">max</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, length.out <span class="op">=</span> <span class="fl">11</span><span class="op">)</span></span>
@@ -1205,26 +1427,26 @@ x' = \frac{x (N - 1) + s}{N}
 </figure>
 </div>
 </div>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </div>
 <div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">4</span>))</span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].hist(data[<span class="st">"Hours of Sleep per Night"</span>], bins<span class="op">=</span><span class="dv">10</span>)</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Hours of Sleep per Night"</span>)</span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_xlabel(<span class="st">"Hours"</span>)</span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Frequency"</span>)</span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].hist(data[<span class="st">"Part-time Work Hours"</span>], bins<span class="op">=</span><span class="dv">10</span>)</span>
-<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Part-time Work Hours"</span>)</span>
-<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Hours per Week"</span>)</span>
-<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">4</span>))</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].hist(data[<span class="st">"Hours of Sleep per Night"</span>], bins<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Hours of Sleep per Night"</span>)</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_xlabel(<span class="st">"Hours"</span>)</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Frequency"</span>)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].hist(data[<span class="st">"Part-time Work Hours"</span>], bins<span class="op">=</span><span class="dv">10</span>)</span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Part-time Work Hours"</span>)</span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Hours per Week"</span>)</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="960"></p>
@@ -1240,10 +1462,10 @@ x' = \frac{x (N - 1) + s}{N}
 <p>Heads-up!</p>
 </div>
 <div class="Heads-up-container">
-<p>The R code for Hours of Sleep per Night is intentionally more detailed than usual. This alternative approach ensures that the histogram uses the same bin boundaries and bin-assignment rules as Python, so the two plots are directly comparable. In practice, R’s default hist() function is usually sufficient.</p>
+<p>The R code for Hours of Sleep per Night is intentionally more detailed than usual. This alternative approach ensures that the histogram uses the same bin boundaries and bin-assignment rules as Python, so the two plots are directly comparable. In practice, R’s default <code><a href="https://rdrr.io/r/graphics/hist.html">hist()</a></code> function is usually sufficient.</p>
 </div>
 </div>
-<p>Overall, both hours of sleep per night and part-time work hours appear to be approximately uniformly distributed, with no strong skewness or extreme concentration in specific ranges. This suggests that neither predictor is dominated by a narrow subset of values, which is helpful for subsequent regression modeling.</p>
+<p>Overall, both hours of sleep per night and part-time work hours appear to be approximately uniformly distributed, with no strong skewness or extreme concentration in specific ranges. This suggests that neither predictor is dominated by a narrow subset of values, which is helpful for subsequent regression modelling.</p>
 </section><section id="categorical-predictors" class="level4"><h4 class="anchored" data-anchor-id="categorical-predictors">Categorical Predictors</h4>
 <p>For categorical predictors, histograms are no longer appropriate. Instead, we use bar charts to visualize how observations are distributed across categories. This allows us to quickly check whether certain groups are under-represented, over-represented, or potentially imbalanced.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
@@ -1254,7 +1476,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-9-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-9-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">categorical_vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span></span>
 <span>  <span class="st">"Café Location"</span>,</span>
@@ -1289,35 +1511,37 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-9-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-9-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
-<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
-<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>]</span>
-<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">9</span>))</span>
-<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
-<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, var <span class="kw">in</span> <span class="bu">enumerate</span>(categorical_vars):</span>
-<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>  counts <span class="op">=</span> data[var].value_counts()</span>
-<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>  axes[i].bar(counts.index.astype(<span class="bu">str</span>), counts.values)</span>
-<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>  axes[i].set_title(var)</span>
-<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>  axes[i].set_ylabel(<span class="st">"Count"</span>)</span>
-<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>  axes[i].tick_params(axis<span class="op">=</span><span class="st">"x"</span>, rotation<span class="op">=</span><span class="dv">45</span>)</span>
-<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn off unused panels (9 total, 8 used)</span></span>
-<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(categorical_vars), <span class="bu">len</span>(axes)):</span>
-<span id="cb28-26"><a href="#cb28-26" aria-hidden="true" tabindex="-1"></a>  axes[j].axis(<span class="st">"off"</span>)</span>
-<span id="cb28-27"><a href="#cb28-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-28"><a href="#cb28-28" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb28-29"><a href="#cb28-29" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">9</span>))</span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, var <span class="kw">in</span> <span class="bu">enumerate</span>(categorical_vars):</span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a>  counts <span class="op">=</span> data[var].value_counts()</span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>  axes[i].bar(counts.index.astype(<span class="bu">str</span>), counts.values)</span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a>  axes[i].set_title(var)</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a>  axes[i].set_ylabel(<span class="st">"Count"</span>)</span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a>  axes[i].tick_params(axis<span class="op">=</span><span class="st">"x"</span>, rotation<span class="op">=</span><span class="dv">45</span>)</span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn off unused panels (9 total, 8 used)</span></span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(categorical_vars), <span class="bu">len</span>(axes)):</span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a>  axes[j].axis(<span class="st">"off"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>(np.float64(0.0), np.float64(1.0), np.float64(0.0), np.float64(1.0))</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="1152"></p>
@@ -1342,7 +1566,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-10-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-10-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html">plot</a></span><span class="op">(</span></span>
 <span>  <span class="va">data</span><span class="op">$</span><span class="va">`Hours of Sleep per Night`</span>,</span>
@@ -1369,35 +1593,35 @@ x' = \frac{x (N - 1) + s}{N}
 </figure>
 </div>
 </div>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </div>
 <div id="tabset-10-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-10-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">4</span>))</span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].scatter(</span>
-<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"Hours of Sleep per Night"</span>],</span>
-<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
-<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  color<span class="op">=</span><span class="st">"gray"</span></span>
-<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_xlabel(<span class="st">"Hours of Sleep per Night"</span>)</span>
-<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
-<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Sleep and Final Grade"</span>)</span>
-<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].scatter(</span>
-<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"Part-time Work Hours"</span>],</span>
-<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
-<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>  color<span class="op">=</span><span class="st">"gray"</span></span>
-<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Part-time Work Hours"</span>)</span>
-<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
-<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Work Hours and Final Grade"</span>)</span>
-<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb31-24"><a href="#cb31-24" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">1</span>, <span class="dv">2</span>, figsize<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">4</span>))</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].scatter(</span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"Hours of Sleep per Night"</span>],</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>  color<span class="op">=</span><span class="st">"gray"</span></span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_xlabel(<span class="st">"Hours of Sleep per Night"</span>)</span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">0</span>].set_title(<span class="st">"Sleep and Final Grade"</span>)</span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].scatter(</span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"Part-time Work Hours"</span>],</span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>  data[<span class="st">"final_grade_prop"</span>],</span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>  color<span class="op">=</span><span class="st">"gray"</span></span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_xlabel(<span class="st">"Part-time Work Hours"</span>)</span>
+<span id="cb41-20"><a href="#cb41-20" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
+<span id="cb41-21"><a href="#cb41-21" aria-hidden="true" tabindex="-1"></a>axes[<span class="dv">1</span>].set_title(<span class="st">"Work Hours and Final Grade"</span>)</span>
+<span id="cb41-22"><a href="#cb41-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-23"><a href="#cb41-23" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb41-24"><a href="#cb41-24" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-21-1.png" class="img-fluid figure-img" width="960"></p>
@@ -1420,7 +1644,7 @@ x' = \frac{x (N - 1) + s}{N}
 <div class="tab-content">
 <div id="tabset-11-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-11-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/par.html">par</a></span><span class="op">(</span>mfrow <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">3</span><span class="op">)</span>, mar <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">4</span>, <span class="fl">3</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">categorical_vars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span></span>
 <span>  <span class="st">"Café Location"</span>,</span>
@@ -1455,41 +1679,39 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <div id="tabset-11-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-11-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
-<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
-<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
-<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
-<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
-<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
-<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
-<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
-<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
-<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>]</span>
-<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">9</span>))</span>
-<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
-<span id="cb33-16"><a href="#cb33-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-17"><a href="#cb33-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, var <span class="kw">in</span> <span class="bu">enumerate</span>(categorical_vars):</span>
-<span id="cb33-18"><a href="#cb33-18" aria-hidden="true" tabindex="-1"></a>  data.boxplot(</span>
-<span id="cb33-19"><a href="#cb33-19" aria-hidden="true" tabindex="-1"></a>    column<span class="op">=</span><span class="st">"final_grade_prop"</span>,</span>
-<span id="cb33-20"><a href="#cb33-20" aria-hidden="true" tabindex="-1"></a>    by<span class="op">=</span>var,</span>
-<span id="cb33-21"><a href="#cb33-21" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axes[i],</span>
-<span id="cb33-22"><a href="#cb33-22" aria-hidden="true" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">False</span></span>
-<span id="cb33-23"><a href="#cb33-23" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb33-24"><a href="#cb33-24" aria-hidden="true" tabindex="-1"></a>  axes[i].set_title(var)</span>
-<span id="cb33-25"><a href="#cb33-25" aria-hidden="true" tabindex="-1"></a>  axes[i].set_xlabel(<span class="st">""</span>)</span>
-<span id="cb33-26"><a href="#cb33-26" aria-hidden="true" tabindex="-1"></a>  axes[i].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
-<span id="cb33-27"><a href="#cb33-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-28"><a href="#cb33-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn off unused panel</span></span>
-<span id="cb33-29"><a href="#cb33-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-30"><a href="#cb33-30" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(categorical_vars), <span class="bu">len</span>(axes)):</span>
-<span id="cb33-31"><a href="#cb33-31" aria-hidden="true" tabindex="-1"></a>  axes[j].axis(<span class="st">"off"</span>)</span>
-<span id="cb33-32"><a href="#cb33-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-33"><a href="#cb33-33" aria-hidden="true" tabindex="-1"></a>plt.suptitle(<span class="st">""</span>)</span>
-<span id="cb33-34"><a href="#cb33-34" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
-<span id="cb33-35"><a href="#cb33-35" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>categorical_vars <span class="op">=</span> [</span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Café Location"</span>,</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Time"</span>,</span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Year in School"</span>,</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Hobbies"</span>,</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Primary Sport"</span>,</span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Living Arrangement"</span>,</span>
+<span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Study Group Participation"</span>,</span>
+<span id="cb43-11"><a href="#cb43-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Has a Tutor"</span></span>
+<span id="cb43-12"><a href="#cb43-12" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb43-13"><a href="#cb43-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-14"><a href="#cb43-14" aria-hidden="true" tabindex="-1"></a>fig, axes <span class="op">=</span> plt.subplots(<span class="dv">3</span>, <span class="dv">3</span>, figsize<span class="op">=</span>(<span class="dv">12</span>, <span class="dv">9</span>))</span>
+<span id="cb43-15"><a href="#cb43-15" aria-hidden="true" tabindex="-1"></a>axes <span class="op">=</span> axes.flatten()</span>
+<span id="cb43-16"><a href="#cb43-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-17"><a href="#cb43-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i, var <span class="kw">in</span> <span class="bu">enumerate</span>(categorical_vars):</span>
+<span id="cb43-18"><a href="#cb43-18" aria-hidden="true" tabindex="-1"></a>  data.boxplot(</span>
+<span id="cb43-19"><a href="#cb43-19" aria-hidden="true" tabindex="-1"></a>    column<span class="op">=</span><span class="st">"final_grade_prop"</span>,</span>
+<span id="cb43-20"><a href="#cb43-20" aria-hidden="true" tabindex="-1"></a>    by<span class="op">=</span>var,</span>
+<span id="cb43-21"><a href="#cb43-21" aria-hidden="true" tabindex="-1"></a>    ax<span class="op">=</span>axes[i],</span>
+<span id="cb43-22"><a href="#cb43-22" aria-hidden="true" tabindex="-1"></a>    grid<span class="op">=</span><span class="va">False</span></span>
+<span id="cb43-23"><a href="#cb43-23" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb43-24"><a href="#cb43-24" aria-hidden="true" tabindex="-1"></a>  axes[i].set_title(var)</span>
+<span id="cb43-25"><a href="#cb43-25" aria-hidden="true" tabindex="-1"></a>  axes[i].set_xlabel(<span class="st">""</span>)</span>
+<span id="cb43-26"><a href="#cb43-26" aria-hidden="true" tabindex="-1"></a>  axes[i].set_ylabel(<span class="st">"Final Grade (Proportion)"</span>)</span>
+<span id="cb43-27"><a href="#cb43-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-28"><a href="#cb43-28" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn off unused panel</span></span>
+<span id="cb43-29"><a href="#cb43-29" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(categorical_vars), <span class="bu">len</span>(axes)):</span>
+<span id="cb43-30"><a href="#cb43-30" aria-hidden="true" tabindex="-1"></a>  _ <span class="op">=</span> axes[j].axis(<span class="st">"off"</span>)</span>
+<span id="cb43-31"><a href="#cb43-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-32"><a href="#cb43-32" aria-hidden="true" tabindex="-1"></a>plt.tight_layout()</span>
+<span id="cb43-33"><a href="#cb43-33" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-23-1.png" class="img-fluid figure-img" width="1152"></p>
@@ -1502,24 +1724,24 @@ x' = \frac{x (N - 1) + s}{N}
 </div>
 <p>From the plots, we observe that study time is the only predictor with a clearly visible positive association with final grade. This finding is largely unsurprising and aligns well with common intuition: students who devote more time to studying tend to perform better academically.</p>
 <p>At the same time, it is somewhat unexpected that the remaining categorical variables show little evidence of a strong marginal relationship with the response. Factors such as tutoring status, study group participation, living arrangement, or extracurricular interests might reasonably be expected to influence academic performance, yet no clear or consistent differences emerge when these variables are examined in isolation.</p>
-<p>These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modeling is conducted, where the effects of multiple predictors can be assessed simultaneously.</p>
+<p>These observations are intriguing but should be interpreted with caution. The analysis at this stage is purely exploratory and reflects only superficial, marginal relationships. While these insights help guide our expectations, no substantive conclusions can be drawn until formal modelling is conducted, where the effects of multiple predictors can be assessed simultaneously.</p>
 </section></section></section><section id="data-modeling" class="level2" data-number="5.10"><h2 data-number="5.10" class="anchored" data-anchor-id="data-modeling">
 <span class="header-section-number">5.10</span> Data Modeling</h2>
-<p>After exploring the data and developing initial intuition through EDA, we now turn to the modeling stage. The purpose of this step is to formalize the relationships we observed and assess how different academic and lifestyle factors are associated with students’ final grades when considered jointly.</p>
+<p>After exploring the data and developing initial intuition through EDA, we now turn to the modelling stage. The purpose of this step is to formalize the relationships we observed and assess how different academic and lifestyle factors are associated with students’ final grades when considered jointly.</p>
 <section id="choosing-a-suitable-regression-model" class="level3" data-number="5.10.1"><h3 data-number="5.10.1" class="anchored" data-anchor-id="choosing-a-suitable-regression-model">
 <span class="header-section-number">5.10.1</span> Choosing a Suitable Regression Model</h3>
 <p>The choice of regression model should follow directly from what we have learned about the response variable and from the goals of the analysis.</p>
 <p>In this case, the response variable, <code>final_grade_prop</code>, represents a student’s final grade expressed as a proportion. After preprocessing, all values lie strictly between zero and one. The EDA also showed that grades are not symmetrically distributed and tend to cluster toward higher values, with variability that appears to depend on the average grade level.</p>
 <p>Equally important, our goal is not to predict future grades as accurately as possible, but to understand how study habits, lifestyle factors, and forms of academic support are associated with students’ performance.</p>
 <p>Taken together, these considerations point toward Beta regression as an appropriate modeling choice. Beta regression is designed specifically for proportion data and naturally respects the bounds of the response. It allows the mean of the response to depend on predictors while accommodating heteroskedasticity, which is common in proportional outcomes.</p>
-<p>By contrast, Ordinary Least Squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.</p>
-</section><section id="defining-modeling-parameters" class="level3" data-number="5.10.2"><h3 data-number="5.10.2" class="anchored" data-anchor-id="defining-modeling-parameters">
-<span class="header-section-number">5.10.2</span> Defining Modeling Parameters</h3>
-<p>With the modeling framework selected, the next step is to specify which variables to include. In this case study, we include all available predictors to capture a broad and realistic picture of student life.</p>
+<p>By contrast, ordinary least squares assumes constant variance and does not constrain predictions to the unit interval. These assumptions are difficult to justify for grade data, making OLS a less suitable option for this analysis.</p>
+</section><section id="defining-modelling-parameters" class="level3" data-number="5.10.2"><h3 data-number="5.10.2" class="anchored" data-anchor-id="defining-modelling-parameters">
+<span class="header-section-number">5.10.2</span> Defining Modelling Parameters</h3>
+<p>With the modelling framework selected, the next step is to specify which variables to include. In this case study, we include all available predictors to capture a broad and realistic picture of student life.</p>
 <p>The predictors reflect multiple dimensions of a student’s experience, including time allocation (such as study time, sleep, and part-time work hours), academic context (such as year in school), and sources of support (such as tutoring and study group participation), as well as several categorical variables describing personal routines and preferences.</p>
-<p>Including the full set of predictors allows us to examine the association between each factor and the average final grade while holding other variables constant. This multivariable perspective is especially important given that most predictors showed weak marginal relationships during EDA but may still play a role once considered together.</p>
-</section><section id="setting-up-the-modeling-equation" class="level3" data-number="5.10.3"><h3 data-number="5.10.3" class="anchored" data-anchor-id="setting-up-the-modeling-equation">
-<span class="header-section-number">5.10.3</span> Setting Up the Modeling Equation</h3>
+<p>Including the full set of predictors allows us to examine the association between each factor and the average final grade while holding the other variables constant. This multivariable perspective is especially important given that most predictors showed weak marginal relationships during EDA but may still play a role once considered together.</p>
+</section><section id="setting-up-the-modelling-equation" class="level3" data-number="5.10.3"><h3 data-number="5.10.3" class="anchored" data-anchor-id="setting-up-the-modelling-equation">
+<span class="header-section-number">5.10.3</span> Setting Up the Modelling Equation</h3>
 <p>Using Beta regression with a logit link, we model the average final grade proportion as a function of the predictors.</p>
 <p>For each student <span class="math inline">\(i\)</span>, the response is assumed to follow a Beta distribution,</p>
 <p><span class="math display">\[
@@ -1553,7 +1775,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <p>With the model structure defined, we are now ready to estimate the model parameters and examine how these academic and lifestyle factors relate to student performance in practice.</p>
 </section></section><section id="estimation" class="level2" data-number="5.11"><h2 data-number="5.11" class="anchored" data-anchor-id="estimation">
 <span class="header-section-number">5.11</span> Estimation</h2>
-<p>With the model structure clearly defined, we now move on to estimation. In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.</p>
+<p>In this step, we fit the Beta regression model to the data and obtain numerical estimates for each coefficient. These estimates allow us to quantify how different academic and lifestyle factors are associated with students’ average final grades under the specified model.</p>
 <div class="Tip">
 <div class="Tip-header">
 <p>How Beta Regression Is Fit</p>
@@ -1564,7 +1786,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 </div>
 <section id="fitting-the-model" class="level3" data-number="5.11.1"><h3 data-number="5.11.1" class="anchored" data-anchor-id="fitting-the-model">
 <span class="header-section-number">5.11.1</span> Fitting the Model</h3>
-<p>In R, Beta regression can be fit using the <code><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg()</a></code> function, which is designed specifically for proportion outcomes. In Python, Beta regression is available through <code>statsmodels</code>, allowing us to specify the same link function and modeling structure.</p>
+<p>In R, Beta regression can be fit using the <code><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg()</a></code> function, which is designed specifically for proportion outcomes. In Python, Beta regression is available through <code>statsmodels</code>, allowing us to specify the same link function and modelling structure.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist">
 <li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-12-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-12-1" role="tab" aria-controls="tabset-12-1" aria-selected="true">R Code</a></li>
@@ -1573,7 +1795,7 @@ Y_i \sim \text{Beta}(\mu_i \phi,\ (1 - \mu_i)\phi)
 <div class="tab-content">
 <div id="tabset-12-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-12-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://topmodels.R-Forge.R-project.org/betareg/">betareg</a></span><span class="op">)</span></span>
+<div class="sourceCode" id="cb44"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://topmodels.R-Forge.R-project.org/betareg/">betareg</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Fit Beta regression model with logit link</span></span>
 <span><span class="va">beta_model</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg</a></span><span class="op">(</span></span>
@@ -1632,16 +1854,55 @@ Number of iterations: 36 (BFGS) + 2 (Fisher scoring) </code></pre>
 </div>
 <div id="tabset-12-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-12-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
-<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.othermod.betareg <span class="im">import</span> BetaModel</span>
-<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> data_encoded[<span class="st">"final_grade_prop"</span>].astype(<span class="bu">float</span>)</span>
-<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> data_encoded.drop(columns<span class="op">=</span>[<span class="st">"final_grade_prop"</span>])</span>
-<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> sm.add_constant(X, has_constant<span class="op">=</span><span class="st">"add"</span>) </span>
-<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>fit_py <span class="op">=</span> BetaModel(y, X).fit()</span>
-<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(fit_py.summary())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> statsmodels.othermod.betareg <span class="im">import</span> BetaModel</span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>y <span class="op">=</span> data_encoded[<span class="st">"final_grade_prop"</span>].astype(<span class="bu">float</span>)</span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> data_encoded.drop(columns<span class="op">=</span>[<span class="st">"final_grade_prop"</span>])</span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a>X <span class="op">=</span> sm.add_constant(X, has_constant<span class="op">=</span><span class="st">"add"</span>) </span>
+<span id="cb46-8"><a href="#cb46-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-9"><a href="#cb46-9" aria-hidden="true" tabindex="-1"></a>fit_py <span class="op">=</span> BetaModel(y, X).fit()</span>
+<span id="cb46-10"><a href="#cb46-10" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(fit_py.summary())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                              BetaModel Results                               
+==============================================================================
+Dep. Variable:       final_grade_prop   Log-Likelihood:                 1474.7
+Model:                      BetaModel   AIC:                            -2903.
+Method:            Maximum Likelihood   BIC:                            -2791.
+Date:                Sun, 07 Jun 2026                                         
+Time:                        13:14:25                                         
+No. Observations:                1000                                         
+Df Residuals:                     977                                         
+Df Model:                          21                                         
+=======================================================================================================
+                                          coef    std err          z      P&gt;|z|      [0.025      0.975]
+-------------------------------------------------------------------------------------------------------
+const                                   0.6665      0.089      7.495      0.000       0.492       0.841
+Part-time Work Hours                   -0.0008      0.002     -0.413      0.680      -0.005       0.003
+Hours of Sleep per Night               -0.0145      0.010     -1.412      0.158      -0.035       0.006
+Café Location_Bean Around the World     0.0504      0.037      1.351      0.177      -0.023       0.124
+Café Location_Ike's Café                0.0065      0.037      0.175      0.861      -0.066       0.079
+Café Location_Koerner's Pub             0.0047      0.036      0.130      0.897      -0.066       0.076
+Café Location_The Loop Café             0.0056      0.038      0.148      0.882      -0.068       0.079
+Study Time_1-3 hours                    0.4579      0.029     15.735      0.000       0.401       0.515
+Study Time_3-5 hours                    1.1301      0.033     34.571      0.000       1.066       1.194
+Study Time_5+ hours                     1.7063      0.039     44.083      0.000       1.630       1.782
+Year in School_2nd Year                 0.0440      0.033      1.328      0.184      -0.021       0.109
+Year in School_3rd Year                 0.0261      0.034      0.772      0.440      -0.040       0.092
+Year in School_4th Year                 0.0161      0.033      0.486      0.627      -0.049       0.081
+Hobbies_Music                          -0.0214      0.034     -0.632      0.527      -0.088       0.045
+Hobbies_Reading                         0.0318      0.034      0.934      0.350      -0.035       0.098
+Hobbies_Sports                          0.0213      0.034      0.625      0.532      -0.045       0.088
+Primary Sport_None                      0.0327      0.029      1.120      0.263      -0.025       0.090
+Primary Sport_Soccer                    0.0246      0.029      0.843      0.399      -0.033       0.082
+Living Arrangement_At Home             -0.0055      0.029     -0.187      0.851      -0.063       0.052
+Living Arrangement_With Friends        -0.0120      0.029     -0.418      0.676      -0.068       0.044
+Study Group Participation_Yes           0.0234      0.024      0.985      0.325      -0.023       0.070
+Has a Tutor_Yes                         0.0241      0.024      1.004      0.316      -0.023       0.071
+precision                               3.7837      0.045     84.916      0.000       3.696       3.871
+=======================================================================================================</code></pre>
+</div>
 </div>
 </div>
 </div>
@@ -1652,9 +1913,9 @@ Number of iterations: 36 (BFGS) + 2 (Fisher scoring) </code></pre>
 <div style="overflow-x: auto; white-space: nowrap;">
 <p><span class="math display">\[
 \begin{aligned}
-\text{logit}(\mu_i) &amp;= 0.665 \\
-&amp;\quad + -0.0008 \times \text{part_time_work_hours}_i \\
-&amp;\quad + -0.0145 \times \text{hours_of_sleep}_i \\
+\text{logit}(\mu_i) &amp;= 0.6665 \\
+&amp;\quad - 0.0008 \times \text{part\_time\_work\_hours}_i \\
+&amp;\quad - 0.0145 \times \text{hours\_of\_sleep}_i \\
 &amp;\quad + \text{(terms for Study Time)} \\
 &amp;\quad + \text{(terms for Café Location)} \\
 &amp;\quad + \text{(terms for Year in School)} \\
@@ -1703,21 +1964,30 @@ R^{2}_{\text{pseudo}} = 1 - \frac{\ell(\text{null model})}{\ell(\text{fitted mod
 </div>
 </section><section id="precision-parameter" class="level3" data-number="5.12.3"><h3 data-number="5.12.3" class="anchored" data-anchor-id="precision-parameter">
 <span class="header-section-number">5.12.3</span> Precision Parameter</h3>
-<p>Beta regression models not only the mean of the response but also its dispersion through a precision parameter, commonly denoted by <span class="math inline">\(\phi\)</span>. As a result, assessing goodness of fit involves evaluating not only how well the model captures the mean structure, but also whether it represents the variability in the data reasonably. Under the standard mean–precision parameterization, the conditional variance of the response is given by:</p>
-<p><span class="math display">\[
-\mathrm{Var}(Y_i \mid X_i) = \dfrac{\mu_i (1 - \mu_i)}{1 + \phi}
-\]</span></p>
-<p>Larger values of <span class="math inline">\(\phi\)</span> indicate that observations are more tightly concentrated around the fitted mean, while smaller values correspond to greater variability. A poorly estimated precision parameter may suggest that the model does not fully capture the dispersion in the response, even if the fitted means appear reasonable.</p>
+<p>Unlike linear regression, Beta regression models not only the average response but also how much the observations vary around that average. This variability is summarized by the <strong>precision parameter</strong>, commonly denoted by <span class="math inline">\(\phi\)</span>.</p>
+<p>You can think of the precision parameter as describing how tightly the data cluster around the fitted mean:</p>
+<ul>
+<li>Larger values of <span class="math inline">\(\phi\)</span> indicate that observations are more tightly concentrated around the predicted mean.</li>
+<li>Smaller values of <span class="math inline">\(\phi\)</span> indicate greater variability in the response.</li>
+</ul>
+<p>Recall from our earlier discussion that Beta regression can be expressed in terms of two quantities:</p>
+<ol type="1">
+<li>the average proportion (<span class="math inline">\(\mu\)</span>), and</li>
+<li>the precision parameter (<span class="math inline">\(\phi\)</span>).</li>
+</ol>
+<p>The regression coefficients estimate how the predictors affect the average proportion, while the precision parameter describes how much variability remains around those fitted values.</p>
 <p>In R’s <code><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg()</a></code>, the precision parameter is estimated directly. In this example, the fitted model reports:</p>
 <p><span class="math display">\[
 \hat{\phi}=43.98
 \]</span></p>
-<p>In contrast, Python’s <code>statsmodels.BetaModel</code> reports the precision parameter on a transformed (log) scale. The reported value of 3.78 corresponds to:</p>
+<p>Python’s <code>statsmodels.BetaModel</code> reports the precision parameter on the log scale instead. The reported value of 3.78 corresponds to:</p>
 <p><span class="math display">\[
-\exp(3.78) = 43.98
+\exp(3.78)=43.98
 \]</span></p>
-<p>which aligns closely with the estimate obtained from <code><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg()</a></code>. Thus, although the numerical values appear different, both implementations are estimating the same underlying precision parameter, and the fitted models are consistent.</p>
-<p>Once the precision parameter <span class="math inline">\(\phi\)</span> has been estimated, we can substitute it into the conditional variance formula to assess whether the implied variability is reasonable for the observed data. In practice, the precision parameter is best interpreted alongside residual diagnostics rather than judged by an absolute threshold. ​ ### Residual Diagnostics</p>
+<p>which matches the estimate reported by <code><a href="https://rdrr.io/pkg/betareg/man/betareg.html">betareg()</a></code>.</p>
+<p>A precision estimate of approximately 44 suggests that the observed grades are relatively tightly clustered around the values predicted by the model. In practice, the precision parameter is typically interpreted together with residual diagnostics rather than evaluated against a specific cutoff value.</p>
+</section><section id="residual-diagnostics" class="level3" data-number="5.12.4"><h3 data-number="5.12.4" class="anchored" data-anchor-id="residual-diagnostics">
+<span class="header-section-number">5.12.4</span> Residual Diagnostics</h3>
 <p>As with other generalized linear models, residual diagnostics help us check whether a Beta regression model is capturing the main patterns in the data. In this section, we focus on Pearson residuals, which compare the observed values to the fitted mean values on a standardized scale.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist">
@@ -1727,7 +1997,7 @@ R^{2}_{\text{pseudo}} = 1 - \frac{\ell(\text{null model})}{\ell(\text{fitted mod
 <div class="tab-content">
 <div id="tabset-13-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-13-1-tab">
 <div class="cell">
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://topmodels.R-Forge.R-project.org/betareg/">betareg</a></span><span class="op">)</span></span>
+<div class="sourceCode" id="cb48"><pre class="downlit sourceCode r code-with-copy"><code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://topmodels.R-Forge.R-project.org/betareg/">betareg</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Extract fitted means and residuals</span></span>
 <span><span class="va">mu_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/fitted.values.html">fitted</a></span><span class="op">(</span><span class="va">beta_model</span><span class="op">)</span></span>
@@ -1748,17 +2018,18 @@ R^{2}_{\text{pseudo}} = 1 - \frac{\ell(\text{null model})}{\ell(\text{fitted mod
 </div>
 <div id="tabset-13-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-13-2-tab">
 <div class="cell">
-<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>mu_hat <span class="op">=</span> fit_py.fittedvalues</span>
-<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>pearson_resid <span class="op">=</span> fit_py.resid_pearson</span>
-<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>plt.scatter(mu_hat, pearson_resid)</span>
-<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>plt.axhline(<span class="dv">0</span>, linestyle<span class="op">=</span><span class="st">"--"</span>)</span>
-<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>plt.xlabel(<span class="st">"Fitted mean"</span>)</span>
-<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>plt.ylabel(<span class="st">"Pearson residual"</span>)</span>
-<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>plt.title(<span class="st">"Pearson residuals vs fitted"</span>)</span>
-<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb49-2"><a href="#cb49-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-3"><a href="#cb49-3" aria-hidden="true" tabindex="-1"></a>mu_hat <span class="op">=</span> fit_py.fittedvalues</span>
+<span id="cb49-4"><a href="#cb49-4" aria-hidden="true" tabindex="-1"></a>pearson_resid <span class="op">=</span> fit_py.resid_pearson</span>
+<span id="cb49-5"><a href="#cb49-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-6"><a href="#cb49-6" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> plt.scatter(mu_hat, pearson_resid)</span>
+<span id="cb49-7"><a href="#cb49-7" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> plt.axhline(<span class="dv">0</span>, linestyle<span class="op">=</span><span class="st">"--"</span>)</span>
+<span id="cb49-8"><a href="#cb49-8" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> plt.xlabel(<span class="st">"Fitted mean"</span>)</span>
+<span id="cb49-9"><a href="#cb49-9" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> plt.ylabel(<span class="st">"Pearson residual"</span>)</span>
+<span id="cb49-10"><a href="#cb49-10" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> plt.title(<span class="st">"Pearson residuals vs fitted"</span>)</span>
+<span id="cb49-11"><a href="#cb49-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb49-12"><a href="#cb49-12" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure"><p><img src="05-beta_files/figure-html/unnamed-chunk-25-1.png" class="img-fluid figure-img" width="672"></p>
@@ -1769,38 +2040,44 @@ R^{2}_{\text{pseudo}} = 1 - \frac{\ell(\text{null model})}{\ell(\text{fitted mod
 </div>
 </div>
 </div>
-<p>The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over- or under-prediction. The vertical banding reflects groups of observations with similar fitted means, often arising from categorical predictors. While residual variability increases slightly for fitted means close to one, this behavior is expected for Beta regression due to the bounded nature of the response. Overall, the diagnostics suggest that the model provides an adequate fit to the data.</p>
+<p>The plots show Pearson residuals plotted against the fitted mean values. The residuals are centered around zero across the range of fitted values, indicating no systematic over or under-prediction. The vertical banding in the plot is not a warning sign. It appears because categorical predictors group observations at the same fitted mean, so instead of a smooth cloud of points, the plot shows columns. Within each column, the residuals are roughly symmetric around zero with no obvious outliers, which is what matters. While residual variability increases slightly for fitted means close to one, this behaviour is expected for Beta regression due to the bounded nature of the response.</p>
+</section><section id="others" class="level3" data-number="5.12.5"><h3 data-number="5.12.5" class="anchored" data-anchor-id="others">
+<span class="header-section-number">5.12.5</span> Others</h3>
+<p>Two other checks are also common in practice, though they are not shown here. A standard Q-Q plot is not well suited for Beta regression because Pearson residuals from this model are not expected to follow a normal distribution. Checking for influential observations using something like Cook’s distance is also a good habit, as it can reveal whether any single observation is pulling the fitted coefficients more than it should.</p>
 </section></section><section id="results" class="level2" data-number="5.13"><h2 data-number="5.13" class="anchored" data-anchor-id="results">
 <span class="header-section-number">5.13</span> Results</h2>
 <p>Great! Nothing seems particularly concerning with goodness of fit. Having established that the model fits the data reasonably well, we can now finally turn to the substantive findings, interpreting results and answering our central question:</p>
 <blockquote class="blockquote">
 <p>Which aspects of students’ academic and daily routines are associated with differences in final course grades?</p>
 </blockquote>
-<p>Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio, which reflects how the odds of achieving a higher average grade change as a predictor increases, holding all other variables constant.</p>
+<p>Recall that the model was fit using Beta regression with a logit link. As a result, coefficients describe changes in the log-odds of the mean grade proportion, rather than direct changes in grades themselves. Exponentiating a coefficient yields an odds ratio that describes how the odds of the mean grade proportion i.e., <span class="math inline">\(\mu/(1-\mu)\)</span> change multiplicatively as a predictor increases. Unlike in logistic regression, this is not the odds of a binary event such as passing or failing; it describes the expected proportion itself, holding all other variables constant.</p>
 <p>Because the logit link is nonlinear, these effects should be interpreted in relative terms rather than as fixed percentage-point increases. The same change in log-odds can correspond to different changes in grade proportions depending on where a student lies on the grade scale.</p>
 <section id="predictors-associated-with-final-grades" class="level3" data-number="5.13.1"><h3 data-number="5.13.1" class="anchored" data-anchor-id="predictors-associated-with-final-grades">
 <span class="header-section-number">5.13.1</span> Predictors Associated with Final Grades</h3>
 <p>Among all variables included in the model, <em>Study Time</em> stands out as the dominant factor associated with academic performance.</p>
 <p>Using students who study less than one hour as the reference group, we observe a clear and increasing association between reported study time and average grades:</p>
 <ul>
-<li>1–3 hours of study The estimated coefficient is 0.458, corresponding to an odds ratio of</li>
+<li>
+<strong>1–3 hours of study</strong>: The estimated coefficient is 0.458, corresponding to an odds ratio of</li>
 </ul>
 <p><span class="math display">\[
-e^0.458 \approx 1.58
+e^{0.458} \approx 1.58
 \]</span></p>
-<p>This indicates that students who study 1–3 hours have noticeably higher odds of achieving a higher average grade than those in the baseline group.</p>
+<p>This indicates that students who study 1–3 hours have noticeably higher odds of a higher mean grade proportion than those in the baseline group.</p>
 <ul>
-<li>3–5 hours of study With a coefficient of 1.130, the odds ratio increases to</li>
+<li>
+<strong>3–5 hours of study</strong>: With a coefficient of 1.130, the odds ratio increases to</li>
 </ul>
 <p><span class="math display">\[
-e^1.130 \approx 3.10
+e^{1.130} \approx 3.10
 \]</span></p>
 <p>This suggests that students in this category have roughly three times the odds of a higher mean grade compared to the reference group.</p>
 <ul>
-<li>5+ hours of study The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of</li>
+<li>
+<strong>5+ hours of study</strong>: The largest effect is observed here, with a coefficient of 1.706 and an odds ratio of</li>
 </ul>
 <p><span class="math display">\[
-e^1.706 \approx 5.51
+e^{1.706} \approx 5.51
 \]</span></p>
 <p>Students who study five or more hours are therefore predicted to have substantially higher average grades than those who study less than one hour.</p>
 <p>The pattern is monotonic and strong: as reported study time increases, the model consistently predicts higher average grade proportions. This relationship remains even after adjusting for sleep, work hours, academic year, and other lifestyle variables.</p>
@@ -1834,7 +2111,7 @@ e^1.706 \approx 5.51
 <p>In this case study, the Beta regression model helps us understand how different aspects of students’ academic lives relate to their final course grades. Rather than treating grades as isolated numbers, the model allows us to view them as outcomes shaped by study habits, routines, and context. Below, we distill the key takeaways from the analysis and discuss what they imply for students, instructors, and academic support staff.</p>
 <section id="key-insights-from-the-model" class="level3" data-number="5.14.1"><h3 data-number="5.14.1" class="anchored" data-anchor-id="key-insights-from-the-model">
 <span class="header-section-number">5.14.1</span> Key Insights From the Model</h3>
-<p>Study time stands out as the primary driver of academic performance. Across all model specifications, higher reported study time is consistently associated with higher average grades. The relationship is not only statistically significant, but also monotonic: students who study more tend to achieve better outcomes, even after accounting for sleep, work commitments, and other lifestyle factors. This reinforces a simple but powerful message—sustained study effort plays a central role in academic success.</p>
+<p>Study time stands out as the primary driver of academic performance. Across all model specifications, higher reported study time is consistently associated with higher average grades. The relationship is not only statistically significant, but also monotonic: students who study more tend to achieve better outcomes, even after accounting for sleep, work commitments, and other lifestyle factors. This reinforces a simple but powerful message: sustained study effort plays a central role in academic success.</p>
 <p>From a practical perspective, this suggests that interventions aimed at improving time management, study planning, and sustained engagement with course material are likely to yield meaningful benefits. Academic advisors and instructors might focus less on where or how students study, and more on helping them build realistic, consistent study routines.</p>
 <p>Many commonly discussed lifestyle factors show little evidence of association once study time is accounted for. Variables such as hours of sleep, part-time work hours, tutoring, study group participation, and living arrangement do not display strong independent associations with final grades in this model. While these factors are often assumed to influence academic outcomes, the analysis suggests that their effects may be indirect, context-dependent, or mediated through study time itself.</p>
 <p>This does not mean that sleep or academic support are unimportant. Rather, it suggests that their influence may be more subtle than often assumed, or that they matter most when they enable students to study more effectively. In other words, these factors may support learning indirectly rather than directly translating into higher grades.</p>
@@ -1850,15 +2127,15 @@ e^1.706 \approx 5.51
 </div>
 </section></section><section id="conclusion" class="level2" data-number="5.15"><h2 data-number="5.15" class="anchored" data-anchor-id="conclusion">
 <span class="header-section-number">5.15</span> Conclusion</h2>
-<p>This chapter has walked through a complete data science workflow using Beta regression, from problem formulation and data preparation to modeling, diagnostics, and interpretation. Along the way, we have seen how Beta regression offers a principled and flexible framework for analyzing outcomes that are continuous, bounded between zero and one, and heteroskedastic.</p>
+<p>And that wraps up the Beta regression chapter. We have walked through a complete data science workflow, from problem formulation and data preparation to modelling, diagnostics, and interpretation and seen how Beta regression offers a principled and flexible framework for outcomes that are continuous, bounded between zero and one, and heteroskedastic.</p>
 <p>More importantly, the chapter highlights that the value of Beta regression lies not just in fitting a model, but in using the model thoughtfully within a broader analytical process. Careful study design, appropriate preprocessing, exploratory analysis, model checking, and clear communication are what ultimately turn proportion data into actionable insight.</p>
-<p>With these ideas in place, you are now equipped to apply Beta regression to a wide range of real-world problems, from academic performance and completion rates to conversion metrics and coverage proportions, and to communicate your findings in a way that supports informed decision-making.</p>
+<p>With these ideas in place, you are now ready to apply Beta regression confidently and communicate your findings in a way that supports informed decision-making.</p>
 <div class="Warning">
 <div class="Warning-header">
 <p>Fun fact!</p>
 </div>
 <div class="Warning-container">
-<p><strong>Soup-erb!</strong> Soup that’s so heartwarming it feels like a cozy hug.</p>
+<p><strong>Beet-a you didn’t know!</strong> The beet plant belongs to the genus <em>Beta</em> (<em>Beta vulgaris</em>, to be precise). So the next time you run a Beta regression, remember that somewhere in a field, a humble root vegetable is quietly sharing your model’s name.</p>
 </div>
 </div>
 <div id="fig-beta-regression" class="quarto-float quarto-figure quarto-figure-center anchored">
