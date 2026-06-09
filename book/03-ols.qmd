@@ -2918,11 +2918,192 @@ If influential points are identified, the next steps involve investigating data 
 
 ## Results
 
-After validating the goodness of fit, we now assess how well the model performs in both predictive analysis and inferential analysis. This step involves using the trained model to generate predictions on unseen data and evaluating how well it generalizes beyond the training set. Additionally, we analyze the estimated regression coefficients to draw meaningful conclusions about student financial behaviors.
+After assessing the goodness of fit and checking the main OLS assumptions, we now evaluate the fitted model from two perspectives: **inference** and **prediction.** First, we examine the estimated regression coefficients, standard errors, and hypothesis tests to identify which student characteristics are meaningfully associated with `Net_Money`. This inferential analysis helps us interpret the direction, magnitude, and uncertainty of the associations between the regressors and student financial balance. Second, we use the trained model to generate predictions for the test data and examine how well the model performs on observations that were not used during training. 
+
+Together, these inferential and predictive results help us understand both which variables are associated with differences in `Net_Money` and how well the model predicts student financial balance.
+
+
+### Inferential Analysis
+
+To address our inferential question, we fit the OLS model on the **test data** and examine the estimated regression coefficients. The goal is to identify which student characteristics are associated with `Net_Money`, while holding the other regressors fixed. For each coefficient, we consider the estimated effect size, standard error, test statistic, p-value, and confidence interval.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| lst-label: lst-ols-data-testing-r
+#| lst-cap: "Code to fit an Ordinary Least-squares (OLS) regression model on test data."
+#| message: false
+
+# Loading libraries
+library(tidyverse)
+library(broom)
+
+# Fitting the OLS model
+testing_OLS_model <- lm(
+  formula = Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type, 
+  data = test_data
+)
+
+# Creating a tidy inferential summary with 95% confidence intervals
+testing_OLS_tidy <- tidy(
+  testing_OLS_model,
+  conf.int = TRUE,
+  conf.level = 0.95
+) |>
+  mutate_if(is.numeric, round, 2)
+
+# Displaying the tidy table
+testing_OLS_tidy
+```
+
+## **`Python`**
+
+```{python}
+#| lst-label: lst-ols-data-testing-py
+#| lst-cap: "Code to fit an Ordinary Least-squares (OLS) regression model on test data."
+#| message: false
+# Fitting the OLS model
+testing_OLS_model = smf.ols(
+    formula="Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type",
+    data=test_data
+).fit()
+
+# Obtaining 95% confidence intervals
+testing_OLS_ci = testing_OLS_model.conf_int(alpha=0.05)
+testing_OLS_ci.columns = ["conf.low", "conf.high"]
+
+# Creating a tidy inferential summary table
+testing_OLS_tidy = pd.DataFrame({
+    "term": testing_OLS_model.params.index,
+    "estimate": np.round(testing_OLS_model.params.values, 2),
+    "std.error": np.round(testing_OLS_model.bse.values, 2),
+    "statistic": np.round(testing_OLS_model.tvalues.values, 2),
+    "p.value": np.round(testing_OLS_model.pvalues.values, 4),
+    "conf.low": np.round(testing_OLS_ci["conf.low"].values, 2),
+    "conf.high": np.round(testing_OLS_ci["conf.high"].values, 2)
+})
+
+# Displaying the tidy table
+print(testing_OLS_tidy.to_string(index=False))
+```
+
+:::
+
+To help organize the coefficient-level results, @tbl-net-money-inferential-results summarizes the inferential evidence for each model term. For each term, the table reports the estimated coefficient, its standard error, the corresponding (t)-statistic, the associated (p)-value, the 95% confidence interval, and the resulting decision at the significance level (\alpha = 0.05).
+
+```{r}
+#| label: tbl-net-money-inferential-results
+#| tbl-cap: "Inferential summary of coefficient-level t-tests for the OLS model fitted on the test data."
+#| echo: false
+#| message: false
+#| warning: false
+
+net_money_inferential_results <- tidy(testing_OLS_model, conf.int = TRUE) |>
+  transmute(
+    Term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "Has_JobYes" ~ "Has job: Yes vs No",
+      term == "Year_of_Study" ~ "Year of study",
+      term == "Financially_DependentYes" ~ "Financially dependent: Yes vs No",
+      term == "Monthly_Allowance" ~ "Monthly allowance",
+      term == "Cooks_at_HomeYes" ~ "Cooks at home: Yes vs No",
+      term == "Goes_Out_Spends_Money" ~ "Goes out/spends money",
+      term == "Drinks_AlcoholYes" ~ "Drinks alcohol: Yes vs No",
+      term == "Monthly_Earnings" ~ "Monthly earnings",
+      term == "Living_SituationShared" ~ "Living situation: Shared vs Family",
+      term == "Living_SituationAlone" ~ "Living situation: Alone vs Family",
+      term == "Housing_TypeOwn" ~ "Housing type: Own vs Rent",
+      term == "Housing_TypeDormitory" ~ "Housing type: Dormitory vs Rent",
+      TRUE ~ term
+    ),
+    Estimate = formatC(estimate, format = "f", digits = 2, big.mark = ","),
+    `Std. Error` = formatC(std.error, format = "f", digits = 2, big.mark = ","),
+    `t-statistic` = round(statistic, 2),
+    `p-value` = case_when(
+      p.value < 0.001 ~ "< .001",
+      TRUE ~ sprintf("%.4f", p.value)
+    ),
+    `95% CI` = paste0(
+      "[",
+      formatC(conf.low, format = "f", digits = 2, big.mark = ","),
+      ", ",
+      formatC(conf.high, format = "f", digits = 2, big.mark = ","),
+      "]"
+    ),
+    Decision = case_when(
+      p.value < 0.05 ~ "Reject H0",
+      TRUE ~ "Fail to reject H0"
+    )
+  )
+
+knitr::kable(net_money_inferential_results, align = "c")
+```
+
+
+The coefficient-level tests in @tbl-net-money-inferential-results identify which regressors show statistical evidence of association with `Net_Money`. To support the next step of interpretation, @tbl-net-money-significant-coefs-ci reports the estimated coefficients and 95% confidence intervals for the statistically significant regressors only. These intervals help quantify a plausible range of values for each association under the fitted model.
+
+For numeric regressors, the coefficient represents the estimated change in `Net_Money` associated with a one-unit increase in the regressor, holding the other variables fixed. For categorical regressors, the coefficient represents the estimated difference in `Net_Money` relative to the baseline category. In both cases, confidence intervals that do not include zero are consistent with statistical significance at the level (\alpha = 0.05).
+
+```{r}
+#| label: tbl-net-money-significant-coefs-ci
+#| tbl-cap: "Estimated coefficients and 95% confidence intervals for the statistically significant regressors in the OLS model fitted on the test data."
+#| echo: false
+#| message: false
+#| warning: false
+
+net_money_significant_ci_results <- tidy(
+  testing_OLS_model,
+  conf.int = TRUE,
+  conf.level = 0.95
+) |>
+  filter(term != "(Intercept)", p.value < 0.05) |>
+  transmute(
+    Term = case_when(
+      term == "Has_JobYes" ~ "Has job: Yes vs No",
+      term == "Year_of_Study" ~ "Year of study",
+      term == "Financially_DependentYes" ~ "Financially dependent: Yes vs No",
+      term == "Monthly_Allowance" ~ "Monthly allowance",
+      term == "Cooks_at_HomeYes" ~ "Cooks at home: Yes vs No",
+      term == "Goes_Out_Spends_Money" ~ "Goes out/spends money",
+      term == "Drinks_AlcoholYes" ~ "Drinks alcohol: Yes vs No",
+      term == "Monthly_Earnings" ~ "Monthly earnings",
+      term == "Living_SituationShared" ~ "Living situation: Shared vs Family",
+      term == "Living_SituationAlone" ~ "Living situation: Alone vs Family",
+      term == "Housing_TypeOwn" ~ "Housing type: Own vs Rent",
+      term == "Housing_TypeDormitory" ~ "Housing type: Dormitory vs Rent",
+      TRUE ~ term
+    ),
+    Estimate = formatC(estimate, format = "f", digits = 2, big.mark = ","),
+    `95% CI Lower` = formatC(conf.low, format = "f", digits = 2, big.mark = ","),
+    `95% CI Upper` = formatC(conf.high, format = "f", digits = 2, big.mark = ",")
+  )
+
+knitr::kable(net_money_significant_ci_results, align = "c")
+```
+
+
+#### Insights from Regression Coefficients
+
+The results suggest that several regressors are meaningfully associated with `Net_Money`. `Year_of_Study` has an estimated coefficient of -89.4, with a 95% confidence interval from -113.0 to -65.5. This suggests that, holding the other variables fixed, moving up by one academic year is associated with an estimated decrease of about 89.4 CAD in predicted financial balance.
+
+`Financially_Dependent` is also strongly associated with `Net_Money`. Students who are financially dependent are estimated to have a financial balance that is 511 CAD lower, on average, than students who are not financially dependent, holding the other regressors fixed. The confidence interval ranges from -564 to -459, suggesting a large negative association.
+
+Monthly financial variables also show clear associations with `Net_Money`. The coefficient for `Monthly_Allowance` is 1.44, meaning that each additional dollar of monthly allowance is associated with an estimated increase of 1.44 CAD in predicted financial balance, holding the other regressors fixed. Similarly, the coefficient for `Monthly_Earnings` is 0.98, suggesting that each additional dollar of monthly earnings is associated with an estimated increase of 0.98 CAD in predicted financial balance.
+
+Several behavioral variables are negatively associated with `Net_Money`. Students who cook at home are estimated to have a financial balance that is 120 CAD lower than students who do not cook at home, holding other variables fixed. A one-unit increase in `Goes_Out_Spends_Money` is associated with an estimated decrease of 55.4 CAD in predicted financial balance. Students who drink alcohol are estimated to have a financial balance that is 143 CAD lower than students who do not drink alcohol, holding the other regressors fixed.
+
+The housing-related variables also show meaningful associations. Compared with students living with family, students in shared housing are estimated to have a financial balance that is 103 CAD higher, while students living alone are estimated to have a financial balance that is 198 CAD higher, holding the other variables fixed. For housing type, students living in owned housing are estimated to have a financial balance that is 168 CAD lower than students living in rented housing, while students living in dormitory housing are estimated to have a financial balance that is 127 CAD higher than students living in rented housing.
+
+The only regressor that does not show strong evidence of association in this fitted model is `Has_Job`. Although the estimated coefficient is positive, with students who have a job estimated to have a financial balance that is 93.7 CAD higher than students without a job, the p-value is 0.20 and the confidence interval includes zero. Therefore, after accounting for monthly earnings and the other regressors in the model, there is not strong evidence that simply having a job is associated with `Net_Money`.
+
+Overall, the inferential results suggest that financial dependence, monthly allowance, monthly earnings, year of study, spending behavior, alcohol consumption, cooking at home, living situation, and housing type are associated with students’ financial balance. These results should be interpreted as associations rather than causal effects, since the model is fitted to observational data.
+
 
 ### Predictive Analysis
 
-A key objective of regression modelling is to generate reliable predictions. To assess how well our model generalizes, we apply it to the test dataset—a portion of the original data that was not used for model training. If the model’s predictions align closely with actual outcomes, we can conclude that it has strong predictive power.
+After examining which regressors are associated with `Net_Money`, we now assess the predictive performance of the model. The goal of this part of the analysis is to evaluate how well the trained model predicts financial balance for observations in the test data. To do this, we compare the observed values of `Net_Money` with the predicted values produced by the model and summarize the prediction error using appropriate performance metrics.
 
 In R, we use the `predict()` function to apply the trained OLS model to the test set. In Python, we use the `predict()` method from the `statsmodels` library in Python after ensuring the test data is properly formatted.
 
@@ -3001,23 +3182,6 @@ If the RMSE is significantly larger than the MAE, it suggests that the model is 
 
 In this case, the model’s performance metrics are encouraging. With a MAE of 175.48, the model’s predictions deviate from actual values by about $175 on average. The RMSE of 212.84, which is not drastically higher than the MAE, suggests that large errors are present but not excessively dominant. An R-squared value of 0.89 confirms that the model explains a substantial portion of the variance in `Net_Money`, indicating strong predictive performance and a solid overall model fit.
 
-### Inferential Analysis
-
-Beyond prediction, OLS regression allows us to interpret the estimated coefficients to uncover patterns in students’ financial behaviors. Each coefficient represents the expected change in `Net_Money` for a one-unit increase in the corresponding predictor, assuming all other variables remain constant.
-
-
-
-
-#### Insights from Regression Coefficients
-
-Here are a few insights that we can extract from the regression model result:
-
-- Financial dependency is one of the strongest negative predictors of financial balance. Students who rely on others—such as parents or guardians—for financial support tend to have $488.10 less in `Net_Money`. This may be due to having limited personal income, reduced autonomy in managing expenses, or tighter financial constraints imposed by dependency on external sources.
-- Spending habits, particularly related to social activities, also play a crucial role. Students who report going out and spending money more frequently experience a $47.85 decrease in `Net_Money` for each unit increase in this behavior. This result aligns with expectations: frequent socializing often involves discretionary expenses such as dining out or entertainment, which can erode savings or disposable income over time.
-- Another lifestyle factor, alcohol consumption, is associated with a $139.96 drop in `Net_Money`. This relatively large effect suggests that students who drink alcohol regularly may also engage in broader spending behaviors linked to nightlife or entertainment, significantly impacting their overall financial standing. It also highlights alcohol as a strong proxy for costly social habits.
-- Finally, the student’s living situation is associated with financial advantage. Certain types of living arrangements correspond to an increase of $107.92 in `Net_Money`. This may reflect the financial benefits of shared housing, university-subsidized residences, or lower-cost arrangements. Choosing a cost-effective living setup appears to have a notable influence on students’ financial outcomes.
-
-These findings suggest that students can improve their financial position through a combination of employment, controlled social spending, and strategic housing choices. Conversely, financial dependency and certain lifestyle habits like frequent alcohol use and going out may contribute to lower net balances. These insights can inform both personal budgeting decisions and institutional support strategies for student financial wellness.
 
 ## Storytelling
 
