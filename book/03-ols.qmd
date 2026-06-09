@@ -662,23 +662,27 @@ data.isna().sum()
 
 #### Encoding Categorical Variables
 
-For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like `Has_Job` and `Drinks_Alcohol` should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:
+For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like `Has_Job`, `Drinks_Alcohol`, `Financially_Dependent`, `Cooks_at_Home`, `Living_Situation`, and `Housing_Type` should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:
 
 ::: {.panel-tabset}
 ## **`R` Code**
 ```{r}
 # Convert binary categorical variables to factors
 data <- data |>
-  mutate(Has_Job = as.factor(Has_Job),
-         Drinks_Alcohol = as.factor(Drinks_Alcohol),
-         Financially_Dependent = as.factor(Financially_Dependent),
-         Cooks_at_Home = as.factor(Cooks_at_Home))
+  mutate(
+    Has_Job = factor(Has_Job, levels = c(0,1), labels = c("No", "Yes")),
+    Drinks_Alcohol = factor(Drinks_Alcohol, levels = c(0,1), labels = c("No", "Yes")),
+    Financially_Dependent = factor(Financially_Dependent, levels = c(0,1), labels = c("No", "Yes")),
+    Cooks_at_Home = factor(Cooks_at_Home, levels = c(0,1), labels = c("No", "Yes")),
+    Living_Situation = factor(Living_Situation, levels = c(1,2,3), labels = c("Family", "Shared", "Alone")),
+    Housing_Type = factor(Housing_Type, levels = c(1,2,3), labels = c("Rent", "Own", "Dormitory"))
+  )
 ```
 
 ## **`Python` Code**
 ```{python}
 # Convert binary columns to categorical dtype
-cols_to_convert = ["Has_Job", "Drinks_Alcohol", "Financially_Dependent", "Cooks_at_Home"]
+cols_to_convert = ["Has_Job", "Drinks_Alcohol", "Financially_Dependent", "Cooks_at_Home", "Living_Situation", "Housing_Type"]
 data[cols_to_convert] = data[cols_to_convert].astype("category")
 ```
 :::
@@ -1672,7 +1676,7 @@ After completing the exploratory data analysis, the next step is to develop a st
 
 The primary goal of regression modeling is to understand how changes in regressors are associated with changes in a response variable. Depending on the application, regression models may be used for inference, prediction, or both. In some settings, analysts are primarily interested in interpreting the estimated coefficients and understanding the relationships between variables. In other situations, the primary objective is accurate prediction of future or unseen observations.
 
-Building a regression model is not simply a matter of applying the `lm()` function to a dataset. Data modeling is an iterative process that involves selecting appropriate variables, deciding how those variables should be represented mathematically, fitting the model, evaluating model assumptions, and refining the model when necessary. Insights obtained during exploratory data analysis often play an important role in guiding these decisions.
+Building a regression model is not simply a matter of applying functions in `R` or `Python` to a dataset. Data modeling is a process that involves selecting appropriate variables, deciding how those variables should be represented mathematically, fitting the model, evaluating model assumptions, and refining the model when necessary. Insights obtained during exploratory data analysis often play an important role in guiding these decisions.
 
 In practice, regressors may also require preprocessing including converting categorical variables into dummy variables, transforming skewed variables using logarithms, creating interaction terms, or adding polynomial terms to capture nonlinear relationships. These preprocessing decisions can substantially affect both the interpretability and predictive performance of the final model.
 
@@ -1684,17 +1688,17 @@ The choice of regression model depends on the patterns identified in EDA and the
 
 | Technique | What the technique is | References |
 |---|---|---|
-| **Simple Linear Regression** | Models the relationship between one predictor variable and a continuous response variable. This approach is useful when the goal is to examine whether a single dominant factor explains variation in financial balance. | @montgomery2012 |
+| **Simple Linear Regression** | Models the relationship between one regressor and a continuous response variable. This approach is useful when the goal is to examine whether a single dominant factor explains variation in financial balance. | @montgomery2012 |
 | **Multiple Linear Regression** | Extends simple linear regression by including two or more regressors. This allows the model to account for several financial, demographic, or behavioural factors simultaneously. | @montgomery2012 |
-| **Polynomial Regression** | Extends linear regression by adding polynomial terms, such as squared or cubic predictors, to capture curved relationships between predictors and the response variable. | @montgomery2012 |
+| **Polynomial Regression** | Extends linear regression by adding polynomial terms, such as squared or cubics of regressors to capture curved relationships between regressors and the response variable. | @montgomery2012 |
 | **Log-Linear Models** | Transform skewed distributions to improve interpretability and meet regression assumptions. | @montgomery2012 |
-| **Regularized Regression (Ridge and Lasso)** | Adds penalty terms to the regression coefficients to shrink estimates. Ridge regression is useful for handling multicollinearity, while Lasso can also perform variable selection by shrinking some coefficients to zero. | @hastie2009 |
+| **Regularized Regression (Ridge and Lasso)** | Adds penalty terms to the regression coefficients to shrink estimates. **Ridge** regression is useful for handling multicollinearity, while **Lasso** can also perform variable selection by shrinking some coefficients to zero. | @hastie2009 |
 
-Given that our goal is to examine how multiple factors-such as income, expenses, and living arrangements—affect students’ financial balance, we select **Multiple Linear Regression** via OLS. This method allows us to quantify the influence of each regressor while controlling for confounding effects.
+Given that our goal is to examine how multiple factors-such as income, expenses, and living arrangements affect students’ financial balance, we select **Multiple Linear Regression**. This method allows us to quantify the influence of each regressor while controlling for confounding effects.
 
 ### Defining the Regression Model
 
-Once we select OLS regression, we define the response variable and the set of predictor variables used to explain variation in the response and write the regression equation. Suppose we observe data from $n$ students. Let $Y_i$ represent the continuous financial balance (`Net_Money`) in CAD for the $i$-th student, where $i = 1, 2, \ldots, n$.
+Once we select OLS regression, we define the response variable and the set of regressors used to explain variation in the response and write the regression equation. Suppose we observe data from $n$ students. Let $Y_i$ represent the continuous financial balance (`Net_Money`) in CAD for the $i$-th student, where $i = 1, 2, \ldots, n$.
 
 For the observed regressors, we define the following:
 
@@ -1837,7 +1841,7 @@ Note that the index $i$ represents the $i$-th individual in the sample and the $
 
 ## Estimation
 
-With the data modelling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each regressor contributes to the response variable, allowing us to measure their individual effects on Net Money.
+With the data modelling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each regressor contributes to the response variable, allowing us to measure their individual effects on net money.
 
 In ordinary least squares, the coefficients are chosen so that the fitted values are as close as possible to the observed responses. For a given observation, the fitted value is
 
@@ -1862,9 +1866,9 @@ Y_i - \left(\beta_0 + \sum_{j=1}^{p} \beta_j x_{i,j}\right)
 \right]^2.
 $$
 
-This objective function gives a mathematical meaning to the phrase “best-fitting line.” The best-fitting model is the one whose coefficients make the squared residuals as small as possible.
+This objective function gives a mathematical meaning to the phrase “best-fitting line” described earlier in this chapter. The best-fitting model is the one whose coefficients make the squared residuals as small as possible. Strictly speaking, when a regression model has more than one regressor, the fitted object is not a line but a hyperplane.
 
-Although functions such as `lm()` in R and `ols()` in Python estimate regression coefficients automatically, it is helpful to understand the mathematical foundation behind ordinary least squares. The following tip briefly shows how the same least squares idea can be written compactly using matrix notation and how the coefficients are estimated so that the sum of squared of residuals is minimized. 
+Although functions such as `lm()` in R and `ols()` in Python estimate regression coefficients automatically for us, it is helpful to understand the mathematical foundation behind ordinary least squares. The following tip briefly shows how the same least squares idea can be written compactly using matrix notation and how the coefficients are estimated so that the sum of squared of residuals is minimized. 
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -1887,7 +1891,7 @@ where:
   
 - $\boldsymbol{\varepsilon}$ is an $n \times 1$ vector of random errors (residual terms).
 
-If we have $n$ observations and $p$ regressors, the design matrix may look like
+If we have $n$ observations and $p$ regressors, the **design matrix** may look like
 
 $$
 \mathbf{X} =
@@ -1903,7 +1907,7 @@ Each row of the matrix corresponds to one observation in the dataset, while each
 
 The first column of ones represents the intercept term. Including this column allows the model to estimate a constant baseline value (the intercept) rather than forcing the regression line (or more accurately hyperplane) to pass through the origin.
 
-For example, suppose we have data from $n = 100$ individuals and we want to predict salary using two predictors: years of experience and years of education. In this case, the response vector $\mathbf{Y}$ would contain 100 salary values, making it a $100 \times 1$ vector. Since we have two regressors plus an intercept term, the design matrix $\mathbf{X}$ would have 100 rows and 3 columns. The first column would contain only ones for the intercept, the second column might contain years of experience, and the third column might contain years of education. The coefficient vector $\boldsymbol{\beta}$ would therefore contain three coefficients: one intercept coefficient and one coefficient for each predictor.
+For example, suppose we have data from $n = 100$ individuals and we want to predict salary using two regressors: *years of experience* and *years of education.* In this case, the response vector $\mathbf{Y}$ would contain 100 salary values, making it a $100 \times 1$ vector. Since we have two regressors plus an intercept term, the design matrix $\mathbf{X}$ would have 100 rows and 3 columns. The first column would contain only ones for the intercept, the second column might contain years of experience, and the third column might contain years of education. The coefficient vector $\boldsymbol{\beta}$ would therefore contain three coefficients: one intercept coefficient and one coefficient for each regressor.
 
 A small portion of the design matrix may look like
 
@@ -1928,12 +1932,12 @@ where:
 Recall that the goal of OLS is to find the coefficient vector $\boldsymbol{\beta}$ that minimizes the sum of squared residuals:
   
 $$
-RSS = \sum_{i=1}^{n}(Y_i - \hat{Y}_i)^2
+SSE = \sum_{i=1}^{n}(Y_i - \hat{Y}_i)^2
 $$
 This objective function can be written more compactly by using matrix notation as:
 
 $$
-RSS = (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+SSE = (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
 $$
   
 These two objects are mathematically the same, the second one is presented in matrix form. Here, the superscript ${}^\top$ denotes the matrix transpose operation, which converts a column vector into a row vector. This allows the expression to produce a single scalar value representing the residual sum of squares.
@@ -1941,7 +1945,7 @@ These two objects are mathematically the same, the second one is presented in ma
 To find the value of $\boldsymbol{\beta}$ that minimizes the residual sum of squares, we differentiate the objective function with respect to $\boldsymbol{\beta}$ and set the derivative equal to zero. Starting from the matrix form of the residual sum of squares,
 
 $$
-RSS =
+SSE =
 (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top
 (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
 $$
@@ -1949,7 +1953,7 @@ $$
 we can expand the expression as follows:
 
 $$
-RSS =
+SSE =
 \left(\mathbf{Y}^\top - (\mathbf{X}\boldsymbol{\beta})^\top\right)
 (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
 $$
@@ -1958,7 +1962,7 @@ Using the transpose rule $(\mathbf{X}\boldsymbol{\beta})^\top =
 \boldsymbol{\beta}^\top \mathbf{X}^\top$, we get
 
 $$
-RSS =
+SSE =
 (\mathbf{Y}^\top - \boldsymbol{\beta}^\top \mathbf{X}^\top)
 (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
 $$
@@ -1966,7 +1970,7 @@ $$
 Now multiply the terms:
 
 $$
-RSS =
+SSE =
 \mathbf{Y}^\top \mathbf{Y}
 -
 \mathbf{Y}^\top \mathbf{X}\boldsymbol{\beta}
@@ -1987,7 +1991,7 @@ $$
 Therefore, the expression simplifies to
 
 $$
-RSS =
+SSE =
 \mathbf{Y}^\top \mathbf{Y}
 -
 2\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
@@ -2035,7 +2039,7 @@ $$
   
 This expression is known as the **ordinary least squares estimator**. Conceptually, OLS chooses the regression coefficients that produce the smallest possible squared prediction error for the observed data.
 
-In practice, software such as `lm()` in R computes these estimates automatically using efficient numerical algorithms rather than explicitly calculating matrix inverses. Although we do not need to perform these calculations by hand, it is still important to understand what happens behind the scenes when fitting a linear regression model using the `lm()` function.
+In practice, software such as `lm()` in R computes these estimates automatically using efficient numerical algorithms rather than explicitly calculating matrix inverses. Although we do not need to perform these calculations by hand, it is still important to understand what happens behind the scenes when fitting a linear regression model using the `lm()` function for example.
 
 ::::
 :::
@@ -2043,9 +2047,7 @@ In practice, software such as `lm()` in R computes these estimates automatically
 
 ### Fitting the Model
 
-To estimate the regression coefficients, we fit the OLS model to the training data using Python (`statsmodels`) or R (`lm`). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions.
-
-In R, we can fit the regression model using the `lm()` function:
+To estimate the regression coefficients, we fit the OLS model to the training data using Python (`ols` method from `statsmodels`) or R (`lm` function). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions. In R, we can fit the regression model using the `lm()` function:
 
 ::: {.panel-tabset}
 
@@ -2053,7 +2055,7 @@ In R, we can fit the regression model using the `lm()` function:
 
 ``` {.r}
 # Fit the OLS model
-ols_model <- lm(Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home, data = train_data)
+ols_model <- lm(Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type, data = train_data)
 
 # Displaying the tidy table
 tidy(ols_model) |>
@@ -2064,14 +2066,26 @@ tidy(ols_model) |>
 
 ``` {.python}
 import statsmodels.formula.api as smf
+import numpy as np
+import pandas as pd
 
 # Fit the OLS model using a formula
 ols_model = smf.ols(
-    formula="Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home",
+    formula="Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type",
     data=train_data
 ).fit()
 
-ols_model.params
+# Creating a tidy summary table
+testing_OLS_tidy = pd.DataFrame({
+     "term": ols_model.params.index,
+     "estimate": np.round(ols_model.params.values, 2),
+     "std_error": np.round(ols_model.bse.values, 2),
+     "t_value": np.round(ols_model.tvalues.values, 2),
+     "p_value": np.round(ols_model.pvalues.values, 2)
+ })
+ 
+# Displaying the tidy table
+print(testing_OLS_tidy)
 ```
 
 :::
@@ -2084,8 +2098,9 @@ ols_model.params
 #| lst-label: lst-ols-training-r
 #| lst-cap: "Code to fit an Ordinary Least-squares (OLS) regression model on training data."
 #| message: false
+
 # Fit the OLS model
-ols_model <- lm(Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home, data = train_data)
+ols_model <- lm(Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type, data = train_data)
 
 # Displaying the tidy table
 tidy(ols_model) |>
@@ -2103,26 +2118,21 @@ import statsmodels.formula.api as smf
 
 # Fit the OLS model using a formula
 ols_model = smf.ols(
-    formula="Net_Money ~ Has_Job + Financially_Dependent + Year_of_Study + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Allowance + Monthly_Earnings + Living_Situation + Housing_Type + Cooks_at_Home",
+    formula="Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type",
     data=train_data
 ).fit()
 
-ols_model.params
-
-# # Creating a tidy summary table
-# testing_OLS_tidy = pd.DataFrame({
-#     "term": ols_model.params.index,
-#     "estimate": np.round(ols_model.params.values, 2),
-#     "std_error": np.round(ols_model.bse.values, 2),
-#     "t_value": np.round(ols_model.tvalues.values, 2),
-#     "p_value": np.round(ols_model.pvalues.values, 2)
-# })
-# 
-# # Displaying the tidy table
-# print(testing_OLS_tidy)
-# 
-# # Display summary of model results
-# print(ols_model.summary())
+# Creating a tidy summary table
+testing_OLS_tidy = pd.DataFrame({
+     "term": ols_model.params.index,
+     "estimate": np.round(ols_model.params.values, 2),
+     "std_error": np.round(ols_model.bse.values, 2),
+     "t_value": np.round(ols_model.tvalues.values, 2),
+     "p_value": np.round(ols_model.pvalues.values, 2)
+ })
+ 
+# Displaying the tidy table
+print(testing_OLS_tidy)
 ```
 
 :::
@@ -2160,32 +2170,32 @@ $$
 \begin{align*}
 \widehat{Y}_i
 &=
--647.24
+-440.18
 +
-91.24x_{i,1}
+102.36x_{i,1}
 -
-100.14x_{i,2}
+98.80x_{i,2}
 -
-488.10x_{i,3}
+482.31x_{i,3}
 +
 1.52x_{i,4}
 -
-86.39x_{i,5} \\
+87.44x_{i,5} \\
 &\quad
 -
-47.85x_{i,6}
+49.86x_{i,6}
 -
-139.96x_{i,7}
+144.11x_{i,7}
 +
-0.92x_{i,8}
+0.91x_{i,8}
 +
-\hat{\beta}_9x_{i,9}
+116.64x_{i,9}
 +
-\hat{\beta}_{10}x_{i,10}
+200.86x_{i,10}
+-
+118.49x_{i,11}
 +
-\hat{\beta}_{11}x_{i,11}
-+
-\hat{\beta}_{12}x_{i,12}.
+171.13x_{i,12}.
 \end{align*}
 $$
 
@@ -2193,26 +2203,25 @@ $$
 
 Here, $\widehat{Y}_i$ represents the predicted financial balance for the $i$-th student. We use $\widehat{Y}_i$ instead of $Y_i$ because the fitted equation gives the model's predicted value, not the exact observed value. The difference between the observed value $Y_i$ and the fitted value $\widehat{Y}_i$ is called the residual.
 
-Each coefficient should be interpreted conditionally on the other regressors in the model. In other words, $\hat{\beta}_j$ describes the estimated association between the regressor $x_{i,j}$ and the response variable, while holding the remaining regressors fixed.
+Each coefficient should be interpreted conditionally on the other regressors in the model. In other words, $\hat{\beta}_j$ describes the estimated association between the regressor $x_{i,j}$ and the response variable while holding the remaining regressors fixed.
 
-For example, $x_{i,4}$ represents `Monthly_Allowance`. The estimated coefficient for this regressor is $1.52$. This means that, among students with the same values for the other regressors in the model, a one-dollar increase in monthly allowance is associated with an estimated increase of 1.52 CAD in predicted financial balance, on average.
+For example, $x_{i,4}$ represents `Monthly_Allowance`. The estimated coefficient for this regressor is $1.52$. This means that, among students with the same values for the other regressors in the model, a one-dollar increase in monthly allowance is associated with an estimated increase of 1.52 CAD in predicted financial balance on average.
 
-Similarly, $x_{i,8}$ represents `Monthly_Earnings`. The estimated coefficient for this regressor is $0.92$. Holding the other regressors fixed, a one-dollar increase in monthly earnings is associated with an estimated increase of 0.92 CAD in predicted financial balance, on average.
+Similarly, $x_{i,8}$ represents `Monthly_Earnings`. The estimated coefficient for this regressor is $0.91$. Holding the other regressors fixed, a one-dollar increase in monthly earnings is associated with an estimated increase of 0.91 CAD in predicted financial balance, on average.
 
-The interpretation of binary regressors is slightly different. For example, $x_{i,1}$ represents `Has_Job`, where $x_{i,1}=1$ if the student has a job and $x_{i,1}=0$ otherwise. The estimated coefficient is $91.24$. Therefore, holding the other regressors fixed, students with a job are estimated to have a financial balance that is 91.24 CAD higher, on average, than students without a job.
+The interpretation of binary regressors is slightly different. For example, $x_{i,1}$ represents `Has_Job`, where $x_{i,1}=1$ if the student has a job and $x_{i,1}=0$ otherwise. The estimated coefficient is $102.36$. Therefore, holding the other regressors fixed, students with a job are estimated to have a financial balance that is 102.36 CAD higher, on average, than students without a job.
 
-The coefficient of $x_{i,3}$ is $-488.10$. Since $x_{i,3}$ represents `Financially_Dependent`, this estimate compares students who are financially dependent to students who are not financially dependent. Holding the other regressors fixed, financially dependent students are estimated to have a financial balance that is 488.10 CAD lower, on average, than students who are not financially dependent.
+The coefficient of $x_{i,3}$ is $-482.31$. Since $x_{i,3}$ represents `Financially_Dependent`, this estimate compares students who are financially dependent to students who are not financially dependent. Holding the other regressors fixed, financially dependent students are estimated to have a financial balance that is 482.31 CAD lower, on average, than students who are not financially dependent.
 
-In this model, the ordinal variables `Year_of_Study` and `Goes_Out_Spends_Money` are treated as numeric regressors. Therefore, their coefficients are interpreted as linear one-unit changes. For example, $x_{i,2}$ represents `Year_of_Study`, and its estimated coefficient is $-100.14$. This means that, holding the other regressors fixed, moving up by one academic year is associated with an estimated decrease of 100.14 CAD in predicted financial balance, on average. Similarly, $x_{i,6}$ represents `Goes_Out_Spends_Money`, and its estimated coefficient is $-47.85$. This means that a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 47.85 CAD in predicted financial balance, on average, holding the other regressors fixed.
+In this model, the ordinal variables `Year_of_Study` and `Goes_Out_Spends_Money` are treated as numeric regressors. Therefore, their coefficients are interpreted as linear one-unit changes. For example, $x_{i,2}$ represents `Year_of_Study`, and its estimated coefficient is $-98.80$. This means that, holding the other regressors fixed, moving up by one academic year is associated with an estimated decrease of 98.80 CAD in predicted financial balance, on average. Similarly, $x_{i,6}$ represents `Goes_Out_Spends_Money`, and its estimated coefficient is $-49.86$. This means that a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 49.86 CAD in predicted financial balance, on average, holding the other regressors fixed.
 
 For categorical variables represented using dummy variables, each coefficient is interpreted relative to the baseline category. For `Living_Situation`, the baseline category is *Family*. Therefore, the coefficients of $x_{i,9}$ and $x_{i,10}$ compare students living in shared housing and students living alone, respectively, to students living with family, after controlling for the other regressors.
 
 Similarly, for `Housing_Type`, the baseline category is *Rent*. Therefore, the coefficients of $x_{i,11}$ and $x_{i,12}$ compare students living in owned housing and students living in dormitory housing, respectively, to students living in rented housing, after controlling for the other regressors.
 
-The intercept also has a mathematical interpretation but it is not always meaningful. Here, the intercept is $-647.24$. It represents the predicted financial balance for a student whose numerical regressors are equal to zero and whose categorical regressors are in their baseline categories. In this example, that would correspond to a student with zero monthly allowance, zero monthly earnings, and the baseline category for all categorical variables. Depending on the context, this combination may not describe a realistic student. Therefore, the intercept is often best viewed as the baseline value needed to construct the fitted regression equation, rather than as a quantity of direct practical interest.
+The intercept also has a mathematical interpretation but it is not always meaningful. Here, the intercept is $-440.18$. It represents the predicted financial balance for a student whose numerical regressors are equal to zero and whose categorical regressors are in their baseline categories. In this example, that would correspond to a student with zero monthly allowance, zero monthly earnings, and the baseline category for all categorical variables. Depending on the context, this combination may not describe a realistic student. Therefore, the intercept is often best viewed as the baseline value needed to construct the fitted regression equation, rather than as a quantity of direct practical interest.
 
 These coefficient estimates provide an initial summary of the direction and magnitude of the associations in the data. Positive coefficients indicate that larger values of a regressor are associated with larger predicted values of `Net_Money`, while negative coefficients indicate the opposite. However, these interpretations are descriptive at this stage. Before drawing stronger conclusions, we need to examine the model assumptions, quantify uncertainty around the estimates, and assess which coefficients provide meaningful evidence of association.
-
 
 ## Goodness of Fit
 
@@ -2222,10 +2231,10 @@ After estimating the regression coefficients, the next step is to assess how wel
 
 OLS regression is built on several fundamental assumptions:
 
-- linearity
-- independence of errors
-- homoscedasticity
-- normality of residuals
+- Linearity
+- Independence of errors
+- Homoscedasticity
+- Normality of residuals
 
 If these assumptions hold, OLS provides unbiased, efficient, and consistent estimates. We assess each assumption through diagnostic plots and statistical tests.
 
@@ -2235,20 +2244,17 @@ A core assumption of OLS is that the relationship between each predictor and the
 
 To visualize linearity, we plot the residuals against the fitted values:
 
-```{r}
-#| label: fig-residuals-vs-fitted-net-money
-#| fig-cap: "OLS diagnostic plot of residuals versus fitted values via training set."
-#| warning: false
-#| echo: false
-#| message: false
-#| fig.height: 8
-#| fig.width: 14
 
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
 # Extract residuals and fitted values
 aug_training <- augment(ols_model)
 
 # Plot
-residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .resid)) +
+residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
   geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
   geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
   labs(
@@ -2272,36 +2278,100 @@ residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .resid)) +
 residuals_vs_fitted
 ```
 
+## **`Python` Code**
 
-<!-- ::: {.panel-tabset} -->
-<!-- ## **`R` Code** -->
-<!-- ```{r} -->
-<!-- # Residuals vs Fitted plot (R) -->
-<!-- plot(ols_model$fitted.values, residuals(ols_model),  -->
-<!--      main = "Residuals vs Fitted", xlab = "Fitted Values", ylab = "Residuals") -->
-<!-- abline(h = 0, col = "red") -->
-<!-- ``` -->
+``` {.python}
+import matplotlib.pyplot as plt
 
-<!-- ## **`Python` Code** -->
-<!-- ```{python} -->
-<!-- import matplotlib.pyplot as plt -->
+# Extract fitted values and residuals
+fitted_vals = ols_model.fittedvalues
+residuals = ols_model.resid
 
-<!-- # Extract fitted values and residuals -->
-<!-- fitted_vals = ols_model.fittedvalues -->
-<!-- residuals = ols_model.resid -->
+# Plot Residuals vs Fitted
+plt.figure(figsize=(6, 4))
+plt.scatter(fitted_vals, residuals, alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Residuals vs Fitted")
+plt.xlabel("Fitted Values")
+plt.ylabel("Residuals")
+plt.tight_layout()
+plt.show()
+```
 
-<!-- # Plot Residuals vs Fitted -->
-<!-- plt.figure(figsize=(6, 4)) -->
-<!-- plt.scatter(fitted_vals, residuals, alpha=0.7) -->
-<!-- plt.axhline(y=0, color='red', linestyle='--') -->
-<!-- plt.title("Residuals vs Fitted") -->
-<!-- plt.xlabel("Fitted Values") -->
-<!-- plt.ylabel("Residuals") -->
-<!-- plt.tight_layout() -->
-<!-- plt.show() -->
-<!-- ``` -->
-<!-- ::: -->
+:::
 
+  
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: fig-residuals-vs-fitted-net-money-r
+#| fig-cap: "OLS diagnostic plot of residuals versus fitted values via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Extract residuals and fitted values
+aug_training <- augment(ols_model)
+
+# Plot
+residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(
+    x = "\n Fitted Values (CAD)",
+    y = "Standardized Residuals (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    xlim = range(aug_training$.fitted, na.rm = TRUE),
+    ylim = range(aug_training$.std.resid, na.rm = TRUE)
+  ) +
+  scale_x_continuous(labels = label_dollar()) +
+  scale_y_continuous(labels = label_dollar())
+
+residuals_vs_fitted
+```
+
+## **`Python` Output**
+
+```{python}
+#| label: fig-residuals-vs-fitted-net-money-py
+#| fig-cap: "OLS diagnostic plot of residuals versus fitted values via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+import matplotlib.pyplot as plt
+
+# Extract fitted values and standardized residuals
+fitted_vals = ols_model.fittedvalues
+influence = ols_model.get_influence()
+standardized_residuals = influence.resid_studentized_internal
+
+# Plot Residuals vs Fitted
+plt.figure(figsize=(6, 4))
+plt.scatter(fitted_vals, standardized_residuals, alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Standardized Residuals vs Fitted")
+plt.xlabel("Fitted Values")
+plt.ylabel("Standardized Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+:::
 
 If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure. However, in this case, the residuals appear to be randomly scattered around the horizontal axis, with no obvious patterns such as curves or systematic structure. This suggests that the linearity assumption of the OLS model holds reasonably well in this case. Therefore, no immediate transformation or addition of nonlinear terms is necessary to capture the relationship between predictors and the response variable.
 
@@ -2328,18 +2398,15 @@ print(f"Durbin-Watson statistic: {dw_stat:.3f}")
 ```
 :::
 
-Based on the Durbin-Watson test, the test statistic is 1.9437 with a p-value of 0.2133. Since the statistic is close to 2 and the p-value is not statistically significant, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.
+Based on the Durbin-Watson test, the test statistic is 1.8927 with a p-value of 0.06475. Since the statistic is close to 2 and the p-value is not statistically significant at 5 percent, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.
 
 If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.
 
 #### Homoscedasticity (Constant Variance of Errors)
 
-
-
 OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
 
 To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.
-
 
 
 ::: {.panel-tabset}
@@ -2368,12 +2435,9 @@ print(f"P-value: {bp_pvalue:.4f}")
 :::
 
 
+Since the p-value (0.1072) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
 
-Since the p-value (0.1563) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
-
-If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the dependent variable (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
-
-
+If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the regressors (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
 
 #### Normality of Residuals
 
@@ -2381,8 +2445,60 @@ For valid hypothesis testing and confidence interval estimation, OLS assumes tha
 
 A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
 
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Extract residuals (including standardized residuals)
+aug_training <- augment(ols_model)
+
+# Plot
+QQ_plot <- ggplot(aug_training, aes(sample = .std.resid)) +
+  stat_qq(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  stat_qq_line(linewidth = 1, color = "red") +
+  labs(
+    x = "\n Theoretical Quantiles",
+    y = "Sample Quantiles\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  )
+
+QQ_plot
+```
+
+## **`Python` Code**
+
+``` {.python}
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+
+# Extract residuals from the model
+residuals = ols_model.resid
+
+# Q-Q plot of residuals
+plt.figure(figsize=(6, 4))
+empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
+plt.title("Q-Q Plot of Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+  
+::: {.panel-tabset}
+
+## **`R` Output**
+
 ```{r}
-#| label: fig-qq-plot-net-money
+#| label: fig-qq-plot-net-money-r
 #| fig-cap: "OLS diagnostic QQ-plot of standardized residuals via training set."
 #| warning: false
 #| echo: false
@@ -2412,32 +2528,32 @@ QQ_plot <- ggplot(aug_training, aes(sample = .std.resid)) +
 QQ_plot
 ```
 
+## **`Python` Output**
 
-<!-- ::: {.panel-tabset} -->
-<!-- ## **`R` Code** -->
-<!-- ```{r} -->
-<!-- qqnorm(residuals(ols_model)) -->
-<!-- qqline(residuals(ols_model), col = "red") -->
-<!-- ``` -->
+```{python}
+#| label: fig-qq-plot-net-money-py
+#| fig-cap: "OLS diagnostic QQ-plot of standardized residuals via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
 
-<!-- ## **`Python` Code** -->
-<!-- ```{python} -->
-<!-- import matplotlib.pyplot as plt -->
-<!-- import scipy.stats as stats -->
+import matplotlib.pyplot as plt
+import scipy.stats as stats
 
-<!-- # Extract residuals from the model -->
-<!-- residuals = ols_model.resid -->
+# Extract residuals from the model
+residuals = ols_model.resid
 
-<!-- # Q-Q plot of residuals -->
-<!-- plt.figure(figsize=(6, 4)) -->
-<!-- empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _ -->
-<!-- plt.title("Q-Q Plot of Residuals") -->
-<!-- plt.tight_layout() -->
-<!-- plt.show() -->
-<!-- ``` -->
-<!-- ::: -->
+# Q-Q plot of residuals
+plt.figure(figsize=(6, 4))
+empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to empty
+plt.title("Q-Q Plot of Residuals")
+plt.tight_layout()
+plt.show()
+```
 
-
+:::
 
 The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.
 
@@ -2474,7 +2590,7 @@ print(f"Adjusted R-squared: {adj_r_squared:.4f}")
 ```
 :::
 
-In this model, the R-squared is 0.894 and the adjusted R-squared is 0.892, indicating that around 89% of the variance in `Net_Money` is explained by the model.
+In this model, the R-squared is 0.9109 and the adjusted R-squared is 0.9095, indicating that around 90% of the variance in `Net_Money` is explained by the model.
 
 However, while $R^2$ provides insight into model fit, it has limitations. Adding more predictors will always increase $R^2$, even if those predictors have little explanatory power. That’s why Adjusted R-squared is often preferred, as it adjusts for the number of predictors and only increases when a new variable meaningfully improves the model.
 
@@ -2484,8 +2600,67 @@ Finally, a high $R^2$ should not be interpreted as evidence of causation, nor do
 
 Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.
 
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Extract residuals
+aug_training <- augment(ols_model)
+
+# Add observation index
+aug_training <- aug_training %>%
+  mutate(index = row_number())
+
+# Plot
+residuals_vs_index <- ggplot(aug_training, aes(x = index, y = .resid)) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
+  labs(
+    x = "\n Observation Index",
+    y = "Residuals (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  scale_y_continuous(labels = label_dollar())
+
+residuals_vs_index
+```
+
+## **`Python` Code**
+
+``` {.python}
+import matplotlib.pyplot as plt
+
+# Extract residuals
+residuals = ols_model.resid
+
+# Residual plot (residuals vs observation index)
+plt.figure(figsize=(6, 4))
+plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Residual Plot")
+plt.xlabel("Observation Index")
+plt.ylabel("Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+  
+::: {.panel-tabset}
+
+## **`R` Output**
+
 ```{r}
-#| label: fig-residuals-index-net-money
+#| label: fig-residuals-index-net-money-r
 #| fig-cap: "OLS diagnostic plot of residuals versus observation index via training set."
 #| warning: false
 #| echo: false
@@ -2520,40 +2695,103 @@ residuals_vs_index <- ggplot(aug_training, aes(x = index, y = .resid)) +
 residuals_vs_index
 ```
 
+## **`Python` Output**
 
-<!-- ::: {.panel-tabset} -->
-<!-- ## **`R` Code** -->
-<!-- ```{r} -->
-<!-- plot(residuals(ols_model), main = "Residual Plot", ylab = "Residuals") -->
-<!-- abline(h = 0, col = "red") -->
-<!-- ``` -->
+```{python}
+#| label: fig-residuals-index-net-money-py
+#| fig-cap: "OLS diagnostic plot of residuals versus observation index via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
 
-<!-- ## **`Python` Code** -->
-<!-- ```{python} -->
-<!-- import matplotlib.pyplot as plt -->
+import matplotlib.pyplot as plt
 
-<!-- # Extract residuals -->
-<!-- residuals = ols_model.resid -->
+# Extract residuals
+residuals = ols_model.resid
 
-<!-- # Residual plot (residuals vs observation index) -->
-<!-- plt.figure(figsize=(6, 4)) -->
-<!-- plt.plot(residuals, marker='o', linestyle='none', alpha=0.7) -->
-<!-- plt.axhline(y=0, color='red', linestyle='--') -->
-<!-- plt.title("Residual Plot") -->
-<!-- plt.xlabel("Observation Index") -->
-<!-- plt.ylabel("Residuals") -->
-<!-- plt.tight_layout() -->
-<!-- plt.show() -->
-<!-- ``` -->
-<!-- ::: -->
+# Residual plot (residuals vs observation index)
+plt.figure(figsize=(6, 4))
+plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
+plt.axhline(y=0, color='red', linestyle='--')
+plt.title("Residual Plot")
+plt.xlabel("Observation Index")
+plt.ylabel("Residuals")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
 
 In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers or highly influential observations in the dataset. The model residuals behave as expected, reinforcing the assumption that the data points do not exert undue influence on the regression fit.
 
 Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.
 
 
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Extract model diagnostics (includes Cook's distance)
+aug_training <- augment(ols_model) |>
+  mutate(row_id = row_number())
+
+# Plot
+cooks_distance_plot <- ggplot(aug_training, aes(x = row_id, y = .cooksd)) +
+  geom_col(fill = "#0073C2FF", color = "#0073C2FF") +
+  labs(
+    x = "\n Observation Index",
+    y = "Cook's Distance\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    ylim = c(0, max(aug_training$.cooksd, na.rm = TRUE))
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, max(aug_training$.cooksd, na.rm = TRUE), length.out = 6)
+  )
+
+cooks_distance_plot
+```
+
+## **`Python` Code**
+
+``` {.python}
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+
+# Get Cook's distance values
+influence = ols_model.get_influence()
+cooks_d = influence.cooks_distance[0]  # Values
+
+# Plot Cook's distance
+fig, ax = plt.subplots(figsize=(6, 4))
+markerline, stemlines, baseline = ax.stem(cooks_d, markerfmt=",")
+ax.set_title("Cook's Distance")
+ax.set_xlabel("Observation Index")
+ax.set_ylabel("Cook's Distance")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
 ```{r}
-#| label: fig-cooks-distance-net-money
+#| label: fig-cooks-distance-net-money-r
 #| fig-cap: "OLS diagnostic Cook's distance plot via training set."
 #| warning: false
 #| echo: false
@@ -2589,45 +2827,42 @@ cooks_distance_plot <- ggplot(aug_training, aes(x = row_id, y = .cooksd)) +
 cooks_distance_plot
 ```
 
+## **`Python` Output**
 
-<!-- ::: {.panel-tabset} -->
-<!-- ## **`R` Code** -->
-<!-- ```{r} -->
-<!-- cook_values <- cooks.distance(ols_model) -->
-<!-- plot(cook_values, type = "h", main = "Cook's Distance") -->
-<!-- ``` -->
+```{python}
+#| label: fig-cooks-distance-net-money-py
+#| fig-cap: "OLS diagnostic Cook's distance plot via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
 
-<!-- ## **`Python` Code** -->
-<!-- ```{python} -->
-<!-- import matplotlib.pyplot as plt -->
-<!-- import statsmodels.api as sm -->
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
 
-<!-- # Get Cook's distance values -->
-<!-- influence = ols_model.get_influence() -->
-<!-- cooks_d = influence.cooks_distance[0]  # Values -->
+# Get Cook's distance values
+influence = ols_model.get_influence()
+cooks_d = influence.cooks_distance[0]  # Values
 
-<!-- # Plot Cook's distance -->
-<!-- fig, ax = plt.subplots(figsize=(6, 4)) -->
-<!-- markerline, stemlines, baseline = ax.stem(cooks_d, markerfmt=",") -->
-<!-- ax.set_title("Cook's Distance") -->
-<!-- ax.set_xlabel("Observation Index") -->
-<!-- ax.set_ylabel("Cook's Distance") -->
-<!-- plt.tight_layout() -->
-<!-- plt.show() -->
-<!-- ``` -->
-<!-- ::: -->
+# Plot Cook's distance
+fig, ax = plt.subplots(figsize=(6, 4))
+markerline, stemlines, baseline = ax.stem(cooks_d, markerfmt=",")
+ax.set_title("Cook's Distance")
+ax.set_xlabel("Observation Index")
+ax.set_ylabel("Cook's Distance")
+plt.tight_layout()
+plt.show()
+```
 
-
+:::
 
 In the plot above, all observations have Cook’s Distance values well below the 0.5 threshold. This indicates that no individual data point has an undue influence on the model’s estimates. 
 
 If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
 
 
-
 ## Results
-
-
 
 After validating the goodness of fit, we now assess how well the model performs in both predictive analysis and inferential analysis. This step involves using the trained model to generate predictions on unseen data and evaluating how well it generalizes beyond the training set. Additionally, we analyze the estimated regression coefficients to draw meaningful conclusions about student financial behaviors.
 
