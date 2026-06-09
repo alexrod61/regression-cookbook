@@ -2225,7 +2225,7 @@ These coefficient estimates provide an initial summary of the direction and magn
 
 ## Goodness of Fit
 
-After estimating the regression coefficients, the next step is to assess how well the model fits on the training data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation ensures that the model is not only statistically valid but also generalizes well to unseen data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are violated, model estimates may be biased, leading to misleading conclusions.
+After estimating the regression coefficients, the next step is to assess how well the model fits on the training data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation helps us understand how well the model fits the training data and whether the fitted model is appropriate for interpretation. Generalization to unseen data should be assessed separately using prediction performance on test or validation data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are seriously violated, coefficient estimates, standard errors, confidence intervals, hypothesis tests, or predictions may become unreliable.
 
 ### Checking Model Assumptions
 
@@ -2259,7 +2259,7 @@ residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
   geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
   labs(
     x = "\n Fitted Values (CAD)",
-    y = "Residuals (CAD)\n"
+    y = "Standardized Residuals\n"
   ) +
   theme_bw() +
   theme(
@@ -2272,8 +2272,7 @@ residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
     xlim = range(aug_training$.fitted, na.rm = TRUE),
     ylim = range(aug_training$.resid, na.rm = TRUE)
   ) +
-  scale_x_continuous(labels = label_dollar()) +
-  scale_y_continuous(labels = label_dollar())
+  scale_x_continuous(labels = label_dollar()) 
 
 residuals_vs_fitted
 ```
@@ -2291,9 +2290,9 @@ residuals = ols_model.resid
 plt.figure(figsize=(6, 4))
 plt.scatter(fitted_vals, residuals, alpha=0.7)
 plt.axhline(y=0, color='red', linestyle='--')
-plt.title("Residuals vs Fitted")
+plt.title("Standardized Residuals\n vs Fitted")
 plt.xlabel("Fitted Values")
-plt.ylabel("Residuals")
+plt.ylabel("Standardized Residuals\n")
 plt.tight_layout()
 plt.show()
 ```
@@ -2323,7 +2322,7 @@ residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
   geom_hline(yintercept = 0, linewidth = 1, linetype = "dashed", color = "red") +
   labs(
     x = "\n Fitted Values (CAD)",
-    y = "Standardized Residuals (CAD)\n"
+    y = "Standardized Residuals\n"
   ) +
   theme_bw() +
   theme(
@@ -2334,10 +2333,9 @@ residuals_vs_fitted <- ggplot(aug_training, aes(x = .fitted, y = .std.resid)) +
   ) +
   coord_cartesian(
     xlim = range(aug_training$.fitted, na.rm = TRUE),
-    ylim = range(aug_training$.std.resid, na.rm = TRUE)
+    ylim = range(aug_training$.resid, na.rm = TRUE)
   ) +
-  scale_x_continuous(labels = label_dollar()) +
-  scale_y_continuous(labels = label_dollar())
+  scale_x_continuous(labels = label_dollar()) 
 
 residuals_vs_fitted
 ```
@@ -2402,6 +2400,8 @@ Based on the Durbin-Watson test, the test statistic is 1.8927 with a p-value of 
 
 If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.
 
+Note that because this dataset is not a time series, the independence assumption is primarily justified by the data collection design. The Durbin-Watson statistic is included here as an additional diagnostic but it is most relevant when observations have a natural ordering.
+
 #### Homoscedasticity (Constant Variance of Errors)
 
 OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
@@ -2435,7 +2435,7 @@ print(f"P-value: {bp_pvalue:.4f}")
 :::
 
 
-Since the p-value (0.1072) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
+Since the p-value (0.09357) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
 
 If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the regressors (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
 
@@ -2596,6 +2596,61 @@ However, while $R^2$ provides insight into model fit, it has limitations. Adding
 
 Finally, a high $R^2$ should not be interpreted as evidence of causation, nor does it guarantee the model is free from issues like omitted variable bias or multicollinearity. Always complement goodness-of-fit metrics with residual diagnostics and statistical inference to ensure model reliability.
 
+
+#### Multicollinearity
+
+In multiple regression, we also need to consider whether some regressors are strongly correlated with each other. This issue is called **multicollinearity**. Multicollinearity does not necessarily make the fitted values poor but it can make individual coefficient estimates unstable and difficult to interpret. In particular, it can inflate standard errors and make it harder to determine which regressors are meaningfully associated with the response variable.
+
+One common diagnostic for multicollinearity is the **Variance Inflation Factor** (VIF) as discussed before. The VIF measures how much the variance of an estimated coefficient is inflated because of linear relationships among the regressors. A VIF close to 1 suggests little multicollinearity, while larger values suggest stronger multicollinearity. As a rough rule of thumb, VIF values above 5 may deserve further investigation and values above 10 are problematic.
+
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+# Variance Inflation Factor (VIF)
+vif_table <- car::vif(ols_model)
+vif_table
+```
+
+## **`Python` Code**
+```{python}
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import pandas as pd
+
+# Variance Inflation Factor (VIF)
+X = ols_model.model.exog
+vif_table = pd.DataFrame({
+    "term": ols_model.model.exog_names,
+    "VIF": [variance_inflation_factor(X, i) for i in range(X.shape[1])]
+})
+
+print(vif_table)
+```
+:::
+
+The VIF diagnostics do not suggest severe multicollinearity for this model. Most reported values in GVIF column are close to 1 indicating little evidence that these regressors are strongly linearly related to the remaining regressors in the model. The largest values occur for two variables of `Has_Job` and `Monthly_Earnings`. Both values are around 6.35 suggesting some multicollinearity involving these variables, which is expected because students who have a job are also more likely to report monthly earnings. However, these values are not extreme, and both variables have clear practical interpretations in the context of the analysis. 
+
+Therefore, we do not remove either variable at this stage. Overall, the VIF diagnostics suggest that multicollinearity is not a major concern for this model. If high multicollinearity is detected, possible strategies include removing one of the highly related regressors, reducing the dimension by methods such as PCA, using domain knowledge to simplify the model, or using regularization methods such as ridge regression.
+
+::: {.Tip}
+::::{.Tip-header}
+Generalized VIF
+::::
+::::{.Tip-container}
+
+When a regression model includes only numeric regressors or binary categorical regressors, the usual Variance Inflation Factor (VIF) can be used to assess multicollinearity. However, categorical regressors with more than two levels are represented by multiple dummy variables. In that case, the `car::vif()` function reports the **generalized variance inflation factor** (GVIF) as you can see in the last column. This extends VIF to terms with more than one degree of freedom.
+
+To make GVIF values comparable across regressors with different numbers of degrees of freedom, we usually interpret the adjusted value,
+
+$$
+\text{GVIF}^{1/(2 \times \text{Df})}.
+$$
+
+Values close to 1 suggest little evidence of multicollinearity. Larger values suggest that the regressor may be strongly related to other regressors in the model and may deserve further investigation. As you can see most of values are near one (except `Has_Job` and `Monthly_Earnings`) suggesting no major multicollinearity problem. The details and formula of You can read more about GVIF here in @GVIF.
+
+::::
+:::
+
+
 #### Identifying Outliers and Influential Points
 
 Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.
@@ -2724,10 +2779,9 @@ plt.show()
 
 :::
 
-
 In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers or highly influential observations in the dataset. The model residuals behave as expected, reinforcing the assumption that the data points do not exert undue influence on the regression fit.
 
-Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Data points with Cook’s Distance values greater than 0.5 may significantly impact model estimates.
+Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Large Cook’s distance values may indicate observations that have a strong influence on the fitted model. Common rules of thumb include investigating values greater than 0.5 or values that stand out clearly relative to the rest of the observations.
 
 
 ::: {.panel-tabset}
@@ -2857,7 +2911,7 @@ plt.show()
 
 :::
 
-In the plot above, all observations have Cook’s Distance values well below the 0.5 threshold. This indicates that no individual data point has an undue influence on the model’s estimates. 
+In the plot above, all observations have Cook’s Distance values well below the 0.5 rule-of-thumb threshold and no observation appears to stand out substantially from the others. This suggests that no individual data point has an undue influence on the model’s estimates.
 
 If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
 
