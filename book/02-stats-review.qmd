@@ -12466,8 +12466,531 @@ The null standard error is used in the one-proportion hypothesis test when the n
 ::::
 :::
 
+::: {.Question}
+::::{.Question-header}
+Question 2.56
+::::
+::::{.Question-container}
+**Open-ended Question**
 
+A clinical team estimates the rate of successful follow-up as $\hat{\pi}_{\operatorname{obs}}=0.62$ from $n=400$ patients. Construct the approximate $95\%$ confidence interval using
 
+$$
+\hat{\pi}_{\operatorname{obs}}\pm z_{0.975}\sqrt{\frac{\hat{\pi}_{\operatorname{obs}}(1-\hat{\pi}_{\operatorname{obs}})}{n}},
+\qquad z_{0.975}\approx 1.96.
+$$
 
+Then, interpret the interval in context.
+::::
+:::
 
+::: {.Answer}
+::::{.Answer-header}
+Answer 2.56
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
 
+**Answer:**
+
+The **estimated standard error** is
+
+$$
+\sqrt{\frac{0.62(1-0.62)}{400}}
+=
+\sqrt{\frac{0.2356}{400}}
+\approx 0.0243.
+$$
+
+The **margin of error** is
+
+$$
+1.96(0.0243)\approx 0.0476.
+$$
+
+Therefore, the **approximate $95\%$ confidence interval** is
+
+$$
+0.62\pm 0.0476=(0.5724,0.6676).
+$$
+
+In context, this interval gives a plausible range for the population follow-up success probability under the Bernoulli sampling model and CLT approximation. We would report it as approximately $(0.57,0.67)$.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 2.57
+::::
+::::{.Question-container}
+**True or False**
+
+A public-health clinic is planning a study to evaluate whether a reminder phone call increases the probability that patients attend their annual screening appointment. The clinic does **not** want to wait until after the study to think about sample size. Instead, **before collecting data**, the analyst considers the following practically meaningful alternative:
+
+$$
+\pi_{\operatorname{call}}-\pi_{\operatorname{usual}}=0.08,
+$$
+
+meaning that the reminder call would increase attendance by $8$ percentage points compared with the usual reminder system.
+
+The clinic plans to use a one-sided test with significance level
+
+$$
+\alpha=0.05.
+$$
+
+A stakeholder says: 
+
+> "*If the true improvement is really $8$ percentage points, then using a larger sample size can make the study more likely to detect that improvement, while keeping $\alpha=0.05$ fixed.*"
+
+> *True or false:* The stakeholder's statement is correct.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 2.57
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** True.
+
+**Rationale:**
+
+he stakeholder's statement is **correct**. This is the basic idea behind **power** and **sample-size planning**.
+
+The significance level $\alpha$ controls the long-run probability of a Type I error: rejecting the null hypothesis $H_0$ when $H_0$ is true. In this study, using
+
+$$
+\alpha=0.05
+$$
+
+means that the test is designed so that, when there is truly no improvement, the rejection region contains $5\%$ of the null distribution.
+
+Via the CLT, for a one-sided right-tailed test, the rejection rule has the form
+
+$$
+Z_{\operatorname{obs}} \geq z_{0.95},
+$$
+
+where
+
+$$
+z_{0.95}\approx 1.645.
+$$
+
+@fig-power-null-rejection-region shows the null distribution and the rejection region controlled by $\alpha=0.05$.
+
+```{r}
+#| label: fig-power-null-rejection-region
+#| fig-cap: "Null distribution for a one-sided right-tailed test. The shaded region is the rejection region, with probability 0.05 under the null hypothesis (i.e., the significance level)."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+alpha <- 0.05
+critical_value <- qnorm(1 - alpha)
+null_grid <- tibble(
+  z = seq(-4, 6, length.out = 1000),
+  density = dnorm(z),
+  rejection_region = z >= critical_value
+)
+
+ggplot(null_grid, aes(x = z, y = density)) +
+  geom_area(
+    data = null_grid |> filter(rejection_region),
+    aes(y = density),
+    fill = "#D55E00",
+    alpha = 0.35
+  ) +
+  geom_line(
+    colour = "#0072B2",
+    linewidth = 1.1
+  ) +
+  geom_vline(
+    xintercept = 0,
+    colour = "#0072B2",
+    linewidth = 1
+  ) +
+  geom_vline(
+    xintercept = critical_value,
+    colour = "#D55E00",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = critical_value,
+    y = 0.27,
+    label = "Critical\nvalue",
+    colour = "#D55E00",
+    hjust = -0.05,
+    size = 7
+  ) +
+  annotate(
+  "text",
+  x = 2.6,
+  y = 0.07,
+  label = "alpha == 0.05",
+  parse = TRUE,
+  colour = "#D55E00",
+  size = 7
+) +
+  coord_cartesian(
+    xlim = c(-4, 6),
+    ylim = c(0, 0.43)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(
+      size = 20,
+      vjust = 0.5,
+      margin = margin(r = 12)
+    ),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = expression(z),
+    y = "Density"
+  )
+```
+
+**Power is different.** Power is the probability that the test rejects $H_0$ when a specified alternative $H_1$ is true. In this applied setting, the specified alternative is not just "*the reminder call helps somehow*." It is the practically meaningful improvement
+
+$$
+\pi_{\operatorname{call}}-\pi_{\operatorname{usual}}=0.08.
+$$
+
+Thus, the power answers a question like
+
+$$
+\Pr(
+\text{Reject } H_0
+\mid
+\pi_{\operatorname{call}}-\pi_{\operatorname{usual}}=0.08
+).
+$$
+
+Graphically, power is the area of the **alternative distribution** that falls inside the rejection region. The rejection cutoff is still determined by $\alpha$ **under the null distribution**, but power is computed under the alternative distribution. @fig-power-alternative-distribution illustrates this idea. The null distribution is centred at $0$, while the alternative distribution is shifted to the right because the true improvement is assumed to be positive. The shaded area under the alternative distribution is the power.
+
+```{r}
+#| label: fig-power-alternative-distribution
+#| fig-cap: "Power for a one-sided right-tailed test. The rejection cutoff is determined by the null distribution, while power is the probability that the test statistic falls in the rejection region when the practically meaningful alternative is true."
+#| echo: false
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+alpha <- 0.05
+
+critical_value <- qnorm(1 - alpha)
+
+alternative_mean <- 2.2
+
+power_grid <- tibble(
+  z = seq(-4, 6, length.out = 1000),
+  null_density = dnorm(z, mean = 0, sd = 1),
+  alternative_density = dnorm(z, mean = alternative_mean, sd = 1),
+  rejection_region = z >= critical_value
+)
+
+approx_power <- 1 - pnorm(critical_value, mean = alternative_mean, sd = 1)
+
+ggplot(power_grid, aes(x = z)) +
+  geom_area(
+    data = power_grid |> filter(rejection_region),
+    aes(y = alternative_density),
+    fill = "#D55E00",
+    alpha = 0.35
+  ) +
+  geom_line(
+    aes(y = null_density, colour = "Null distribution"),
+    linewidth = 1.1
+  ) +
+  geom_line(
+    aes(y = alternative_density, colour = "Alternative distribution"),
+    linewidth = 1.1
+  ) +
+  geom_vline(
+    xintercept = critical_value,
+    colour = "#D55E00",
+    linewidth = 1,
+    linetype = "dashed"
+  ) +
+  annotate(
+    "text",
+    x = critical_value,
+    y = 0.31,
+    label = "Critical\nvalue",
+    colour = "#D55E00",
+    hjust = -0.05,
+    size = 7
+  ) +
+  annotate(
+    "text",
+    x = 2.75,
+    y = 0.13,
+    label = paste0("Power %~~% ", round(approx_power, 2)),
+    parse = TRUE,
+    colour = "#D55E00",
+    size = 7
+  ) +
+  scale_colour_manual(
+    values = c(
+      "Null distribution" = "#0072B2",
+      "Alternative distribution" = "#009E73"
+    ),
+    name = NULL
+  ) +
+  coord_cartesian(
+    xlim = c(-4, 6),
+    ylim = c(0, 0.43)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(
+      size = 20,
+      vjust = 0.5,
+      margin = margin(r = 12)
+    ),
+    legend.position = "right",
+    legend.text = element_text(size = 16),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = expression(z),
+    y = "Density"
+  )
+```
+
+Increasing the sample size usually reduces the standard error of the estimated difference in proportions. For example, a typical standard error for a difference in two independent sample proportions has the form
+
+$$
+\operatorname{SE}
+\approx
+\sqrt{
+\frac{\pi_{\operatorname{call}}(1-\pi_{\operatorname{call}})}{n_{\operatorname{call}}}
++
+\frac{\pi_{\operatorname{usual}}(1-\pi_{\operatorname{usual}})}{n_{\operatorname{usual}}}
+}.
+$$
+
+As $n_{\operatorname{call}}$ and $n_{\operatorname{usual}}$ increase, this standard error decreases. When the standard error is smaller, the same true improvement of $8$ percentage points becomes easier to distinguish from random sampling variation. In the standardized test-statistic scale, this means the alternative distribution shifts farther into the rejection region, increasing the shaded area in @fig-power-alternative-distribution.
+
+This does not mean that increasing the sample size changes $\alpha$. The significance level remains fixed at
+
+$$
+\alpha=0.05.
+$$
+
+It also does **not** mean that a larger sample proves the alternative is true. Instead, for a fixed significance level and a specified practically meaningful alternative, a larger sample can make the test more probable to reject $H_0$ when that alternative is actually true.
+
+Therefore, **the stakehoder's statement is true**.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 2.58
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+A Type I error occurs when:
+
+**A.** The test rejects $H_0$ even though $H_0$ is true.
+
+**B.** The test fails to reject $H_0$ even though $H_0$ is false.
+
+**C.** The sample size is too large.
+
+**D.** The $p$-value is exactly $1$.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 2.58
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+A Type I error is a **false positive**: the testing procedure rejects the null hypothesis even though the null hypothesis is true. The significance level $\alpha$ controls the long-run probability of this kind of error.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 2.59
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+An environmental analyst observes a large sample of pollutant concentrations and obtains
+
+$$
+\bar{y}=18.4,
+\qquad
+s_Y=6.2,
+\qquad
+n=225.
+$$
+
+They want a two-sided $95\%$ confidence interval for the population mean concentration $\mu$. Use the CLT-based interval
+
+$$
+\bar{y}\pm z_{0.975}\frac{s_Y}{\sqrt{n}},
+\qquad z_{0.975}\approx 1.96.
+$$
+
+Compute and interpret the interval.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 2.59
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
+The estimated standard error is
+
+$$
+\frac{s_Y}{\sqrt{n}}
+=
+\frac{6.2}{\sqrt{225}}
+=
+\frac{6.2}{15}
+\approx 0.4133.
+$$
+
+The margin of error is
+
+$$
+1.96(0.4133)\approx 0.8101.
+$$
+
+Thus, the interval is
+
+$$
+18.4\pm 0.8101=(17.5899,19.2101).
+$$
+
+A stakeholder-facing interpretation is that, under the sampling assumptions and CLT approximation, a plausible range for the population mean pollutant concentration is approximately 17.59 to 19.21 units.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 2.60
+::::
+::::{.Question-container}
+**True or False**
+
+A delivery company wants to evaluate whether its new routing system reduces the **average delivery time** below a $30$-minute service target. Let $\mu$ denote the population average delivery time under the new routing system.
+
+The operations team asks a directional question:
+
+$$
+\text{Is there evidence that } \mu < 30?
+$$
+
+The analyst uses a one-sided hypothesis test,
+
+$$
+H_0 \text{: } \mu = 30
+\qquad
+\text{versus}
+\qquad
+H_1 \text{: } \mu < 30.
+$$
+
+The analyst also constructs a two-sided $95\%$ confidence interval for $\mu$ to quantify uncertainty around the estimated average delivery time.
+
+> *True or false:* The one-sided hypothesis test and the two-sided confidence interval answer exactly the same stakeholder question in all cases.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 2.60
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+**The statement is false.** The two tools are related, but they do not answer exactly the same stakeholder question in all cases.
+
+The one-sided hypothesis test is designed to answer a **directional evidence question** relative to the service target:
+
+$$
+\text{Does the sample provide evidence that } \mu < 30?
+$$
+
+In this case, the test focuses specifically on whether the average delivery time is below the benchmark. The alternative hypothesis is one-sided:
+
+$$
+H_1 \text{: } \mu < 30.
+$$
+
+The two-sided confidence interval answers a different, though related, question:
+
+$$
+\begin{gather*}
+\text{What range of values for } \mu \text{ is plausible given the} \\
+\text{observed sample and the uncertainty calculation?}
+\end{gather*}
+$$
+
+A two-sided interval quantifies uncertainty in both directions. It can show whether the estimated average delivery time is clearly below $30$ minutes, close to $30$ minutes, or possibly above $30$ minutes. This is useful for planning because the operations team may care not only about whether the service target is beaten, but also by how much and with how much uncertainty.
+
+For example, suppose the $95\%$ confidence interval is
+
+$$
+(27.8,\ 29.6).
+$$
+
+This interval would support the practical message that the average delivery time appears to be below 30 minutes. But suppose instead the interval is
+
+$$
+(28.9,\ 31.2).
+$$
+
+The point estimate might still be below $30$ minutes, and a one-sided test could potentially provide directional evidence depending on the sample size and standard error. However, the confidence interval would remind the team that values above the service target are still plausible under the uncertainty calculation.
+
+Therefore, a one-sided hypothesis test and a two-sided confidence interval should be reported as complementary inferential tools. The test addresses a directional benchmark question; the confidence interval communicates the uncertainty around the estimated average delivery time. They are connected, but they are not identical stakeholder answers in all cases.
+
+</details>
+::::
+:::
