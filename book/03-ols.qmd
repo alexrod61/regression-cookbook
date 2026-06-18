@@ -2334,18 +2334,44 @@ Note that because this dataset is not a time series, the independence assumption
 
 #### Homoscedasticity (Constant Variance of Errors)
 
-OLS regression assumes that the variance of residuals remains constant across all fitted values. If this assumption is violated, the model exhibits heteroscedasticity, where the spread of residuals increases or decreases systematically. This can result in inefficient coefficient estimates, making some predictors appear statistically significant when they are not.
+OLS regression assumes that the variance of residuals remains constant across all fitted values. This assumption is called **homoscedasticity**. If this assumption is violated, the model exhibits **heteroscedasticity**, where the spread of residuals increases or decreases systematically. When heteroscedasticity is present, the coefficient estimates may still be unbiased if the other OLS assumptions hold, but the estimated standard errors can be incorrect. This can make confidence intervals and hypothesis tests unreliable.
 
-To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether residual variance is constant.
+To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether the residual variance is constant.
 
+The Breusch-Pagan test is based on the idea that, under the assumption that homoscedasticity is correct, the squared residuals should not be systematically related to the regressors or fitted values. If the squared residuals can be explained by the regressors, this suggests that the error variance changes across observations. Note that the sum of residuals is nearly zero and you can think of squared residuals as an estimate for the variance of error terms. Now if the variance can be explained by regressors then it means the variance is not constant across regressors.
+
+The Breusch-Pagan test can be written as the following hypothesis test:
+
+$$
+H_0: \text{The residual variance is constant.}
+$$
+
+$$
+H_A: \text{The residual variance is not constant.}
+$$
+
+Equivalently, the null hypothesis states that the model does not show evidence of heteroscedasticity, while the alternative hypothesis states that heteroscedasticity is present.
+
+One way to express the Breusch-Pagan test is to first compute the residuals from the original OLS model, square them, and then regress the squared residuals on the regressors. The test statistic is commonly written as
+
+$$
+BP = nR^2_{\text{aux}},
+$$
+
+where $n$ is the sample size and $R^2_{\text{aux}}$ is the coefficient of determination from the auxiliary regression of the squared residuals on the regressors. Under the null hypothesis of constant variance, this statistic is approximately distributed as a chi-square random variable with degrees of freedom equal to the number of regressors in the auxiliary regression.
+
+In practice, a small p-value provides evidence against the null hypothesis and suggests that the residual variance is not constant.
 
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
-bptest(ols_model)  # Uses all regressors, like Python
+bptest(ols_model)
 ```
 
 ## **`Python` Code**
+
 ```{python}
 from statsmodels.stats.diagnostic import het_breuschpagan
 
@@ -2362,12 +2388,12 @@ bp_stat, bp_pvalue, empty, empty = bp_test
 print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
 print(f"P-value: {bp_pvalue:.4f}")
 ```
+
 :::
 
+Since the p-value (0.09357) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no statistically significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears reasonable for this model.
 
-Since the p-value (0.09357) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears to hold for this model.
-
-If heteroscedasticity is detected, solutions include applying weighted least squares (WLS) regression, transforming the regressors (e.g., using a log transformation), or computing robust standard errors to correct for variance instability.
+If heteroscedasticity is detected, possible solutions include applying weighted least squares (WLS) regression, transforming variables, or computing robust standard errors to account for non-constant variance.
 
 #### Normality of Residuals
 
@@ -2491,22 +2517,61 @@ If the plot reveals heavy tails or skewness, potential solutions include applyin
 
 ### Evaluating Model Fit
 
-A good model should explain a large proportion of variance in the response variable.
-
 #### R-Squared
 
-Beyond checking assumptions, it is essential to assess how well the model explains variability in the response variable. One of the most commonly used metrics is R-Squared ($R^2$), which measures the proportion of variance in Net_Money that is explained by the predictors. An $R^2$ value close to 1 indicates a strong model fit, whereas a low value suggests that important predictors may be missing or that the model is poorly specified.
+A good model should explain a large proportion of the variability in the response variable. Beyond checking model assumptions, it is also important to assess how well the model explains variation in the observed response values. One of the most commonly used goodness-of-fit metrics for OLS regression is **R-squared** ($R^2$) also known as coefficient of determination, which measures the proportion of variation in the response variable that is explained by the regressors in the model.
 
-We can retrieve the R-squared and Adjusted R-squared values from the model summary:
+The $R^2$ statistic is defined as
+
+$$
+R^2 = 1 - \frac{\text{SSE}}{\text{SST}},
+$$
+
+where
+
+$$
+\text{SSE} = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+$$
+
+is the sum of squared errors, and
+
+$$
+\text{SST} = \sum_{i=1}^{n} (y_i - \bar{y})^2
+$$
+
+is the total sum of squares. Here, $y_i$ is the observed response value, $\hat{y}_i$ is the fitted response value, and $\bar{y}$ is the sample mean of the response variable.
+
+The rationale behind $R^2$ is to compare the fitted regression model with a simple baseline model that always predicts the sample mean $\bar{y}$. If the regression model greatly reduces the unexplained variation compared with this baseline, then $\text{SSE}$ will be much smaller than $\text{SST}$, and $R^2$ will be closer to 1. If the model does not improve much over predicting the mean, then $\text{SSE}$ will be close to $\text{SST}$, and $R^2$ will be closer to 0.
+
+An $R^2$ value close to 1 indicates that the model explains a large proportion of the variation in the response variable. A low $R^2$ suggests that the model explains less of the variation, which may indicate that important regressors are missing, that the relationship is not well captured by a linear model, or that the response variable is naturally difficult to predict.
+
+Because $R^2$ never decreases when more regressors are added to the model, we often also report **adjusted R-squared**. Adjusted R-squared accounts for the number of regressors in the model and is defined as
+
+$$
+R^2_{\text{adj}}
+=
+1 -
+\left(
+\frac{n - 1}{n - p - 1}
+\right)
+(1 - R^2),
+$$
+
+where $n$ is the sample size and $p$ is the number of regressors in the model, not including the intercept. Adjusted R-squared is useful because it penalizes unnecessary model complexity and only increases when adding a regressor improves the model more than would be expected by chance.
+
+We can retrieve the R-squared and adjusted R-squared values from the model summary:
 
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 summary(ols_model)$r.squared  # R-squared value
 summary(ols_model)$adj.r.squared  # Adjusted R-squared
 ```
 
 ## **`Python` Code**
+
 ```{python}
 # R-squared
 r_squared = ols_model.rsquared
@@ -2518,23 +2583,35 @@ adj_r_squared = ols_model.rsquared_adj
 print(f"R-squared: {r_squared:.4f}")
 print(f"Adjusted R-squared: {adj_r_squared:.4f}")
 ```
+
 :::
 
-In this model, the R-squared is 0.9109 and the adjusted R-squared is 0.9095, indicating that around 90% of the variance in `Net_Money` is explained by the model.
+In this model, the R-squared is 0.9109 and the adjusted R-squared is 0.9095. This indicates that approximately 91% of the variation in `Net_Money` is explained by the regressors included in the model.
 
-However, while $R^2$ provides insight into model fit, it has limitations. Adding more predictors will always increase $R^2$, even if those predictors have little explanatory power. That’s why Adjusted R-squared is often preferred, as it adjusts for the number of predictors and only increases when a new variable meaningfully improves the model.
-
-Finally, a high $R^2$ should not be interpreted as evidence of causation, nor does it guarantee the model is free from issues like omitted variable bias or multicollinearity. Always complement goodness-of-fit metrics with residual diagnostics and statistical inference to ensure model reliability.
+However, while $R^2$ provides useful information about model fit, it has important limitations. A high $R^2$ does not mean that the model is causal, nor does it guarantee that the model assumptions are satisfied. It also does not rule out issues such as omitted variable bias, multicollinearity, or poor predictive performance on new data. Therefore, $R^2$ and adjusted $R^2$ should be interpreted together with residual diagnostics, statistical inference, and prediction-based performance metrics.
 
 
 #### Multicollinearity
 
-In multiple regression, we also need to consider whether some regressors are strongly correlated with each other. This issue is called **multicollinearity**. Multicollinearity does not necessarily make the fitted values poor but it can make individual coefficient estimates unstable and difficult to interpret. In particular, it can inflate standard errors and make it harder to determine which regressors are meaningfully associated with the response variable.
+In multiple regression, we also need to consider whether some regressors are strongly correlated with each other. This issue is called **multicollinearity**. Multicollinearity does not necessarily make the fitted values poor, but it can make individual coefficient estimates unstable and difficult to interpret. In particular, it can inflate standard errors and make it harder to determine which regressors are meaningfully associated with the response variable.
 
-One common diagnostic for multicollinearity is the **Variance Inflation Factor** (VIF) as discussed before. The VIF measures how much the variance of an estimated coefficient is inflated because of linear relationships among the regressors. A VIF close to 1 suggests little multicollinearity, while larger values suggest stronger multicollinearity. As a rough rule of thumb, VIF values above 5 may deserve further investigation and values above 10 are problematic.
+One common diagnostic for multicollinearity is the **Variance Inflation Factor** (VIF). The VIF measures how much the variance of an estimated coefficient is inflated because of linear relationships among the regressors. For the $j$th regressor, the VIF is defined as
+
+$$
+\text{VIF}_j =
+\frac{1}{1 - R_j^2},
+$$
+
+where $R_j^2$ is the coefficient of determination obtained by regressing the $j$th regressor on all the other regressors in the model.
+
+The rationale behind VIF is that if a regressor can be well explained by the other regressors, then $R_j^2$ will be large and $1 - R_j^2$ will be small. As a result, the VIF will be large, indicating that the variance of the estimated coefficient for that regressor has been inflated. A VIF close to 1 suggests little multicollinearity, while larger values suggest stronger multicollinearity. As a rough rule of thumb, VIF values above 5 may deserve further investigation and values above 10 are often considered problematic.
+
+Unlike tests such as the Breusch-Pagan or Durbin-Watson tests, VIF is usually used as a diagnostic measure rather than a formal hypothesis test. Therefore, we do not usually write a null and alternative hypothesis for VIF. Instead, we compare the VIF values to practical rule-of-thumb thresholds and use subject-matter knowledge to decide whether any variables should be removed, combined, or interpreted with caution.
 
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 # Variance Inflation Factor (VIF)
 vif_table <- car::vif(ols_model)
@@ -2542,6 +2619,7 @@ vif_table
 ```
 
 ## **`Python` Code**
+
 ```{python}
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import pandas as pd
@@ -2555,11 +2633,12 @@ vif_table = pd.DataFrame({
 
 print(vif_table)
 ```
+
 :::
 
-The VIF diagnostics do not suggest severe multicollinearity for this model. Most reported values in GVIF column are close to 1 indicating little evidence that these regressors are strongly linearly related to the remaining regressors in the model. The largest values occur for two variables of `Has_Job` and `Monthly_Earnings`. Both values are around 6.35 suggesting some multicollinearity involving these variables, which is expected because students who have a job are also more likely to report monthly earnings. However, these values are not extreme, and both variables have clear practical interpretations in the context of the analysis. 
+The VIF diagnostics do not suggest severe multicollinearity for this model. Most reported values are close to 1, indicating little evidence that these regressors are strongly linearly related to the remaining regressors in the model. The largest values occur for `Has_Job` and `Monthly_Earnings`. Both values are around 6.35, suggesting some multicollinearity involving these variables. This is expected because students who have a job are also more likely to report monthly earnings. However, these values are not extreme, and both variables have clear practical interpretations in the context of the analysis.
 
-Therefore, we do not remove either variable at this stage. Overall, the VIF diagnostics suggest that multicollinearity is not a major concern for this model. If high multicollinearity is detected, possible strategies include removing one of the highly related regressors, reducing the dimension by methods such as PCA, using domain knowledge to simplify the model, or using regularization methods such as ridge regression.
+Therefore, we do not remove either variable at this stage. Overall, the VIF diagnostics suggest that multicollinearity is not a major concern for this model. If high multicollinearity is detected, possible strategies include removing one of the highly related regressors, reducing dimension using methods such as principal component analysis (PCA), using domain knowledge to simplify the model, or using regularization methods such as ridge regression.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -2567,7 +2646,7 @@ Generalized VIF
 ::::
 ::::{.Tip-container}
 
-When a regression model includes only numeric regressors or binary categorical regressors, the usual Variance Inflation Factor (VIF) can be used to assess multicollinearity. However, categorical regressors with more than two levels are represented by multiple dummy variables. In that case, the `car::vif()` function reports the **generalized variance inflation factor** (GVIF) as you can see in the last column. This extends VIF to terms with more than one degree of freedom.
+When a regression model includes only numeric regressors or binary categorical regressors, the usual Variance Inflation Factor (VIF) can be used to assess multicollinearity. However, categorical regressors with more than two levels are represented by multiple dummy variables. In that case, the `car::vif()` function reports the **generalized variance inflation factor** (GVIF), which extends VIF to model terms with more than one degree of freedom.
 
 To make GVIF values comparable across regressors with different numbers of degrees of freedom, we usually interpret the adjusted value,
 
@@ -2575,7 +2654,7 @@ $$
 \text{GVIF}^{1/(2 \times \text{Df})}.
 $$
 
-Values close to 1 suggest little evidence of multicollinearity. Larger values suggest that the regressor may be strongly related to other regressors in the model and may deserve further investigation. As you can see most of values are near one (except `Has_Job` and `Monthly_Earnings`) suggesting no major multicollinearity problem. The details and formula of You can read more about GVIF here in @GVIF.
+Values close to 1 suggest little evidence of multicollinearity. Larger values suggest that the regressor may be strongly related to other regressors in the model and may deserve further investigation. In this model, most adjusted GVIF values are close to 1, suggesting no major multicollinearity problem. The main exception is the pair of variables `Has_Job` and `Monthly_Earnings`, which show moderate multicollinearity for practical reasons. You can read more about GVIF in @GVIF.
 
 ::::
 :::
