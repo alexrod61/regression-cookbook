@@ -46,17 +46,17 @@ When to Use and Not Use Ordinal Logistic Regression
 ::::{.Warning-container}
 Ordinal logistic regression is a model for ordered categorical outcomes that is appropriately used under the following conditions:
 
-- The outcome variable is **categorical** with **more than two ordered categories**, as illustrated in @fig-regression-ordinal-logistic-regression. The categories have a natural ranking, but the spacing between them is not assumed to be equal. Examples include Likert-scale survey responses (`Strongly Disagree` < `Disagree` < `Neutral` < `Agree` < `Strongly Agree`), customer satisfaction levels (`Very Unsatisfied`<`Unsatisfied`<`Neutral`<`Satisfied`<`Very Satisfied`), level of education (`High School`<`College Diploma`<`Bachelor's`<`Master's`<`Doctorate`), and clinical severity scales (`mild` < `moderate` < `severe`).
-- There is one or more **regressors** that may be continuous, ordinal, or nominal (including dichotomous variables).
-- We assume a **linear relationship** between any continuous regressors and the **logit of the cumulative probabilities** of the outcome.
-- Our data points do not exhibit any **correlation structures**, which means there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
-- The **proportional odds (parallel slopes) assumption** holds: the effect of each regressor on the log-odds of being at or below a given category threshold is constant across all thresholds.
+- The outcome variable is categorical with more than two ordered categories, as illustrated in @fig-regression-ordinal-logistic-regression. The categories have a natural ranking, but the spacing between them is not assumed to be equal. Examples include Likert-scale survey responses (`Strongly Disagree` < `Disagree` < `Neutral` < `Agree` < `Strongly Agree`), customer satisfaction levels (`Very Unsatisfied`<`Unsatisfied`<`Neutral`<`Satisfied`<`Very Satisfied`), level of education (`High School`<`College Diploma`<`Bachelor's`<`Master's`<`Doctorate`), and clinical severity scales (`mild` < `moderate` < `severe`).
+- There is one or more regressors that may be continuous, ordinal, or nominal (including dichotomous variables).
+- We assume a **linear relationship** between any continuous regressors and the logit of the cumulative probabilities of the outcome.
+- The data points do not exhibit any correlation structures, which means there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
+- The proportional odds assumption holds: the effect of each regressor on the log-odds of being at or below a given category threshold is constant across all thresholds.
 
 However, ordinal logistic regression should not be used in the following scenarios:
 
-- The outcome variable is **unordered (nominal)** rather than ordered. When the categories have no meaningful ranking, you should consult the section on **multinomial logistic regression** (see @sec-multinomial-logistic). When the outcome has only **two categories**, the appropriate model is **binary logistic regression** (see @sec-binary-logistic).
-- The outcome variable is **continuous** or a **count**. For continuous and unbounded outcomes, refer to **Ordinary Least-squares regression** (see @sec-ols); for count outcomes, refer to the count regression models such as **Poisson regression** (see @sec-generalized-poisson).
-- The data points exhibit **correlation structures**, indicating statistical dependence among the sampled observations (for example, repeated measurements on the same subject).
+- The outcome variable is unordered (nominal) rather than ordered. When the categories have no meaningful ranking, you should consult the section on multinomial logistic regression (see @sec-multinomial-logistic). When the outcome has only two categories, the appropriate model is binary logistic regression (see @sec-binary-logistic).
+- The outcome variable is continuous or a count. For continuous and unbounded outcomes, refer to rrdinary least-squares regression** (see @sec-ols); for count outcomes, refer to the count regression models such as Poisson regression (see @sec-generalized-poisson).
+- The data points exhibit correlation structures, indicating statistical dependence among the sampled observations (for example, repeated measurements on the same subject).
 ::::
 :::
 
@@ -1555,7 +1555,7 @@ For numerical optimization, Newton–Raphson method proceeds identically to the 
 
 In `R`, we fit the fully non-proportional model using `vglm()` from the `VGAM` package. Setting `parallel = FALSE` removes the proportional odds constraint entirely. Setting `parallel = TRUE` would recover the proportional odds model, and passing a named logical vector (e.g. `parallel = c(GPA = TRUE, GRE_score = FALSE)`) fits the partial proportional odds model. For more details on the `parallel` argument, refer to the documentation of [CommonVGAMffArguments](https://www.rdocumentation.org/packages/VGAM/versions/0.9-1/topics/CommonVGAMffArguments)
 
-In `Python`, `statsmodels` does not currently provide a built-in non-proportional ordinal model. A practical approach is to reframe the $J-1$ cumulative binary splits as separate binary logistic regression models (one model per cutpoint) and fit each independently using `LogisticRegression` or `sm.Logit`.
+In `Python`, `statsmodels` does not currently provide a built-in non-proportional ordinal model. To match `vglm()`, we therefore reproduce the *same* joint model by maximising its multinomial log-likelihood directly: a single fit in which each cumulative logit $\text{logit}(P(Y_i \le j)) = \alpha_j + \boldsymbol{\beta}_j^\top \mathbf{x}_i$ has its own intercept and slope vector, all estimated together with `scipy.optimize.minimize`. Reframing the $J-1$ cumulative splits as *separate* binary logistic regressions (one independent `sm.Logit` per cutpoint) is tempting, but it maximises $J-1$ disjoint binomial likelihoods and discards the multinomial structure that links the splits, so its coefficients would not agree with `vglm()`.
 
 ::: {.panel-tabset}
 
@@ -1596,39 +1596,95 @@ for (i in seq_along(groups)) {
 ### Python Code
 
 ```{.python}
-# statsmodels has no built-in non-proportional ordinal model, so we fit
-# J-1 = 3 separate binary logistic regressions, one per cumulative split.
-# Each models P(Y <= j) vs P(Y > j) for j = 1, 2, 3. Using sm.Logit (rather
-# than sklearn) lets us report standard errors and z-values, matching the
-# coefficient table that R's vglm() summary produces.
+# statsmodels has no built-in non-proportional (unconstrained) cumulative
+# ordinal model, so we reproduce R's vglm(..., parallel = FALSE) fit directly:
+# a SINGLE joint model in which each cumulative logit
+#     logit(P(Y <= j)) = alpha_j + beta_j' x,    j = 1, ..., J-1,
+# has its own intercept and slope vector, all estimated together by maximising
+# the multinomial log-likelihood. (Fitting one INDEPENDENT binary logistic
+# regression per cutpoint maximises J-1 separate binomial likelihoods and is a
+# different model, so its coefficients would not agree with vglm().)
 
-import statsmodels.api as sm
 import numpy as np
+import statsmodels.api as sm
+from scipy.optimize import minimize
+from scipy.special import expit
+from scipy.stats import norm
+from statsmodels.tools.numdiff import approx_hess
 
-cats      = ["Low", "Medium", "High", "Very High"]
-X_np      = pd.get_dummies(
+# Design matrix WITHOUT an intercept column (a separate intercept alpha_j is
+# estimated per cumulative logit). Reference level for field_of_study is Arts.
+X_np  = pd.get_dummies(
     train_df[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
-X_np      = sm.add_constant(X_np)              # add the intercept term
-y_ord     = train_df["inclination_to_apply"].cat.codes  # 0,1,2,3
+feature_names = ["const"] + list(X_np.columns)
+Xmat  = X_np.to_numpy()
+y_ord = train_df["inclination_to_apply"].cat.codes.to_numpy()   # 0,1,2,3
 
+n_obs, K  = Xmat.shape
+J         = 4                       # number of ordered categories
+Jm1       = J - 1                   # number of cumulative logits (cutpoints)
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
-np_models = {}
 
-for j, label in enumerate(cutpoints):
-    # binary target: 1 if Y <= j, 0 if Y > j
+def cumulative_probs(theta):
+    # theta packs, per cutpoint j, [alpha_j, beta_j(1..K)]
+    pars  = theta.reshape(Jm1, K + 1)
+    eta   = pars[:, 0][None, :] + Xmat @ pars[:, 1:].T   # (n, J-1) predictors
+    gamma = expit(eta)                                   # P(Y <= j)
+    G     = np.column_stack([np.zeros(n_obs), gamma, np.ones(n_obs)])
+    probs = np.clip(np.diff(G, axis=1), 1e-12, 1.0)      # category probs P(Y=j)
+    return gamma, probs
+
+def neg_loglik(theta):
+    _, probs = cumulative_probs(theta)
+    return -np.sum(np.log(probs[np.arange(n_obs), y_ord]))
+
+def neg_score(theta):
+    # Analytic gradient of the negative multinomial log-likelihood, so the
+    # optimiser lands on the exact MLE that vglm() also targets.
+    gamma, probs = cumulative_probs(theta)
+    gp   = gamma * (1.0 - gamma)                    # d gamma / d eta
+    pobs = probs[np.arange(n_obs), y_ord]
+    W    = np.zeros((n_obs, Jm1))                   # d log p_obs / d eta_{i,j}
+    c    = y_ord
+    upper = c <= Jm1 - 1
+    W[upper, c[upper]]     += gp[upper, c[upper]]     / pobs[upper]
+    lower = c >= 1
+    W[lower, c[lower] - 1] -= gp[lower, c[lower] - 1] / pobs[lower]
+    grad = np.column_stack([W.sum(0), (Xmat.T @ W).T])   # (J-1, K+1)
+    return -grad.ravel()
+
+# Starting values: one independent binary logit per cutpoint.
+theta0 = np.zeros(Jm1 * (K + 1))
+Xc     = sm.add_constant(X_np, has_constant="add").to_numpy()
+for j in range(Jm1):
     y_bin = (y_ord <= j).astype(int)
-    model = sm.Logit(y_bin, X_np).fit(disp=False)
-    np_models[label] = model
+    theta0[j * (K + 1):(j + 1) * (K + 1)] = np.asarray(
+        sm.Logit(y_bin, Xc).fit(disp=False).params
+    )
 
-    # Coefficient table: estimate, standard error, z-value, and p-value per regressor
-    coef_table = pd.DataFrame({
-        "coef":    model.params,
-        "std err": model.bse,
-        "z":       model.tvalues,
-        "p-value": model.pvalues,
-    }).round(3)
+# Maximise the joint multinomial log-likelihood.
+opt       = minimize(neg_loglik, theta0, jac=neg_score, method="BFGS",
+                     options={"maxiter": 2000, "gtol": 1e-10})
+theta_hat = opt.x
+
+# Standard errors from the observed information (Hessian of the NLL).
+cov      = np.linalg.inv(approx_hess(theta_hat, neg_loglik))
+se       = np.sqrt(np.diag(cov))
+coef_mat = theta_hat.reshape(Jm1, K + 1)
+se_mat   = se.reshape(Jm1, K + 1)
+
+# One coefficient table per cumulative logit, matching the R layout.
+for j, label in enumerate(cutpoints):
+    coef = coef_mat[j]
+    err  = se_mat[j]
+    z    = coef / err
+    coef_table = pd.DataFrame(
+        {"coef": coef, "std err": err, "z": z,
+         "p-value": 2 * (1 - norm.cdf(np.abs(z)))},
+        index=feature_names,
+    ).round(3)
     print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
     print(coef_table.to_string())
 ```
@@ -1679,37 +1735,84 @@ for (i in seq_along(groups)) {
 #| echo: false
 #| message: false
 #| warning: false
-import statsmodels.api as sm
 import numpy as np
+import statsmodels.api as sm
+from scipy.optimize import minimize
+from scipy.special import expit
+from scipy.stats import norm
+from statsmodels.tools.numdiff import approx_hess
 
-cats  = ["Low", "Medium", "High", "Very High"]
 X_np  = pd.get_dummies(
     train_df[["GPA", "GRE_score", "field_of_study"]],
     drop_first=True
 ).astype(float)
-X_np  = sm.add_constant(X_np)
-y_ord = train_df["inclination_to_apply"].cat.codes
+feature_names = ["const"] + list(X_np.columns)
+Xmat  = X_np.to_numpy()
+y_ord = train_df["inclination_to_apply"].cat.codes.to_numpy()
 
+n_obs, K  = Xmat.shape
+J         = 4
+Jm1       = J - 1
 cutpoints = ["Low|Medium", "Medium|High", "High|Very High"]
-np_models = {}
+
+def cumulative_probs(theta):
+    pars  = theta.reshape(Jm1, K + 1)
+    eta   = pars[:, 0][None, :] + Xmat @ pars[:, 1:].T
+    gamma = expit(eta)
+    G     = np.column_stack([np.zeros(n_obs), gamma, np.ones(n_obs)])
+    probs = np.clip(np.diff(G, axis=1), 1e-12, 1.0)
+    return gamma, probs
+
+def neg_loglik(theta):
+    _, probs = cumulative_probs(theta)
+    return -np.sum(np.log(probs[np.arange(n_obs), y_ord]))
+
+def neg_score(theta):
+    gamma, probs = cumulative_probs(theta)
+    gp   = gamma * (1.0 - gamma)
+    pobs = probs[np.arange(n_obs), y_ord]
+    W    = np.zeros((n_obs, Jm1))
+    c    = y_ord
+    upper = c <= Jm1 - 1
+    W[upper, c[upper]]     += gp[upper, c[upper]]     / pobs[upper]
+    lower = c >= 1
+    W[lower, c[lower] - 1] -= gp[lower, c[lower] - 1] / pobs[lower]
+    grad = np.column_stack([W.sum(0), (Xmat.T @ W).T])
+    return -grad.ravel()
+
+theta0 = np.zeros(Jm1 * (K + 1))
+Xc     = sm.add_constant(X_np, has_constant="add").to_numpy()
+for j in range(Jm1):
+    y_bin = (y_ord <= j).astype(int)
+    theta0[j * (K + 1):(j + 1) * (K + 1)] = np.asarray(
+        sm.Logit(y_bin, Xc).fit(disp=False).params
+    )
+
+opt       = minimize(neg_loglik, theta0, jac=neg_score, method="BFGS",
+                     options={"maxiter": 2000, "gtol": 1e-10})
+theta_hat = opt.x
+
+cov      = np.linalg.inv(approx_hess(theta_hat, neg_loglik))
+se       = np.sqrt(np.diag(cov))
+coef_mat = theta_hat.reshape(Jm1, K + 1)
+se_mat   = se.reshape(Jm1, K + 1)
 
 for j, label in enumerate(cutpoints):
-    y_bin = (y_ord <= j).astype(int)
-    model = sm.Logit(y_bin, X_np).fit(disp=False)
-    np_models[label] = model
-    coef_table = pd.DataFrame({
-        "coef":    model.params,
-        "std err": model.bse,
-        "z":       model.tvalues,
-        "p-value": model.pvalues,
-    }).round(3)
+    coef = coef_mat[j]
+    err  = se_mat[j]
+    z    = coef / err
+    coef_table = pd.DataFrame(
+        {"coef": coef, "std err": err, "z": z,
+         "p-value": 2 * (1 - norm.cdf(np.abs(z)))},
+        index=feature_names,
+    ).round(3)
     print(f"\nCutpoint {label}  (P(Y <= j) vs P(Y > j))")
     print(coef_table.to_string())
 ```
 
 :::
 
-Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, z-value, and p-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we obtain the equivalent information by fitting one binary logistic regression per cutpoint with `sm.Logit` and printing a matching table for each. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
+Both outputs now follow the same scheme: a coefficient table for each of the $J-1$ cumulative logits, reporting the estimate, standard error, z-value, and p-value for every regressor. In `R`, `vglm()` fits a single non-proportional model and prints these as stacked rows; in `Python`, where no built-in non-proportional ordinal model exists, we fit the *same* joint model by maximising its multinomial log-likelihood and print a matching table per cutpoint, so the two languages now report the same estimates. If the proportional odds assumption held perfectly, the slope estimates would be identical across cutpoints. Marked differences between them, especially relative to their standard errors, are a preliminary signal that the assumption may be violated. A formal test of this assumption is introduced in the Inference section.
 
 ## Goodness of Fit
 
@@ -3186,7 +3289,7 @@ print(f"Macro F1:         {f1:.3f}")
 
 :::
 
-On the test set, the model achieves an overall accuracy of **52.5%**, a macro recall of **49.4%**, and a macro F1 of **46.7%**. While these figures are modest in absolute terms, they should be interpreted in the context of a four-class ordinal prediction problem where random guessing would yield 25% accuracy. The confusion matrix reveals a clear ordinal pattern in the errors: most misclassifications land in adjacent categories rather than opposite ends of the scale. For example, the model rarely confuses `Low` with `Very High` or vice versa; mistakes tend to be one step off, which is an important property for an ordinal outcome.
+On the test set, the model achieves an overall accuracy of **41.2%**, a macro recall of **37.2%**, and a macro F1 of **40.0%**. The confusion matrix shows a clear ordinal pattern in the errors: most misclassifications land in adjacent categories rather than opposite ends of the ordinal scale. For example, the model rarely confuses `Low` with `Very High` or vice versa; mistakes tend to be one step off, which is an important property for an ordinal outcome.
 
 The `Very High` category is predicted most reliably, with a recall of 0.87 and F1 of 0.73, consistent with the inference finding that both GPA and GRE score most sharply distinguish students at the very high end of the ordinal scale. In contrast, the `High` category is the hardest to classify correctly (recall = 0.12, F1 = 0.19), likely because it sits between two well-separated groups (`Medium` and `Very High`) and receives predictions pulled toward both. This pattern reinforces the inferential finding that the regressors create a clearer separation at the extremes of the ordinal scale than in the middle.
 
