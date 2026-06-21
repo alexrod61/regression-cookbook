@@ -47,15 +47,14 @@ When to Use and Not Use Ordinal Logistic Regression
 Ordinal logistic regression is a model for ordered categorical outcomes that is appropriately used under the following conditions:
 
 - The outcome variable is categorical with more than two ordered categories, as illustrated in @fig-regression-ordinal-logistic-regression. The categories have a natural ranking, but the spacing between them is not assumed to be equal. Examples include Likert-scale survey responses (`Strongly Disagree` < `Disagree` < `Neutral` < `Agree` < `Strongly Agree`), customer satisfaction levels (`Very Unsatisfied`<`Unsatisfied`<`Neutral`<`Satisfied`<`Very Satisfied`), level of education (`High School`<`College Diploma`<`Bachelor's`<`Master's`<`Doctorate`), and clinical severity scales (`mild` < `moderate` < `severe`).
-- There is one or more regressors that may be continuous, ordinal, or nominal (including dichotomous variables).
+- There is one or more regressors that may be continuous, ordinal, or nominal.
 - We assume a **linear relationship** between any continuous regressors and the logit of the cumulative probabilities of the outcome.
-- The data points do not exhibit any correlation structures, which means there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
-- The proportional odds assumption holds: the effect of each regressor on the log-odds of being at or below a given category threshold is constant across all thresholds.
+- The data points do not exhibit any correlation structures, which means that there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
 
 However, ordinal logistic regression should not be used in the following scenarios:
 
-- The outcome variable is unordered (nominal) rather than ordered. When the categories have no meaningful ranking, you should consult the section on multinomial logistic regression (see @sec-multinomial-logistic). When the outcome has only two categories, the appropriate model is binary logistic regression (see @sec-binary-logistic).
-- The outcome variable is continuous or a count. For continuous and unbounded outcomes, refer to rrdinary least-squares regression** (see @sec-ols); for count outcomes, refer to the count regression models such as Poisson regression (see @sec-generalized-poisson).
+- The outcome variable is unordered (nominal) instead of ordered. If the categories have no meaningful ranking, refer to the chapter on multinomial logistic regression (@sec-multinomial-logistic). If the outcome has only two categories, the appropriate model is binary logistic regression (@sec-binary-logistic).
+- The outcome variable is continuous or a count. For continuous and unbounded outcomes, refer to ordinary least-squares regression (@sec-ols); for count outcomes, refer to the count regression models, such as Poisson regression (see @sec-generalized-poisson).
 - The data points exhibit correlation structures, indicating statistical dependence among the sampled observations (for example, repeated measurements on the same subject).
 ::::
 :::
@@ -175,13 +174,13 @@ By the end of this chapter, you will be able to:
 
 - Define an **ordinal variable**, identify its key properties, and recognize examples of ordinal outcomes in practice.
 
-- Describe why ordinary **linear models** and **multinomial logistic regression** are inappropriate for **ordered categorical outcomes**.
+- Describe why **ordinary least squares** and **multinomial logistic regression** models are inappropriate for **ordered categorical outcomes**.
 
-- Write down the ordinal regression likelihood and the cumulative logit link functions, express cumulative probabilities, and recover category probabilities.
+- Write down the **likelihood function** for ordinal logistic regression and its cumulative logit link functions, express cumulative probabilities, and obtain category probabilities.
 
-- Understand the **proportional odds assumption** and how it constrains the model (common slope parameters across cutpoints).
+- Understand the **proportional odds assumption** and how it constrains the model.
 
-- Understand how coefficient estimation via maximum likelihood works in this model.
+- Understand how coefficient estimation via **maximum likelihood estimation** works in this model.
 
 - Interpret ordinal regression coefficients in real scenarios.
 
@@ -189,7 +188,7 @@ By the end of this chapter, you will be able to:
 
 - Assess and diagnose the proportional odds assumption by the **Brant–Wald** test.
 
-- Formulate and interpret **non-proportional odds models** when the proportional odds assumption is violated.
+- Formulate and interpret **non-proportional odds models** if the proportional odds assumption is violated.
 
 - Evaluate model performance and construct confidence intervals.
 
@@ -199,39 +198,39 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-**Ordinal logistic regression** is a statistical modeling technique used to analyze relationships between an ordered multi-class categorical response variable and a set of regressors. Unlike **multinomial logistic regression**, which treats categories as unordered, ordinal logistic regression take into account the natural ranking of response levels. Ignoring this ordering may lead to loss of valuable information in both **inference** and **prediction**.
+**Ordinal logistic regression** is a statistical modelling technique used to analyze relationships between an ordered multi-class categorical response variable and a set of regressors. Unlike **multinomial logistic regression**, which treats categories as unordered, ordinal logistic regression takes into account the order of classes in the response variable. Ignoring this ordering may lead to loss of valuable information in the context of both **inference** and **prediction**.
 
-In ordinal outcomes, the information lies **not only** in category membership **but also** in the relative ordering between categories. This structure is modelled through cumulative probabilities, which form the foundation of the cumulative logit (proportional odds) model. Instead of modeling the log-odds of each category relative to a baseline (as we do in multinomial regression), ordinal logistic regression models the **log-odds of being at or below a given category threshold**. That's right! We are looking at a cumulative probability now.
+In ordinal outcomes, the information lies not only in category membership **but also** in the relative ordering between categories. This structure is modelled through cumulative probabilities, which form the foundation of the ordinal logistic regression model. Instead of modelling the log-odds of each category relative to a baseline (as we do in multinomial regression), ordinal logistic regression models the log-odds of being at or below a given category threshold.
 
-A key characteristic of the most commonly used ordinal models is the proportional odds model. It asserts that the effect of regressors is assumed to be constant across all cumulative splits of the response. This assumption plays a central role in the modelling framework and interpretation.
+A key characteristic of the most commonly used ordinal models is the **proportional odds model**. It asserts that the effect of regressors is assumed to be constant across all cumulative splits of the response. This assumption plays a central role in the modelling framework and interpretation.
 
 
 ### Ordinal Logistic Regression Assumptions
 
 The following are the assumptions that we need to be aware of before fitting this model:
 
-- The response or dependent variable should be measured at the ordinal level with more than two ordered categories. This means there is a natural order between the categories in the response variable. For example, Likert scale: Strongly agree / Agree / Neutral / Disagree / Strongly Disagree
+- The response or dependent variable should be measured at the ordinal level with more than two ordered categories. This means there is a natural order between the categories in the response variable. For example, Likert scale: `Strongly Agree` / `Agree` / `Neutral` / `Disagree` / `Strongly Disagree`
 
-- There should be one or more independent variables that are continuous, ordinal, or nominal (including dichotomous variables).
+- There should be one or more independent variables that are continuous, ordinal, or nominal.
 
-- Logit linearity assumption: There must be a linear relationship between any continuous independent variables and the logit of the cumulative probabilities.
+- **Logit linearity assumption:** There must be a linear relationship between any continuous independent variables and the logit of the cumulative probabilities.
 
-- Independent observations: The observations should be independent and the dependent variable should consist of mutually exclusive and exhaustive ordered categories.
+- **Independent observations:** The observations should be independent and the dependent variable should consist of mutually exclusive and exhaustive ordered categories.
 
-- Proportional odds assumption: The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
+- **Proportional odds assumption:** The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
 
-- When the proportional odds assumption is violated, a non-proportional odds model may be considered because it allows for some regressors to vary across thresholds.
+- If the proportional odds assumption is violated, a **non-proportional odds** model should be used because it allows for some regressors to vary across thresholds.
 
 
 ### Use Cases of Ordinal Logistic Regression
 
-Ordinal logistic regression is particularly useful when the outcome has a meaningful ranking and collapsing categories would discard important structure. Some examples of this are:
+Ordinal logistic regression is particularly useful when the outcome variable has a meaningful ranking. Some examples of this are:
 
-1. **Likert Scale Survey Responses:** A classic example is agreement levels in surveys (`Strongly disagree`/ `Disagree` / `Neutral` / `Agree` / `Strongly Agree`). For example, you may study how regressors such as age, education, or exposure to misinformation influence the probability of showing extreme political ideas. 
+1. **Likert Scale Survey Responses:** A classic example is agreement levels in surveys (`Strongly Disagree`/ `Disagree` / `Neutral` / `Agree` / `Strongly Agree`). For example, you may study how regressors such as age, education, or exposure to misinformation influence the probability of showing extreme political ideas. 
 
-2. **Customer Satisfaction Levels:** Marketing analysts may use ordinal regression to understand how service quality, wait time, or pricing influence the likelihood of higher satisfaction ratings.
+2. **Customer Satisfaction Levels:** Marketing analysts may use ordinal regression to understand how service quality, wait time, or pricing influence the customer satisfaction ratings.
 
-3. **Educational Achievement Levels:** Educational researchers may study how study time, attendance in lectures and class activities, or prior preparation affects the probability of achieving higher results in exams.
+3. **Educational Achievement Levels:** Educational researchers may study how study time, attendance in lectures and class activities, or prior preparation affects the probability of achieving higher results in exams (`F`/ `D` / `C` / `B` / `A`).
 
 4. **Clinical Severity Scales:** Ordinal models help quantify how treatments or patient characteristics influence the likelihood of more severe disease states. These status are often divided into categories such as `mild`, `moderate`, or `severe`.
 
@@ -239,7 +238,7 @@ Ordinal logistic regression is particularly useful when the outcome has a meanin
 
 6. **Self-Reported Health Status:** Public health surveys frequently measure overall health on an ordered scale (for example, `Poor` / `Fair` / `Good` / `Very Good` / `Excellent`). Researchers may apply ordinal regression to examine how factors such as age, physical activity, smoking status, or income affect the likelihood of reporting better health.
 
-In all these examples, the ordering is essential. Treating these outcomes as nominal would ignore the structured progression between categories, while treating them as numeric would have implications for interpretability. Ordinal logistic regression provides a principled framework that incorporates the ranking of categories while maintaining probabilistic modelling rigor.
+In all these examples, the order is essential. Treating these outcomes as nominal would ignore the structured progression between categories, while treating them as numeric would have implications for interpretability. Ordinal logistic regression provides a principled and rigorous framework to incorporate the ranking of categories.
 
 ## Case Study
 
@@ -257,12 +256,12 @@ These questions correspond to two distinct **statistical objectives**:
 
 The dataset contains the following variables:
 
-| Variable | Description | Type | Scale | Model Role | Coding Name |
+| Variable | Description | Type | Scale | Model Role | Variable Name |
 |---|---|---|---|---|---|
-| Inclination to Apply to Graduate School | How likely the student will apply to graduate school, with four increasing ordered categories | Discrete | Ordinal (`Low` < `Medium` < `High` < `Very High`) | Response | `inclination_to_apply` |
+| Inclination to Apply to Graduate School | How likely the student will apply to graduate school, with four ordered categories | Discrete | Ordinal (`Low` < `Medium` < `High` < `Very High`) | Response | `inclination_to_apply` |
 | Grade Point Average | The student's current cumulative GPA | Continuous | Unbounded positive | Regressor | `GPA` |
 | GRE Score | The student's most recent Graduate Record Examination score | Continuous | Unbounded positive | Regressor | `GRE_score` |
-| Field of Study | The student's undergraduate field of study | Categorical | Nominal (Arts, Business, Social Sciences, STEM) | Regressor | `field_of_study` |
+| Field of Study | The student's undergraduate field of study | Categorical | Nominal | Regressor | `field_of_study` |
 
 : Classification table for variables in the college dataset. {#tbl-college-variables}
 
@@ -321,9 +320,9 @@ print_as_dt(college_data_100)
 
 :::
 
-In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we must explicitly tell `R` and `Python` that this variable is **ordinal**, not just a set of unordered labels. This matters for two reasons. First, ordinal logistic regression is built on the *cumulative* probability of being at or below each category, so the software needs to know the correct ordering (`Low` < `Medium` < `High` < `Very High`) in order to form those cumulative splits. Second, if the categories were left as plain (nominal) factors, the model would ignore their natural ranking and effectively treat them as unordered, discarding exactly the structure we want to exploit.
+In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we explicitly tell `R` and `Python` that this variable is ordinal. This matters for two reasons. First, ordinal logistic regression is built on the *cumulative* probability of being at or below each category, so the software needs to know the correct ordering (`Low` < `Medium` < `High` < `Very High`) in order to form the correct cumulative splits. Second, if the categories were left as unordered nominal factors, the model would ignore their natural ranking and discard exactly the structure that we would like to model.
 
-By default, both languages order categories **alphabetically**, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually in the substantively meaningful order. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm the ordering is exactly as intended.
+By default, both languages order categories **alphabetically**, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually for the `inclination_to_apply` variable. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm that the ordering is exactly as intended.
 
 ::: {.panel-tabset}
 
@@ -423,7 +422,7 @@ print(college_data["inclination_to_apply"].cat.categories.tolist())
 
 ## Exploratory Data Analysis
 
-We will begin by splitting the data into 80% training (800 observations) and 20% test (200 observations), stratified by `inclination_to_apply`. To visualize the relationship between `inclination_to_apply` and each continuous explanatory variable (`GPA` and `GRE_score`), we will use the following side-by-side plots:
+We will begin by splitting the data into 80% training and 20% test, stratified by `inclination_to_apply`. To visualize the relationship between `inclination_to_apply` and each continuous explanatory variable (`GPA` and `GRE_score`), we will use the following side-by-side plots:
 
 - Boxplots
 - Violin plots
@@ -575,6 +574,10 @@ pivot = pd.crosstab(
     train_df['inclination_to_apply'],
     normalize='index'
 )
+
+# Reorder fields so Social Sciences comes before STEM on the x-axis
+field_order_eda = ["Arts", "Business", "Humanities", "Social Sciences", "STEM"]
+pivot = pivot.reindex(field_order_eda)
 
 # Plot
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -770,6 +773,10 @@ pivot = pd.crosstab(
     train_df['inclination_to_apply'],
     normalize='index'
 )
+
+# Reorder fields so Social Sciences comes before STEM on the x-axis
+field_order_eda = ["Arts", "Business", "Humanities", "Social Sciences", "STEM"]
+pivot = pivot.reindex(field_order_eda)
 
 # Plot
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -986,17 +993,17 @@ plt.show()
 
 :::
 
-The GRE score plots mirror the structure of the GPA plots, allowing us to assess whether standardized test performance follows a similar pattern across likelihood-to-apply categories.
+The GRE score plots mirror the structure of the GPA plots, allowing us to assess whether GRE performance follows a similar pattern across likelihood-to-apply categories.
 
-- The `Very High` group stands clearly apart from the other three, with a mean GRE score of approximately 154.3, roughly 6 to 8 points higher than the `Low` (148.6), `Medium` (146.5), and `High` (148.0) groups. This separation is visible in both the boxplot and violin plot as a distinct upward shift in the distribution.
-- Unlike GPA, GRE score does **not** increase monotonically across the ordered categories. The `Medium` group has the lowest mean GRE score of all four groups, and the `Low`, `Medium`, and `High` groups show substantially overlapping distributions. This suggests that GRE score may primarily distinguish students in the `Very High` category rather than tracking the full ordinal gradient.
-- The `Low` group exhibits the widest spread in GRE scores (standard deviation ≈ 6.7), while the `High` group is the most tightly clustered (standard deviation ≈ 5.0), indicating greater homogeneity in standardized test performance among students who are likely (but not extremely likely) to apply.
+- The `Very High` group stands clearly apart from the other three, with a mean GRE score of approximately $152.4$, roughly 3 to 4 points higher than the `Low` ($148.7$), `Medium` ($147.9$), and `High` ($149.0$) groups. This separation is visible in both the boxplot and the violin plot.
+- Unlike GPA, GRE score does not increase monotonically across the ordered categories. The `Medium` group has the lowest mean GRE score of all four groups, and the `Low`, `Medium`, and `High` groups show substantially overlapping distributions. This suggests that GRE score may primarily distinguish students in the `Very High` category rather than tracking the full ordinal gradient.
+- The `Low` group exhibits the widest spread in GRE scores (standard deviation ≈ $6.7$), while the `High` group is the most tightly clustered (standard deviation ≈ $5.9$), indicating greater homogeneity in standardized test performance among students who are likely (but not extremely likely) to apply.
 
-## Data Modeling
+## Data Modelling
 
-We have been discussing the advantages of using a different model in the presence of an **ordinal response variable**. In this section, we go over the details of data modeling for an **ordinal response variable** with a set of discrete or continuous regressors using an ordinal logistic regression model. This type of modeling is the most frequent and popular model for ordinal responses. 
+We have been discussing the advantages of using an alternative model instead of multinomial regression in the presence of an **ordinal response variable**. In this section, we go over the details of data modelling for an ordinal response variable with a set of discrete or continuous regressors using an ordinal logistic regression model. This type of modelling is the most frequent and popular model for ordinal responses. 
 
-To present the details of the modeling framework, we begin with the concept of **cumulative logits**. We have already encountered the logit function in the context of binary logistic regression (see @sec-binary-logistic). Recall that in logistic regression, the logit function is applied to the odds of an event. Specifically, if 
+To present the details of the modelling framework, we begin with the concept of **cumulative logits**. We have already encountered the logit function in the context of binary logistic regression (see @sec-binary-logistic). Recall that in logistic regression, the logit function is applied to the odds of an event. Specifically, if 
 
 $$
 p_i = P(Y_i = 1 |x_{i,1}, x_{i,2}, ..., x_{i,k})
@@ -1008,31 +1015,27 @@ $$
 \frac{P(Y_i = 1 \mid x_{i,1}, ..., x_{i,k})}{P(Y_i = 0 \mid x_{i,1}, ..., x_{i,k})} = \frac{p_i}{1-p_i}
 $$
 
-and the logit is defined as the logarithm of these odds, i.e. $\log\left(\frac{p_i}{1-p_i}\right)$. In logistic regression modeling, we assume that this log-odds is a linear function of the regressors:
+and the logit is defined as the logarithm of these odds, i.e. $\log\left(\frac{p_i}{1-p_i}\right)$. In logistic regression modelling, we assume that this log-odds is a linear function of the regressors:
 
 $$
 \log\left(\frac{p_i}{1-p_i}\right) = \beta_0 + \beta_1 x_{i,1} + \beta_2x_{i,2} + \ldots + \beta_k x_{i,k}
 $$
 
-This idea and formulation is the basis for extending the logistic regression framework for an outcome with two categories to ordinal outcomes where there are more than two categories and the order matters as well. In the ordinal case, instead of modeling the log-odds of a single binary event, we model **the cumulative logits**, which compare the probability of being at or below a given category to the probability of being above that category. 
+This idea and formulation is the basis for extending the logistic regression framework for an outcome with two categories to ordinal outcomes with more than two ordered categories. In the ordinal case, instead of modelling the log-odds of a single binary event, we model **the cumulative logits**, which compare the probability of being at or below a given category to the probability of being above that category. 
 
-**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,k})$ the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
+**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,k})$, the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
 
 $$
-\mathbf{x}_i = (x_{i,1},...,x_{i,k})
+\mathbf{x}_i = (x_{i,1},...,x_{i,k}),
 $$ 
 
-In simple terms, $\mathbf{x}_i$ is just a vector of size $k$ that bundles all $k$ regressors together into a single object, so we can refer to them all at once instead of listing each one.
-
-and write;
+where $\mathbf{x}_i$ is a vector of size $k$ that bundles all $k$ regressors into a single object, so we can refer to them all at once instead of listing each one, and write
 
 $$
-P(Y_i = 1 \mid \mathbf{x}_i)
+P(Y_i = 1 \mid \mathbf{x}_i).
 $$
 
-This notation simplifies expressions and improves readability. Let's continue!
-
-Imagine that your ordered response variable has $J$ different categories, such that $J \ge 3$. We start with the category ordering by formally defining the **logits of cumulative probabilities** as follows. Let:
+This notation simplifies expressions and improves readability. Now let's imagine that your ordered response variable has $J$ different categories, such that $J \ge 3$. We begin with the category ordering by formally defining the logits of cumulative probabilities as follows. Let
 
 $$
 P(Y_i \leq j \mid \mathbf{x}_i) = p_{i,1} + p_{i,2} + \ldots + p_{i,j} \quad \quad j = 1, 2, \ldots, J-1
@@ -1040,7 +1043,7 @@ $$
 
 be the cumulative probability.
 
-For example, let's consider $J = 3$ ordered categories. Here $j$ runs over the values $1, 2, \ldots, J - 1 = 2$, so there are two cumulative probabilities to form:
+For example, let's consider $J = 3$ ordered categories, such that $j$ runs over the values $1, 2, \ldots, J - 1 = 2$, and therefore there are two cumulative probabilities to consider:
 
 $$
 \begin{aligned}
@@ -1049,7 +1052,7 @@ P(Y_i \leq 2 \mid \mathbf{x}_i) &= p_{i,1} + p_{i,2}.
 \end{aligned}
 $$
 
-Each one accumulates the category probabilities from the lowest category up to category $j$. We stop at $j = 2$ because the final cumulative probability is always $P(Y_i \leq 3 \mid \mathbf{x}_i) = p_{i,1} + p_{i,2} + p_{i,3} = 1$, which carries no information and is therefore not modelled. The same idea applies for any number of categories $J$: we form the $J - 1$ running totals $P(Y_i \leq j \mid \mathbf{x}_i) = p_{i,1} + \ldots + p_{i,j}$ for $j = 1, 2, \ldots, J - 1$, each adding one more category probability than the previous.
+Each one accumulates the category probabilities from the lowest category up to category $j$. We stop at $j = 2$ because the final cumulative probability is always $P(Y_i \leq 3 \mid \mathbf{x}_i) = p_{i,1} + p_{i,2} + p_{i,3} = 1$, which carries no information and is therefore not modelled. The same idea applies for an arbitrary number of categories $J$: we form $J - 1$ running totals of the form $P(Y_i \leq j \mid \mathbf{x}_i) = p_{i,1} + \ldots + p_{i,j}$ for $j = 1, 2, \ldots, J - 1$, with each adding one more category probability than the previous.
 
 The **logits of cumulative probabilities** are defined as:
 
@@ -1060,14 +1063,14 @@ $$
 \end{aligned}
 $$
 
-The logit transformation defined above is the model's **link function**. A link function maps a probability — here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$ — onto the entire real line, so that it can be expressed as a linear function of the regressors. Because it is applied to *cumulative* probabilities, it is known as the **cumulative logit link**, the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
+The logit transformation defined above is the model's **link function**. A link function maps a probability - here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$, onto the entire set of real numbers, so that it can be expressed as a linear function of the regressors. As it is applied to *cumulative* probabilities, it is known as the **cumulative logit link**, which is the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
 
-Perfect! We have defined our cumulative logit odds here. At this point, an important modelling decision must be addressed. When working with cumulative logits in ordinal logistic regression, there are two primary modelling approaches based on different assumptions about the relationship between the regressors and the response categories. These two primary modelling approaches are the proportional odds assumption and the non-proportional odds assumption. 
+With the cumulative logits now defined, we reach an important modelling decision. In ordinal logistic regression, cumulative logits can be approached in two main ways, distinguished by the assumptions each makes about how the regressors relate to the response categories. These two primary modelling approaches are the proportional odds assumption and the non-proportional odds assumption. 
 
-The proportional odds model assumes that each regressor has the same effect across all cumulative logits. In other words, the regression coefficient for a given regressor is shared across the cumulative comparisons and does not depend on the response category cutoff (i.e. the value of j). This assumption leads to a simpler model with a simple interpretation: each coefficient describes how the regressor shifts the odds of being in a higher response category, regardless of where the ordinal response is split. In contrast, the non-proportional odds model relaxes this assumption by allowing regression coefficients to vary across cumulative splits of the response. In the following sections, we introduce these two approaches in detail and discuss their interpretation and practical implications. Later in the chapter, we also show how to formally assess the proportional odds assumption using the Brant–Wald test.
+The proportional odds model assumes that each regressor has the same effect across all cumulative logits. In other words, the regression coefficient for a given regressor is shared across the cumulative comparisons and does not depend on the response category cutoff (i.e. the value of j). This assumption leads to a model with a simpler interpretation: each coefficient describes how the regressor shifts the odds of being in a higher response category, regardless of where the ordinal response is split. In contrast, the non-proportional odds model relaxes this assumption by allowing regression coefficients to vary across cumulative splits of the response. In the following sections, we introduce these two approaches in detail and discuss their interpretation and practical implications. Later in the chapter, we also show how to formally assess the proportional odds assumption using the Brant–Wald test.
 
 
-### The Proportional Odds Modeling
+### The Proportional Odds modelling
 
 For an ordinal response variable with $J$ ordered categories, we defined the cumulative logits as:
 
@@ -1081,12 +1084,12 @@ $$
 \text{logit}( P(Y_i \le j \mid \mathbf{x}_i) ) = \alpha_j + \beta_1 x_{i,1} + \beta_2 x_{i,2} + ... + \beta_k x_{i,k}
 $$ {#eq-po}
 
-for all values of $j = 1, 2, \ldots, J-1$. Note that in this formula:
+for all values of $j\in\{1, 2, \ldots, J-1\}$. In this formula,
 
 - $\alpha_j$ is a category-specific intercept and depends on the category $j$,
 - $\beta_1, ..., \beta_k$ are regression coefficients that do not depend on $j$. 
 
-The essential assumption is that the effect of each explanatory variable on the log-odds is constant across all cumulative splits of the response variable. The slope parameters remain the same whether we compare:
+The essential assumption is that the effect of each explanatory variable on the log-odds is constant across all cumulative splits of the response variable. The slope parameters remain the same for comparing each of the following pairs of probabilities.
 
 - $P(Y_i \le 1 \mid \mathbf{x}_i)$ versus $P(Y_i > 1 \mid \mathbf{x}_i)$
 - $P(Y_i \le 2 \mid \mathbf{x}_i)$ versus $P(Y_i > 2 \mid \mathbf{x}_i)$
@@ -1097,11 +1100,11 @@ The essential assumption is that the effect of each explanatory variable on the 
 This property of regression coefficients across cumulative logits is known as **the proportional odds assumption**.
 
 
-### The Non-proportional Odds Modeling
+### The Non-proportional Odds modelling
 
-While the proportional odds model assumes that the effect of each regressor is the same across all cumulative logits, this assumption may not always hold in practice. When the effect of one or more regressors varies across the cumulative splits of the ordinal response, we use a non-proportional odds model.
+While the proportional odds model assumes that the effect of each regressor is the same across all cumulative logits, this assumption may not always hold in practice. If the effect of one or more regressors varies across the cumulative splits of the ordinal response, then we use a **non-proportional odds** model.
 
-Formally speaking, the non-proportional odds model allows the regression coefficients to depend on the cumulative category $j$ as shown below:
+Formally speaking, the non-proportional odds model allows the regression coefficients to depend on the cumulative category $j$, as shown below:
 
 $$
 \text{logit}( P(Y_i \le j \mid \mathbf{x}_i) ) = \alpha_j + \beta_{1,j} x_{i,1} + \beta_{2,j} x_{i,2} + \ldots + \beta_{k,j} x_{i,k}
@@ -1110,12 +1113,12 @@ $$ {#eq-npo}
 In this model:
 
 - $\alpha_j$ is the category-specific intercept (the same as before),
-- $\beta_{1,j}, \beta_{2,j}, \ldots , \beta_{k,j}$ are category-specific regression coefficients, meaning that the effect of each explanatory variable can differ across cumulative logits.
+- $\beta_{1,j}, \beta_{2,j}, \ldots , \beta_{k,j}$ are category-specific regression coefficients, meaning that the effect of each regressor can differ across cumulative logits.
 
-At the first glance this seems to be a great flexibility for modeling but this flexibility comes at a cost: **the number of parameters increases with the number of cumulative splits**, making the model more complex and potentially harder to interpret. However, it provides a more accurate representation when the proportional odds assumption is not valid. We will discuss how to assess these assumptions later in this chapter.
+At the first glance, this seems to be a great flexibility for modelling but it comes at a cost: **the number of parameters increases with the number of cumulative splits**, making the model more complex and potentially harder to interpret. However, it provides a more accurate representation when the proportional odds assumption is not valid. We will discuss how to assess these assumptions later in this chapter.
 
 
-To help us understand the differences in assumption visually, we have the following plot. The figure below visualizes four cumulative probabilities $P(Y <= 1 \mid x)$, $P(Y <= 2 \mid x)$, $P(Y <= 3 \mid x)$, and $P(Y <= 4 \mid x)$ on the y-axis plotted as a logistic curve against one explanatory variable $x$. Notice that all curves have the same slope (same amount of steepness) but different intercepts. This parallel structure shows the proportional odds assumption: the effect of $x$ on the log-odds scale (which is the coefficient of $x$) is the same across all cumulative logits. In other words, increasing $x$ shifts each cumulative logit by the same amount regardless of which categorical group $j$ we consider. Note that the intercepts in this model are $\alpha_1 = 4$, $\alpha_2 = 5.5$, $\alpha_3 = 6.3$, $\alpha_4 = 10$. The coefficient which measures the effect of $x$ on log-odds is $\beta=12$ and the same for all cumulative probabilities. Thus, the visual parallelism in this plot provides an intuitive way to understand what proportional odds means geometrically
+To help us understand the differences in assumption visually, we have the following plot. The figure below visualizes four cumulative probabilities $P(Y <= 1 \mid x)$, $P(Y <= 2 \mid x)$, $P(Y <= 3 \mid x)$, and $P(Y <= 4 \mid x)$ on the y-axis plotted as a logistic curve against a single regressor $x$. Notice that all curves have the same slope but different intercepts. This parallel structure shows the proportional odds assumption: the effect of $x$ on the log-odds scale (which is the coefficient of $x$) is the same across all cumulative logits. In other words, increasing $x$ shifts each cumulative logit by the same amount regardless of which categorical group $j$ we consider. Note that the intercepts in this model are $\alpha_1 = 4$, $\alpha_2 = 5.5$, $\alpha_3 = 6.3$, and $\alpha_4 = 10$. The coefficient which measures the effect of $x$ on log-odds is $\beta=12$ and it is the same for all cumulative probabilities. Thus, the visual parallelism in this plot provides an intuitive way to understand what proportional odds means geometrically.
 
 
 ```{r}
@@ -1179,7 +1182,7 @@ ggplot(df, aes(x, y, color = curve)) +
 ```
 
 
-If the proportional odds assumption were violated, these curves would no longer be parallel on the logit scale; instead, their slopes would differ, indicating that the effect of $x$ changes depending on which cumulative split of the ordinal outcome is being modeled. The following figure is an example of proportional odds assumption being violated:
+If the proportional odds assumption were violated, these curves would no longer be parallel on the logit scale; instead, their slopes would differ, indicating that the effect of $x$ changes depending on which cumulative split of the ordinal outcome is being modelled. The following figure is an example of proportional odds assumption being violated:
 
 ```{r}
 #| label: fig-nonproportional-odds-curves
@@ -1268,7 +1271,7 @@ $$
 \eta_{i,j} = \alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i .
 $$
 
-The model therefore states simply that $\text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \eta_{i,j}$. To recover the cumulative probability itself, we undo the logit by solving this equation for $P(Y_i \le j \mid \mathbf{x}_i)$. Writing $P = P(Y_i \le j \mid \mathbf{x}_i)$ for brevity, we start from $\log\!\bigl(\tfrac{P}{1 - P}\bigr) = \eta_{i,j}$, exponentiate both sides, and rearrange:
+Therefore the model states that $\text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \eta_{i,j}$. To obtain the cumulative probabilities, we undo the logit by solving this equation for $P(Y_i \le j \mid \mathbf{x}_i)$. Writing $P = P(Y_i \le j \mid \mathbf{x}_i)$ for brevity, we start from $\log\!\bigl(\tfrac{P}{1 - P}\bigr) = \eta_{i,j}$, exponentiate both sides, and rearrange the equation:
 
 $$
 \frac{P}{1 - P} = e^{\eta_{i,j}}
@@ -1280,7 +1283,7 @@ P\bigl(1 + e^{\eta_{i,j}}\bigr) = e^{\eta_{i,j}}
 P = \frac{e^{\eta_{i,j}}}{1 + e^{\eta_{i,j}}}.
 $$
 
-This final expression is exactly the **logistic cumulative function** $F$ evaluated at the systematic component:
+The final expression is the **logistic cumulative function** $F$ evaluated at the systematic component:
 
 $$
 F(\eta) = \frac{e^{\eta}}{1 + e^{\eta}}, \qquad \text{so that} \qquad P(Y_i \le j \mid \mathbf{x}_i) = F(\eta_{i,j}) = \frac{e^{\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i}}{1 + e^{\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i}} .
@@ -1511,11 +1514,11 @@ $$
 \text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right), \quad j = 1, 2, 3,
 $$
 
-where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ from the coefficients block of the output. $\hat{\boldsymbol{\beta}}_{\texttt{field}}$ is a vector of size $4$ which contains estimated slope coefficients for `field_of_study`, such that $\hat{\boldsymbol{\beta}}_{\texttt{field}}=(0.566, 0.268, 0.441, 0.259)$ according to the above outputs.
+where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ from the coefficients block of the output. $\hat{\boldsymbol{\beta}}_{\texttt{field}}$ is a vector of size $4$ which contains estimated slope coefficients for `field_of_study`, such that $\hat{\boldsymbol{\beta}}_{\texttt{field}}=(0.461, 0.031, 0.408, 0.209)$ according to the above outputs.
 
 ### Fitting the Non-Proportional Odds Model
 
-When the proportional odds assumption is violated for one or more regressors, we allow each cumulative logit to have its own set of regression coefficients. We can formally check the proportional odds assumption using Brant-Wald test, which is introduced later in (@sec-brant-wald). Recall the non-proportional odds model introduced in the Data Modeling section (@eq-npo), where every slope $\beta_{k,j}$ now depends on the cumulative split $j$. In the case study model with regressors $x_{i,\texttt{GPA}}$, $x_{i,\texttt{GRE}}$, and the `field_of_study` dummy variables $\mathbf{Z}_{i,\texttt{field}}$, the fitted non-proportional odds model can be written as:
+When the proportional odds assumption is violated for one or more regressors, we allow each cumulative logit to have its own set of regression coefficients. We can formally check the proportional odds assumption using Brant-Wald test, which is introduced later in (@sec-brant-wald). Recall the non-proportional odds model introduced in the Data modelling section (@eq-npo), where every slope $\beta_{k,j}$ now depends on the cumulative split $j$. In the case study model with regressors $x_{i,\texttt{GPA}}$, $x_{i,\texttt{GRE}}$, and the `field_of_study` dummy variables $\mathbf{Z}_{i,\texttt{field}}$, the fitted non-proportional odds model can be written as:
 
 $$
 \text{logit}\!\left(P(Y_i \le 1 \mid \mathbf{x}_i)\right) = \hat{\alpha}_1 - \left(\hat{\beta}_{1,\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{1,\texttt{GRE}}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{1,\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right),
@@ -1989,7 +1992,7 @@ print(f"BIC:                {ordinal_result.bic:.2f}")
 
 :::
 
-The residual deviance (1875.57) is substantially smaller than the null deviance (2211.35), and there is a reduction of 335.78 units. This reduction is captured by the likelihood-ratio statistic $G^2 = 335.79$ on 6 degrees of freedom ($p < 0.001$), providing very strong evidence that at least one regressor improves on the null model. McFadden's $R^2 = 0.152$ falls within the 0.2 range commonly associated with acceptable fit for ordinal models, indicating that GPA, GRE score, and field of study together explain a meaningful share of the variation in `inclination_to_apply` on the log-likelihood scale.
+The residual deviance (2049.12) is smaller than the null deviance (2201.55), a reduction of 152.43 units. This reduction is captured by the likelihood-ratio statistic $G^2 = 152.43$ on 6 degrees of freedom ($p < 0.001$), providing very strong evidence that at least one regressor improves on the null model. McFadden's $R^2 = 0.069$ is modest — below the 0.2–0.4 range commonly associated with a good fit for ordinal models — indicating that GPA, GRE score, and field of study together explain only a limited share of the variation in `inclination_to_apply` on the log-likelihood scale, even though their joint contribution is strongly significant.
 
 ### Classification-Based Measures
 
@@ -2157,11 +2160,11 @@ print(f"Macro F1:         {f1:.3f}")
 
 :::
 
-On the training set, the model achieves an overall accuracy of **42.8%**, a macro recall of **40.1%**, and a macro F1 of **38.2%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model meaningfully outperforms chance, but leaves substantial room for improvement.
+On the training set, the model achieves an overall accuracy of **38.2%**, a macro recall of **34.3%**, and a macro F1 of **37.6%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model outperforms chance, but leaves substantial room for improvement.
 
 The confusion matrix reveals the characteristic ordinal error pattern: most misclassifications fall into **adjacent categories** rather than opposite ends of the scale. For instance, `Low` observations are most often misclassified as `Medium`, and `High` observations are most often confused with `Very High` or `Medium`, rarely with `Low`. This near-diagonal structure is desirable for an ordinal model because it indicates that the model incorporates the relative order of response categories, even when it does not predict the exact category correctly.
 
-The `Very High` category is the best-predicted class (recall = 0.75, F1 = 0.64). The `High` category is the most difficult to classify correctly (recall = 0.11, F1 = 0.15), as it sits between two better-separated groups and receives predictions pulled in both directions. Macro recall (0.401) is noticeably lower than accuracy (0.428), indicating mild imbalance in how well the model performs across the four categories, a pattern that persists on the held-out test set and is discussed further in the Results section.
+The `Very High` category is the best-predicted class (recall = 0.67, F1 = 0.52), with `Low` close behind (recall = 0.61, F1 = 0.47). The two middle categories fare poorly: the model never assigns the `Medium` label at all (recall = 0), and `High` is rarely recovered (recall = 0.10, F1 = 0.13), as it sits between two better-separated groups and has its observations pulled in both directions. Macro recall (0.343) is lower than accuracy (0.382), reflecting this uneven performance across the four categories, a pattern that persists on the held-out test set and is discussed further in the Results section.
 
 ## Inference
 
@@ -2981,21 +2984,21 @@ for i in range(0, len(slope_lbls), 2):
 
 The partial proportional odds model yields the following estimated coefficients. The sign convention is the same as before: a positive $\hat{\beta}$ corresponds to higher values of that regressor being associated with higher ordinal categories.
 
-**GPA (`GPA`), shared slope.** GPA retains a single slope across all three cumulative splits ($\hat{\beta}_{\texttt{GPA}} = 4.20$, $z = 7.71$, $p < 0.001$, OR = 66.69, 95% CI: 22.95, 194.22). It has the following interpretation.
+**GPA (`GPA`), shared slope.** GPA retains a single slope across all three cumulative splits ($\hat{\beta}_{\texttt{GPA}} = 2.40$, $z = 5.11$, $p < 0.001$, OR = 11.01, 95% CI: 4.38, 27.63). It has the following interpretation.
 
-> *Holding GRE score and field of study constant, a one-unit increase in GPA is associated with 66.69 times higher cumulative odds of falling in a higher likelihood-to-apply category, at every cumulative threshold simultaneously.*
+> *Holding GRE score and field of study constant, a one-unit increase in GPA is associated with 11.01 times higher cumulative odds of falling in a higher likelihood-to-apply category, at every cumulative threshold simultaneously.*
 
 **GRE Score (`GRE_score`), cutpoint-specific slopes.** GRE score now has three separate slopes, one per cumulative split, all statistically significant:
 
 | Cutpoint | $\hat{\beta}_{\texttt{GRE},j}$ | OR ($e^{\hat\beta}$) | 95% CI | 5-pt OR ($e^{5\hat\beta}$) |
 |---|---|---|---|---|
-| `Low\|Medium` ($j=1$) | 0.066 | 1.068 | (1.017, 1.123) | 1.391 |
-| `Medium\|High` ($j=2$) |0.174 | 1.190 | (1.126, 1.257) | 2.387 |
-| `High\|Very High` ($j=3$) | 0.275 | 1.317 | (1.217, 1.425) | 3.955 |
+| `Low\|Medium` ($j=1$) | 0.084 | 1.088 | (1.023, 1.156) | 1.522 |
+| `Medium\|High` ($j=2$) | 0.126 | 1.134 | (1.070, 1.202) | 1.878 |
+| `High\|Very High` ($j=3$) | 0.135 | 1.145 | (1.076, 1.219) | 1.964 |
 
-The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.068 times higher odds of being above `Low`, a modest effect. But at the `High|Very High` split, the same one-point increase is associated with 1.317 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is even starker: a 5-point GRE advantage multiplies the odds by only 1.391 at the lowest split, but by nearly 4.0 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform regressor across the full range.
+The increasing pattern across cutpoints is the core finding. At the `Low|Medium` split, a one-point GRE increase is associated with only 1.088 times higher odds of being above `Low`, a modest effect. At the `High|Very High` split, the same one-point increase is associated with 1.145 times higher odds of being in the `Very High` category. Expressed as 5-point effects, the contrast is clearer: a 5-point GRE advantage multiplies the odds by about 1.52 at the lowest split, but by about 1.96 at the highest. This confirms that GRE score is primarily a discriminator for students at the top of the ordinal scale rather than a uniform regressor across the full range.
 
-**Field of Study (`field_of_study`), shared slopes.** None of the field-of-study levels reaches statistical significance at the 5% level: Business ($\hat{\beta}_{\texttt{Business}} = 0.06$, $z = 0.12$, $p = 0.907$, OR = 1.06), Humanities ($\hat{\beta}_{\texttt{Humanities}} = -0.28$, $z = -0.49$, $p = 0.626$, OR = 0.76), STEM ($\hat{\beta}_{\texttt{STEM}} = 0.13$, $z = 0.26$, $p = 0.794$, OR = 1.14), and Social Sciences ($\hat{\beta}_{\texttt{Social Sciences}} = -0.23$, $z = -0.43$, $p = 0.666$, OR = 0.80). After adjusting for GPA and GRE score, a student's field of study shows no statistically detectable association with their inclination to apply to graduate school relative to the `Arts` baseline.
+**Field of Study (`field_of_study`), shared slopes.** On the held-out test set, all four field-of-study levels reach significance at the 5% level relative to the `Arts` baseline: Business ($\hat{\beta}_{\texttt{Business}} = 1.11$, $z = 2.07$, $p = 0.039$, OR = 3.03), Humanities ($\hat{\beta}_{\texttt{Humanities}} = 1.08$, $z = 1.99$, $p = 0.046$, OR = 2.95), STEM ($\hat{\beta}_{\texttt{STEM}} = 1.31$, $z = 2.62$, $p = 0.009$, OR = 3.72), and Social Sciences ($\hat{\beta}_{\texttt{Social Sciences}} = 1.03$, $z = 1.97$, $p = 0.049$, OR = 2.81). These point in the same direction \u2014 students in each field show higher cumulative odds of a stronger inclination to apply than students in `Arts` \u2014 but they should be read with caution: this model is fitted on the 199-row test set, so the field coefficients are imprecise (wide confidence intervals) and noticeably larger than the corresponding training-set effects in the proportional odds model, where only `Business` was significant.
 
 ## Results
 
@@ -3009,24 +3012,24 @@ for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`
 
 | Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
 |---|---|---|---|---|---|---|
-| $\hat{\alpha}_1$ (`Low\|Medium`) | 21.10 | — | — | — | — | — |
-| $\hat{\alpha}_2$ (`Medium\|High`) | 38.78 | — | — | — | — | — |
-| $\hat{\alpha}_3$ (`High\|Very High`) | 55.46 | — | — | — | — | — |
-| $\hat{\beta}_{\texttt{GPA}}$ (shared) | 4.20 | 0.545 | 7.71 | $< 0.001$ | 66.69 | (22.95, 194.22) |
-| $\hat{\beta}_{\texttt{GRE},1}$ (`Low\|Medium`) | 0.066 | 0.025 | 2.62 | 0.009 | 1.068 | (1.017, 1.123) |
-| $\hat{\beta}_{\texttt{GRE},2}$ (`Medium\|High`) | 0.174 | 0.028 | 6.22 | $< 0.001$ | 1.190 | (1.126, 1.257) |
-| $\hat{\beta}_{\texttt{GRE},3}$ (`High\|Very High`) | 0.275 | 0.040 | 6.82 | $< 0.001$ | 1.317 | (1.217, 1.425) |
-| $\hat{\beta}_{\texttt{Business}}$ (shared) | 0.06 | 0.508 | 0.12 | 0.907 | 1.06 | (0.39, 2.87) |
-| $\hat{\beta}_{\texttt{Humanities}}$ (shared) | -0.28 | 0.566 | -0.49 | 0.626 | 0.76 | (0.25, 2.30) |
-| $\hat{\beta}_{\texttt{STEM}}$ (shared) | 0.13 | 0.509 | 0.26 | 0.794 | 1.14 | (0.42, 3.10) |
-| $\hat{\beta}_{\texttt{Social Sciences}}$ (shared) | -0.23 | 0.521 | -0.43 | 0.666 | 0.80 | (0.29, 2.22) |
+| $\hat{\alpha}_1$ (`Low\|Medium`) | 19.72 | — | — | — | — | — |
+| $\hat{\alpha}_2$ (`Medium\|High`) | 27.02 | — | — | — | — | — |
+| $\hat{\alpha}_3$ (`High\|Very High`) | 29.65 | — | — | — | — | — |
+| $\hat{\beta}_{\texttt{GPA}}$ (shared) | 2.40 | 0.470 | 5.11 | $< 0.001$ | 11.01 | (4.38, 27.63) |
+| $\hat{\beta}_{\texttt{GRE},1}$ (`Low\|Medium`) | 0.084 | 0.031 | 2.70 | 0.007 | 1.088 | (1.023, 1.156) |
+| $\hat{\beta}_{\texttt{GRE},2}$ (`Medium\|High`) | 0.126 | 0.030 | 4.26 | $< 0.001$ | 1.134 | (1.070, 1.202) |
+| $\hat{\beta}_{\texttt{GRE},3}$ (`High\|Very High`) | 0.135 | 0.032 | 4.23 | $< 0.001$ | 1.145 | (1.076, 1.219) |
+| $\hat{\beta}_{\texttt{Business}}$ (shared) | 1.11 | 0.537 | 2.07 | 0.039 | 3.03 | (1.06, 8.70) |
+| $\hat{\beta}_{\texttt{Humanities}}$ (shared) | 1.08 | 0.543 | 1.99 | 0.046 | 2.95 | (1.02, 8.55) |
+| $\hat{\beta}_{\texttt{STEM}}$ (shared) | 1.31 | 0.502 | 2.62 | 0.009 | 3.72 | (1.39, 9.95) |
+| $\hat{\beta}_{\texttt{Social Sciences}}$ (shared) | 1.03 | 0.526 | 1.97 | 0.049 | 2.81 | (1.00, 7.88) |
 
-After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in `R`) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.066$, $\hat{\beta}_{\texttt{GRE},2} = 0.174$, and $\hat{\beta}_{\texttt{GRE},3} = 0.275$ at the three cumulative splits respectively, with all other slope coefficients remaining shared. The interpretation of each significant coefficient is:
+After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in `R`) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.084$, $\hat{\beta}_{\texttt{GRE},2} = 0.126$, and $\hat{\beta}_{\texttt{GRE},3} = 0.135$ at the three cumulative splits respectively, with all other slope coefficients remaining shared. The interpretation of each significant coefficient is:
 
-- **GPA** ($\hat{\beta} = 4.20$, OR = 66.69, 95% CI: 22.95–194.22): Holding GRE score and field of study constant, each additional GPA point is associated with 66.69 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
-- **GRE Score** (cutpoint-specific): The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with a 6.8% increase in the odds of being above `Low` (OR = 1.068 at $j=1$), rising to a 19.0% increase in the odds of being above `Medium` (OR = 1.190 at $j=2$), and a 31.7% increase in the odds of being in the `Very High` category (OR = 1.317 at $j=3$). This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
+- **GPA** ($\hat{\beta} = 2.40$, OR = 11.01, 95% CI: 4.38–27.63): Holding GRE score and field of study constant, each additional GPA point is associated with 11.01 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
+- **GRE Score** (cutpoint-specific): The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with an 8.8% increase in the odds of being above `Low` (OR = 1.088 at $j=1$), rising to a 13.4% increase in the odds of being above `Medium` (OR = 1.134 at $j=2$), and a 14.5% increase in the odds of being in the `Very High` category (OR = 1.145 at $j=3$). This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
 
-None of the field-of-study levels is statistically significant after adjusting for GPA and GRE score (all $p > 0.6$), so field of study does not contribute a detectable shift in the cumulative odds relative to the `Arts` baseline.
+On the test set, all four field-of-study levels are statistically significant after adjusting for GPA and GRE score (all $p < 0.05$), with odds ratios between 2.8 and 3.7 relative to the `Arts` baseline. Because this model is fitted on the small (199-row) test set, these field effects are estimated imprecisely and run larger than the corresponding effects in the training-set proportional odds model, where only `Business` is significant; they should be interpreted with that caveat in mind.
 
 ### Prediction
 
