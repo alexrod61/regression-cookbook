@@ -2659,11 +2659,19 @@ Values close to 1 suggest little evidence of multicollinearity. Larger values su
 ::::
 :::
 
-
 #### Identifying Outliers and Influential Points
 
-Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. One way to identify extreme residuals is through residual plots, where large deviations from zero may indicate problematic data points.
+Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. An **outlier** is an observation with an unusually large residual, meaning that its observed response value is far from the value predicted by the model. An **influential observation** is an observation that has a strong effect on the fitted regression model. An observation can be an outlier without being highly influential, and an influential observation does not always have the largest residual.
 
+For observation $i$, the residual is defined as
+
+$$
+\hat{\varepsilon}_i = y_i - \hat{y}_i,
+$$
+
+where $y_i$ is the observed response value and $\hat{y}_i$ is the fitted response value from the model. The rationale behind residual plots is that unusually large positive or negative residuals may indicate observations that are poorly fit by the model. Plotting residuals against the observation index can help identify whether a small number of observations have unusually large deviations from zero.
+
+Unlike formal tests such as the Breusch-Pagan or Durbin-Watson tests, identifying outliers using residual plots is usually treated as a diagnostic procedure rather than a formal hypothesis test. We inspect whether any residuals stand out clearly from the rest and then investigate those observations in the context of the data.
 
 ::: {.panel-tabset}
 
@@ -2718,7 +2726,7 @@ plt.show()
 
 :::
 
-  
+
 ::: {.panel-tabset}
 
 ## **`R` Output**
@@ -2788,10 +2796,26 @@ plt.show()
 
 :::
 
-In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers or highly influential observations in the dataset. The model residuals behave as expected, reinforcing the assumption that the data points do not exert undue influence on the regression fit.
+In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers based on the residual plot. The residuals behave as expected, providing no visual evidence that a small number of observations are poorly fit by the model.
 
-Another important diagnostic tool is Cook’s Distance, which measures the influence of each observation on the regression results. Large Cook’s distance values may indicate observations that have a strong influence on the fitted model. Common rules of thumb include investigating values greater than 0.5 or values that stand out clearly relative to the rest of the observations.
+Another important diagnostic tool is **Cook’s Distance**, which measures the influence of each observation on the fitted regression model. Cook’s Distance combines information about the size of the residual and the leverage of the observation. Therefore, it helps identify observations that may have a large effect on the estimated regression coefficients.
 
+For observation $i$, Cook’s Distance can be written as
+
+$$
+D_i =
+\frac{
+\sum_{j=1}^{n} (\hat{y}_j - \hat{y}_{j(i)})^2
+}{
+p \, \widehat{\sigma}^2
+},
+$$
+
+where $\hat{y}_j$ is the fitted value for observation $j$ using the full dataset, $\hat{y}_{j(i)}$ is the fitted value for observation $j$ after removing observation $i$, $p$ is the number of estimated parameters in the model, and $\widehat{\sigma}^2$ is the estimated error variance.
+
+The rationale behind Cook’s Distance is to ask how much the fitted model would change if one observation were removed. If removing an observation changes the fitted values substantially, then that observation may be influential. Common rules of thumb include investigating Cook’s Distance values greater than 0.5 or values that stand out clearly relative to the rest of the observations.
+
+As with residual plots, Cook’s Distance is usually treated as a diagnostic measure rather than a formal hypothesis test. We do not usually write a null and alternative hypothesis for Cook’s Distance. Instead, we inspect the values and investigate any observations that appear unusually influential.
 
 ::: {.panel-tabset}
 
@@ -2920,9 +2944,9 @@ plt.show()
 
 :::
 
-In the plot above, all observations have Cook’s Distance values well below the 0.5 rule-of-thumb threshold and no observation appears to stand out substantially from the others. This suggests that no individual data point has an undue influence on the model’s estimates.
+In the plot above, all observations have Cook’s Distance values well below the 0.5 rule-of-thumb threshold, and no observation appears to stand out substantially from the others. This suggests that no individual data point has an undue influence on the model’s estimates.
 
-If influential points are identified, the next steps involve investigating data quality, testing robust regression techniques, or applying Winsorization, which involves replacing extreme values with more moderate ones to reduce their impact.
+If influential points are identified, the next steps involve investigating data quality, checking whether the observation is a data entry error or a valid unusual case, and refitting the model with and without the influential observation to assess sensitivity. Other possible approaches include using robust regression techniques or applying Winsorization, which involves replacing extreme values with more moderate values to reduce their impact.
 
 
 ## Results
