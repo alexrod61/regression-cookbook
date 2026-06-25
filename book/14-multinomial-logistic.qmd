@@ -236,7 +236,7 @@ print(data)
 ## Python Output
 
 ```{python}
-#| echo: false
+#| echo: true
 #| message: false
 #| warning: false
 url = "https://raw.githubusercontent.com/andytai7/cookbook/refs/heads/main/raw-data/multinomial_transport.csv"
@@ -1887,7 +1887,7 @@ Question 14.6
 ::::{.Question-container}
 **Short Answer**
 
-Why does the chapter use the Softmax form to convert the logit-linear functions into category probabilities?
+Why does the chapter use the Softmax form to convert the logit-linear functions into category probabilities? In practice, what problem would occur if we tried to interpret the separate logit-linear scores as probabilities without this final conversion?
 ::::
 :::
 
@@ -1902,7 +1902,7 @@ Answer 14.6
 
 **Rationale:**
 
-The Softmax form converts the $m - 1$ baseline-category logits into probabilities for all $m$ categories. It ensures that every predicted probability is between 0 and 1 and that the probabilities across the categories sum to 1 for each observation.
+The Softmax form converts the $m - 1$ baseline-category logits into probabilities for all $m$ categories. In practical terms, the model first produces one relative score for each non-baseline category; Softmax then turns those scores into a complete probability distribution. This matters because a person cannot have separate category probabilities that add up to more than 1 or less than 1 across mutually exclusive choices such as `Car`, `Bicycle`, `Public_Transit`, and `Walking`. Softmax guarantees that each probability is between 0 and 1 and that the probabilities across all categories sum to 1 for each observation. This is also why Softmax appears in many multi-class machine learning models, including the output layer of some [neural networks](https://en.wikipedia.org/wiki/Softmax_function#Applications).
 
 </details>
 ::::
@@ -1915,7 +1915,7 @@ Question 14.7
 ::::{.Question-container}
 **Short Answer**
 
-The chapter notes that changing the baseline category, for example from `Car` to `Public_Transit`, does not change the estimated probability for each category. If the probabilities do not change, what does change?
+The chapter notes that changing the baseline category, for example from `Car` to `Public_Transit`, does not change the estimated probability for each category. If the probabilities do not change, how does changing the baseline affect the coefficients and their interpretation?
 ::::
 :::
 
@@ -1930,7 +1930,7 @@ Answer 14.7
 
 **Rationale:**
 
-Changing the baseline changes the **parameterization** of the model: the intercepts, coefficients, and log-odds comparisons are rewritten relative to a different reference category. The fitted category probabilities remain the same because they describe the same modelled distribution, only expressed using a different baseline.
+Changing the baseline changes the **parameterization** of the model: the intercepts, coefficients, and log-odds comparisons are rewritten relative to a different reference category. If `Car` is the baseline, a coefficient describes a change in the log odds of some other category versus `Car`. If `Public_Transit` becomes the baseline, the same model is now described through comparisons versus `Public_Transit`. The fitted category probabilities remain the same, but the wording and numerical values of the coefficients change because the reference comparison has changed.
 
 </details>
 ::::
@@ -2024,7 +2024,40 @@ Answer 14.10
 
 **Rationale:**
 
-You can subtract the two baseline-category logit equations. For example, the log odds comparing `Walking` to `Bicycle` can be obtained by taking the `Walking` versus `Car` linear predictor and subtracting the `Bicycle` versus `Car` linear predictor, which also means subtracting the corresponding coefficients.
+You can subtract the two baseline-category logit equations. If `Car` is the baseline, then
+
+$$
+\log\left[
+\frac{P(Y_i = \texttt{Walking} \mid \mathbf{x}_i)}
+{P(Y_i = \texttt{Car} \mid \mathbf{x}_i)}
+\right]
+= \eta_i^{(\texttt{Walking}, \texttt{Car})}
+$$
+
+and
+
+$$
+\log\left[
+\frac{P(Y_i = \texttt{Bicycle} \mid \mathbf{x}_i)}
+{P(Y_i = \texttt{Car} \mid \mathbf{x}_i)}
+\right]
+= \eta_i^{(\texttt{Bicycle}, \texttt{Car})}.
+$$
+
+Therefore,
+
+$$
+\log\left[
+\frac{P(Y_i = \texttt{Walking} \mid \mathbf{x}_i)}
+{P(Y_i = \texttt{Bicycle} \mid \mathbf{x}_i)}
+\right]
+=
+\eta_i^{(\texttt{Walking}, \texttt{Car})}
+-
+\eta_i^{(\texttt{Bicycle}, \texttt{Car})}.
+$$
+
+This also means subtracting the corresponding coefficient vectors.
 
 </details>
 ::::
@@ -2090,7 +2123,7 @@ Answer 14.12
 
 **Rationale:**
 
-Factorizing these variables tells the software to treat them as **categorical** rather than continuous numeric variables. This is especially important for `transport_mode`, which defines the response categories, and for binary predictors such as `has_car_available` and `weekend_commuter`, which should be represented through category indicators or codes rather than interpreted as arbitrary continuous measurements.
+Factorizing these variables tells the software to treat them as **categorical** rather than continuous numeric variables. This is especially important for `transport_mode`, which defines the response categories, and for binary predictors such as `has_car_available` and `weekend_commuter`, which should be represented through category indicators or codes rather than interpreted as arbitrary continuous measurements. In coding terms, factors in `R` determine the available levels and the reference category used in the model matrix. In `Python`, converting to categorical variables or creating dummy variables with `pd.get_dummies()` serves the same purpose: it makes the category labels explicit and controls which indicator columns are included in the model. Without this step, software may treat categories as raw numbers or may choose an unintended baseline.
 
 </details>
 ::::
@@ -2184,7 +2217,7 @@ Answer 14.15
 
 **Rationale:**
 
-Downsampling reduces the number of observations in the majority class so the classes are more balanced, but it can throw away useful data. Upsampling increases the number of minority-class observations, often by resampling with replacement, but it can increase the risk of overfitting to repeated minority cases.
+Downsampling reduces the number of observations in the majority class so the classes are more balanced, but it can throw away useful data. Upsampling increases the number of minority-class observations, often by resampling with replacement, but it can increase the risk of overfitting to repeated minority cases. In practice, this choice depends on the goal of the analysis. If a transit planner mostly cares about overall accuracy, keeping the observed class distribution may be reasonable. If the planner also needs to identify less common choices such as walking or bicycling, balancing methods may help the model pay more attention to those smaller groups, even if overall accuracy decreases.
 
 </details>
 ::::
@@ -2269,7 +2302,7 @@ Question 14.18
 ::::{.Question-container}
 **Short Answer**
 
-Suppose an exponentiated 95% confidence interval for an odds ratio is $(0.82, 1.24)$. At the 5% significance level, would this provide strong evidence that the predictor changes the odds for that category comparison? Why or why not?
+Suppose an exponentiated 95% confidence interval for an odds ratio is $(0.82, 1.24)$ for the `Bicycle` versus `Car` comparison, where `Car` is the baseline category. At the 5% significance level, would this provide strong evidence that the predictor changes the odds of choosing `Bicycle` rather than `Car`? Why or why not?
 ::::
 :::
 
@@ -2284,7 +2317,7 @@ Answer 14.18
 
 **Rationale:**
 
-No. Because the confidence interval includes 1, the data are compatible with no multiplicative change in the odds for that category comparison at the 5% significance level. This would usually correspond to a p-value greater than 0.05 for the associated coefficient.
+No. Because the confidence interval includes 1, the data are compatible with no multiplicative change in the odds for that category comparison at the 5% significance level. In this context, the interval says that the predictor could plausibly decrease the odds of choosing the non-baseline category `Bicycle` rather than the baseline category `Car`, increase those odds, or have essentially no effect. This would usually correspond to a p-value greater than 0.05 for the associated coefficient.
 
 </details>
 ::::
@@ -2297,7 +2330,7 @@ Question 14.19
 ::::{.Question-container}
 **Short Answer**
 
-The chapter distinguishes an inferential objective from a predictive objective. In the transportation case study, what is one example of each?
+The chapter distinguishes an inferential objective from a predictive objective. Give one example of each in a setting different from the transportation case study.
 ::::
 :::
 
@@ -2312,7 +2345,7 @@ Answer 14.19
 
 **Rationale:**
 
-An inferential objective is to estimate how predictors such as `commute_distance`, `age`, `has_car_available`, and `weekend_commuter` are associated with the odds or probabilities of different transport modes. A predictive objective is to classify a new individual's most likely `transport_mode` using those same predictors and then evaluate performance with tools such as a confusion matrix, accuracy, macro recall, and macro F1.
+For a university dining study, an inferential objective could be to estimate how `weekly_food_budget` or `has_meal_plan` is associated with the odds of choosing `Food_Delivery`, `Packed_Lunch`, or `Fast_Food` relative to `Cafeteria`. A predictive objective could be to use a student's budget, schedule, distance from home, meal-plan status, and dietary restriction status to classify their most likely lunch choice, then evaluate the classifier with a confusion matrix, accuracy, macro recall, and macro F1.
 
 </details>
 ::::
@@ -2483,7 +2516,8 @@ for level in levels:
 plt.xticks(x, meal_props.index)
 plt.xlabel("Has meal plan")
 plt.ylabel("Proportion")
-plt.legend(title="Lunch choice", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.legend(title="Lunch choice", loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=2)
+plt.tight_layout()
 plt.show()
 
 time_bins = pd.cut(train_set["time_between_classes"], bins=np.arange(0, 161, 20))
@@ -2494,7 +2528,8 @@ for level in levels:
 plt.xlabel("Time between classes")
 plt.ylabel("Proportion")
 plt.xticks(rotation=45)
-plt.legend(title="Lunch choice", bbox_to_anchor=(1.02, 1), loc="upper left")
+plt.legend(title="Lunch choice", loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=2)
+plt.tight_layout()
 plt.show()
 ```
 
@@ -2713,6 +2748,7 @@ For `Food_Delivery` versus `Cafeteria`, the odds ratio for `weekly_food_budget` 
 1. Suppose a student has a weekly food budget of 95 dollars, 25 minutes between classes, lives 6 km from campus, does not have a meal plan, and does not have a dietary restriction. Use both models to predict this student's lunch-choice probabilities.
 2. Which lunch choice is most likely under each model?
 3. Returning to the original campus dining question: what have we learned about understanding and predicting student lunch choice?
+4. Write a short storytelling summary for a campus dining office. Your summary should explain the main finding, the prediction limitation, and one practical implication in plain language.
 
 <details>
 <summary><strong>Click to reveal answer</strong></summary>
@@ -2764,6 +2800,8 @@ print(new_probs_bal.idxmax(axis=1))
 
 :::
 The original model may still lean toward `Cafeteria`, because that is the majority class in the observed data. The balanced model may assign more probability to minority classes such as `Fast_Food` or `Food_Delivery` for this profile. Overall, the predictors are useful for understanding lunch-choice patterns, especially the roles of food budget and meal plan status, but prediction is only moderate. Accuracy alone is not enough here, because the model can look good while missing less common lunch choices.
+
+A short storytelling summary could be: student lunch choice is shaped by practical constraints such as food budget, meal-plan status, dietary restrictions, and time between classes. The model can identify broad patterns, such as meal-plan students being more likely to use the cafeteria and higher-budget students being more likely to buy food elsewhere, but it should not be treated as a perfect individual-level prediction tool. For a campus dining office, the main implication is to use the model as a planning aid for understanding demand across lunch options, while still looking carefully at minority choices that overall accuracy may hide.
 </details>
 
 :::
