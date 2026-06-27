@@ -1438,7 +1438,50 @@ ordinal_fit = OrderedModel(
     distr="logit"
 )
 ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
-print(ordinal_result.summary())
+n_thr = ordinal_result.model.k_levels - 1           # number of cutpoints (J - 1)
+n_slope = len(ordinal_result.params) - n_thr         # number of slope coefficients
+
+params = ordinal_result.params.values
+cov = ordinal_result.cov_params().values
+
+# Slope coefficients: identical to R, reported as-is.
+slope_tbl = pd.DataFrame({
+    "term": ordinal_result.params.index[:n_slope],
+    "estimate": params[:n_slope],
+    "std.error": ordinal_result.bse.values[:n_slope],
+    "statistic": ordinal_result.tvalues.values[:n_slope],
+    "coef.type": "coefficient",
+})
+
+# Thresholds: back-transform log-increments to cutpoints.
+thr_raw = params[n_slope:]
+thr_cov = cov[n_slope:, n_slope:]
+cutpoints = np.concatenate(([thr_raw[0]], np.exp(thr_raw[1:]))).cumsum()
+
+# Delta-method Jacobian d(cutpoint) / d(raw threshold parameter).
+jac = np.zeros((n_thr, n_thr))
+for m in range(n_thr):
+    jac[m, 0] = 1.0
+    jac[m, 1:m + 1] = np.exp(thr_raw[1:m + 1])
+cut_se = np.sqrt(np.diag(jac @ thr_cov @ jac.T))
+
+thr_tbl = pd.DataFrame({
+    "term": [f"{ordered_categories[i]}|{ordered_categories[i + 1]}" for i in range(n_thr)],
+    "estimate": cutpoints,
+    "std.error": cut_se,
+    "statistic": cutpoints / cut_se,
+    "coef.type": "scale",
+})
+
+tidy_ordinal = pd.concat([slope_tbl, thr_tbl], ignore_index=True)
+
+print(
+    "Note: statsmodels reports thresholds beyond the first as log-increments\n"
+    "between consecutive cutpoints. The thresholds below have been transformed\n"
+    "to the cutpoint scale (with delta-method standard errors), so that\n"
+    "they match the cutpoints reported by polr() in R.\n"
+)
+print(tidy_ordinal.round({"estimate": 4, "std.error": 4, "statistic": 3}).to_string(index=False))
 ```
 
 :::
@@ -1501,7 +1544,50 @@ ordinal_fit = OrderedModel(
     distr="logit"
 )
 ordinal_result = ordinal_fit.fit(method="bfgs", disp=False)
-print(ordinal_result.summary())
+n_thr = ordinal_result.model.k_levels - 1           # number of cutpoints (J - 1)
+n_slope = len(ordinal_result.params) - n_thr         # number of slope coefficients
+
+params = ordinal_result.params.values
+cov = ordinal_result.cov_params().values
+
+# Slope coefficients: identical to R, reported as-is.
+slope_tbl = pd.DataFrame({
+    "term": ordinal_result.params.index[:n_slope],
+    "estimate": params[:n_slope],
+    "std.error": ordinal_result.bse.values[:n_slope],
+    "statistic": ordinal_result.tvalues.values[:n_slope],
+    "coef.type": "coefficient",
+})
+
+# Thresholds: back-transform log-increments to cutpoints.
+thr_raw = params[n_slope:]
+thr_cov = cov[n_slope:, n_slope:]
+cutpoints = np.concatenate(([thr_raw[0]], np.exp(thr_raw[1:]))).cumsum()
+
+# Delta-method Jacobian d(cutpoint) / d(raw threshold parameter).
+jac = np.zeros((n_thr, n_thr))
+for m in range(n_thr):
+    jac[m, 0] = 1.0
+    jac[m, 1:m + 1] = np.exp(thr_raw[1:m + 1])
+cut_se = np.sqrt(np.diag(jac @ thr_cov @ jac.T))
+
+thr_tbl = pd.DataFrame({
+    "term": [f"{ordered_categories[i]}|{ordered_categories[i + 1]}" for i in range(n_thr)],
+    "estimate": cutpoints,
+    "std.error": cut_se,
+    "statistic": cutpoints / cut_se,
+    "coef.type": "scale",
+})
+
+tidy_ordinal = pd.concat([slope_tbl, thr_tbl], ignore_index=True)
+
+print(
+    "Note: statsmodels reports thresholds beyond the first as log-increments\n"
+    "between consecutive cutpoints. The thresholds below have been transformed\n"
+    "to the cutpoint scale (with delta-method standard errors), so that\n"
+    "they match the cutpoints reported by polr() in R.\n"
+)
+print(tidy_ordinal.round({"estimate": 4, "std.error": 4, "statistic": 3}).to_string(index=False))
 ```
 
 :::
