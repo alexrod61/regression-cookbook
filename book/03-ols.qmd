@@ -1798,10 +1798,10 @@ Each coefficient represents the expected change in $Y_i$ associated with a one-u
 - $\beta_7$ measures the association between alcohol consumption and financial balance.
 - $\beta_{10}$ represents the expected difference in financial balance between students living alone and students living with family, after controlling for the remaining regressors.
 
-More generally, a multiple linear regression model with $p$ regressors can be written as follows:
+More generally, a multiple linear regression model with $k$ regressors can be written as follows:
 
 $$
-Y_i = \beta_0 + \sum_{j=1}^{p} \beta_j x_{i,j} + \epsilon_i.
+Y_i = \beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j} + \epsilon_i.
 $${#eq-ols-main-formula-compact-version}
 
 Note that the index $i$ represents the $i$-th individual in the sample and the $j$-th presents the $j$-th regressor. The model can be extended to include interaction terms between regressors but we will not consider that in this example.
@@ -1813,7 +1813,7 @@ With the data modelling stage completed, we now move to estimation, where we fit
 In ordinary least squares, the coefficients are chosen so that the fitted values are as close as possible to the observed responses. For a given observation, the fitted value is
 
 $$
-\widehat{Y}_i = \beta_0 + \sum_{j=1}^{p} \beta_j x_{i,j}.
+\widehat{Y}_i = \beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}.
 $${#eq-ols-fitted-value}
 
 Therefore, the residual for the $i$-th observation is
@@ -1821,7 +1821,7 @@ Therefore, the residual for the $i$-th observation is
 $$
 Y_i - \widehat{Y}_i
 =
-Y_i - \left(\beta_0 + \sum_{j=1}^{p} \beta_j x_{i,j}\right).
+Y_i - \left(\beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}\right).
 $${#eq-residual-formula}
 
 OLS chooses the coefficient estimates that minimize the sum of squared residuals:
@@ -1829,7 +1829,7 @@ OLS chooses the coefficient estimates that minimize the sum of squared residuals
 $$
 \sum_{i=1}^{n}
 \left[
-Y_i - \left(\beta_0 + \sum_{j=1}^{p} \beta_j x_{i,j}\right)
+Y_i - \left(\beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}\right)
 \right]^2.
 $${#eq-sse-obj-function}
 
@@ -1852,21 +1852,21 @@ where:
   
 - $\mathbf{Y}$ is an $n \times 1$ vector of observed response values, where $n$ is the number of observations in the sample.
   
-- $\mathbf{X}$ is an $n \times (p+1)$ design matrix containing the regressors, where $p$ is the number of regressors The additional column corresponds to the intercept term.
+- $\mathbf{X}$ is an $n \times (k+1)$ design matrix containing the regressors, where $k$ is the number of regressors The additional column corresponds to the intercept term.
   
-- $\boldsymbol{\beta}$ is a $(p+1) \times 1$ vector of regression coefficients including the intercept coefficient.
+- $\boldsymbol{\beta}$ is a $(k+1) \times 1$ vector of regression coefficients including the intercept coefficient.
   
 - $\boldsymbol{\varepsilon}$ is an $n \times 1$ vector of random errors (residual terms).
 
-If we have $n$ observations and $p$ regressors, the **design matrix** may look like
+If we have $n$ observations and $k$ regressors, the **design matrix** may look like
 
 $$
 \mathbf{X} =
 \begin{bmatrix}
-1 & x_{11} & x_{12} & \cdots & x_{1p} \\
-1 & x_{21} & x_{22} & \cdots & x_{2p} \\
+1 & x_{11} & x_{12} & \cdots & x_{1k} \\
+1 & x_{21} & x_{22} & \cdots & x_{2k} \\
 \vdots & \vdots & \vdots & \ddots & \vdots \\
-1 & x_{n1} & x_{n2} & \cdots & x_{np}
+1 & x_{n1} & x_{n2} & \cdots & x_{nk}
 \end{bmatrix}
 $${#eq-design-matrix}
   
@@ -2301,7 +2301,7 @@ H_0: \text{There is no autocorrelation in the residuals.}
 $$
 
 $$
-H_A: \text{There is autocorrelation in the residuals.}
+H_1: \text{There is autocorrelation in the residuals.}
 $$
 
 In practice, a small p-value provides evidence against the null hypothesis and suggests that the residuals may be autocorrelated.
@@ -2327,9 +2327,47 @@ print(f"Durbin-Watson statistic: {dw_stat:.3f}")
 
 Based on the Durbin-Watson test, the test statistic is 1.891 with a p-value of 0.06215. Since the statistic is close to 2 and the p-value is not statistically significant at 5 percent, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.
 
-If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data.
+::: {.Tip}
+::::{.Tip-header}
+Distribution of the Durbin-Watson Statistic
+::::
+::::{.Tip-container}
+
+Under the null hypothesis of no autocorrelation, the Durbin-Watson statistic does not follow a simple standard distribution such as a $t$-distribution or a $\chi^2$ distribution. Its distribution depends on the design matrix $X$ used in the regression model.
+
+More formally, under the null hypothesis, the Durbin-Watson statistic can be written as a ratio of weighted sums of squared standard Normal random variables:
+
+$$
+d
+\sim
+\frac{
+\sum_{i=1}^{n-k} \nu_i \xi_i^2
+}{
+\sum_{i=1}^{n-k} \xi_i^2
+},
+$$
+
+where $\xi_1, \ldots, \xi_{n-k}$ are independent standard Normal random variables, and $\nu_1, \ldots, \nu_{n-k}$ are eigenvalues that depend on the regression design matrix $X$.
+
+The main takeaway is that the Durbin-Watson test has a special null distribution that depends on the fitted regression model. In practice, software computes or approximates the relevant p-value for us, so we usually focus on interpreting the statistic and its p-value.
+
+::::
+:::
+
+
+
+::: {.Tip}
+::::{.Tip-header}
+A note on autocorrelation
+::::
+::::{.Tip-container}
+
+If the test suggests autocorrelation, a possible solution is to use time-series regression models such as Autoregressive Integrated Moving Average (ARIMA) or introduce lagged predictors to account for dependencies in the data. These models are beyond the scope of this textbook, but readers interested in time-series models and ARIMA models can consult @BrockwellDavis.
 
 Note that because this dataset is not a time series, the independence assumption is primarily justified by the data collection design. The Durbin-Watson statistic is included here as an additional diagnostic but it is most relevant when observations have a natural ordering.
+
+::::
+:::
 
 
 #### Homoscedasticity (Constant Variance of Errors)
@@ -2347,7 +2385,7 @@ H_0: \text{The residual variance is constant.}
 $$
 
 $$
-H_A: \text{The residual variance is not constant.}
+H_1: \text{The residual variance is not constant.}
 $$
 
 Equivalently, the null hypothesis states that the model does not show evidence of heteroscedasticity, while the alternative hypothesis states that heteroscedasticity is present.
@@ -2949,6 +2987,21 @@ In the plot above, all observations have Cook’s Distance values well below the
 If influential points are identified, the next steps involve investigating data quality, checking whether the observation is a data entry error or a valid unusual case, and refitting the model with and without the influential observation to assess sensitivity. Other possible approaches include using robust regression techniques or applying Winsorization, which involves replacing extreme values with more moderate values to reduce their impact.
 
 
+::: {.Tip}
+::::{.Tip-header}
+Robust Regression and Influential Observations
+::::
+::::{.Tip-container}
+
+If one or more observations appear to have a strong influence on the fitted OLS model, it is important to investigate them carefully before deciding what to do. Sometimes influential observations are data entry errors but other times they are valid observations that represent unusual but meaningful cases.
+
+One possible approach is to compare the OLS model with a **robust regression** model. Robust regression methods are designed to reduce the influence of extreme observations, so they can provide a useful sensitivity check when outliers or influential points are present. For example, instead of minimizing squared residuals as in OLS, some robust methods use alternative loss functions that give less weight to very large residuals.
+
+Robust regression is beyond the scope of this textbook, but readers interested in robust methods for regression and outlier detection can consult @rousseeuw1987
+
+::::
+:::
+
 ## Results
 
 After assessing the goodness of fit and checking the main OLS assumptions, we now evaluate the fitted model from two perspectives: **inference** and **prediction.** First, we examine the estimated regression coefficients, standard errors, and hypothesis tests to identify which student characteristics are meaningfully associated with `Net_Money`. This inferential analysis helps us interpret the direction, magnitude, and uncertainty of the associations between the regressors and student financial balance. Second, we use the trained model to generate predictions for the test data and examine how well the model performs on observations that were not used during training. 
@@ -2979,7 +3032,7 @@ t_j =
 \frac{\hat{\beta}_j - 0}{SE(\hat{\beta}_j)},
 $${#eq-beta-t-statistic}
 
-where $\hat{\beta}_j$ is the estimated regression coefficient and $SE(\hat{\beta}_j)$ is its standard error. Under the null hypothesis, this statistic follows a $t$-distribution with $n - p - 1$ degrees of freedom, where $n$ is the sample size and $p$ is the number of parameters in the model.
+where $\hat{\beta}_j$ is the estimated regression coefficient and $SE(\hat{\beta}_j)$ is its standard error. Under the null hypothesis, this statistic follows a $t$-distribution with $n - (k + 1) = n - k - 1$ degrees of freedom, where $n$ is the sample size and $k$ is the number of regressors in the model.
 
 We can compute the p-value using the statistic in @eq-beta-t-statistic. Note that a small p-value provides evidence against the null hypothesis. In this chapter, we use a significance level of $\alpha = 0.05$. Therefore, if the p-value is less than 0.05, we reject $H_0$ and conclude that there is statistical evidence that the regressor is associated with `Net_Money`, holding the other regressors fixed.
 
@@ -3104,7 +3157,7 @@ The coefficient-level tests in @tbl-net-money-inferential-results identify which
 For the $j$th regression coefficient, a 95% confidence interval is computed as
 
 $$
-\hat{\beta}_j \pm t_{\alpha/2, \, n - p - 1} \times SE(\hat{\beta}_j),
+\hat{\beta}_j \pm t_{\alpha/2, \, n - k - 1} \times SE(\hat{\beta}_j),
 $${#eq-beta-confidence-interval}
 
 For numeric regressors, the coefficient represents the estimated change in `Net_Money` associated with a one-unit increase in the regressor, holding the other variables fixed. For categorical regressors, the coefficient represents the estimated difference in `Net_Money` relative to the baseline category. In both cases, confidence intervals that do not include zero are consistent with statistical significance at the level (\alpha = 0.05).
