@@ -3136,11 +3136,11 @@ net_money_inferential_results <- tidy(testing_OLS_model, conf.int = TRUE) |>
       TRUE ~ sprintf("%.4f", p.value)
     ),
     `95% CI` = paste0(
-      "[",
+      "(",
       formatC(conf.low, format = "f", digits = 2, big.mark = ","),
       ", ",
       formatC(conf.high, format = "f", digits = 2, big.mark = ","),
-      "]"
+      ")"
     ),
     Decision = case_when(
       p.value < 0.05 ~ "Reject H0",
@@ -3983,6 +3983,8 @@ A confounding variable is a variable that is related to both the response variab
 ::::
 :::
 
+:::
+
 
 ### Coding Question
 
@@ -4001,16 +4003,35 @@ For future iterations of the course, you are curious to know if it is possible t
 1. How does a 5% increase in a particular variable (one of `current_grade`, `prior_courses`, `hours_studied`) affect the `exam_score`?
 2. Inference: How does `hours_studied` influence `exam_score`, holding other variables constant?
 3. Prediction: Given a particular set of predictor values, what is the expected `exam_score`?
+
 Dive in to see how you can answer these questions using OLS regression!
 
 
-### A. Data Wrangling and Exploratory Data Analysis {.unnumbered}
+::: {.Question}
+::::{.Question-header}
+Question 3.20
+::::
+::::{.Question-container}
+**Coding Question**
+
+**Part A: Data Wrangling and Exploratory Data Analysis**
+
 1. Read in the data from `problem-1-data.csv` (you can find the data [here](https://github.com/alexrod61/regression-cookbook/tree/main/book/03-ols_files/simulations), checking for any missing entries. 
 2. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
 3. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
+::::
+:::
 
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.20
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
 
 ::: {.panel-tabset}
 
@@ -4196,18 +4217,43 @@ plt.show()
 
 
 `current_grade` appears roughly uniform over its range, with no strong skew or extreme outliers. `prior_courses` is discrete and right-skewed, with most students having taken 0–2 prior courses and very few above 4. `hours_studied` is relatively uniform. `exam_score` is unimodal and left-skewed, with most scores concentrated between roughly 60 and 90. Now for the relationships with `exam_score`: `exam_score` vs `current_grade` shows a fairly weak positive trend, with a lot of noise. `exam_score` vs `prior_courses` shows strong variation at low integers, and no strong monotonic trend. This suggests a weak or nonlinear effect, and motivates categorical treatment. `exam_score` vs `hours_studied` is strongly increasing but clearly nonlinear, with diminishing returns at high study times. This is potentially consistent with a log-linear effect rather than a linear one.
-</details>
 
-### B. Data Modelling {.unnumbered}
+</details>
+::::
+:::
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.21
+::::
+::::{.Question-container}
+**Coding Question**
+
+**Part B: Data Modelling**
+
 1. Fit a multiple linear regression model predicting `exam_score` using the other variables. Display a statistics summary table.
 2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they would not? We will revisit this. 
 3. Plot residuals against the fitted values. Is heteroscedasticity present?
 4. Create a Q-Q plot of the residuals. Are they normally distributed?
+::::
+:::
 
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.21
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 # B.1 Fit initial model
 model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
@@ -4257,22 +4303,49 @@ sm.qqplot(model1.resid, line='45')
 plt.title('Q-Q Plot of Residuals')
 plt.show()
 ```
-</details>
+
 :::
+
 The coefficients do not entirely match intuition---`prior_courses` comes out negative in the linear model. A plausible explanation could be a selection bias: students who took more prior courses may be doing so because they struggled previously, leading to lower exam scores. Or, `pior_courses` is a poor linear proxy.
 
 Heteroscedasticity appears present in the residuals vs fitted plot and the Breusch-Pagan test, which shown non-constant variance. The Q-Q plot shows residuals which deviate from a normal distribution.
 
-### C. Goodness of Fit {.unnumbered}
+</details>
+::::
+:::
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.22
+::::
+::::{.Question-container}
+**Coding Question**
+
+**Part C: Goodness of Fit**
+
 1. Perform the Durbin-Watson test to check for autocorrelation in the residuals. What does the test statistic tell you about the independence of errors assumption?
 2. Test for Homoscedasticity: You already plotted residuals against fitted values. Perform the Breusch-Pagan test to formally assess homoscedasticity. What does the p-value of the test indicate about the model?
 3. Identify Outliers: Create a plot of the residuals against the observation index. Does this plot reveal any obvious outliers or problematic patterns?
 4. Check for Influential Points: Calculate and plot the Cook's Distance for each observation. Are there any data points that have a disproportionately large influence on the model's coefficients?
+::::
+:::
 
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.22
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 # C.1 Durbin-Watson Test (Independence)
 
@@ -4365,22 +4438,49 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 ```
-</details>
+
 :::
+
 The Durbin-Watson test produces a value of 1.79, close to 2, meaning there is no strong evidence of autocorrelation (errors are approximately independent). The p-value of the Breusch-Pagan test is essentially 0, and thus we reject homoscedasticity: residual variance changes with fitted values. Looking at the residuals vs observation index, there is no obvious time/order pattern implied here. Using Cook's Distance plot, there are no point that appear to have disproportionately large influence on the fitted coefficients.
 
+</details>
+::::
+:::
 
 
-### D. Data Modelling - Improvements {.unnumbered}
+::: {.Question}
+::::{.Question-header}
+Question 3.23
+::::
+::::{.Question-container}
+**Coding Question**
+
+**Part D: Data Modelling - Improvements**
+
 1. Should `prior_courses` be converted to another variable type? If so, why and which one? If you answered yes, try converting it and re-fit. Do you notice any improvements?
 2. Create `log_hours_studied`, the log of `hours_studied`. Re-fit the OLS using this predictor instead. Does $R^2$ improve? 
-> Hint: the true data generation process used `log(hours_studied)`!
-3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
 
+> Hint: the true data generation process used `log(hours_studied)`!
+
+3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.23
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 # D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
 df <- df %>% mutate(prior_courses_category = factor(prior_courses))
@@ -4429,21 +4529,48 @@ model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied',
              data=df.dropna()).fit()
 print(model4.summary())
 ```
-</details>
+
 :::
+
 `prior_courses` should be converted to categorical, because it is discrete and its relationship with exam_score isn't clearly linear. We see that this gives a small improvement in the fit ($R^2$ increases). Following the log-transform of `hours_studied`, $R^2$ improves and reaches 0.973. This is consistent with diminishing returns in studying. The `current_grade * prior_courses` interaction is not very significant, having a p-value of 0.830. There is therefore no evidence of  a dependence of `current_grade` on `prior_courses` here.
 
-### E. Final Evaluation {.unnumbered}
+</details>
+::::
+:::
+
+
+::: {.Question}
+::::{.Question-header}
+Question 3.24
+::::
+::::{.Question-container}
+**Coding Question**
+
+**Part E: Final Evaluation**
+
 1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
 2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
 3. Why might having taken more `prior_courses` show diminishing returns in `exam_score`?
 4. Inference: Based on your final model, describe the relationship between `hours_studied` and `exam_score`. Namely, if a student increases their study time by 10%, how does their expected exam score change?
 5. Prediction: Suppose a student has a current grade of 82, has taken 2 prior programming courses, and studied for 12.5 hours. Based on your final model, what is the predicted exam score of this student?
+::::
+:::
 
+::: {.Answer}
+::::{.Answer-header}
+Answer 3.24
+::::
+::::{.Answer-container}
 <details>
-<summary><strong>Click to reveal answer</strong></summary>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
 ::: {.panel-tabset}
+
 ## **`R` Code**
+
 ```{r}
 # E.1 Compare models
 # Create a comparison table of R² and RMSE
@@ -4506,6 +4633,7 @@ predicted_score <- predict(model3, newdata = new_student)
 
 cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
 ```
+
 1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
 
 3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
@@ -4514,6 +4642,7 @@ cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
    - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
 
 ## **`Python` Code**
+
 ```{python}
 # E.1 Compare models
 models = {
@@ -4563,10 +4692,16 @@ prediction = final_model.predict(new_student)
 print("\nPredicted exam score for the student:")
 print(prediction[0])
 ```
+
 1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
 
 3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
    - Students who have taken many prior courses may be repeating courses due to past struggles, indicating a negative selection bias.
    - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
    - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
+
+:::
+
 </details>
+::::
+:::
