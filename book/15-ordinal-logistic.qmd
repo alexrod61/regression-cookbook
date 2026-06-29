@@ -221,7 +221,7 @@ The following are the assumptions that we need to be aware of before fitting thi
 
 - **Proportional odds assumption:** The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
 
-- If the proportional odds assumption is violated, a **non-proportional odds** model should be used because it allows for some regressors to vary across thresholds.
+- If the proportional odds assumption is violated, a **non-proportional odds** model should be used because it allows for regressors to vary across thresholds.
 
 
 ### Use Cases of Ordinal Logistic Regression
@@ -260,7 +260,7 @@ The dataset contains the following variables:
 
 | Variable | Description | Type | Scale | Model Role | Variable Name |
 |---|---|---|---|---|---|
-| Inclination to Apply to Graduate School | How likely the student will apply to graduate school, with four ordered categories | Discrete | Ordinal (`Low` < `Medium` < `High` < `Very High`) | Response | `inclination_to_apply` |
+| Inclination to Apply to Graduate School | How inclined the is to apply to graduate school, with four ordered categories | Discrete | Ordinal | Response | `inclination_to_apply` |
 | Grade Point Average | The student's current cumulative GPA | Continuous | Unbounded positive | Regressor | `GPA` |
 | GRE Score | The student's most recent Graduate Record Examination score | Continuous | Unbounded positive | Regressor | `GRE_score` |
 | Field of Study | The student's undergraduate field of study | Categorical | Nominal | Regressor | `field_of_study` |
@@ -322,7 +322,7 @@ print_as_dt(college_data_100)
 
 :::
 
-In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we explicitly tell `R` and `Python` that this variable is ordinal. This matters for two reasons. First, ordinal logistic regression is built on the *cumulative* probability of being at or below each category, so the software needs to know the correct ordering (`Low` < `Medium` < `High` < `Very High`) in order to form the correct cumulative splits. Second, if the categories were left as unordered nominal factors, the model would ignore their natural ranking and discard exactly the structure that we would like to model.
+In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we explicitly tell `R` and `Python` that this variable is ordinal. This matters for two reasons. First, ordinal logistic regression is built on the cumulative probability of being at or below each category, so the correct ordering (`Low` < `Medium` < `High` < `Very High`) needs to be programmed in order form the correct cumulative splits. Second, if the categories were left as unordered nominal factors, the model would ignore their natural ranking and discard exactly the structure that we would like to model.
 
 By default, both languages order categories alphabetically, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually for the `inclination_to_apply` variable. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm that the ordering is exactly as intended.
 
@@ -1069,7 +1069,7 @@ $$
 
 This idea and formulation is the basis for extending the logistic regression framework for an outcome with two categories to ordinal outcomes with more than two ordered categories. In the ordinal case, instead of modelling the log-odds of a single binary event, we model **the cumulative logits**, which compare the probability of being at or below a given category to the probability of being above that category. 
 
-**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter of book. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,k})$, the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
+**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,k})$, the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
 
 $$
 \mathbf{x}_i = (x_{i,1},...,x_{i,k}),
@@ -1109,7 +1109,7 @@ $$
 \end{aligned}
 $$
 
-The logit transformation defined above is the model's **link function**. A link function maps a probability - here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$, onto the entire set of real numbers, so that it can be expressed as a linear function of the regressors. As it is applied to *cumulative* probabilities, it is known as the **cumulative logit link**, which is the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
+The logit transformation defined above is the model's **link function**. A link function maps a probability - here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$, onto the entire set of real numbers, so that it can be expressed as a linear function of the regressors. As it is applied to cumulative probabilities, it is known as the **cumulative logit link**, which is the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
 
 With the cumulative logits now defined, we reach an important modelling decision. In ordinal logistic regression, cumulative logits can be approached in two main ways, distinguished by the assumptions each makes about how the regressors relate to the response categories. These two primary modelling approaches are the proportional odds assumption and the non-proportional odds assumption. 
 
@@ -1419,7 +1419,7 @@ $$
 \text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \alpha_j - (\beta_1 x_{i,1} + \beta_2 x_{i,2} + \ldots + \beta_k x_{i,k}), \quad j = 1, \ldots, J-1,
 $$
 
-where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_k$ are the shared slope coefficients. Note the sign convention: the regressor terms are subtracted from the intercept, such that that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
+where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_k$ are the shared slope coefficients. Note the sign convention - the regressor terms are subtracted from the intercept, such that that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
 
 The model therefore comprises $(J - 1) + k$ parameters: $J - 1$ threshold parameters $(\alpha_1, \alpha_2, \ldots, \alpha_{J-1})$ and $k$ regression coefficients $(\beta_1, \beta_2, \ldots, \beta_k)$ shared across all cumulative splits.
 
@@ -1668,7 +1668,7 @@ $$
 \text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right), \quad j = 1, 2, 3,
 $$
 
-where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ from the coefficients block of the output. $\hat{\boldsymbol{\beta}}_{\texttt{field}}$ is a vector of size $4$ which contains estimated slope coefficients for `field_of_study`, such that $\hat{\boldsymbol{\beta}}_{\texttt{field}}=(0.461, 0.031, 0.408, 0.209)$ according to the above outputs.
+where each $\hat{\alpha}_j$ is read from the thresholds block of the output and each $\hat{\beta}$ is read from the coefficients block of the output. $\hat{\boldsymbol{\beta}}_{\texttt{field}}$ is a vector of size $4$ which contains estimated slope coefficients for `field_of_study`, such that $\hat{\boldsymbol{\beta}}_{\texttt{field}}=(0.461, 0.031, 0.408, 0.209)$ according to the above outputs.
 
 ### Fitting the Non-Proportional Odds Model
 
@@ -2144,7 +2144,7 @@ print(f"BIC:                {ordinal_result.bic:.2f}")
 
 :::
 
-The residual deviance $(2049.12)$ is smaller than the null deviance $(2201.55)$ by $152.43$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 152.43$ on 6 degrees of freedom ($p < 0.001$), providing strong evidence that at least one regressor improves on the null model. McFadden's $R^2 = 0.069$ is below the 0.2–0.4 range commonly associated with a good fit for ordinal models, which indicates that GPA, GRE score, and field of study together explain only a limited share of the variation in `inclination_to_apply` on the log-likelihood scale, even though their joint contribution is significant.
+The residual deviance is smaller than the null deviance by $152.43$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 152.43$ on 6 degrees of freedom ($p < 0.001$), providing evidence that a model with at least one regressor fits the training data better than the null model. McFadden's $R^2 = 0.069$ is below the 0.2–0.4 range commonly associated with a good fit for ordinal models, which indicates that GPA, GRE score, and field of study together explain only a limited share of the variation in `inclination_to_apply` on the log-likelihood scale, even though their joint contribution is significant.
 
 ### Classification-Based Measures
 
@@ -2328,9 +2328,9 @@ The confusion matrix does not show the tidy near-diagonal pattern one might hope
 
 The `Very High` category is the best-predicted class (recall = $0.67$, F1 = $0.52$), with `Low` close behind (recall = $0.61$, F1 = $0.47$). The two middle categories fare poorly: the model never assigns the `Medium` label at all (recall = $0$), and `High` is rarely recovered (recall = $0.10$, F1 = $0.13$), as it sits between two better-separated groups and has its observations pulled in both directions. Macro recall $(0.343)$ is lower than accuracy $(0.382)$, reflecting this uneven performance across the four categories, a pattern that persists on the held-out test set and is discussed further in the Results section.
 
-## Inference
+## Inference {#sec-inference}
 
-After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors, we build confidence intervals. To make results more interpretable, we exponentiate a regression coefficient (or its confidence thresholds) to obtain a **proportional odds ratio**, which describes how the cumulative odds of being at or below any category threshold change for a one unit increase in the regressor, holding other variables fixed.
+After we finish estimating the coefficients, we examine how uncertain they are and whether they differ meaningfully from zero. We obtain a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the MLE solution). Taking the square roots of those diagonal variances gives standard errors. Each coefficient divided by its standard error gives an asymptotically normal **Wald $z$-statistic** for testing whether the true effect is zero. Using the same standard errors, we build confidence intervals. To make results more interpretable, we exponentiate a regression coefficient (or its confidence thresholds) to obtain a **proportional odds ratio**, which describes how the cumulative odds of being at or below any category threshold change for a one unit increase in the regressor, holding other variables fixed.
 
 A key advantage of the proportional odds model compared to the multinomial model is parsimony: as the proportional odds assumption constrains each regressor to a single shared slope across all $J - 1$ cumulative logits, there is exactly one odds ratio to interpret per regressor rather than one per outcome category. A single estimate summarizes the regressor's effect on the entire scale of the response variable.
 
@@ -2340,7 +2340,7 @@ $$
 z_k = \frac{\hat{\beta}_k}{\widehat{\text{se}}\!\left(\hat{\beta}_k\right)}
 $$
 
-and we test the following hypotheses:
+and we test the following null $(H_0)$ and alternative $(H_a)$ hypotheses:
 
 $$
 \begin{gather*}
@@ -2351,7 +2351,7 @@ $$
 
 Assuming that the sample size $n$ is large enough, $z_k$ follows an approximately Standard Normal distribution under $H_0$. Note that `polr()` in `R` labels this column `t value` in its summary output, but the inference is based on the Normal approximation.
 
-The corresponding $p$-values for each $\hat{\beta}_k$ can be computed. The smaller the $p$-value, the stronger the evidence against $H_0$. As in previous regression models, we set a predetermined significance level (usually $\alpha = 0.05$): if the $p$-value is smaller than $\alpha$, we claim there is evidence to reject the null hypothesis. Hence, small $p$-values indicate that the data support an association between the ordinal response and the $k$th regressor, after adjusting for all other regressors in the model.
+The corresponding $p$-values for each $\hat{\beta}_k$ can be computed. The smaller the $p$-value, the stronger is the evidence against $H_0$. As in previous regression models, we set a predetermined significance level (usually $\alpha = 0.05$): if the $p$-value is smaller than $\alpha$, we claim there is evidence to reject the null hypothesis. Hence, small $p$-values indicate that the data support an association between the ordinal response and the $k$th regressor, after adjusting for all other regressors in the model.
 
 Given a significance level $\alpha$, we construct approximate $(1-\alpha)\times 100\%$ confidence intervals for the true $\beta_k$:
 
@@ -2514,7 +2514,7 @@ $$
 
 Because of the sign convention, a positive $\hat{\beta}_k$ means higher values of $x_{i,k}$ are associated with lower cumulative probability of being in the lower categories, i.e., a shift of probability mass toward higher ordinal categories. The proportional odds ratio $e^{\hat{\beta}_k} > 1$ therefore means that the odds of being in a higher category (i.e., $Y_i > j$) increases with $x_{i,k}$.
 
-Before interpreting these results, however, we should verify that the proportional odds assumption actually holds for each regressor. We do this formally in the next subsection using the Brant–Wald test.
+Before interpreting these results, however, we should verify that the proportional odds assumption actually holds for each regressor. We do this formally in the next subsection using the Brant–Wald test (@sec-brant-wald).
 
 ### Brant–Wald Test for Proportional Odds {#sec-brant-wald}
 
@@ -2753,7 +2753,7 @@ print("\nH0: Parallel Regression Assumption holds")
 
 :::
 
-According to the Brant–Wald test results, `GPA` satisfies the proportional odds assumption ($\chi^2(2) = 0.45$, $p = 0.80$), as do all four `field-of-study` dummy variables (all $p > 0.24$). `GRE_score` violates the proportional odds assumption ($\chi^2(2) = 16.87$, $p < 0.005$), which confirms the EDA finding that `GRE_score` mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. As the violation of proportional odds assumption is confined to a single regressor, a partial proportional odds model, which frees only GRE score's slope across cutpoints while keeping all other slopes shared, is the appropriate approach.
+According to the Brant–Wald test results, `GPA` satisfies the proportional odds assumption ($\chi^2(2) = 0.45$, $p = 0.80$), as do all four `field-of-study` dummy variables (all $p \geq 0.25$). `GRE_score` violates the proportional odds assumption ($\chi^2(2) = 16.87$, $p < 0.005$), which confirms the EDA finding that `GRE_score` mainly distinguishes students in the `Very High` category rather than tracking the full ordinal gradient. As the violation of proportional odds assumption is confined to a single regressor, a partial proportional odds model, which frees only GRE score's slope across cutpoints while keeping all other slopes shared, is the appropriate approach.
 
 In many real-world datasets, the proportional odds assumption holds for some regressors but not others. Rather than defaulting to either extreme (the fully proportional odds model or the fully non-proportional odds model), a partial proportional odds model constrains the slopes for "well-behaved" regressors to be shared across cutpoints, while freeing the slopes for regressors that violate the proportional odds assumption. This is the most common approach in practice and is supported by the `VGAM` package in `R` via the `vglm()` function with the `cumulative` family.
 
@@ -2767,7 +2767,7 @@ $$
 
 where $\beta_{\texttt{GPA}}$ and each element of $\boldsymbol{\beta}_{\texttt{field}}$ are shared across all three cumulative splits, but $\beta_{\texttt{GRE},j}$ varies freely with $j$. The total parameter count is $(J - 1) + 1 + (J - 1) + (F - 1) = 3 + 1 + 3 + 4 = 11$, compared with 9 in the fully proportional model.
 
-In `R`, this is straightforward using `vglm()` from the `VGAM` package with a named `parallel` vector. In `Python`, we implement the likelihood directly and optimize using `scipy`.
+In `R`, this is straightforward using `vglm()` from the `VGAM` package with a named `parallel` vector. In `Python`, we implement the likelihood function directly and optimize it using `scipy`.
 
 ::: {.panel-tabset}
 
@@ -3164,13 +3164,13 @@ The increasing pattern across cutpoints is the core finding. At the `Low|Medium`
 
 ## Results
 
-The partial proportional odds model, in which `GPA` and `field_of_study` are constrained to shared coefficients while `GRE_score` is allowed cutpoint-specific coefficients, is the model selected for this case study, based on the Brant–Wald test results from the Inference section. Using the sign convention, the fitted model is:
+The partial proportional odds model, in which `GPA` and `field_of_study` are constrained to shared coefficients while `GRE_score` is allowed cutpoint-specific coefficients, is the model selected for this case study, based on the Brant–Wald test results from @sec-inference. Using the sign convention, the fitted model is:
 
 $$
-\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE},j}\, x_{i,\texttt{GRE}} + \hat{\beta}_{\texttt{Business}}\, Z_{i,\texttt{Business}} + \hat{\beta}_{\texttt{Hum}}\, Z_{i,\texttt{Hum}} + \hat{\beta}_{\texttt{STEM}}\, Z_{i,\texttt{STEM}} + \hat{\beta}_{\texttt{SocSci}}\, Z_{i,\texttt{SocSci}}\right),
+\text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE}}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right)
 $$
 
-for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`). The estimated thresholds and slopes of the selected partial proportional odds model are summarized below. GPA and the field-of-study levels carry a single shared slope, while GRE score has a separate slope at each cumulative split:
+for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`, and `High|Very High`). The estimated thresholds and slopes of the selected partial proportional odds model are summarized below. GPA and the field of study levels carry a single shared slope, while GRE score has a separate slope at each cumulative split:
 
 | Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
 |---|---|---|---|---|---|---|
@@ -3188,8 +3188,8 @@ for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`
 
 After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in `R`) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.084$, $\hat{\beta}_{\texttt{GRE},2} = 0.126$, and $\hat{\beta}_{\texttt{GRE},3} = 0.135$ at the three cumulative splits respectively, with all other slope coefficients remaining shared. The interpretation of each significant coefficient is:
 
-- **GPA** ($\hat{\beta} = 2.40$, OR = 11.01, 95% CI: 4.38–27.63): Holding GRE score and field of study constant, each additional GPA point is associated with 11.01 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
-- **GRE score** (cutpoint-specific): The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with an 8.8% increase in the odds of being above `Low` (OR = 1.088 at $j=1$), rising to a 13.4% increase in the odds of being above `Medium` (OR = 1.134 at $j=2$), and a 14.5% increase in the odds of being in the `Very High` category (OR = 1.145 at $j=3$). This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
+- **GPA**: Holding GRE score and field of study constant, each additional GPA point is associated with 11.01 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
+- **GRE score**: The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with an 8.8% increase in the odds of being above `Low` (OR = 1.088 at $j=1$), rising to a 13.4% increase in the odds of being above `Medium` (OR = 1.134 at $j=2$), and a 14.5% increase in the odds of being in the `Very High` category (OR = 1.145 at $j=3$), assuming that GPA and field of study are held constant. This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
 
 On the test set, all four field-of-study levels are statistically significant after adjusting for GPA and GRE score (all $p < 0.05$), with odds ratios between 2.8 and 3.7 relative to the `Arts` baseline. Because this model is fitted on the small (199-row) test set, these field effects are estimated imprecisely and run larger than the corresponding effects in the training-set proportional odds model, where only `Business` is significant; they should be interpreted with that caveat in mind.
 
@@ -3464,7 +3464,7 @@ print(f"Macro F1:         {f1:.3f}")
 
 :::
 
-On the test set, the model achieves an overall accuracy of **41.2%**, a macro recall of **37.2%**, and a macro F1 of **40.0%**. Rather than showing the tidy near-diagonal pattern, the confusion matrix shows that the model concentrates its predictions at the two ends of the scale. It labels students either `Low` or `Very High` and never predicts `Medium` at all. For example, 12 students with `Low` inclination of applying to graduate school, are predicted `Very High` and another 12 students with `Very High` inclination are predicted `Low`. Among 49 students with `Medium` inclination of applying to graduate school, the predictions are 21 `Low`, 2 `High`, and 16 `Very High`. The model captures the broad high versus low contrast but resolves the interior of the ordinal scale poorly.
+On the test set, the model achieves an overall accuracy of **41.2%**, a macro recall of **37.2%**, and a macro F1 of **40.0%**. Rather than showing the tidy near-diagonal pattern, the confusion matrix shows that the model concentrates its predictions at the two ends of the ordinal scale. It labels students either `Low` or `Very High` and never predicts `Medium` at all. For example, 12 students with `Low` inclination of applying to graduate school, are predicted `Very High` and another 12 students with `Very High` inclination are predicted `Low`. Among 49 students with `Medium` inclination of applying to graduate school, the predictions are 21 `Low`, 2 `High`, and 16 `Very High`. The model captures the broad high versus low contrast but resolves the interior of the ordinal scale poorly.
 
 The `Very High` and `Low` categories are predicted most reliably, with recalls of $0.70$ and $0.69$ (F1 = $0.54$ and $0.51$, respectively), consistent with the inference finding that GPA and GRE score most sharply distinguish students at the two ends of the ordinal scale. The model does not assign the `Medium` label at all; its entire prediction column is empty (recall = $0$), and `High` is recovered only rarely (recall = $0.10$, F1 = $0.15$). Most students with `High` inclination are pushed outward to `Very High` ($26$ cases) or `Low` ($18$ cases) instead.
 
