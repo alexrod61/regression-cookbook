@@ -3356,6 +3356,187 @@ If the RMSE is significantly larger than the MAE, it suggests that the model is 
 In this case, the model’s performance metrics are encouraging. With a MAE of 175.48, the model’s predictions deviate from actual values by about $175 on average. The RMSE of 212.84, which is not drastically higher than the MAE, suggests that large errors are present but not excessively dominant. An R-squared value of 0.89 confirms that the model explains a substantial portion of the variance in `Net_Money`, indicating strong predictive performance and a solid overall model fit.
 
 
+The next predictive quantity we consider is the model-based prediction for a single student profile corresponding to our motivating question. In @tbl-net-money-new-student-prediction, we report the point prediction together with a 95% confidence interval for the expected mean `Net_Money` at that student profile and a 95% prediction interval for the `Net_Money` of a new individual student with those same characteristics. The following tip box provides more context about the difference between these two intervals.
+
+
+::: {.Tip}
+::::{.Tip-header}
+Confidence Interval versus Prediction Interval
+::::
+::::{.Tip-container}
+
+The 95% confidence interval describes uncertainty about the **expected mean** `Net_Money` for students with the same profile. In other words, it estimates the average financial balance for students who share these characteristics.
+
+The 95% prediction interval describes uncertainty about the `Net_Money` value for **one new individual student** with the same profile. This interval is usually wider because it includes both uncertainty about the estimated mean and the natural student-to-student variability around that mean.
+
+For a new profile with regressor vector $\mathbf{x}_0$, the confidence interval for the expected mean response has the form
+
+$$
+\hat{y}_0 \pm t_{\alpha/2, \, n-p-1} \, SE(\hat{y}_0),
+$$
+
+where $\hat{y}_0$ is the predicted mean response for the profile, and $SE(\hat{y}_0)$ is the standard error of the estimated mean prediction.
+
+The prediction interval for a new individual response has the form
+
+$$
+\hat{y}_0 \pm t_{\alpha/2, \, n-p-1}
+\sqrt{\widehat{\sigma}^2 + SE(\hat{y}_0)^2}.
+$$
+
+The additional $\widehat{\sigma}^2$ term accounts for the variability of individual observations around the regression line. This is why prediction intervals are wider than confidence intervals.
+
+::::
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Define the new student profile
+new_student_profile <- tibble::tibble(
+  Has_Job = factor("Yes", levels = levels(test_data$Has_Job)),
+  Year_of_Study = 3,
+  Financially_Dependent = factor("No", levels = levels(test_data$Financially_Dependent)),
+  Monthly_Allowance = 800,
+  Cooks_at_Home = factor("Yes", levels = levels(test_data$Cooks_at_Home)),
+  Goes_Out_Spends_Money = 3,
+  Drinks_Alcohol = factor("No", levels = levels(test_data$Drinks_Alcohol)),
+  Monthly_Earnings = 1200,
+  Living_Situation = factor("Shared", levels = levels(test_data$Living_Situation)),
+  Housing_Type = factor("Rent", levels = levels(test_data$Housing_Type))
+)
+
+# Confidence interval for the expected mean Net Money
+mean_prediction <- predict(
+  testing_OLS_model,
+  newdata = new_student_profile,
+  interval = "confidence",
+  level = 0.95
+)
+
+# Prediction interval for a new individual student's Net Money
+individual_prediction <- predict(
+  testing_OLS_model,
+  newdata = new_student_profile,
+  interval = "prediction",
+  level = 0.95
+)
+
+# Create summary table
+new_student_predictive_summary <- tibble::tibble(
+  predicted_net_money = mean_prediction[, "fit"],
+  mean_ci_lower = mean_prediction[, "lwr"],
+  mean_ci_upper = mean_prediction[, "upr"],
+  pred_pi_lower = individual_prediction[, "lwr"],
+  pred_pi_upper = individual_prediction[, "upr"]
+)
+
+new_student_predictive_summary_vertical <- tibble::tibble(
+  Quantity = c(
+    "Predicted Net Money",
+    "95% confidence interval for the expected mean Net Money (lower bound)",
+    "95% confidence interval for the expected mean Net Money (upper bound)",
+    "95% prediction interval (lower bound)",
+    "95% prediction interval (upper bound)"
+  ),
+  Value = c(
+    new_student_predictive_summary$predicted_net_money,
+    new_student_predictive_summary$mean_ci_lower,
+    new_student_predictive_summary$mean_ci_upper,
+    new_student_predictive_summary$pred_pi_lower,
+    new_student_predictive_summary$pred_pi_upper
+  )
+)
+
+new_student_predictive_summary_vertical |>
+  mutate(Value = formatC(Value, format = "f", digits = 2, big.mark = ",")) |>
+  knitr::kable(align = c("c", "c"))
+```
+
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: tbl-net-money-new-student-prediction
+#| tbl-cap: "Point prediction, 95% confidence interval for the expected mean Net Money, and 95% prediction interval for the Net Money of a new individual student with the selected profile."
+#| echo: false
+#| message: false
+#| warning: false
+
+# Define the new student profile
+new_student_profile <- tibble::tibble(
+  Has_Job = factor("Yes", levels = levels(test_data$Has_Job)),
+  Year_of_Study = 3,
+  Financially_Dependent = factor("No", levels = levels(test_data$Financially_Dependent)),
+  Monthly_Allowance = 800,
+  Cooks_at_Home = factor("Yes", levels = levels(test_data$Cooks_at_Home)),
+  Goes_Out_Spends_Money = 3,
+  Drinks_Alcohol = factor("No", levels = levels(test_data$Drinks_Alcohol)),
+  Monthly_Earnings = 1200,
+  Living_Situation = factor("Shared", levels = levels(test_data$Living_Situation)),
+  Housing_Type = factor("Rent", levels = levels(test_data$Housing_Type))
+)
+
+# Confidence interval for the expected mean Net Money
+mean_prediction <- predict(
+  testing_OLS_model,
+  newdata = new_student_profile,
+  interval = "confidence",
+  level = 0.95
+)
+
+# Prediction interval for a new individual student's Net Money
+individual_prediction <- predict(
+  testing_OLS_model,
+  newdata = new_student_profile,
+  interval = "prediction",
+  level = 0.95
+)
+
+# Create summary table
+new_student_predictive_summary <- tibble::tibble(
+  predicted_net_money = mean_prediction[, "fit"],
+  mean_ci_lower = mean_prediction[, "lwr"],
+  mean_ci_upper = mean_prediction[, "upr"],
+  pred_pi_lower = individual_prediction[, "lwr"],
+  pred_pi_upper = individual_prediction[, "upr"]
+)
+
+new_student_predictive_summary_vertical <- tibble::tibble(
+  Quantity = c(
+    "Predicted Net Money",
+    "95% confidence interval for the expected mean Net Money (lower bound)",
+    "95% confidence interval for the expected mean Net Money (upper bound)",
+    "95% prediction interval (lower bound)",
+    "95% prediction interval (upper bound)"
+  ),
+  Value = c(
+    new_student_predictive_summary$predicted_net_money,
+    new_student_predictive_summary$mean_ci_lower,
+    new_student_predictive_summary$mean_ci_upper,
+    new_student_predictive_summary$pred_pi_lower,
+    new_student_predictive_summary$pred_pi_upper
+  )
+)
+
+new_student_predictive_summary_vertical |>
+  mutate(Value = formatC(Value, format = "f", digits = 2, big.mark = ",")) |>
+  knitr::kable(align = c("c", "c"))
+```
+
+:::
+
+
+For the selected student profile (`Has_Job = Yes`, `Year_of_Study = 3`, `Financially_Dependent = No`, `Monthly_Allowance = 800`, `Cooks_at_Home = Yes`, `Goes_Out_Spends_Money = 3`, `Drinks_Alcohol = No`, `Monthly_Earnings = 1200`, `Living_Situation = Shared`, and `Housing_Type = Rent`), the fitted model predicts a `Net_Money` value of approximately 1,601.79 CAD. The 95% confidence interval for the expected mean `Net_Money` is from 1,492.79 CAD to 1,710.79 CAD, which means that the model estimates the average financial balance for students with this same profile to be in this range. The 95% prediction interval is wider, ranging from 1,221.12 CAD to 1,982.46 CAD. This wider interval reflects the additional uncertainty involved in predicting the `Net_Money` value for one new individual student, rather than the average value for students with the same characteristics.
+
+
 ## Storytelling
 
 The final step in the data science workflow is storytelling. At this stage, we translate the statistical results into a clear message that can be understood by both technical and non-technical audiences. For this case study, the main story is that students’ financial balance is associated with a combination of income, financial dependence, spending behavior, and living arrangements. These key coefficient estimates and inferential decisions are summarized in @tbl-net-money-inferential-results.
