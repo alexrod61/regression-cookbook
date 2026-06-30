@@ -17,9 +17,17 @@ When to Use and Not Use Classical Poisson Regression
 ::::{.Warning-container}
 Multinomial Logistic regression is a type of generalized linear model that is appropriately used under the following conditions:
 
+- The outcome variable is categorical with more than two categories, as illustrated in @fig-multinomial-regression.
+- There is one or more regressors that may be continuous, ordinal, or nominal.
+- We assume a **linear relationship** between any continuous regressors and the logit of the cumulative probabilities of the outcome.
+- The data points do not exhibit any correlation structures, which means that there is statistical independence across the sampled observations, with mutually exclusive and exhaustive ordered categories.
 
 However, Multinomial Logistic regression should not be used in the following scenarios:
 
+- The outcome variable is ordered. If the categories are ordered, refer to the chapter on ordinal logistic regression (@sec-ordinal-logistic).
+- The outcome variable is binary with two categories. For binary outcomes, refer to the chapter on binary logistic regression (@sec-binary-logistic).
+- The outcome variable is continuous or a count. For continuous and unbounded outcomes, refer to ordinary least-squares regression (@sec-ols). For count outcomes, refer to count regression models, such as Poisson regression (@sec-generalized-poisson).
+- The data points exhibit correlation structures, indicating statistical dependence among the sampled observations (for example, repeated measurements on the same subject).
 ::::
 :::
 
@@ -143,9 +151,10 @@ Learning Objectives
 By the end of this chapter, you will be able to:
 
 - Describe why ordinary linear models are inappropriate for multi-class nominal outcomes.
-- Determine when multinomial logistic regression is an appropriate modeling choice (unordered categorical response with >2 categories; suitable predictors; independent observations).
+- Determine when multinomial logistic regression is an appropriate modelling choice (unordered categorical response with >2 categories; suitable predictors; independent observations).
 - Write down the multinomial likelihood and the system of logit link functions relative to a reference category; express class probabilities that sum to one.
 - Understand the computation procedure for coefficient estimation via maximum likelihood.
+- Fit a multinomial logistic regression model using `Python` or `R`.
 - Interpret multinomial logistic regression coefficients in real scenarios (log-odds vs. baseline, odds ratios, contrasts between non-baseline categories, predicted probabilities).
 - Evaluate model performance and construct confidence intervals (confusion matrix, accuracy, log-loss, cross-validation; Wald/LR tests and CIs).
 ::::
@@ -153,7 +162,7 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-Multinomial logistic regression is a statistical modeling technique used to analyze relationships between a multi-class categorical response variable and a set of explanatory variables. Unlike binary logistic regression, which models outcomes with two categories, multinomial logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the predictors by modeling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
+Multinomial logistic regression is a statistical modelling technique used to analyze relationships between a multi-class categorical response variable and a set of explanatory variables. Unlike binary logistic regression, which models outcomes with two categories, multinomial logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the predictors by modelling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
 
 
 ### Multinomial Logistic Regression Assumptions
@@ -382,7 +391,7 @@ train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort
 
 p1 <- train_set %>%
   ggplot(aes(x = transport_mode, fill = has_car_available)) +
-  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
   labs(y = "Count", title = "With Car Availability") +
   scale_fill_manual(values=cbPalette) +
   theme_bw() +
@@ -391,7 +400,7 @@ p1 <- train_set %>%
 
 p2 <- train_set %>%
   ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
-  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
   labs(x = "Transport Mode", y = "Count", title = "With Weekend Commuter Status") +
   scale_fill_manual(values=cbPalette) +
   theme_bw() +
@@ -465,7 +474,7 @@ cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00",
 train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
 p1 <- train_set %>%
   ggplot(aes(x = transport_mode, fill = has_car_available)) +
-  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
   labs(x = "Transport Mode", y = "Count", title = "With Car Availability") +
   scale_fill_manual(values=cbPalette) +
   theme_bw() +
@@ -473,7 +482,7 @@ p1 <- train_set %>%
   guides(fill = guide_legend(title = "Car Availability"))
 p2 <- train_set %>%
   ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
-  geom_bar(position = "stack") +  # use "stack" for counts, "fill" for proportions
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
   labs(x = "Transport Mode", y = "", title = "With Weekend Commuter Status") +
   scale_fill_manual(values=cbPalette) +
   theme_bw() +
