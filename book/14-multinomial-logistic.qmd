@@ -124,6 +124,20 @@ statsmodels <- import("statsmodels")
 sklearn <- import("sklearn")
 scipy <- import("scipy")
 plotnine <- import("plotnine")
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr',
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
 ```
 
 ```{python setup-py, include=FALSE}
@@ -188,10 +202,11 @@ The two research problems correspond to **inferential** and **predictive** **sta
 
 ## Data Collection and Wrangling
 
-The dataset includes the following five variables:
+The dataset includes the following five variables, such that `transport_mode` is the response variable and other four variables are regressors:
 
-- `transport_mode` (categorical, 4 levels):
-  - The primary mode of transport used by the individual. Categories: "Bicycle", "Car", "Public Transit", "Walking". This variable is used as the response in data modelling.
+- `transport_mode` (categorical with 4 levels):
+  - The primary mode of transport used by the individual. 
+  - Categories: `Bicycle`, `Car`, `Public Transit`, `Walking`
 
 - `commute_distance` (numeric):
   - The one-way commuting distance in kilometers.
@@ -213,7 +228,8 @@ The dataset includes the following five variables:
 data(multinomial_transport)
 data <- multinomial_transport[,-1]
 cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
-print(data)
+head(multinomial_transport, n = 100) |>
+  print_as_dt()
 ```
 
 ## Python Code
@@ -239,7 +255,8 @@ print(data)
 data(multinomial_transport)
 data <- multinomial_transport %>% select(-'income_bracket')
 cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
-print(data)
+head(multinomial_transport, n = 100) |>
+  print_as_dt()
 ```
 
 ## Python Output
@@ -457,7 +474,10 @@ ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0
 
 # Adjust plot layout
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -535,7 +555,10 @@ ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0
 
 # Adjust layout
 plt.tight_layout(rect=[0, 0.05, 1, 1])
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -654,7 +677,10 @@ ax2.set_ylabel("Age")
 ax2.get_legend()
 
 plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -764,7 +790,10 @@ ax2.set_ylabel("Age")
 ax2.get_legend()  # no legend to remove manually
 
 plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -883,7 +912,7 @@ $$
 
 ## Estimation
 
-We summarise the key estimation steps in math below. We consider one observation at each population $i$.
+We summarize the key estimation steps in math below. We consider one observation at each population $i$.
 More estimation details and generalization from one to $n_i$ observations for population $i$ can be found in Section 2.2 Parameter Estimation of [Czepiel, S. A. (2002).](https://czep.net/stat/mlelr.pdf). 
 
 Let's follow the notations in @eq-multinomial-model and @eq-prob-multinomial. Define $y_{i,j} = 1$ if $i$th individual is observed as category $j$ and $y_{i,j} = 0$ otherwise. 
@@ -900,9 +929,13 @@ Substituting the probabilities by the function of linear combination of regresso
 $$
 \ell(\beta) = \sum_{i=1}^n \sum_{j=2}^m \left(y_{i,j}\sum_{k=0}^K X_{i,k} \beta_k^{(j,1)}\right) - \log\left(1+\sum_{j=2}^m e^{\sum_{k=0}^K X_{i,k}\beta_k^{(j,1)}}\right),
 $$
-where $X_{i,0}=1$ corresponds to the intercept in the linear model. We solve the minimization problem by the Newton-Raphson method as in Section 10.6 in the Poisson Regression Section.
+where $X_{i,0}=1$ corresponds to the intercept in the linear model. We solve the minimization problem by the **Newton-Raphson** method, which is described in the tip box below. 
 
-### The Newton–Raphson Method
+::: {.Tip}
+::::{.Tip-header}
+Tip on the Newton-Raphson Method
+::::
+::::{.Tip-container}
 
 To carry out maximum-likelihood estimation, we iterate Newton–Raphson in a compact matrix form (multinomial iteratively reweighted least squares (IRLS)). 
 Let $q=(K+1)(m-1)$ be the total number of parameters (an intercept and $K$ slopes for each of the $m-1$ non-baseline classes). Then denote
@@ -933,6 +966,8 @@ The Newton-Raphson/IRLS iteration procedure is as follows.
    - Form the stacked score $S(\beta^{(t)})$ and Hessian functions $H(\beta^{(t)})$ using the expressions above.
    - Update $\beta^{(t+1)} \leftarrow \beta^{(t)}+\alpha (H(\beta^{(t)}))^{-1}S(\beta^{(t)})$, with step size $\alpha\in(0,1]$.
    - Check convergence criteria.
+::::
+:::   
 
 ### Fitting the Model
 
@@ -1187,12 +1222,15 @@ Let's visualize and summarize goodness of fit for the training set.
 
 ```{.r}
 y_pred <- predict(multinom_fit, newdata = train_set)
-conf_matrix <- confusionMatrix(factor(y_pred, levels = levels(train_set$transport_mode)),
-                              factor(train_set$transport_mode, levels = levels(train_set$transport_mode)))
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(train_set$transport_mode, levels = mode_levels))
 
 cm_table <- as.table(conf_matrix$table)
 cm_df <- as.data.frame(cm_table)
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
+cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
 ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
     geom_tile(color = "white") +
@@ -1216,7 +1254,9 @@ plt.title("Confusion Matrix Heatmap")
 plt.xlabel("Actual")
 plt.ylabel("Predicted")
 
-plt.show()
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -1230,12 +1270,15 @@ plt.show()
 #| message: false
 #| warning: false
 y_pred <- predict(multinom_fit, newdata = train_set)
-conf_matrix <- confusionMatrix(factor(y_pred, levels = levels(train_set$transport_mode)),
-                              factor(train_set$transport_mode, levels = levels(train_set$transport_mode)))
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(train_set$transport_mode, levels = mode_levels))
 
 cm_table <- as.table(conf_matrix$table)
 cm_df <- as.data.frame(cm_table)
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
+cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
 ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
     geom_tile(color = "white") +
@@ -1262,7 +1305,9 @@ plt.title("Confusion Matrix Heatmap")
 plt.xlabel("Actual")
 plt.ylabel("Predicted")
 
-plt.show()
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -1528,19 +1573,22 @@ We predict the model on test set and visualize the prediction results in the con
 y_pred <- predict(multinom_fit, newdata = test_set)
 
 # Compute confusion matrix
-conf_matrix <- confusionMatrix(factor(y_pred, levels = levels(test_set$transport_mode)),
-                              factor(test_set$transport_mode, levels = levels(test_set$transport_mode)))
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(test_set$transport_mode, levels = mode_levels))
 
 # Visualize the confusion matrix
 cm_table <- as.table(conf_matrix$table)
 cm_df <- as.data.frame(cm_table)
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
+cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 cm_df %>%
-  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  ggplot(aes(x = Actual, y = Predicted, fill = Freq)) +
   geom_tile(color = "white") +
   geom_text(aes(label = Freq), color = "black", size = 4) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)", x = "Predicted", y = "Actual") +
+  labs(title = "Confusion Matrix (Test Set)", x = "Actual", y = "Predicted") +
   theme_bw()
 ```
 
@@ -1572,7 +1620,10 @@ disp.plot(cmap='Blues')
 plt.title("Confusion Matrix")
 plt.xlabel("Actual")
 plt.ylabel("Predicted")
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
@@ -1586,19 +1637,22 @@ plt.show()
 #| message: false
 #| warning: false
 y_pred <- predict(multinom_fit, newdata = test_set)
-conf_matrix <- confusionMatrix(factor(y_pred, levels = levels(test_set$transport_mode)),
-                              factor(test_set$transport_mode, levels = levels(test_set$transport_mode)))
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(test_set$transport_mode, levels = mode_levels))
 
 cm_table <- as.table(conf_matrix$table)
 cm_df <- as.data.frame(cm_table)
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
+cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
 cm_df %>%
-  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  ggplot(aes(x = Actual, y = Predicted, fill = Freq)) +
   geom_tile(color = "white") +
   geom_text(aes(label = Freq), color = "black", size = 4) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)", x = "Predicted", y = "Actual") +
+  labs(title = "Confusion Matrix (Test Set)", x = "Actual", y = "Predicted") +
   theme_bw()
 ```
 
@@ -1630,7 +1684,10 @@ disp.plot(cmap='Blues')
 plt.title("Confusion Matrix")
 plt.xlabel("Actual")
 plt.ylabel("Predicted")
-plt.show()
+
+# Display the plot
+fig = plt.gcf()
+fig
 ```
 
 :::
