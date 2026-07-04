@@ -485,6 +485,10 @@ fig
 ## R Output
 
 ```{r}
+#| label: fig-eda-transport-mode-distribution-R
+#| fig-cap:
+#|   - "Stacked bar chart of transport mode counts by car availability."
+#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
 #| echo: false
 #| message: false
 #| warning: false
@@ -512,6 +516,10 @@ grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport M
 ## Python Output
 
 ```{python}
+#| label: fig-eda-transport-mode-distribution-py
+#| fig-cap:
+#|   - "Stacked bar chart of transport mode counts by car availability."
+#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
 #| echo: false
 #| message: false
 #| warning: false
@@ -682,6 +690,10 @@ fig
 ## R Output
 
 ```{r}
+#| label: fig-eda-transport-mode-continuous-R
+#| fig-cap:
+#|   - "Boxplots and violin plots of commute distance by transport mode."
+#|   - "Boxplots and violin plots of age by transport mode."
 #| echo: false
 #| message: false
 #| warning: false
@@ -713,6 +725,10 @@ grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots"
 ## Python Output
 
 ```{python}
+#| label: fig-eda-transport-mode-continuous-py
+#| fig-cap:
+#|   - "Boxplots and violin plots of commute distance by transport mode."
+#|   - "Boxplots and violin plots of age by transport mode."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1260,6 +1276,8 @@ fig
 ## R Output
 
 ```{r}
+#| label: fig-confusion-matrix-train-R
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the training set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1292,6 +1310,8 @@ cm_df |>
 ## Python Output
 
 ```{python}
+#| label: fig-confusion-matrix-train-py
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the training set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1434,7 +1454,10 @@ We compute the 95\% confidence intervals below and filter the signicant coeffici
 ## R Code
 
 ```{.r}
-broom::tidy(multinom_fit, conf.int = TRUE, exponentiate = TRUE) |>
+# Fit multinomial logistic regression model on test set
+multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
+
+broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
   dplyr::filter(p.value < 0.05) |>
   rename(outcome_class = y.level)
@@ -1443,11 +1466,34 @@ broom::tidy(multinom_fit, conf.int = TRUE, exponentiate = TRUE) |>
 ## Python Code
 
 ```{.python}
+# Factorize the response and set the baseline model
+test_set["transport_mode"] = pd.Categorical(
+    test_set["transport_mode"],
+    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    ordered=False
+)
+
+# Design matrix and response
+y = test_set["transport_mode"]
+X = test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
+
+# Add intercept
+X = sm.add_constant(X)
+
+# Convert categorical variables to numeric codes for statsmodels MNLogit
+X_numeric = X.copy()
+for col in ['has_car_available', 'weekend_commuter']:
+    X_numeric[col] = X_numeric[col].cat.codes
+
+# Fit multinomial logistic regression
+model = sm.MNLogit(y, X_numeric)
+multinom_test = model.fit()
+
 data_dict = {
-    "estimate": np.exp(multinom_fit.params),      # odds ratios
-    "pvalue": multinom_fit.pvalues,
-    "std_err": multinom_fit.bse,
-    "statistic": multinom_fit.tvalues
+    "estimate": np.exp(multinom_test.params),      # odds ratios
+    "pvalue": multinom_test.pvalues,
+    "std_err": multinom_test.bse,
+    "statistic": multinom_test.tvalues
 }
 
 # Outcome class mapping
@@ -1462,7 +1508,7 @@ for name, df in data_dict.items():
         .swaplevel()             # variable first, outcome second
         .reset_index()           # convert MultiIndex to columns
         .rename(columns={"level_0": "outcome_class", 
-                         "level_1": "variable", 
+                         "level_1": "term", 
                          0: name})
     )
     tidy["outcome_class"] = tidy["outcome_class"].replace(class_map)
@@ -1471,7 +1517,7 @@ for name, df in data_dict.items():
     tidy_dict[name] = tidy
 
 # CIs
-conf = multinom_fit.conf_int()
+conf = multinom_test.conf_int()
 or_conf = np.exp(conf)
 ci_lower_stacked = or_conf["lower"].reset_index()
 ci_lower_stacked.columns = ['outcome_class', 'term', 'ci_lower']
@@ -1502,9 +1548,12 @@ print(results_sig)
 #| echo: false
 #| message: false
 #| warning: false
-broom::tidy(multinom_fit, conf.int = TRUE, exponentiate = TRUE) |>
-  mutate_if(is.numeric, round, 3) |>
-  filter(p.value < 0.05) |>
+# Fit multinomial logistic regression model on test set
+multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
+
+broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::mutate_if(is.numeric, round, 3) |>
+  dplyr::filter(p.value < 0.05) |>
   rename(outcome_class = y.level)
 ```
 
@@ -1514,35 +1563,65 @@ broom::tidy(multinom_fit, conf.int = TRUE, exponentiate = TRUE) |>
 #| echo: false
 #| message: false
 #| warning: false
+# Factorize the response and set the baseline model
+test_set["transport_mode"] = pd.Categorical(
+    test_set["transport_mode"],
+    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    ordered=False
+)
+
+# Design matrix and response
+y = test_set["transport_mode"]
+X = test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
+
+# Add intercept
+X = sm.add_constant(X)
+
+# Convert categorical variables to numeric codes for statsmodels MNLogit
+X_numeric = X.copy()
+for col in ['has_car_available', 'weekend_commuter']:
+    X_numeric[col] = X_numeric[col].cat.codes
+
+# Fit multinomial logistic regression
+model = sm.MNLogit(y, X_numeric)
+multinom_test = model.fit()
+
 data_dict = {
-    "estimate": np.exp(multinom_fit.params),      # odds ratios
-    "pvalue": multinom_fit.pvalues,
-    "std_err": multinom_fit.bse,
-    "statistic": multinom_fit.tvalues
+    "estimate": np.exp(multinom_test.params),      # odds ratios
+    "pvalue": multinom_test.pvalues,
+    "std_err": multinom_test.bse,
+    "statistic": multinom_test.tvalues
 }
+
+# Outcome class mapping
 class_map = {0: "Bicycle", 1: "Public_Transit", 2: "Walking"}
+
+# Container for processed tidy tables
 tidy_dict = {}
+
 for name, df in data_dict.items():
     tidy = (
-        df.stack()
-        .swaplevel()
-        .reset_index()
+        df.stack()               # long form
+        .swaplevel()             # variable first, outcome second
+        .reset_index()           # convert MultiIndex to columns
         .rename(columns={"level_0": "outcome_class", 
                          "level_1": "term", 
                          0: name})
     )
     tidy["outcome_class"] = tidy["outcome_class"].replace(class_map)
     tidy = tidy.sort_values(by="outcome_class").reset_index(drop=True)
+    
     tidy_dict[name] = tidy
 
 # CIs
-conf = multinom_fit.conf_int()
+conf = multinom_test.conf_int()
 or_conf = np.exp(conf)
 ci_lower_stacked = or_conf["lower"].reset_index()
 ci_lower_stacked.columns = ['outcome_class', 'term', 'ci_lower']
 ci_upper_stacked = or_conf["upper"].reset_index()
 ci_upper_stacked.columns = ['outcome_class', 'term', 'ci_upper']
 
+# Merge the result tables
 ref_cols = ["outcome_class", "term"]
 results = tidy_dict['estimate'] \
     .merge(tidy_dict['pvalue'], on=ref_cols) \
@@ -1550,6 +1629,8 @@ results = tidy_dict['estimate'] \
     .merge(tidy_dict['statistic'], on=ref_cols) \
     .merge(ci_lower_stacked, on=ref_cols) \
     .merge(ci_upper_stacked, on=ref_cols)
+
+# Filter the rows with significant p-values
 results_sig = results[results["pvalue"] < 0.05].round(3)
 print(results_sig)
 ```
@@ -1641,6 +1722,8 @@ fig
 ## R Output
 
 ```{r}
+#| label: fig-confusion-matrix-test-R
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the held-out test set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1673,6 +1756,8 @@ cm_df |>
 ## Python Output
 
 ```{python}
+#| label: fig-confusion-matrix-test-py
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the held-out test set."
 #| echo: false
 #| message: false
 #| warning: false
