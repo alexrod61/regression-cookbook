@@ -165,7 +165,7 @@ Learning Objectives
 By the end of this chapter, you will be able to:
 
 - Describe why ordinary linear models are inappropriate for multi-class nominal outcomes.
-- Determine when multinomial logistic regression is an appropriate modelling choice (unordered categorical response with >2 categories; suitable predictors; independent observations).
+- Determine when multinomial logistic regression is an appropriate modelling choice (unordered categorical response with >2 categories; suitable regressors; independent observations).
 - Write down the multinomial likelihood and the system of logit link functions relative to a reference category; express class probabilities that sum to one.
 - Understand the computation procedure for coefficient estimation via maximum likelihood.
 - Fit a multinomial logistic regression model using `Python` or `R`.
@@ -176,7 +176,7 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-Multinomial logistic regression is a statistical modelling technique used to analyze relationships between a multi-class categorical response variable and a set of explanatory variables. Unlike binary logistic regression, which models outcomes with two categories, multinomial logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the predictors by modelling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
+Multinomial logistic regression is a statistical modelling technique used to analyze relationships between a multi-class categorical response variable and a set of regressors. Unlike binary logistic regression, which models outcomes with two categories, multinomial logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the regressors by modelling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
 
 
 ### Assumptions
@@ -195,30 +195,24 @@ We will explore a dataset containing information on individuals' commuting behav
 - How is the transportation mode of people (driving own cars or taking public transportation specifically) **associated** by their commuting distances, given the individuals' commuting behaviors and demographics including if they have a car, if they commute on weekends, and ages?
 - Can we accurately **predict** the transportation mode of an individual based on their commuting behaviors and demographics including if they have a car, if they commute on weekends, their commute distance, and age?
 
-The two research problems correspond to **inferential** and **predictive** **statistical objectives** respectively:
+These questions correspond to two distinct **statistical objectives**:
 
-- To estimate the **association** between the explanatory variable---commute distance---and the probability of each category of the response---using each transport mode (car v.s. public transportation specifically), given the confounding effects of age, car availability, and weekend commuter status. 
-- To develop a **predictive** model that classifies individuals into their most likely transport mode using the predictors commute distance, age, car availability, and weekend commuting status. 
+- **Inference:** Understand the relationship between the regressor (commute distance) and the probability of each category of the response variable (transport mode), given the confounding effects of age, car availability, and weekend commuter status. 
+- **Prediction:** Develop a classification model that classifies individuals into their most probable transport mode: `Bicycle`, `Car`, `Public Transit`, or `Walking`.
 
 ## Data Collection and Wrangling
 
-The dataset includes the following five variables, such that `transport_mode` is the response variable and other four variables are regressors:
+The dataset contains the following variables:
 
-- `transport_mode` (categorical with 4 levels):
-  - The primary mode of transport used by the individual. 
-  - Categories: `Bicycle`, `Car`, `Public Transit`, `Walking`
+| Variable | Description | Scale | Model Role | Variable Name |
+|---|---|---|---|---|---|
+| Inclination to Apply to Graduate School | The primary mode of transport used by the individual | Nominal | Response | `transport_mode` |
+| Commute Distance | The one-way commuting distance in kilometers | Numeric | Regressor | `commute_distance` |
+| Age | The age of the individual in years | Numeric | Regressor | `age` |
+| Car Availability | Whether the individual has access to a car | Binary Categorical | Regressor | `has_car_available` |
+| Weekend Commuter | Whether the individual commutes during weekends | Binary Categorical | Regressor | `weekend_commuter` |
 
-- `commute_distance` (numeric):
-  - The one-way commuting distance in kilometers.
-
-- `age` (numeric):
-   - The age of the individual in years.
-
-- `has_car_available` (binary categorical):
-  - Indicates whether the individual has access to a car. Levels: "Yes" or "No".
-
-- `weekend_commuter` (binary categorical):
-  - Indicates whether the individual commutes during weekends. Levels: "Yes" or "No".
+: Classification table for variables in the dataset. {#tbl-variables}
 
 ::: {.panel-tabset}
 
@@ -274,7 +268,7 @@ print(data)
 
 :::
 
-Factorize the categorical variables. There are four types of transport mode which are by bicycle, car, public transit, and walking. 
+Let's begin by factorizing the categorical variables.
 
 ::: {.panel-tabset}
 
@@ -330,7 +324,7 @@ for col in categorical_cols:
 
 :::
 
-Now, we split the dataset into training and test sets, use training set to fit the model, and use test set to assess the model performance. 
+Now, we split the dataset into train and test sets, use training set to fit the model, and use test set to assess the model performance. 
 
 ::: {.panel-tabset}
 
@@ -394,7 +388,7 @@ print(f"Test set size: {len(test_set)}")
 
 ## Exploratory Data Analysis
 
-Let's visualize the response `transport_mode` and its relationship with the continuous or categorical(binary) explanatory variables (predictors).
+Let's visualize the response `transport_mode` and its relationship with the continuous or categorical regressors.
 
 ::: {.panel-tabset}
 
@@ -567,7 +561,7 @@ Most weekend commuters do not significantly change their transport mode: the pro
 However, Public Transit has a noticeable number of weekend commuters (blue), indicating some weekend reliance on public transit.
 Walking and Bicycling show little weekend commuting activity.
 
-Visualize the relationship between `transport_mode` and continuous variables `commute_distance` and `age`.
+Now let's visualize the relationship between `transport_mode` and continuous regressors `commute_distance` and `age`.
 
 ::: {.panel-tabset}
 
@@ -798,11 +792,11 @@ Bicycle users skew slightly younger, but with a long tail of older users.
 Walking has a much wider spread in age, with a high median (around 60) and some very young walkers as well.
 The variability in age is greatest for walking, suggesting diverse usage across age groups.
 
-You can also visualize the relationship across other explanatory variables or predictors in various types of figures for practice.
+You can also visualize the relationship across other regressors in various types of figures for practice.
 
 ## Data Modelling
 
-A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is categorical and nominal (our response of interest) subject to the numerical regressors `commute_distance` and `age` and binary regressors `has_car_available` and `weekend_commuter`. Moreover, its corresponding regression estimates will allow us to measure variable association.
+A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is categorical and nominal (our response of interest) subject to the numerical regressors `commute_distance` and `age`, and binary regressors `has_car_available` and `weekend_commuter`. 
 
 This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities that will belong to categories $1,2,\dots,m$ respectively; i.e., 
 $$P(Y_i=1)=p_{i,1}, P(Y_i=2)=p_{i,2}, \dots, P(Y_i=m)=p_{i,m}$$
@@ -811,14 +805,14 @@ $$
 \sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
 $$
 
-*A particular highlight is that the Binomial distriution is a special Multinomial distribution when $m=2$.*
+*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with $m=2$.*
 
-The Multinomial Logistic regression **also models the logarithm of the odds**. However, only one logarithm of the odds (or **logit**) will not be enough anymore. Recall we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
+The Multinomial Logistic regression **also models the logarithm of the odds**. However, only one logarithm of the odds (or **logit**) will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
 
 Here is what we can do:
 
 1. Pick one of the categories to be the **baseline**. For example, the category "$1$".
-2. For each of the **other** categories, we model the logarithm of the odds to the baseline category.
+2. For each of the other categories, we model the logarithm of the odds to the baseline category.
 
 Now, **what is the math for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ linK functions in the Multinomial Logistic regression model as follows:
 
@@ -853,11 +847,11 @@ p_{i,m} = P(Y_i = m \mid X_{i,1}, \ldots, X_{i,K}) = \frac{\exp \big( \eta_i^{(m
 \end{gathered}
 $$ {#eq-prob-multinomial}
 
-***Note: The equations above are Softmax functions. The multinomial logistic regression is theoretically equivalent to a one-layer neural network with Softmax activation function, where we input $X$, output probability $p_{i,j}$, and minimize the cross-entropy loss function to train the neural network to learn parameters $\beta$.***
+***Note: The equations above are Softmax functions. The multinomial logistic regression is theoretically equivalent to a one-layer neural network with a Softmax activation function, where we input $X$, output probability $p_{i,j}$, and minimize the cross-entropy loss function to train the neural network to learn parameters $\beta$.***
 
 ***If we sum all $m$ probabilities in @eq-prob-multinomial, the sum will be equal to $1$ for the $i$th observation. This is particularly important when we want to use this model for making predictions in classification matters.***
 
-Goting back to our data example, let us set the Multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public_Transit`, `Bicycle`, and `Walking` (denoted as `Car`, `Public`, `Bike`, `Walk` respectively) subject to the continuous regressors `commute_distance` and `age`, denoted as $X_{\texttt{distance}}$ and $X_{\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{\texttt{car}}$ and $Z_{\texttt{weekend}}$ respectively. Use `Car` class as the baseline model.
+Let us set up a Multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public_Transit`, `Bicycle`, and `Walking` (denoted as `Car`, `Public`, `Bike`, `Walk` respectively) subject to the continuous regressors `commute_distance` and `age`, denoted as $X_{\texttt{distance}}$ and $X_{\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{\texttt{car}}$ and $Z_{\texttt{weekend}}$ respectively. Use `Car` class as the baseline model.
 
 $$
 \begin{align*}
@@ -1046,7 +1040,7 @@ print(multinom_fit.summary())
 
 :::
 
-In multinomial logistic regression, we model the probability of each outcome category given predictors. The key assumption is that we have enough data for each category to estimate the model parameters reliably.
+In multinomial logistic regression, we model the probability of each outcome category given regressors. The key assumption is that we have enough data for each category to estimate the model parameters reliably.
 If one category is much more frequent than the others (i.e., unbalanced outcomes), the model may:
 
 1. Bias coefficients toward the majority class because the likelihood function is dominated by majority observations.
@@ -1214,18 +1208,26 @@ mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(train_set$transport_mode, levels = mode_levels))
 
-cm_table <- as.table(conf_matrix$table)
-cm_df <- as.data.frame(cm_table)
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
-cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
-ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
-    geom_tile(color = "white") +
-    scale_fill_gradient(low = "white", high = "#0072B2") +
-    geom_text(aes(label = Freq), color = "black", size = 4) +
-    labs(title = "Confusion Matrix Heatmap", x = "Actual", y = "Predicted") +
-    theme_bw()
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
 ```
 
 ## Python Code
@@ -1233,16 +1235,14 @@ ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
 ```{.python}
 y_pred = multinom_fit.predict(X_numeric).idxmax(axis=1)
 
-# Compute confusion matrix
-cm = confusion_matrix(y.cat.codes, y_pred)
-
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=y.cat.categories)
-disp.plot(cmap='Blues')
-disp.ax_.set_title("Confusion Matrix Heatmap")
-disp.ax_.set_xlabel("Actual")
-disp.ax_.set_ylabel("Predicted")
-fig = disp.figure_
-fig
+# Confusion matrix
+cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y.cat.categories)
+_ = disp.plot(cmap="Blues")
+_ = plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
 ```
 
 :::
@@ -1260,18 +1260,25 @@ mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(train_set$transport_mode, levels = mode_levels))
 
-cm_table <- as.table(conf_matrix$table)
-cm_df <- as.data.frame(cm_table)
+cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
-cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
-ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
-    geom_tile(color = "white") +
-    scale_fill_gradient(low = "white", high = "#0072B2") +
-    geom_text(aes(label = Freq), color = "black", size = 4) +
-    labs(title = "Confusion Matrix Heatmap", x = "Actual", y = "Predicted") +
-    theme_bw()
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Training Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
 ```
 
 ## Python Output
@@ -1283,15 +1290,13 @@ ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
 y_pred = multinom_fit.predict(X_numeric).idxmax(axis=1)
 
 # Compute confusion matrix
-cm = confusion_matrix(y.cat.codes, y_pred)
-
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=y.cat.categories)
-disp.plot(cmap='Blues')
-disp.ax_.set_title("Confusion Matrix Heatmap")
-disp.ax_.set_xlabel("Actual")
-disp.ax_.set_ylabel("Predicted")
-fig = disp.figure_
-fig
+cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y.cat.categories)
+_ = disp.plot(cmap="Blues")
+_ = plt.title("Confusion Matrix (Training Set)")
+plt.tight_layout()
+plt.show()
 ```
 
 :::
@@ -1327,7 +1332,11 @@ y_pred = probs.idxmax(axis=1)
 # Compute the metrics
 acc = accuracy_score(y.cat.codes, y_pred)
 recall = recall_score(y.cat.codes, y_pred, average='macro')
-f1 = f1_score(y.cat.codes, y_pred, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred)
+f1 = f1_score(y.cat.codes, y_pred, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
 print(f"Macro F1-score: {f1:.3f}")
@@ -1364,7 +1373,11 @@ probs = multinom_fit.predict(X_numeric)
 y_pred = probs.idxmax(axis=1)
 acc = accuracy_score(y.cat.codes, y_pred)
 recall = recall_score(y.cat.codes, y_pred, average='macro')
-f1 = f1_score(y.cat.codes, y_pred, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred)
+f1 = f1_score(y.cat.codes, y_pred, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
 print(f"Macro F1-score: {f1:.3f}")
@@ -1380,7 +1393,7 @@ You are encouraged to explore the performance of the fitted model on the balance
 ## Inference
 
 After we finish estimating the coefficients, we look at how uncertain they are and whether they differ from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the solution). Taking square roots of those variances gives standard errors. 
-Similar as in Poisson regression, each coefficient divided by its standard error gives a (asymptotically normal) **Wald Z statistic** to test if the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio—how the odds of choosing a category change for a one‑unit increase in the predictor, holding other variables fixed.
+Similar as in Poisson regression, each coefficient divided by its standard error gives a (asymptotically normal) **Wald Z statistic** to test if the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio—how the odds of choosing a category change for a one‑unit increase in the regressor, holding other variables fixed.
 
 We can determine whether a regressor is statistically associated with the logarithm of the odds through hypothesis testing for the parameters $\beta^{(u,v)}_j$ by link function. Define the Wald statistic $z^{(u,v)}_j$ as:
 $$
@@ -1561,19 +1574,26 @@ mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(test_set$transport_mode, levels = mode_levels))
 
-# Visualize the confusion matrix
-cm_table <- as.table(conf_matrix$table)
-cm_df <- as.data.frame(cm_table)
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
-cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
-cm_df %>%
-  ggplot(aes(x = Actual, y = Predicted, fill = Freq)) +
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
   geom_tile(color = "white") +
-  geom_text(aes(label = Freq), color = "black", size = 4) +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)", x = "Actual", y = "Predicted") +
-  theme_bw()
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
 ```
 
 ## Python Code
@@ -1593,19 +1613,15 @@ for col in ['has_car_available', 'weekend_commuter']:
     X_test_num[col] = X_test_num[col].cat.codes
 y_pred_test = multinom_fit.predict(X_test_num).idxmax(axis=1)
 
-# Compute the confusion matrix
-cm = confusion_matrix(y_test.cat.codes, y_pred_test)
-
-# Print confusion matrix
+# Confusion matrix
 labels = y_test.cat.categories
 cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=y_test.cat.categories)
-disp.plot(cmap='Blues')
-disp.ax_.set_title("Confusion Matrix (Test Set)")
-disp.ax_.set_xlabel("Actual")
-disp.ax_.set_ylabel("Predicted")
-fig = disp.figure_
-fig
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y_test.cat.categories)
+_ = disp.plot(cmap="Blues")
+_ = plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
 ```
 
 :::
@@ -1623,19 +1639,25 @@ mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(test_set$transport_mode, levels = mode_levels))
 
-cm_table <- as.table(conf_matrix$table)
-cm_df <- as.data.frame(cm_table)
+cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-cm_df$Predicted <- factor(cm_df$Predicted, levels = rev(mode_levels))
-cm_df$Actual <- factor(cm_df$Actual, levels = mode_levels)
 
-cm_df %>%
-  ggplot(aes(x = Actual, y = Predicted, fill = Freq)) +
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
   geom_tile(color = "white") +
-  geom_text(aes(label = Freq), color = "black", size = 4) +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)", x = "Actual", y = "Predicted") +
-  theme_bw()
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted", y = "Actual") +
+  theme_bw(base_size = 13)
 ```
 
 ## Python Output
@@ -1656,18 +1678,16 @@ X_test_num = X_test.copy()
 for col in ['has_car_available', 'weekend_commuter']:
     X_test_num[col] = X_test_num[col].cat.codes
 y_pred_test = multinom_fit.predict(X_test_num).idxmax(axis=1)
-cm = confusion_matrix(y_test.cat.codes, y_pred_test)
+
+# Confusion matrix
 labels = y_test.cat.categories
 cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
-
-import matplotlib.pyplot as plt
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=y_test.cat.categories)
-disp.plot(cmap='Blues')
-disp.ax_.set_title("Confusion Matrix (Test Set)")
-disp.ax_.set_xlabel("Actual")
-disp.ax_.set_ylabel("Predicted")
-fig = disp.figure_
-fig
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y_test.cat.categories)
+_ = disp.plot(cmap="Blues")
+_ = plt.title("Confusion Matrix (Test Set)")
+plt.tight_layout()
+plt.show()
 ```
 
 :::
@@ -1694,7 +1714,11 @@ cat("Macro F1:", round(macro_f1, 3), "\n")
 # Compute the metrics
 acc = accuracy_score(y_test.cat.codes, y_pred_test)
 recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
-f1 = f1_score(y_test.cat.codes, y_pred_test, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred_test)
+f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
 print(f"Macro F1-score: {f1:.3f}")
@@ -1726,7 +1750,11 @@ cat("Macro F1:", round(macro_f1, 3), "\n")
 #| warning: false
 acc = accuracy_score(y_test.cat.codes, y_pred_test)
 recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
-f1 = f1_score(y_test.cat.codes, y_pred_test, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred_test)
+f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
 print(f"Macro F1-score: {f1:.3f}")
