@@ -12,7 +12,7 @@
 
 ::: {.Warning}
 ::::{.Warning-header}
-When to Use and Not Use Classical Poisson Regression
+When to Use and Not Use Multinomial Logistic Regression
 ::::
 ::::{.Warning-container}
 Multinomial Logistic regression is a type of generalized linear model that is appropriately used under the following conditions:
@@ -331,7 +331,7 @@ for col in categorical_cols:
 
 :::
 
-Now, we split the dataset into train and test sets, use training set to fit the model, and use test set to assess the model performance. 
+Now, we split the dataset into train and test sets, use train set to fit the model, and use test set to assess the model performance. 
 
 ::: {.panel-tabset}
 
@@ -692,8 +692,7 @@ fig
 ```{r}
 #| label: fig-eda-transport-mode-continuous-R
 #| fig-cap:
-#|   - "Boxplots and violin plots of commute distance by transport mode."
-#|   - "Boxplots and violin plots of age by transport mode."
+#|   - "Boxplots and violin plots of commute distance and age by transport mode."
 #| echo: false
 #| message: false
 #| warning: false
@@ -727,8 +726,7 @@ grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots"
 ```{python}
 #| label: fig-eda-transport-mode-continuous-py
 #| fig-cap:
-#|   - "Boxplots and violin plots of commute distance by transport mode."
-#|   - "Boxplots and violin plots of age by transport mode."
+#|   - "Boxplots and violin plots of commute distance and age by transport mode."
 #| echo: false
 #| message: false
 #| warning: false
@@ -803,9 +801,9 @@ fig
 
 :::
 
-Box and violin plots present that how commute distance and age vary across different transport modes.
+Box and violin plots show how commute distance and age vary across different transport modes.
 
-Public transit users tend to have the longest commutes on average, with a wide distribution and a median around 17–18 km.
+Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 17–18 km.
 Car users also have moderately long commutes, with a median around 10-11 km and a relatively broad spread.
 Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end.
 All modes show some long-distance commuters (long tails), especially public transit and car.
@@ -830,7 +828,7 @@ $$
 
 *A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with $m=2$.*
 
-The Multinomial Logistic regression **also models the logarithm of the odds**. However, only one logarithm of the odds (or **logit**) will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
+The Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
 
 Here is what we can do:
 
@@ -848,7 +846,7 @@ $$
 \end{gathered}
 $$ {#eq-multinomial-model}
 
-***Note that the superscript $(j, 1)$ in @eq-multinomial-model indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, **the regression coefficients are different for each link function**.***
+Note that the superscript $(j, 1)$ in @eq-multinomial-model indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, the regression coefficients are different for each link function.
 
 Each of the logit-linear functions in @eq-multinomial-model writes the log of odds between each category $j=2,\dots,m$ and the baseline category $j=1$ as a linear combination of the regressors. To compare between the categories $j=2,\dots,m$, we can simply deduct one equation be another, e.g.,
 $$
@@ -874,7 +872,7 @@ $$ {#eq-prob-multinomial}
 
 ***If we sum all $m$ probabilities in @eq-prob-multinomial, the sum will be equal to $1$ for the $i$th observation. This is particularly important when we want to use this model for making predictions in classification matters.***
 
-Let us set up a Multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public_Transit`, `Bicycle`, and `Walking` (denoted as `Car`, `Public`, `Bike`, `Walk` respectively) subject to the continuous regressors `commute_distance` and `age`, denoted as $X_{\texttt{distance}}$ and $X_{\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{\texttt{car}}$ and $Z_{\texttt{weekend}}$ respectively. Use `Car` class as the baseline model.
+Let's set up a multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public_Transit`, `Bicycle`, and `Walking`, subject to the continuous regressors `commute_distance` and `age`, denoted as $X_{\texttt{distance}}$ and $X_{\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{\texttt{car}}$ and $Z_{\texttt{weekend}}$ respectively. We will use `Car` class as the baseline level. The equation of each link function for this multinomial model is given below, such that each function has its own intercept and a set of regression coefficients.
 
 $$
 \begin{align*}
@@ -886,8 +884,6 @@ $$
 &= \beta_0^{(\texttt{Walk},\texttt{Car})} + \beta_1^{(\texttt{Walk},\texttt{Car})} X_{i, \texttt{distance}} + \beta_2^{(\texttt{Walk},\texttt{Car})} X_{i, \texttt{age}} + \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}} .
 \end{align*}
 $$
-
-***In a Multinomial Logistic regression model, each link function has its own intercept and regression coefficients.***
 
 Taking exponential on both sides of the model equations gives the ratio of probability of each category `Public_Transit`, `Bicycle`, and `Walking` over the probability of the baseline level `Car`:
 
@@ -902,7 +898,7 @@ $$
 \end{align*}
 $$
 
-Finally, the probability of $Y_i$ belonging to categories `Car`, `Public_Transit`, `Bicycle`, and `Walking` are:
+Finally, the probability of $Y_i$ belonging to categories `Car`, `Public_Transit`, `Bicycle`, and `Walking` respectively are given by the following expressions.
 
 $$
 \begin{align*}
@@ -913,66 +909,94 @@ P(Y_i = \texttt{Walk} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, 
 \end{align*}
 $$
 
-***Note: Changing the baseline category, e.g., switching from `Car` to `Public` won't change the estimated probability for each category for each individual.***
 
-## Estimation
+### The Log-Likelihood Function
 
-We summarize the key estimation steps in math below. We consider one observation at each population $i$.
-More estimation details and generalization from one to $n_i$ observations for population $i$ can be found in Section 2.2 Parameter Estimation of [Czepiel, S. A. (2002).](https://czep.net/stat/mlelr.pdf). 
+A multinomial logistic regression model treats the categories in the response variable as nominal, which means that there is no inherent ranking or ordering among them; therefore, each category is compared directly against a single baseline category. Recall from @eq-prob-multinomial that this comparison gives us the category-specific probabilities in closed form,
 
-Let's follow the notations in @eq-multinomial-model and @eq-prob-multinomial. Define $y_{i,j} = 1$ if $i$th individual is observed as category $j$ and $y_{i,j} = 0$ otherwise. 
-Define the kernel of the log likelihood function for multinomial logistic regression models is 
 $$
-\mathcal{L}(\beta \mid y) \simeq \prod_{i=1}^n \prod_{j=1}^m p_{i,j}^{y_{i,j}}.
+p_{i,j} = P(Y_i = j \mid X_{i,1}, \ldots, X_{i,K}), \qquad j = 1, \ldots, m,
 $$
 
-Replacing $y_{i,1}$ by $1-\sum_{j=2}^{m} y_{i,j}$ and rearranging the function gives
+where each non-baseline category $j$ enters through its own logit $\eta_i^{(j,1)}$ and the whole set is normalized by the softmax denominator so that $\sum_{j=1}^m p_{i,j} = 1$. These probabilities are exactly what the likelihood is built from.
+
+***Note: Changing the baseline category, e.g., switching from `Car` to `Public` would not change the estimated probability for each category for each individual.***
+
+To estimate the model, we need a way to measure how well a given set of coefficients explains the observed data. The **likelihood function** does exactly this: it expresses the probability of the data we actually observed as a function of the unknown coefficients, and estimation amounts to finding the coefficient values that make this probability as large as possible.
+
+We first encode each individual's observed response category using indicator variables. Following the notation in @eq-multinomial-model and @eq-prob-multinomial, let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. Since each individual belongs to exactly one of the $m$ possible categories, the vector $\mathbf{y}_i = (y_{i,1}, y_{i,2}, \ldots, y_{i,m})$ contains exactly one entry equal to $1$, with all remaining entries equal to $0$. This representation is often called a one-hot encoding of the response category. The likelihood function for the multinomial logistic regression model is then
+
 $$
-\mathcal{L}(\beta \mid y) \simeq \prod_{i=1}^n \prod_{j=2}^{m} \left(\frac{p_{i,j}}{p_{i,1}} \right)^{y_{i,j}} p_{i,1}.
+\mathcal{L}(\boldsymbol{\beta}; \mathbf{y}) = \prod_{i=1}^n \prod_{j=1}^m p_{i,j}^{y_{i,j}},
 $$
-Substituting the probabilities by the function of linear combination of regressors as in @eq-prob-multinomial and taking the logarithm of the likelihood function yields the log likelihood function, which is the loss function to minimize:
+
+where $n$ is the number of individuals in the sample, $m$ is the number of categories, and $p_{i,j}$ is the model-implied softmax probability that individual $i$ (with regressor values $X_{i,1}, \ldots, X_{i,K}$) falls in category $j$. The unknown parameters are collected in $\boldsymbol{\beta}$, the stack of all reference-category coefficients $\beta_k^{(j,1)}$ for $j = 2, \ldots, m$ and $k = 0, 1, \ldots, K$ — an intercept and $K$ slopes for each of the $m-1$ non-baseline categories.
+
+The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual: because of the indicator $y_{i,j}$ in the exponent, every term equals $1$ except the one matching the individual's true category, so the inner product collapses to just $p_{i,j}$ for that observed category. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
+
+Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the **log-likelihood function**:
+
 $$
-\ell(\beta) = \sum_{i=1}^n \sum_{j=2}^m \left(y_{i,j}\sum_{k=0}^K X_{i,k} \beta_k^{(j,1)}\right) - \log\left(1+\sum_{j=2}^m e^{\sum_{k=0}^K X_{i,k}\beta_k^{(j,1)}}\right),
+\ell(\boldsymbol{\beta}; \mathbf{y}) = \sum_{i=1}^n \sum_{j=1}^m y_{i,j} \log p_{i,j}.
+$$ {#eq-log-likelihood-multinomial}
+
+Substituting the softmax probabilities from @eq-prob-multinomial and using the reference-category constraint $y_{i,1} = 1 - \sum_{j=2}^m y_{i,j}$, the log-likelihood can be written explicitly in terms of the coefficients as
+
 $$
-where $X_{i,0}=1$ corresponds to the intercept in the linear model. We solve the minimization problem by the **Newton-Raphson** method, which is described in the tip box below. 
+\ell(\boldsymbol{\beta}) = \sum_{i=1}^n \left[ \sum_{j=2}^m y_{i,j} \sum_{k=0}^K X_{i,k} \beta_k^{(j,1)} - \log\left( 1 + \sum_{j=2}^m e^{\sum_{k=0}^K X_{i,k} \beta_k^{(j,1)}} \right) \right],
+$$
+
+where $X_{i,0} = 1$ corresponds to the intercept in the linear model.
+
+Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\beta}}$, the coefficient values under which the observed data are most probable. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
 
 ::: {.Tip}
 ::::{.Tip-header}
-Tip on the Newton-Raphson Method
+Tip on the Newton–Raphson Method
 ::::
 ::::{.Tip-container}
+The parameters we ultimately estimate are the reference-category coefficients, collected into the stacked vector $\boldsymbol{\beta} \in \mathbb{R}^q$ with $q = (K+1)(m-1)$ (an intercept and $K$ slopes for each of the $m-1$ non-baseline categories). Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\beta}$ by iterating with the score function and Hessian matrix of the log-likelihood, in a compact matrix form known as multinomial iteratively reweighted least squares (IRLS).
 
-To carry out maximum-likelihood estimation, we iterate Newton–Raphson in a compact matrix form (multinomial iteratively reweighted least squares (IRLS)). 
-Let $q=(K+1)(m-1)$ be the total number of parameters (an intercept and $K$ slopes for each of the $m-1$ non-baseline classes). Then denote
+**Score function:** For category $j$ and regressor $k$, the corresponding component of the score vector $S(\boldsymbol{\beta}) \in \mathbb{R}^q$ (the first-order partial derivative of $\ell$) is
 
-- $\beta \in \mathbb{R}^q$ (stack of all $\beta_k^{(j,1)}$),
-- $S(\beta) \in \mathbb{R}^q$ (stacked Score function components),
-- $H(\beta) \in \mathbb{R}^{q\times q}$ (stacked second derivatives).
+$$
+\frac{\partial \ell(\boldsymbol{\beta})}{\partial \beta_k^{(j,1)}} = \sum_{i=1}^n \left( y_{i,j} - p_{i,j} \right) X_{i,k}.
+$$
 
-For model (category) $j$ and regressor $k$, the component of the score function (first-order partial detivative) $S(\beta)$ is 
+Each component compares the observed indicator $y_{i,j}$ with the model-implied probability $p_{i,j}$, weighted by the regressor value $X_{i,k}$; at the maximum, these differences balance out so that the score is zero.
+
+**Hessian matrix:** The Hessian $H(\boldsymbol{\beta}) \in \mathbb{R}^{q \times q}$ collects the second-order partial derivatives of $\ell$. For the row indexed by category $j$ and regressor $k$, and the column indexed by category $j'$ and regressor $k'$, its entry is
+
 $$
-\frac{\partial \ell(\beta)}{\partial \beta_k^{(j,1)}} = \sum_i^n y_{i,j}X_{i,k} - p_{i,j}X_{i,k}.
-$$
-For model $j$ and regressor $k$ on the row, the component for category $j'$ and regressor $k'$ on the column of the Hessian matrix (second-order partial derivative) $H(\beta)$ is 
-$$
-\frac{\partial \ell^2(\beta)}{\partial \beta_k^{(j,1)} \partial \beta_{k'}^{(j',1)}} = 
+\frac{\partial^2 \ell(\boldsymbol{\beta})}{\partial \beta_k^{(j,1)} \partial \beta_{k'}^{(j',1)}} =
 \begin{cases}
--\sum_{i=1^n} X_{i,k}p_{i,j}(1-p_{i,j})X_{i,k'} & \text{ if } j'=j, \\
-\sum_{i=1}^n X_{i,k}p_{i,j}p_{i,j'}X_{i,k'} & \text{ if } j' \neq j,
+-\sum_{i=1}^n X_{i,k}\, p_{i,j}(1 - p_{i,j})\, X_{i,k'} & \text{if } j' = j, \\
+\phantom{-}\sum_{i=1}^n X_{i,k}\, p_{i,j}\, p_{i,j'}\, X_{i,k'} & \text{if } j' \neq j,
 \end{cases}
 $$
-where $j,j'=1,\dots,m$ and $k,k'=0,\dots,K$. 
 
-The Newton-Raphson/IRLS iteration procedure is as follows.
+for $j, j' = 2, \ldots, m$ and $k, k' = 0, \ldots, K$. Because the non-baseline categories are coupled through the shared softmax denominator, the Hessian is a dense $q \times q$ matrix rather than block-diagonal. In software this is handled automatically.
 
-1. Choose baseline class; initialize $\beta^{(0)}=\mathbf{0}$ (stacked over all $(j,k)$).
+**Iteration:** Collecting the score and Hessian above, the Newton–Raphson update at step $t$ is
+
+$$
+\boldsymbol{\beta}^{(t+1)} \leftarrow \boldsymbol{\beta}^{(t)} - \left[ H\!\left( \boldsymbol{\beta}^{(t)} \right) \right]^{-1} S\!\left( \boldsymbol{\beta}^{(t)} \right),
+$$
+
+initialized at $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeated until changes in $\ell$ and $\boldsymbol{\beta}$ fall below a convergence tolerance.
+
+The full Newton–Raphson/IRLS procedure is:
+
+1. Choose the baseline category and initialize $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (stacked over all $(j,k)$).
 2. Repeat until convergence:
-   - Compute the log-odds $\eta_i^{(j,1)}$, probability $p_{i,j}$ for all individual $i$ and category $j$ across all regressors $k=1,\dots,K$, and the log-likelihood function $\ell(\beta^{(t)})$.
-   - Form the stacked score $S(\beta^{(t)})$ and Hessian functions $H(\beta^{(t)})$ using the expressions above.
-   - Update $\beta^{(t+1)} \leftarrow \beta^{(t)}+\alpha (H(\beta^{(t)}))^{-1}S(\beta^{(t)})$, with step size $\alpha\in(0,1]$.
-   - Check convergence criteria.
+   - Compute the logits $\eta_i^{(j,1)}$ and category probabilities $p_{i,j}$ for all individuals $i$ and categories $j$, and evaluate the log-likelihood $\ell(\boldsymbol{\beta}^{(t)})$.
+   - Form the stacked score $S(\boldsymbol{\beta}^{(t)})$ and Hessian $H(\boldsymbol{\beta}^{(t)})$ using the expressions above.
+   - Update $\boldsymbol{\beta}^{(t+1)}$ using the Newton–Raphson step above.
+   - Check the convergence criteria.
 ::::
-:::   
+:::
+
+## Estimation
 
 ### Fitting the Model
 
@@ -1219,7 +1243,7 @@ print(multinom_fit_balanced.summary())
 
 Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes. We consider the residual deviance (similar as @sec-poisson-goodness-of-fit in the Classical Poisson Regression chapter) and the classification performance (confusion matrix, accuracy, per-class precision, recall, F1 score). 
 
-Let's visualize and summarize goodness of fit for the training set. 
+Let's visualize and summarize goodness of fit for the train set. 
 
 ::: {.panel-tabset}
 
@@ -1447,19 +1471,30 @@ $$
 $$
 where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution.
 
-We compute the 95\% confidence intervals below and filter the signicant coefficients under the 5\% significance level.
+Now we will fit the model on the test set using the `nnet` package in R or the `statsmodel` package in Python. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients under the 5\% significance level.
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
+# Set "Car" as the baseline level
+test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
+
 # Fit multinomial logistic regression model on test set
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
+# Print the fitted model
+print(summary(multinom_test))
+
+# Significant coefficients only
+cat("\nSignificant coefficients (5% threshold):\n")
+
 broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
-  rename(outcome_class = y.level)
+  dplyr::filter(p.value < 0.05) |>          # keep only significant coefficients
+  rename(outcome_class = y.level) |>
+  print(n = Inf, width = Inf)               # show full term names without truncation
 ```
 
 ## Python Code
@@ -1471,6 +1506,11 @@ test_set["transport_mode"] = pd.Categorical(
     categories=["Car", "Bicycle", "Public_Transit", "Walking"],
     ordered=False
 )
+
+# Drop outcome categories with no observations in this set. A class present in
+# the full data may be absent from the smaller test set; statsmodels cannot
+# estimate coefficients for an empty category and would otherwise return NaN.
+test_set["transport_mode"] = test_set["transport_mode"].cat.remove_unused_categories()
 
 # Design matrix and response
 y = test_set["transport_mode"]
@@ -1486,7 +1526,10 @@ for col in ['has_car_available', 'weekend_commuter']:
 
 # Fit multinomial logistic regression
 model = sm.MNLogit(y, X_numeric)
-multinom_test = model.fit()
+multinom_test = model.fit(disp=False)
+
+# Print the fitted model
+print(multinom_test.summary())
 
 data_dict = {
     "estimate": np.exp(multinom_test.params),      # odds ratios
@@ -1495,8 +1538,9 @@ data_dict = {
     "statistic": multinom_test.tvalues
 }
 
-# Outcome class mapping
-class_map = {0: "Bicycle", 1: "Public_Transit", 2: "Walking"}
+# Outcome class mapping. With "Car" as the baseline, the remaining (non-empty)
+# categories are the comparison classes, in categorical order.
+class_map = dict(enumerate(y.cat.categories[1:]))
 
 # Container for processed tidy tables
 tidy_dict = {}
@@ -1532,8 +1576,10 @@ results = tidy_dict['estimate'] \
     .merge(ci_lower_stacked, on=ref_cols) \
     .merge(ci_upper_stacked, on=ref_cols)
 
-# Print the results
-print(results)
+# Keep only coefficients significant at the 5% level
+results_sig = results[results["pvalue"] < 0.05].round(3)
+print("\nSignificant coefficients (5% threshold):")
+print(results_sig)
 ```
 
 :::
@@ -1546,12 +1592,23 @@ print(results)
 #| echo: false
 #| message: false
 #| warning: false
+# Set "Car" as the baseline level
+test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
+
 # Fit multinomial logistic regression model on test set
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
+# Print the fitted model
+print(summary(multinom_test))
+
+# Significant coefficients only
+cat("\nSignificant coefficients (5% threshold):\n")
+
 broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
-  rename(outcome_class = y.level)
+  dplyr::filter(p.value < 0.05) |>          # keep only significant coefficients
+  rename(outcome_class = y.level) |>
+  print(n = Inf, width = Inf)               # show full term names without truncation
 ```
 
 ## Python Output
@@ -1567,6 +1624,11 @@ test_set["transport_mode"] = pd.Categorical(
     ordered=False
 )
 
+# Drop outcome categories with no observations in this set. A class present in
+# the full data may be absent from the smaller test set; statsmodels cannot
+# estimate coefficients for an empty category and would otherwise return NaN.
+test_set["transport_mode"] = test_set["transport_mode"].cat.remove_unused_categories()
+
 # Design matrix and response
 y = test_set["transport_mode"]
 X = test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
@@ -1581,7 +1643,10 @@ for col in ['has_car_available', 'weekend_commuter']:
 
 # Fit multinomial logistic regression
 model = sm.MNLogit(y, X_numeric)
-multinom_test = model.fit()
+multinom_test = model.fit(disp=False)
+
+# Print the fitted model
+print(multinom_test.summary())
 
 data_dict = {
     "estimate": np.exp(multinom_test.params),      # odds ratios
@@ -1590,8 +1655,9 @@ data_dict = {
     "statistic": multinom_test.tvalues
 }
 
-# Outcome class mapping
-class_map = {0: "Bicycle", 1: "Public_Transit", 2: "Walking"}
+# Outcome class mapping. With "Car" as the baseline, the remaining (non-empty)
+# categories are the comparison classes, in categorical order.
+class_map = dict(enumerate(y.cat.categories[1:]))
 
 # Container for processed tidy tables
 tidy_dict = {}
@@ -1627,21 +1693,23 @@ results = tidy_dict['estimate'] \
     .merge(ci_lower_stacked, on=ref_cols) \
     .merge(ci_upper_stacked, on=ref_cols)
 
-# Print the results
-print(results)
+# Keep only coefficients significant at the 5% level
+results_sig = results[results["pvalue"] < 0.05].round(3)
+print("\nSignificant coefficients (5% threshold):")
+print(results_sig)
 ```
 
 :::
 
-Whether people choose driving or taking public transits varys significantly on average. The commute distance and the availability of cars both have significant effects on the choices of transportation mode.
+Whether people choose driving or taking public transits varys significantly on average. The commute distance and the availability of cars both have significant effects on the choices of transportation mode. Note that the R output flags the `weekend_commuterYes` coefficient for `Bicycle` as significant, with an odds ratio and standard error of essentially zero and an extreme test statistic; this is a spurious artifact of complete separation, since no `Bicycle` riders in the test set are weekend commuters, so the coefficient is not identifiable. `statsmodels` instead assigns this term a very large standard error, yielding a large p-value, so it is correctly excluded from the significant coefficients in the Python output.
 
 ## Results
 
 The predicted model can be written as 
 $$
-\log \big[ \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \big] = \hat{\beta}_{0k} + \hat{\beta}_{1k} X_{1i} + \hat{\beta}_{2k} X_{2i} + \hat{\beta}_{3k} X_{3i} + \hat{\beta}_{4k} X_{4i},
+\log \left( \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} X_{1,i} + \hat{\beta}_{2}^{(k,\text{Car})} X_{2,i} + \hat{\beta}_{3}^{(k,\text{Car})} X_{3,i} + \hat{\beta}_{4}^{(k,\text{Car})} X_{4,i},
 $$
-where $k\in\{$ Bicycle, Public Transit, Walking $\}$ and $X_1,X_2,X_3,X_4$ represent age, commute distance, car availability, and weekend commuter indicator respectively.
+where $k\in\{$ Bicycle, Public Transit, Walking $\}$ and $X_{1,i},X_{2,i},X_{3,i},X_{4,i}$ represent age, commute distance, car availability, and weekend commuter indicator respectively.
 
 ### Prediction 
 
