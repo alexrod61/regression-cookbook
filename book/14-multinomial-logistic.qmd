@@ -1241,7 +1241,7 @@ print(multinom_fit_balanced.summary())
 
 ## Goodness of Fit
 
-Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes. We consider the residual deviance (similar as @sec-poisson-goodness-of-fit in the Classical Poisson Regression chapter) and the classification performance (confusion matrix, accuracy, per-class precision, recall, F1 score). 
+Let us assess how well the fitted multinomial logistic regression explains and predicts the observed `transport_mode`. We consider the residual deviance (similar as @goodness in the Classical Poisson Regression chapter) and the classification performance (confusion matrix, accuracy, per-class precision, recall, F1 score). 
 
 Let's visualize and summarize goodness of fit for the train set. 
 
@@ -1927,5 +1927,27 @@ On the test set, the model’s overall accuracy is slightly lower than training.
 
 ## Storytelling
 
-Commuting behaviors and demographic factors are both associated with transportation mode choice and useful for predicting the choice between choosing cars or public transportation. In general, prediction is stronger for more frequent modes. 
-This inferential question provides a comprehensive understanding of how individual characteristics shape transportation decisions and the predictive question can guide planning or personalized recommendations. You may choose one perspective of either inferential or predictive depending on your research goal. 
+To complete the data science workflow, let's step back from the coefficients, tests, and confusion matrices and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real-world decision-making.
+
+In this case study, the multinomial logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. Below, we distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
+
+### Key Insights From the Model
+
+Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with markedly lower odds of using public transit or walking instead of driving; the corresponding effect for cycling is not statistically distinguishable from zero, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving: each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches intuition — the car and public transit are the practical options once a commute gets long, while cycling stays attractive mainly over short distances.
+
+Age and weekend-commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking` (and, to a lesser extent, `Bicycle`): older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ — for rare categories, a lack of significance can reflect insufficient data rather than a genuinely null effect.
+
+One estimate needs a caveat rather than a substantive interpretation. On the test set, the `weekend_commuter` effect for `Bicycle` comes back with an enormous coefficient, an enormous standard error, and a $p$-value near 1. This is not evidence of no effect; it is a symptom of complete separation, since none of the bicycle commuters in the test set commute on weekends, so the term is not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
+
+As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public_Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to travel mode choice, rather than as a precise classifier for the least common commuting behaviours.
+
+::: {.Tip}
+::::{.Tip-header}
+Using the Results Responsibly
+::::
+::::{.Tip-container}
+It is important to remember that this analysis is associational, not causal. The model does not show that changing someone's commute distance or car access would, on its own, change how they travel; it shows that, in this dataset, these regressors are consistently linked to the mode people choose once other measured factors are accounted for.
+
+Nevertheless, the results provide a useful evidence-based starting point for discussion. They help identify which regressors are most strongly linked to travel mode choice, and which associations — such as age and weekend commuting for the rarer categories — may only become visible with more balanced or more abundant data. For transportation planners, this kind of insight can help prioritize where infrastructure investment, such as bike lanes or improved transit access, is likely to shift commuting patterns the most.
+::::
+:::
