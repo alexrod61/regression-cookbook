@@ -169,7 +169,7 @@ By the end of this chapter, you will be able to:
 - Write down the **likelihood function** for multinomial logistic regression and its **cumulative logit link** functions, express cumulative probabilities, and obtain category probabilities.
 - Fit a multinomial logistic regression model in both `R` and `Python`.
 - Interpret multinomial logistic regression coefficients in real scenarios (log-odds vs. baseline, odds ratios, contrasts between non-baseline categories, and predicted probabilities).
-- Evaluate model performance using **accuracy**, **confusion matrices**, and **cross-validation**, and construct confidence intervals using **Wald Z statistic**.
+- Evaluate model performance using both **likelihood-based** (eg. residual deviance, AIC, BIC, etc.) and **classification-based** (eg. accuracy, confusion matrices, etc.) measures, and construct confidence intervals using **Wald Z statistic**.
 ::::
 :::
 
@@ -1240,7 +1240,170 @@ print(multinom_fit_balanced.summary())
 
 ## Goodness of Fit
 
-Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes. We consider the residual deviance (similar as @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)) and the classification performance (confusion matrix, accuracy, per-class precision, recall, F1 score). 
+Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes on the training set. We consider two complementary perspectives: (1) likelihood-based measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and (2) classification-based measures that evaluate how accurately the model assigns observations to their correct transport mode.
+
+### Likelihood-Based Measures
+
+The **null deviance** measures how well the intercept-only model (no regressors, only a baseline log-odds for each non-reference category) fits the data:
+
+$$
+D_{\text{null}} = -2\,\ell(\hat{\boldsymbol{\beta}}_{0,\text{null}}),
+$$
+
+where $\hat{\boldsymbol{\beta}}_{0,\text{null}}$ are the category-specific intercepts estimated without any regressor.
+
+The **residual deviance** is the analogous quantity for the fitted model:
+
+$$
+D_{\text{resid}} = -2\,\ell(\hat{\boldsymbol{\beta}}).
+$$
+
+A well-fitting model should have a substantially smaller residual deviance than the null deviance. The reduction $D_{\text{null}} - D_{\text{resid}}$ is the likelihood-ratio (LR) statistic, which under $H_0$ (all slope coefficients across all non-baseline categories are zero) follows a $\chi^2$ distribution with degrees of freedom equal to the number of slope parameters $k$:
+
+$$
+G^2 = D_{\text{null}} - D_{\text{resid}} = -2\bigl(\ell_{\text{null}} - \ell_{\text{fitted}}\bigr) \;\overset{H_0}{\sim}\; \chi^2(k).
+$$
+
+**McFadden's pseudo-$R^2$** expresses the proportional reduction in log-likelihood relative to the null model:
+
+$$
+R^2_{\text{McFadden}} = 1 - \frac{\ell(\hat{\boldsymbol{\beta}})}{\ell(\hat{\boldsymbol{\beta}}_{0,\text{null}})}.
+$$
+
+Unlike the usual R-squared in OLS regression, McFadden's pseudo-R-squared should not be interpreted as the proportion of variance explained. Instead, it measures improvement in log-likelihood relative to the null model. Its values are typically much smaller than regular R-squared values, and values around $0.2$–$0.4$ are often considered indicative of a good/decent model fit in discrete-response models.
+
+**AIC and BIC** penalize the log-likelihood for model complexity:
+
+$$
+\text{AIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + p\log n,
+$$
+
+where $p$ is the total number of estimated parameters (the category-specific intercepts and slopes across all non-baseline categories) and $n$ is the sample size. Lower AIC and BIC indicate better fit, and they are most useful for comparing competing models (e.g. this imbalanced fit versus the upsampled fit).
+
+We compute all of these measures below.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+library(nnet)
+
+# Null model: intercept only, no regressors
+multinom_null <- multinom(transport_mode ~ 1, data = train_set)
+
+ll_fitted <- logLik(multinom_fit)
+ll_null   <- logLik(multinom_null)
+
+null_deviance  <- -2 * as.numeric(ll_null)
+resid_deviance <- -2 * as.numeric(ll_fitted)
+mcfadden_r2    <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat        <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df          <- attr(ll_fitted, "df") - attr(ll_null, "df")
+lr_pval        <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("G²:                 ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(multinom_fit), 2), "\n")
+cat("BIC:                ", round(BIC(multinom_fit), 2), "\n")
+```
+
+## Python Code
+
+```{.python}
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+# The log-likelihood of the intercept-only (null) model is available
+# directly on the fitted MNLogit result
+ll_fitted = multinom_fit.llf
+ll_null   = multinom_fit.llnull
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = multinom_fit.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"G²:                 {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {multinom_fit.aic:.2f}")
+print(f"BIC:                {multinom_fit.bic:.2f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+library(nnet)
+
+multinom_null <- multinom(transport_mode ~ 1, data = train_set)
+
+ll_fitted <- logLik(multinom_fit)
+ll_null   <- logLik(multinom_null)
+
+null_deviance  <- -2 * as.numeric(ll_null)
+resid_deviance <- -2 * as.numeric(ll_fitted)
+mcfadden_r2    <- 1 - as.numeric(ll_fitted) / as.numeric(ll_null)
+lr_stat        <- as.numeric(-2 * (ll_null - ll_fitted))
+lr_df          <- attr(ll_fitted, "df") - attr(ll_null, "df")
+lr_pval        <- pchisq(lr_stat, df = lr_df, lower.tail = FALSE)
+
+cat("Null deviance:      ", round(null_deviance,  2), "\n")
+cat("Residual deviance:  ", round(resid_deviance, 2), "\n")
+cat("McFadden R²:        ", round(mcfadden_r2, 4),   "\n")
+cat("G²:                 ", round(lr_stat, 4),
+    " (df =", lr_df, ", p =", formatC(lr_pval, format = "e", digits = 2), ")\n")
+cat("AIC:                ", round(AIC(multinom_fit), 2), "\n")
+cat("BIC:                ", round(BIC(multinom_fit), 2), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+import numpy as np
+from scipy.stats import chi2 as chi2dist
+
+ll_fitted = multinom_fit.llf
+ll_null   = multinom_fit.llnull
+
+null_deviance  = -2 * ll_null
+resid_deviance = -2 * ll_fitted
+mcfadden_r2    = 1 - ll_fitted / ll_null
+lr_stat        = -2 * (ll_null - ll_fitted)
+lr_df          = multinom_fit.df_model
+lr_pval        = chi2dist.sf(lr_stat, lr_df)
+
+print(f"Null deviance:      {null_deviance:.2f}")
+print(f"Residual deviance:  {resid_deviance:.2f}")
+print(f"McFadden R²:        {mcfadden_r2:.4f}")
+print(f"G²:                 {lr_stat:.4f}  (df = {lr_df}, p = {lr_pval:.2e})")
+print(f"AIC:                {multinom_fit.aic:.2f}")
+print(f"BIC:                {multinom_fit.bic:.2f}")
+```
+
+:::
+
+The residual deviance is smaller than the null deviance by $238.17$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 238.17$ on 12 degrees of freedom ($p < 0.001$), providing strong evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's $R^2 = 0.165$ is still below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC ($1236.60$) and BIC ($1308.64$) reported here describe the imbalanced training model; they are most useful later for comparing this fit against the upsampled model or other model specifications.
+
+### Classification-Based Measures
+
+While likelihood-based measures evaluate the model on the probability scale, classification-based measures assess how well the model assigns each observation to its predicted transport mode by taking the category with the highest predicted probability as the point prediction.
 
 Let's visualize and summarize goodness of fit for the train set. 
 
