@@ -244,7 +244,7 @@ In all these examples, the order is essential. Treating these outcomes as nomina
 
 ## Case Study
 
-We will explore a dataset containing some factors that might influence the decision of college juniors to apply to graduate school. This dataset provides a classic example of an ordinal response, such that the categories are ordered in the response variable. We explore two primary research questions based on this dataset.
+We will explore a simulated dataset containing some factors that might influence the decision of college juniors to apply to graduate school. This dataset provides a classic example of an ordinal response, such that the categories are ordered in the response variable. We explore two primary research questions based on this dataset.
 
 - How are a student's GPA, GRE score, and field of study **associated** with their inclination to apply to graduate school?
 - Can we accurately **predict** a student's inclination to apply to graduate school based on their GPA, GRE score, and field of study?
@@ -261,8 +261,8 @@ The dataset contains the following variables:
 | Variable | Description | Type | Scale | Model Role | Variable Name |
 |---|---|---|---|---|---|
 | Inclination to Apply to Graduate School | How inclined the is to apply to graduate school, with four ordered categories | Discrete | Ordinal | Response | `inclination_to_apply` |
-| Grade Point Average | The student's current cumulative GPA | Continuous | Unbounded positive | Regressor | `GPA` |
-| GRE Score | The student's most recent Graduate Record Examination score | Continuous | Unbounded positive | Regressor | `GRE_score` |
+| Grade Point Average | The student's current cumulative GPA | Continuous | Bounded positive | Regressor | `GPA` |
+| GRE Score | The student's most recent Graduate Record Examination score | Continuous | Bounded positive | Regressor | `GRE_score` |
 | Field of Study | The student's undergraduate field of study | Categorical | Nominal | Regressor | `field_of_study` |
 
 : Classification table for variables in the college dataset. {#tbl-college-variables}
@@ -1089,7 +1089,7 @@ $$
 
 be the cumulative probability.
 
-For example, let's consider $J = 3$ ordered categories, such that $j$ runs over the values $1, 2, \ldots, J - 1 = 2$, and therefore there are two cumulative probabilities to consider:
+For example, let's consider $J = 3$ ordered categories, such that $j$ runs over values of $j=1$ and $j=2$; therefore, there are two cumulative probabilities to consider:
 
 $$
 \begin{aligned}
@@ -1107,9 +1107,9 @@ $$
 &\text{logit}(P(Y_i \leq j \mid \mathbf{x}_i)) = \log\left( \frac{P(Y_i \leq j \mid \mathbf{x}_i)}{ 1 - P(Y_i \leq j \mid \mathbf{x}_i)} \right) \\
 &= \log\left( \frac{P(Y_i = 1 \mid \mathbf{x}_i) + P(Y_i = 2 \mid \mathbf{x}_i) + \ldots + P(Y_i = j \mid \mathbf{x}_i)}{ P(Y_i = j+1 \mid \mathbf{x}_i) + P(Y_i = j+2 \mid \mathbf{x}_i) + \ldots + P(Y_i = J \mid \mathbf{x}_i) } \right)
 \end{aligned}
-$$
+$$ {#eq-link}
 
-The logit transformation defined above is the model's **link function**. A link function maps a probability - here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$, onto the entire set of real numbers, so that it can be expressed as a linear function of the regressors. As it is applied to cumulative probabilities, it is known as the **cumulative logit link**, which is the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible (such as the probit or complementary log–log links), but the cumulative logit is the most widely used, and it is the one we adopt throughout this chapter.
+The logit transformation defined above is the model's **link function**. A link function maps a probability - here the cumulative probability $P(Y_i \leq j \mid \mathbf{x}_i)$, which is confined to the interval $[0, 1]$, onto the entire set of real numbers, so that it can be expressed as a linear function of the regressors. As it is applied to cumulative probabilities, it is known as the **cumulative logit link**, which is the ordinal counterpart of the ordinary logit link used in binary logistic regression. Other links are possible, such as the probit or complementary log–log links, but the cumulative logit is the most widely used, and it is the one we will use in this chapter.
 
 With the cumulative logits now defined, we reach an important modelling decision. In ordinal logistic regression, cumulative logits can be approached in two main ways, distinguished by the assumptions each makes about how the regressors relate to the response categories. These two primary modelling approaches are the proportional odds assumption and the non-proportional odds assumption. 
 
@@ -1369,7 +1369,7 @@ Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\alpha}}$ and $\hat{\bol
 Tip on the Newton–Raphson Method
 ::::
 ::::{.Tip-container}
-The parameters we ultimately estimate are the thresholds $\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_{J-1})^\top$ and the shared slopes $\boldsymbol{\beta} = (\beta_1, \ldots, \beta_k)^\top$. Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\alpha}$ and $\boldsymbol{\beta}$ jointly by iterating with the score function and Hessian matrix of the log-likelihood.
+The parameters we ultimately estimate are the thresholds $\boldsymbol{\alpha} = (\alpha_1, \ldots, \alpha_{J-1})^\top$ and the shared slopes $\boldsymbol{\beta} = (\beta_1, \ldots, \beta_k)^\top$. Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\alpha}$ and $\boldsymbol{\beta}$ jointly by iterating with the score function and Hessian matrix of the log-likelihood [@agresti2010analysis].
 
 **Score function:** The partial derivative of the log-likelihood with respect to each threshold $\alpha_j$ is:
 
@@ -1385,7 +1385,7 @@ $$
 
 The key difference from the multinomial case is that the slopes $\beta_k$ appear in **all** $J-1$ cumulative logits simultaneously, so their score components aggregate information across every cumulative split.
 
-**Hessian matrix:** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of $\ell$ with respect to the thresholds and slopes. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+k) \times (J-1+k)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, see @agresti2010analysis, Chapter 3.
+**Hessian matrix:** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of $\ell$ with respect to the thresholds and slopes. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+k) \times (J-1+k)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, refer to Chapter 3 of @agresti2010analysis.
 
 **Iteration:** Collecting the thresholds and slopes into the stacked parameter pair $(\boldsymbol{\alpha}, \boldsymbol{\beta})$, the Newton–Raphson update at step $t$ is:
 
@@ -2338,7 +2338,7 @@ We can determine whether a regressor is statistically associated with the cumula
 
 $$
 z_k = \frac{\hat{\beta}_k}{\widehat{\text{se}}\!\left(\hat{\beta}_k\right)}
-$$
+$$ {#eq-wald-statistic}
 
 and we test the following null $(H_0)$ and alternative $(H_a)$ hypotheses:
 
@@ -2357,7 +2357,7 @@ Given a significance level $\alpha$, we construct approximate $(1-\alpha)\times 
 
 $$
 \hat{\beta}_k \pm z_{\alpha/2}\,\widehat{\text{se}}\!\left(\hat{\beta}_k\right),
-$$
+$$ {#eq-ci}
 
 where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution. Exponentiating the endpoints of this interval gives a $(1-\alpha)\times 100\%$ confidence interval for the proportional odds ratio $e^{\beta_k}$.
 
@@ -2524,7 +2524,7 @@ For each regressor $x_{i,k}$, let $\hat{\beta}_{k,j}$ be the estimated slope fro
 
 $$
 B_k = \sum_{j=1}^{J-1} \frac{(\hat{\beta}_{k,j} - \hat{\beta}_k^{\text{pool}})^2}{\widehat{\text{Var}}(\hat{\beta}_{k,j})},
-$$
+$$ {#eq-brant-wald}
 
 which follows a $\chi^2$ distribution with $J - 2$ degrees of freedom under $H_0$ (proportional odds holds for $x_{i,k}$). An omnibus version of the test aggregates across all $k$ regressors, giving a $\chi^2$ statistic with $(J-2) \times k$ degrees of freedom.
 
