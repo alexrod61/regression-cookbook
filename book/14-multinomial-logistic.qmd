@@ -337,7 +337,7 @@ Now, we split the dataset into train and test sets, use train set to fit the mod
 ## R Code
 
 ```{.r}
-set.seed(50)
+set.seed(42)
 train_idx  <- createDataPartition(data$transport_mode, p = 0.8, list = FALSE)
 train_set  <- data[train_idx, ]
 test_set   <- data[-train_idx, ]
@@ -369,7 +369,7 @@ print(f"Test set size: {len(test_set)}")
 #| echo: false
 #| message: false
 #| warning: false
-set.seed(50)
+set.seed(42)
 train_idx  <- createDataPartition(data$transport_mode, p = 0.8, list = FALSE)
 train_set  <- data[train_idx, ]
 test_set   <- data[-train_idx, ]
@@ -1403,7 +1403,7 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by $238.17$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 238.17$ on 12 degrees of freedom ($p < 0.001$), providing strong evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's $R^2 = 0.165$ is still below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC ($1236.60$) and BIC ($1308.64$) reported here describe the imbalanced training model; they are most useful later for comparing this fit against the upsampled model or other model specifications.
+The residual deviance is smaller than the null deviance by $201.99$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 201.99$ on 12 degrees of freedom ($p < 0.001$), providing strong evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's $R^2 = 0.156$ is still below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC ($1120.09$) and BIC ($1190.38$) reported here describe the imbalanced training model; they are most useful later for comparing this fit against the upsampled model or other model specifications.
 
 ### Classification-Based Measures
 
@@ -1604,8 +1604,8 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-About 69.6\% of all individual transportation modes were classified correctly. On average, the model correctly identifies 34.4\% of instances for each transport mode. Recall is relatively low, which suggests the model is biased to the majority classes, even though accuracy is decent. 
-Macro F1 score is 0.682, meaning the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall — this can happen if precision is high for the majority class, but recall for minority classes is low.
+About 67.3\% of all individual transportation modes were classified correctly. On average, the model correctly identifies 33.1\% of instances for each transport mode. Recall is relatively low, which suggests the model is biased to the majority classes, even though accuracy is decent. 
+Macro F1 score is 0.656, meaning the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall — this can happen if precision is high for the majority class, but recall for minority classes is low.
 In summary, the model performs okay overall but is biased toward the dominant class(es). It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes.
 You are encouraged to explore the performance of the fitted model on the balanced sets. 
 
@@ -1867,7 +1867,7 @@ print(results_sig)
 
 :::
 
-Whether people choose driving or taking public transits varys significantly on average. The commute distance and the availability of cars both have significant effects on the choices of transportation mode. Note that the R output flags the `weekend_commuterYes` coefficient for `Bicycle` as significant, with an odds ratio and standard error of essentially zero and an extreme test statistic; this is a spurious artifact of complete separation, since no `Bicycle` riders in the test set are weekend commuters, so the coefficient is not identifiable. `statsmodels` instead assigns this term a very large standard error, yielding a large p-value, so it is correctly excluded from the significant coefficients in the Python output.
+On the test set, commute distance and the availability of cars remain significant predictors of choosing public transit over driving, and these two coefficients are the only ones that both R and Python agree are significant. The remaining rows of the R table should be read with caution. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the `Walking` equation and the `weekend_commuterYes` term for `Bicycle` suffer from complete separation. The R output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics; these are spurious artifacts rather than meaningful effects. `statsmodels` handles the separation differently: it assigns the separated terms very large standard errors, yielding $p$-values near 1, so they are correctly excluded from the significant coefficients in the Python output, although the optimizer also reports that the fit did not fully converge.
 
 ## Results
 
@@ -2088,7 +2088,7 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the test set, the model’s overall accuracy is slightly lower than training. The higher macro recall suggests the model is now better at detecting less frequent transport modes, though overall prediction quality per class (macro F1) is still moderate. This indicates the model generalizes reasonably well, but there is room to improve detection of all classes evenly.
+On the test set, the model’s metrics are somewhat higher than training: overall accuracy is 71.9\%, and macro recall and macro F1 also improve slightly. With only 199 test observations, this gap more likely reflects sampling variability than genuinely better out-of-sample performance, but it does indicate the model generalizes well to unseen data. The same limitation carries over, however: macro recall remains low, so there is room to improve detection of the less frequent transport modes.
 
 
 ## Storytelling
@@ -2101,9 +2101,9 @@ In this case study, the multinomial logistic regression model helps us understan
 
 Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with markedly lower odds of using public transit or walking instead of driving; the corresponding effect for cycling is not statistically distinguishable from zero, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving: each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches intuition — the car and public transit are the practical options once a commute gets long, while cycling stays attractive mainly over short distances.
 
-Age and weekend-commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking` (and, to a lesser extent, `Bicycle`): older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ — for rare categories, a lack of significance can reflect insufficient data rather than a genuinely null effect.
+Age and weekend-commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ — for rare categories, a lack of significance can reflect insufficient data rather than a genuinely null effect.
 
-One estimate needs a caveat rather than a substantive interpretation. On the test set, the `weekend_commuter` effect for `Bicycle` comes back with an enormous coefficient, an enormous standard error, and a $p$-value near 1. This is not evidence of no effect; it is a symptom of complete separation, since none of the bicycle commuters in the test set commute on weekends, so the term is not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
+Some estimates need a caveat rather than a substantive interpretation. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the test-set model suffers from complete separation. In R, the `weekend_commuter` effect for `Bicycle` and several `Walking` coefficients are flagged as significant with implausibly large or near-zero odds ratios, standard errors of essentially zero, and extreme test statistics; in Python, `statsmodels` assigns the same terms enormous standard errors and $p$-values near 1, and reports that the fit did not fully converge. None of this is evidence about the true effects; the terms are simply not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
 
 As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public_Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to travel mode choice, rather than as a precise classifier for the least common commuting behaviours.
 
