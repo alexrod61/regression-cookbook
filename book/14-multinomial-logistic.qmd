@@ -571,12 +571,11 @@ fig
 
 The bar plots displays the distribution of transport mode across car availability and weekend commute status. 
 
-Car is the dominant mode of transport, especially among those who have access to a car (blue bar is much taller than orange).
-Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
+The blue bar is much taller than the orange bar, which means that car is the dominant mode of transport, especially among those who have access to a car. Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
 Bicycle and Walking are rare overall but tend to occur more when no car is available. 
 
-Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the “No” (non-weekend commuter) group (orange).
-However, Public Transit has a noticeable number of weekend commuters (blue), indicating some weekend reliance on public transit.
+Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the non-weekend commuter group (orange).
+However, Public Transit has a noticeable number of weekend commuters (blue), which indicates some weekend reliance on public transit.
 Walking and Bicycling show little weekend commuting activity.
 
 Now let's visualize the relationship between `transport_mode` and continuous regressors `commute_distance` and `age`.
@@ -644,6 +643,7 @@ sns.boxplot(
     showcaps=True,
     boxprops={'facecolor': 'none', 'edgecolor': 'black'},
     whiskerprops={'color': 'black'},
+    medianprops={'color': 'black', 'linewidth': 2},
     flierprops={'markerfacecolor': 'black', 'markersize': 3},
     ax=ax1,
     order=order
@@ -673,6 +673,7 @@ sns.boxplot(
     showcaps=True,
     boxprops={'facecolor': 'none', 'edgecolor': 'black'},
     whiskerprops={'color': 'black'},
+    medianprops={'color': 'black', 'linewidth': 2},
     flierprops={'markerfacecolor': 'black', 'markersize': 3},
     ax=ax2,
     order=order
@@ -760,6 +761,7 @@ sns.boxplot(
     showcaps=True,
     boxprops={'facecolor': 'none', 'edgecolor': 'black'},
     whiskerprops={'color': 'black'},
+    medianprops={'color': 'black', 'linewidth': 2},
     flierprops={'markerfacecolor': 'black', 'markersize': 3},
     ax=ax1,
     order=order
@@ -789,6 +791,7 @@ sns.boxplot(
     showcaps=True,
     boxprops={'facecolor': 'none', 'edgecolor': 'black'},
     whiskerprops={'color': 'black'},
+    medianprops={'color': 'black', 'linewidth': 2},
     flierprops={'markerfacecolor': 'black', 'markersize': 3},
     ax=ax2,
     order=order
@@ -1147,7 +1150,7 @@ print(y.value_counts())
 
 :::
 
-The fitted model on upsampled training set is below.
+The fitted model on upsampled training set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so both languages fit the model on the identical balanced training set and produce matching estimates.
 
 ::: {.panel-tabset}
 
@@ -1156,7 +1159,7 @@ The fitted model on upsampled training set is below.
 ```{.r}
 # Upsample the outcome classes
 set.seed(352) # set a seed for sampling
-train_set_balanced <- upSample(x = train_set[, c("age","commute_distance")],
+train_set_balanced <- upSample(x = train_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
                   y = train_set$transport_mode,
                   yname = "transport_mode")
 # Fit the multinomial logit regression
@@ -1167,19 +1170,13 @@ print(summary(multinom_fit_balanced))
 ## Python Code
 
 ```{.python}
-# Upsample the outcome classes
-balanced_df = pd.DataFrame()
-for label in train_set["transport_mode"].unique():
-    subset = train_set[train_set["transport_mode"] == label]
-    balanced_subset = resample(
-        subset,
-        replace=True,  # sample with replacement
-        n_samples=train_set["transport_mode"].value_counts().max(),  # match majority class size
-        random_state=352
-    )
-    balanced_df = pd.concat([balanced_df, balanced_subset])
-X_bal = balanced_df[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-y_bal = balanced_df["transport_mode"]
+# The upsampled training set is created once in R (caret::upSample; see the
+# R tab) and pulled into Python via reticulate's `r` object, so both languages
+# fit the model on the identical balanced training set.
+train_set_balanced = r.train_set_balanced.reset_index(drop=True)
+
+X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
+y_bal = train_set_balanced["transport_mode"]
 X_bal = sm.add_constant(X_bal)
 
 # Convert categorical variables to numeric codes for statsmodels MNLogit
@@ -1217,18 +1214,13 @@ print(summary(multinom_fit_balanced))
 #| echo: false
 #| message: false
 #| warning: false
-balanced_df = pd.DataFrame()
-for label in train_set["transport_mode"].unique():
-    subset = train_set[train_set["transport_mode"] == label]
-    balanced_subset = resample(
-        subset,
-        replace=True,
-        n_samples=train_set["transport_mode"].value_counts().max(), 
-        random_state=352
-    )
-    balanced_df = pd.concat([balanced_df, balanced_subset])
-X_bal = balanced_df[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-y_bal = balanced_df["transport_mode"]
+# The upsampled training set is created once in R (caret::upSample; see the
+# R tab) and pulled into Python via reticulate's `r` object, so both languages
+# fit the model on the identical balanced training set.
+train_set_balanced = r.train_set_balanced.reset_index(drop=True)
+
+X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
+y_bal = train_set_balanced["transport_mode"]
 X_bal = sm.add_constant(X_bal)
 
 X_bal_num = X_bal.copy()
@@ -1617,7 +1609,7 @@ Similar as in [Poisson regression](https://alexrod61.github.io/regression-cookbo
 We can determine whether a regressor is statistically associated with the logarithm of the odds through hypothesis testing for the parameters $\beta^{(u,v)}_j$ by link function. Define the Wald statistic $z^{(u,v)}_j$ as:
 $$
 z_j^{(u, v)} = \frac{\hat{\beta}_j^{(u, v)}}{\mbox{se}\left(\hat{\beta}_j^{(u, v)}\right)}
-$$ {eq-wald-statistic}
+$$ {#eq-wald-statistic}
 and we test the hypotheses: 
 $$
 \begin{gather*}
@@ -1627,14 +1619,14 @@ H_a: \beta_j^{(u, v)} \neq 0.
 $$
 Provided the sample size $n$ is large enough, $z_j$ has an approximately Standard Normal distribution under $H_0$.
 
-The corresponding $p$-values for each $\beta^{(u,v)}_j$ can be computed. The smaller the $p$-value, the stronger the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level  (usually taken to be 0.05) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, $p$-values that are small enough indicate that the data provides evidence in favour of association (or causation in the case of an experimental study!) between the response variable and the $j$th regressor.
+The corresponding $p$-values for each $\beta^{(u,v)}_j$ can be computed. The smaller the $p$-value, the stronger the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level  (usually taken to be $\alpha=0.05$) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, $p$-values that are small enough indicate that the data provides evidence in favour of association (or causation in the case of an experimental study!) between the response variable and the $j$th regressor.
 
 Given a specified level of confidence where $\alpha$ is the significance level, we can construct approximate $(1-\alpha)\times 100\%$ confidence intervals for the corresponding true value of $\beta^{(u,v)}_j$:
 $$
 \begin{equation*}
 \hat{\beta}_j^{(u, v)} \pm z_{\alpha/2}\mbox{se} \left( \hat{\beta}_j^{(u, v)} \right),
 \end{equation*}
-$$
+$$ {#eq-ci}
 where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution.
 
 Now we will fit the model on the test set using the `nnet` package in R or the `statsmodel` package in Python. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients under the 5\% significance level.
@@ -1874,7 +1866,7 @@ On the test set, commute distance and the availability of cars remain significan
 The fitted model can be written as 
 $$
 \log \left( \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} X_{1,i} + \hat{\beta}_{2}^{(k,\text{Car})} X_{2,i} + \hat{\beta}_{3}^{(k,\text{Car})} X_{3,i} + \hat{\beta}_{4}^{(k,\text{Car})} X_{4,i},
-$$
+$$ {#eq-fitted-model}
 where $k$ is one of the non-baseline levels: `Bicycle`, `Public Transit`, or `Walking`, and $X_{1,i},X_{2,i},X_{3,i},X_{4,i}$ represent `age`, `commute_distance`, `has_car_available`, and `weekend_commuter` regressors respectively.
 
 ### Prediction 
@@ -2093,17 +2085,17 @@ On the test set, the model’s metrics are somewhat higher than training: overal
 
 ## Storytelling
 
-To complete the data science workflow, let's step back from the coefficients, tests, and confusion matrices and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real-world decision-making.
+To complete the data science workflow, let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real world decision making.
 
-In this case study, the multinomial logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. Below, we distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
+In this case study, the Multinomial Logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. We will distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
 
 ### Key Insights From the Model
 
-Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with markedly lower odds of using public transit or walking instead of driving; the corresponding effect for cycling is not statistically distinguishable from zero, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving: each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches intuition — the car and public transit are the practical options once a commute gets long, while cycling stays attractive mainly over short distances.
+Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with markedly lower odds of using public transit or walking instead of driving; the corresponding effect for cycling is not statistically significant, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
 
-Age and weekend-commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ — for rare categories, a lack of significance can reflect insufficient data rather than a genuinely null effect.
+Age and weekend commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ because a lack of significance can potentially reflect insufficient data rather than a genuinely null effect for rare categories
 
-Some estimates need a caveat rather than a substantive interpretation. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the test-set model suffers from complete separation. In R, the `weekend_commuter` effect for `Bicycle` and several `Walking` coefficients are flagged as significant with implausibly large or near-zero odds ratios, standard errors of essentially zero, and extreme test statistics; in Python, `statsmodels` assigns the same terms enormous standard errors and $p$-values near 1, and reports that the fit did not fully converge. None of this is evidence about the true effects; the terms are simply not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
+Some estimates need a caveat rather than a substantive interpretation. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the test set model suffers from complete separation. In R, the `weekend_commuter` effect for `Bicycle` and several `Walking` coefficients are flagged as significant with implausibly large or near-zero odds ratios, standard errors of essentially zero, and extreme test statistics. In Python, `statsmodels` assigns the same terms enormous standard errors and $p$-values near 1, and reports that the fit did not fully converge. None of this is evidence about the true effects; the terms are simply not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
 
 As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public_Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to travel mode choice, rather than as a precise classifier for the least common commuting behaviours.
 
