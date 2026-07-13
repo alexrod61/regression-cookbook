@@ -1065,7 +1065,7 @@ and the logit is defined as the logarithm of these odds, i.e. $\log\left(\frac{p
 
 $$
 \log\left(\frac{p_i}{1-p_i}\right) = \beta_0 + \beta_1 x_{i,1} + \beta_2x_{i,2} + \ldots + \beta_k x_{i,k}
-$$
+$$ {#eq-log-odds}
 
 This idea and formulation is the basis for extending the logistic regression framework for an outcome with two categories to ordinal outcomes with more than two ordered categories. In the ordinal case, instead of modelling the log-odds of a single binary event, we model **the cumulative logits**, which compare the probability of being at or below a given category to the probability of being above that category. 
 
@@ -1415,11 +1415,11 @@ The full Newton–Raphson/IRLS procedure is:
 
 We now turn to the question of how the parameters of the ordinal logistic regression model are estimated from data. We summarize the key estimation steps in mathematical terms below, working with one observation at a time before generalizing to the full sample.
 
-Recall that the proportional odds model for an ordinal response $Y$ with $J$ ordered categories and $k$ regressors is:
+Recall that the proportional odds model for an ordinal response $Y$ with $J$ ordered categories and $k$ regressors is
 
 $$
 \text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \alpha_j - (\beta_1 x_{i,1} + \beta_2 x_{i,2} + \ldots + \beta_k x_{i,k}), \quad j = 1, \ldots, J-1,
-$$
+$$ {#eq-proportional-odds}
 
 where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_k$ are the shared slope coefficients. Note the sign convention - the regressor terms are subtracted from the intercept, such that that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
 
@@ -2005,13 +2005,13 @@ $$
 
 Unlike the usual R-squared in OLS regression, McFadden’s pseudo-R-squared should not be interpreted as the proportion of variance explained. Instead, it measures improvement in log-likelihood relative to the null model. Its values are typically much smaller than regular R-squared values, and values around $0.2–0.4$ are often considered indicative of a good/decent model fit in discrete-response models.
 
-**AIC and BIC** penalize the log-likelihood for model complexity:
+**AIC** and **BIC** scores penalize the log-likelihood for model complexity:
 
 $$
 \text{AIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\alpha}}, \hat{\boldsymbol{\beta}}) + p\log n,
 $$
 
-where $p = (J-1) + k$ is the total number of parameters and $n$ is the sample size. Lower AIC and BIC indicate better fit, and they are most useful for comparing competing models (e.g. proportional vs. partial proportional odds).
+where $p = (J-1) + k$ is the total number of parameters and $n$ is the sample size. Lower AIC and BIC scores indicate better fit, and they are most useful for comparing competing models (e.g. proportional vs. partial proportional odds).
 
 We compute all of these measures below.
 
@@ -2326,7 +2326,7 @@ print(f"Macro F1:         {f1:.3f}")
 
 On the training set, the model achieves an overall accuracy of **38.2%**, a macro recall of **34.3%**, and a macro F1 of **37.6%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model outperforms chance, but leaves substantial room for improvement.
 
-The confusion matrix does not show the tidy near-diagonal pattern one might hope for in an ordinal model. Instead, the model concentrates its predictions at the two ends of the scale by labelling students `Low` or `Very High`, and never assigns the `Medium` label at all. As the adjacent `Medium` category is never predicted, misclassified `Low` students skip it entirely and are sent to `High` $(25)$ or all the way to the opposite end at `Very High` (56), while `High` students are split between `Very High` $(104)$ and `Low` $(73)$. The model captures the broad low-versus-high contrast but resolves the interior of the ordinal scale poorly.
+The confusion matrix does not show the tidy near-diagonal pattern one might hope for in an ordinal model; instead, the model concentrates its predictions at the two ends of the scale by labelling students `Low` or `Very High`, and never assigns the `Medium` label at all. As the adjacent `Medium` category is never predicted, misclassified `Low` students skip it entirely and are sent to `High` $(25)$ or all the way to the opposite end at `Very High` (56), while `High` students are split between `Very High` $(104)$ and `Low` $(73)$. The model captures the broad low-versus-high contrast but resolves the interior of the ordinal scale poorly.
 
 The `Very High` category is the best-predicted class (recall = $0.67$, F1 = $0.52$), with `Low` close behind (recall = $0.61$, F1 = $0.47$). The two middle categories fare poorly: the model never assigns the `Medium` label at all (recall = $0$), and `High` is rarely recovered (recall = $0.10$, F1 = $0.13$), as it sits between two better-separated groups and has its observations pulled in both directions. Macro recall $(0.343)$ is lower than accuracy $(0.382)$, reflecting this uneven performance across the four categories, a pattern that persists on the held-out test set and is discussed further in the Results section.
 
@@ -2765,7 +2765,7 @@ In the partial proportional odds model, GRE score receives a separate slope at e
 
 $$
 \text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \alpha_j - \left(\beta_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \beta_{\texttt{GRE},j}\, x_{i,\texttt{GRE}} + \boldsymbol{\beta}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right), \quad j = 1, 2, 3,
-$$
+$$ {#eq-partial-prop}
 
 where $\beta_{\texttt{GPA}}$ and each element of $\boldsymbol{\beta}_{\texttt{field}}$ are shared across all three cumulative splits, but $\beta_{\texttt{GRE},j}$ varies freely with $j$. The total parameter count is $(J - 1) + 1 + (J - 1) + (F - 1) = 3 + 1 + 3 + 4 = 11$, compared with 9 in the fully proportional model.
 
@@ -3166,7 +3166,7 @@ The increasing pattern across cutpoints is the core finding. At the `Low|Medium`
 
 ## Results
 
-The partial proportional odds model, in which `GPA` and `field_of_study` are constrained to shared coefficients while `GRE_score` is allowed cutpoint-specific coefficients, is the model selected for this case study, based on the Brant–Wald test results from @sec-inference. Using the sign convention, the fitted model is:
+The partial proportional odds model, in which `GPA` and `field_of_study` are constrained to shared coefficients while `GRE_score` is allowed cutpoint-specific coefficients, is the model selected for this case study, based on the Brant–Wald test results from @sec-inference. Using the sign convention, the fitted model is
 
 $$
 \text{logit}\!\left(P(Y_i \le j \mid \mathbf{x}_i)\right) = \hat{\alpha}_j - \left(\hat{\beta}_{\texttt{GPA}}\, x_{i,\texttt{GPA}} + \hat{\beta}_{\texttt{GRE},j}\, x_{i,\texttt{GRE}} + \hat{\boldsymbol{\beta}}_{\texttt{field}}^\top \mathbf{Z}_{i,\texttt{field}}\right)
