@@ -826,7 +826,7 @@ You can also visualize the relationship across other regressors in various types
 A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is categorical and nominal (our response of interest) subject to the numerical regressors `commute_distance` and `age`, and binary regressors `has_car_available` and `weekend_commuter`. 
 
 This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities that will belong to categories $1,2,\dots,m$ respectively; i.e., 
-$$P(Y_i=1)=p_{i,1}, P(Y_i=2)=p_{i,2}, \dots, P(Y_i=m)=p_{i,m}$$
+$$P(Y_i=1)=p_{i,1}, P(Y_i=2)=p_{i,2}, \dots, P(Y_i=m)=p_{i,m}$$ {#eq-multinomial}
 where
 $$
 \sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
@@ -834,11 +834,11 @@ $$
 
 *A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with $m=2$.*
 
-The Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. **What about adding some other ones?**
+The Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
 
 Here is what we can do:
 
-1. Pick one of the categories to be the **baseline**. For example, the category "$1$".
+1. Pick one of the categories to be the **baseline**.
 2. For each of the other categories, we model the logarithm of the odds to the baseline category.
 
 Now, **what is the math for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ linK functions in the Multinomial Logistic regression model as follows:
@@ -913,7 +913,7 @@ P(Y_i = \texttt{Public} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i
 P(Y_i = \texttt{Bike} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}\\
 P(Y_i = \texttt{Walk} \mid X_{i, \texttt{distance}}, X_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}
 \end{align*}
-$$
+$$ {#eq-probabilities}
 
 
 ### The Log-Likelihood Function
@@ -1101,12 +1101,12 @@ If one category is much more frequent than the others (i.e., unbalanced outcomes
 3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
 4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates (complete separation).
 
-The intuition behind is if 95\% are "car", then the model has little incentive to adjust parameters for "walk" and "bus," so estimates for those categories can be unstable. There are two common approaches: 
+For example, if 95\% of the observations are `Car`, then the model has little incentive to adjust parameters for `Walk` and `Bus`, so estimates for those categories can be unstable. There are two common approaches: 
 
 1. Downsampling: Reduce the majority class size so that each class is roughly balanced. This risks throwing away data, but helps balance influence.
 2. Upsampling: Duplicate (or synthetically generate) minority class cases until classes are balanced. This risks overfitting, but improves minority estimation.
 
-Check the class counts of the outcome below.
+Let's check the class counts of the outcome below.
 
 ::: {.panel-tabset}
 
@@ -1150,7 +1150,7 @@ print(y.value_counts())
 
 :::
 
-The fitted model on upsampled training set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so both languages fit the model on the identical balanced training set and produce matching estimates.
+The fitted model on upsampled training set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so that both languages fit the model on the identical balanced training set and produce matching estimates. The upsampling can be performed in `Python` with `RandomOverSampler` from the imbalanced-learn (`imblearn`) package. For more details on the `RandomOverSampler` function, refer to its [documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.RandomOverSampler.html).
 
 ::: {.panel-tabset}
 
