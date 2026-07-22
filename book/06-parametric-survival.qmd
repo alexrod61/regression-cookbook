@@ -120,6 +120,18 @@ Right censoring is not the only kind of censoring. An observation is **left cens
 ::::
 :::
 
+## Why Ordinary Least Squares is Not Suitable
+
+Before introducing new machinery, it is worth being clear about why the familiar linear regression toolkit does not carry over. Given that survival times are numerical, it is tempting to model them with ordinary least squares regression. There are three reasons why this does not work well.
+
+First and foremost, OLS has no way to handle censoring. If we treat a censored follow-up time as if it were an event time, we systematically understate how long subjects actually survive, biasing the estimates downward. If we instead drop the censored observations, we discard real information and introduce a different bias, since the subjects who survive longest are exactly the ones most likely to be censored. Either way, the analysis is compromised.
+
+Second, OLS places no restriction on the sign of its predictions. A fitted linear model can happily predict a negative lifetime, which is meaningless for a duration.
+
+Third, survival times are typically right skewed with variability that changes across the range of the response, while OLS assumes symmetric errors with constant variance. Transforming the response, for example by taking logarithms, can soften the skewness and the range problem, but it does nothing to solve the censoring problem, which remains the fundamental obstacle.
+
+Parametric survival regression addresses all three issues at once: it models a nonnegative, skewed response through an appropriate distribution, and its estimation procedure is built to use censored observations correctly. To get there, we first need a vocabulary for describing when events happen, which is the purpose of the two functions introduced next.
+
 ## The Survival and Hazard Functions
 
 Survival analysis describes the distribution of event times using two functions that are more natural for this setting than the density alone: the survival function and the hazard function.
@@ -197,7 +209,7 @@ $$
 h(t) = \frac{f(t)}{S(t)}
 $$
 
-where $f(t)$ is the density of the survival time. Intuitively, the hazard at time $t$ is the instantaneous rate at which the event occurs, given that the subject has survived up to time $t$. Among the machines still running at time $t$, the hazard tells us how rapidly failures are happening at that moment.
+where $f(t)$ is the density of the survival time. This ratio has a natural reading: it is the event density $f(t)$ rescaled by the fraction $S(t)$ still at risk, so it measures how concentrated events are *among those who have survived so far*. Intuitively, then, the hazard at time $t$ is the instantaneous rate at which the event occurs, given that the subject has survived up to time $t$. Among the machines still running at time $t$, the hazard tells us how rapidly failures are happening at that moment.
 
 It is important to note that the hazard is a rate, not a probability. Its value can exceed one, and it is measured per unit of time. What makes the hazard so useful is its shape over time: a rising hazard describes processes where risk accumulates with age, such as mechanical wear, while a falling hazard describes processes where early failures dominate, such as defective units failing shortly after production.
 
@@ -206,27 +218,29 @@ It is important to note that the hazard is a rate, not a probability. Its value 
 One Distribution, Many Views
 ::::
 ::::{.Tip-container}
-The density $f(t)$, the CDF $F(t)$, the survival function $S(t)$, and the hazard function $h(t)$ are four descriptions of the same distribution. Knowing any one of them determines all the others. A particularly elegant connection runs through the **cumulative hazard** $H(t)$, defined as the accumulated hazard up to time $t$, which satisfies
+The density $f(t)$, the CDF $F(t)$, the survival function $S(t)$, and the hazard function $h(t)$ are four descriptions of the same distribution, and knowing any one of them determines all the others. The links are a short chain of calculus. Since $S(t) = 1 - F(t)$, differentiating gives the density,
 
 $$
+f(t) = -\frac{d}{dt} S(t)
+$$
+
+Dividing by $S(t)$ and recognizing the derivative of a logarithm turns the hazard definition into a compact form,
+
+$$
+h(t) = \frac{f(t)}{S(t)} = -\frac{d}{dt} \ln S(t)
+$$
+
+Finally, accumulating the hazard from the start up to time $t$ defines the **cumulative hazard** $H(t)$, and undoing the derivative above recovers the survival function,
+
+$$
+H(t) = \int_0^t h(u)\, du = -\ln S(t)
+\qquad\Longrightarrow\qquad
 S(t) = \exp\left(-H(t)\right)
 $$
 
-This identity is used constantly in survival analysis, both in theory and in software.
+So one can start from any of these functions and travel to the others by differentiating, dividing, or integrating. This last identity, $S(t) = \exp(-H(t))$, is used constantly in survival analysis, both in theory and in software.
 ::::
 :::
-
-## Why Ordinary Least Squares is Not Suitable
-
-Given that survival times are numerical, it is tempting to model them with ordinary least squares regression. There are three reasons why this does not work well.
-
-First and foremost, OLS has no way to handle censoring. If we treat a censored follow-up time as if it were an event time, we systematically understate how long subjects actually survive, biasing the estimates downward. If we instead drop the censored observations, we discard real information and introduce a different bias, since the subjects who survive longest are exactly the ones most likely to be censored. Either way, the analysis is compromised.
-
-Second, OLS places no restriction on the sign of its predictions. A fitted linear model can happily predict a negative lifetime, which is meaningless for a duration.
-
-Third, survival times are typically right skewed with variability that changes across the range of the response, while OLS assumes symmetric errors with constant variance. Transforming the response, for example by taking logarithms, can soften the skewness and the range problem, but it does nothing to solve the censoring problem, which remains the fundamental obstacle.
-
-Parametric survival regression addresses all three issues at once: it models a nonnegative, skewed response through an appropriate distribution, and its estimation procedure is built to use censored observations correctly.
 
 ## Common Distributions for Survival Times
 
@@ -248,6 +262,8 @@ $$
 
 A constant hazard means the risk of the event is the same at every moment, regardless of how much time has already passed. This is the famous **memoryless** property: under an Exponential model, an old component is exactly as likely to fail in the next hour as a brand new one. That assumption is elegant but often unrealistic, since most real processes involve some form of aging or early failure. For this reason, the Exponential distribution usually serves as a baseline against which richer models are compared.
 
+To make the rate concrete, note that the median survival time under an Exponential model is $\ln 2 / \lambda$: it is the time at which $S(t) = 0.5$, found by solving $e^{-\lambda t} = 0.5$. For example, a rate of $\lambda = 0.1$ per month corresponds to a median survival time of about $6.9$ months, meaning half of the units are expected to have experienced the event by then.
+
 ### The Weibull Distribution
 
 The Weibull distribution generalizes the Exponential by adding a shape parameter. With shape $k > 0$ and scale $\lambda > 0$, its survival function is
@@ -267,6 +283,8 @@ The shape parameter controls how risk evolves over time:
 - When $k > 1$, the hazard increases with time, describing wear-out processes where risk grows with age.
 - When $k < 1$, the hazard decreases with time, describing settings where early failures dominate and survivors become more robust.
 - When $k = 1$, the hazard is constant and the Weibull distribution reduces exactly to the Exponential distribution.
+
+A word of caution on notation is in order here. In the Weibull distribution, $\lambda$ is a **scale** parameter measured in units of time, so a *larger* $\lambda$ stretches survival times *out*. This is the opposite of the role $\lambda$ played in the Exponential distribution, where it was a **rate** and larger values made events happen *sooner*. The two are consistent at the boundary: setting $k = 1$ makes the Weibull hazard equal to $1/\lambda$, which is an Exponential distribution whose rate is the reciprocal of the Weibull scale. The symbol is the same by convention, but its meaning differs between the two distributions, so it is worth reading each formula on its own terms.
 
 This flexibility, combined with mathematical convenience, has made the Weibull distribution the workhorse of parametric survival analysis.
 
@@ -331,7 +349,7 @@ The figure above compares the hazard shapes of the three families. The Exponenti
 
 ## The Parametric Survival Regression Model
 
-So far we have described the distribution of survival times on its own. Regression enters the picture when we let that distribution depend on predictor variables. The most common formulation of parametric survival regression is the **accelerated failure time (AFT)** model, which relates predictors to the logarithm of the survival time.
+So far we have described the distribution of survival times on its own. Regression enters the picture when we let that distribution depend on predictor variables, so that different subjects are described by different survival and hazard curves according to their characteristics. In principle we could make any of the distribution's parameters a function of the predictors; in practice, the most common and most interpretable way to do this is the **accelerated failure time (AFT)** model, which places a familiar linear model on the logarithm of the survival time.
 
 For each observation $i$, the model takes the form
 
@@ -344,8 +362,10 @@ Here, $\beta_0$ is the intercept, the coefficients $\beta_1, ..., \beta_p$ descr
 The distribution assumed for the error term determines the distribution of the survival times themselves:
 
 - When $\varepsilon_i$ follows a standard normal distribution, $T_i$ follows a Log-normal distribution.
-- When $\varepsilon_i$ follows a standard extreme value distribution, $T_i$ follows a Weibull distribution.
+- When $\varepsilon_i$ follows a standard extreme value distribution (also known as the Gumbel distribution), $T_i$ follows a Weibull distribution.
 - In the Weibull case with $\sigma = 1$, the model reduces to Exponential survival times.
+
+You do not need to know the details of the extreme value distribution to use these models. The point is simply that each choice of error distribution corresponds to one of the survival-time distributions we met earlier, so choosing an error distribution and choosing a survival distribution are two sides of the same decision.
 
 ### Interpreting the Coefficients
 
@@ -357,14 +377,16 @@ $$
 
 This quantity is called a **time ratio** or **acceleration factor**. If $e^{\beta_j} = 2$, subjects with one additional unit of $x_j$ tend to survive twice as long; for instance, their median survival time doubles. If $e^{\beta_j} = 0.5$, their survival times are cut in half. Predictors therefore stretch or compress the time scale on which the event process unfolds, which is a remarkably direct and intuitive way to describe effects on durations.
 
+It is worth pausing on what a fitted model actually produces. Plugging a particular subject's predictor values into the linear predictor $\beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip}$ gives that subject their own survival-time distribution, and hence their own survival curve $S(t)$ and hazard curve $h(t)$. From that individual distribution we can read off concrete summaries, such as a predicted median survival time or the probability of surviving past a chosen horizon. In this way the abstract machinery of survival and hazard functions turns into a concrete, per-person answer once the model is estimated.
+
 ::: {.Tip}
 ::::{.Tip-header}
 Accelerated Failure Time vs. Proportional Hazards
 ::::
 ::::{.Tip-container}
-The AFT formulation describes predictors as speeding up or slowing down the passage of time. An alternative viewpoint, called **proportional hazards**, describes predictors as multiplying the hazard function up or down. These are genuinely different assumptions, and in general a model satisfies one or the other.
+The AFT formulation describes predictors as speeding up or slowing down the passage of time. An alternative viewpoint, called **proportional hazards**, describes predictors as multiplying the hazard function up or down. These are genuinely different assumptions: a given model may satisfy one, the other, both, or neither. For instance, the Log-normal AFT model does not have a proportional hazards interpretation.
 
-The Weibull distribution, including its Exponential special case, is the only family that satisfies both: a Weibull AFT model can always be rewritten as a proportional hazards model, and vice versa. The proportional hazards viewpoint takes centre stage in the [next chapter](07-semiparametric-survival.qmd), where we study the Cox model.
+The Weibull distribution, including its Exponential special case, is special in that it satisfies both: a Weibull AFT model can always be rewritten as a proportional hazards model, and vice versa. The proportional hazards viewpoint takes centre stage in the [next chapter](07-semiparametric-survival.qmd), where we study the Cox model.
 ::::
 :::
 
