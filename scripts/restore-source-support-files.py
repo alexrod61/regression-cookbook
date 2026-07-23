@@ -8,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 # Keep source-side simulation assets available after each render.
 SOURCE_SUPPORT_DIRS = [
     (
+        ROOT / "docs/book/04-gamma_files/simulations",
+        ROOT / "book/04-gamma_files/simulations",
+    ),
+    (
         ROOT / "docs/book/14-multinomial-logistic_files/simulations",
         ROOT / "book/14-multinomial-logistic_files/simulations",
     )
