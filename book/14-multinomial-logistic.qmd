@@ -906,7 +906,7 @@ $$
 \end{align*}
 $$
 
-Taking exponential on both sides of the model equations gives the ratio of probability of each category `Public Transit`, `Bicycle`, and `Walking` over the probability of the baseline level `Car`:
+Taking exponential on both sides of the model equations gives the ratio of the probability of each category `Public Transit`, `Bicycle`, and `Walking` over the probability of the baseline level `Car`:
 
 $$
 \begin{align*}
@@ -919,7 +919,7 @@ $$
 \end{align*}
 $$
 
-Finally, the probability of $Y_i$ belonging to categories `Car`, `Public Transit`, `Bicycle`, and `Walking` respectively are given by the following expressions.
+Finally, the probabilities of $Y_i$ belonging to categories `Car`, `Public Transit`, `Bicycle`, and `Walking` respectively are given by the following expressions.
 
 $$
 \begin{align*}
@@ -1959,7 +1959,7 @@ On the test set, commute distance and the availability of cars are significant p
 
 ### Interpreting the Coefficients
 
-The multinomial logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category relative $k$ to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of the category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `Public Transit` equation, and we will interpret them below. 
+The multinomial logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category $k$ relative to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `Public Transit` equation, and we will interpret them below. 
 
 **Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = 1.09$, $z = 3.51$, $p < 0.001$, 95% CI: $1.04, 1.14$). It has the following interpretation.
 
@@ -1969,7 +1969,7 @@ Although the per-kilometre effect appears modest, it compounds over realistic di
 
 **Car availability:** Car availability is a significant predictor of choosing public transit over the car ($\text{OR} = 0.193$, $z = -4.79$, $p < 0.001$, 95% CI: $0.098, 0.378$). It has the following interpretation.
 
-> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have 0.193 times the odds of choosing public transit over the car, relative to individuals without a car available; that is, car availability is associated with a reduction of approximately 81% in these odds.*
+> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have 0.193 times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately 81% in these odds.*
 
 The remaining rows of the significant coefficients table in the `R` output are artifacts of the quasi-complete separation discussed above and are therefore not interpreted.
 
@@ -2268,7 +2268,13 @@ print(f"Macro F1-score: {f1:.3f}")
 
 On the test set, the model achieves an overall accuracy of **67.6\%**, a macro recall of **33.5\%**, and a macro F1 of **66.5\%**. 
 
-The `Car` and `Public Transit` categories are predicted most reliably with recalls of $ $ and $ $ respectively. The `Bicycle` and `Walking` observations in the test set are all misclassified as `Car` or `Public Transit`.
+The `Car` and `Public Transit` classes are predicted most reliably with recalls of $77.5\%$ and $56.6\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. All $4$ `Bicycle` observations in the test set are classified as `Car` and the `Walking` observation is misclassified as `Public_Transit`. The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the equation
+
+$$
+\sum_{i=1}^n \hat{p}_{i,j} = \sum_{i=1}^n y_{i,j} = n_j,
+$$
+
+where $n_j$ is the number of training observations in category $j$. Consequently, the fitted probabilities of each category average exactly its sample proportion in the training set, which is roughly $3\%$ for `Bicycle` and under $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above this small average, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, and therefore these minority classes are not predicted at all in the test set.
 
 ## Storytelling
 
@@ -2278,7 +2284,7 @@ In this case study, the Multinomial Logistic regression model helps us understan
 
 ### Key Insights From the Model
 
-Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with markedly lower odds of using public transit or walking instead of driving; the corresponding effect for cycling is not statistically significant, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
+Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with lower odds of using public transit instead of driving; the corresponding effect for cycling is not statistically significant, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
 
 Age and weekend commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ because a lack of significance can potentially reflect insufficient data rather than a genuinely null effect for rare categories
 
