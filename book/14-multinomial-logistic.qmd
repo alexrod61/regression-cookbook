@@ -1725,18 +1725,33 @@ model = sm.MNLogit(y, X_numeric)
 
 # Fit with BFGS rather than the default Newton-Raphson method. Under
 # quasi-complete separation the Newton-Raphson iterations overflow the
-# log-likelihood and Hessian, returning NaN for every coefficient.
-# BFGS avoids that failure, but if it runs for enough iterations the
-# separated coefficients still grow until the Hessian used for the
-# standard errors overflows, leaving the covariance matrix of the
-# estimates unavailable. The likelihood is essentially flat along the
-# separated directions, so stopping earlier sacrifices nothing; we
-# therefore retry with fewer iterations until the covariance exists.
+# log-likelihood and Hessian, returning NaN for every coefficient. If
+# the BFGS solution itself overflows the observed information matrix,
+# retry with fewer iterations; the likelihood is essentially flat along
+# the separated directions, so stopping earlier sacrifices nothing.
 for max_iterations in (1000, 200, 100, 50, 25, 10):
     multinom_test = model.fit(method="bfgs", maxiter=max_iterations, disp=False)
-    if (multinom_test.normalized_cov_params is not None
-            and not np.isnan(multinom_test.bse.values).any()):
+    information = -multinom_test.model.hessian(
+        multinom_test.params.values.ravel(order="F"))
+    if np.all(np.isfinite(information)):
         break
+
+# statsmodels declines to invert an observed information matrix that is
+# not strictly positive definite, which is exactly what quasi-complete
+# separation produces: the log-likelihood is flat along the separated
+# directions, so the corresponding eigenvalues are numerically zero. In
+# that case, invert the information matrix with its eigenvalues floored
+# at a small positive value. Directions in which the data carry
+# essentially no information then receive very large variances, so the
+# separated terms are reported with enormous standard errors and
+# p-values near one instead of aborting the computation. The check must
+# bypass the results wrapper via ._results, because the wrapper
+# converts a missing covariance into a data frame of NaNs.
+if multinom_test._results.normalized_cov_params is None:
+    eigenvalues, eigenvectors = np.linalg.eigh(information)
+    eigenvalues = np.maximum(eigenvalues, 1e-8)
+    multinom_test._results.normalized_cov_params = (
+        eigenvectors @ np.diag(1.0 / eigenvalues) @ eigenvectors.T)
 
 # Print the fitted model
 print(multinom_test.summary())
@@ -1856,18 +1871,33 @@ model = sm.MNLogit(y, X_numeric)
 
 # Fit with BFGS rather than the default Newton-Raphson method. Under
 # quasi-complete separation the Newton-Raphson iterations overflow the
-# log-likelihood and Hessian, returning NaN for every coefficient.
-# BFGS avoids that failure, but if it runs for enough iterations the
-# separated coefficients still grow until the Hessian used for the
-# standard errors overflows, leaving the covariance matrix of the
-# estimates unavailable. The likelihood is essentially flat along the
-# separated directions, so stopping earlier sacrifices nothing; we
-# therefore retry with fewer iterations until the covariance exists.
+# log-likelihood and Hessian, returning NaN for every coefficient. If
+# the BFGS solution itself overflows the observed information matrix,
+# retry with fewer iterations; the likelihood is essentially flat along
+# the separated directions, so stopping earlier sacrifices nothing.
 for max_iterations in (1000, 200, 100, 50, 25, 10):
     multinom_test = model.fit(method="bfgs", maxiter=max_iterations, disp=False)
-    if (multinom_test.normalized_cov_params is not None
-            and not np.isnan(multinom_test.bse.values).any()):
+    information = -multinom_test.model.hessian(
+        multinom_test.params.values.ravel(order="F"))
+    if np.all(np.isfinite(information)):
         break
+
+# statsmodels declines to invert an observed information matrix that is
+# not strictly positive definite, which is exactly what quasi-complete
+# separation produces: the log-likelihood is flat along the separated
+# directions, so the corresponding eigenvalues are numerically zero. In
+# that case, invert the information matrix with its eigenvalues floored
+# at a small positive value. Directions in which the data carry
+# essentially no information then receive very large variances, so the
+# separated terms are reported with enormous standard errors and
+# p-values near one instead of aborting the computation. The check must
+# bypass the results wrapper via ._results, because the wrapper
+# converts a missing covariance into a data frame of NaNs.
+if multinom_test._results.normalized_cov_params is None:
+    eigenvalues, eigenvectors = np.linalg.eigh(information)
+    eigenvalues = np.maximum(eigenvalues, 1e-8)
+    multinom_test._results.normalized_cov_params = (
+        eigenvectors @ np.diag(1.0 / eigenvalues) @ eigenvectors.T)
 
 # Print the fitted model
 print(multinom_test.summary())
@@ -1925,7 +1955,7 @@ print(results_sig)
 
 :::
 
-On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The R output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above. If the optimizer runs for enough iterations, however, the separated coefficients can still grow until the Hessian used to compute the standard errors overflows, in which case the covariance matrix of the estimates is unavailable and any request for standard errors raises an error. We therefore reduce the number of BFGS iterations until the covariance matrix can be computed, which is harmless because the likelihood is essentially flat along the separated directions.
+On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The R output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above. In addition, `statsmodels` declines to invert an observed information matrix that is not strictly positive definite, and separation produces exactly that: the flat directions of the likelihood correspond to eigenvalues that are numerically zero, so the covariance matrix of the estimates is unavailable and any request for standard errors raises an error. We therefore stop the optimizer early enough that the information matrix remains finite, and invert it with its eigenvalues floored at a small positive value, so that the directions in which the data carry essentially no information receive very large variances rather than aborting the computation.
 
 ### Interpreting the Coefficients
 
