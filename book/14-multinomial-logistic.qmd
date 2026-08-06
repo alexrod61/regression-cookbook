@@ -115,6 +115,7 @@ py_require("scikit-learn")
 py_require("spicy")
 
 reticulate::py_install("plotnine")
+reticulate::py_install("imblearn")
 
 pandas <- import("pandas")
 numpy <- import("numpy")
@@ -125,6 +126,7 @@ statsmodels <- import("statsmodels")
 sklearn <- import("sklearn")
 scipy <- import("scipy")
 plotnine <- import("plotnine")
+imblearn <- import("imblearn")
 
 print_as_dt <- function(x){
   DT::datatable(x,
@@ -142,6 +144,7 @@ print_as_dt <- function(x){
 ```
 
 ```{python setup-py, include=FALSE}
+import imblearn
 import numpy as np
 import pandas as pd
 from plotnine import *
@@ -1955,7 +1958,7 @@ print(results_sig)
 
 :::
 
-On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The R output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation, the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above.
+On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The `R` output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation, the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above.
 
 To handle the imbalanced groups in the test set, we use the `caret::upSample` function in `R` and the `RandomOverSampler` function in Python.
 
@@ -1963,36 +1966,38 @@ To handle the imbalanced groups in the test set, we use the `caret::upSample` fu
 ```{r}
 # Upsample the outcome classes
 set.seed(352) # set a seed for sampling
-train_set_balanced <- upSample(x = train_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
+test_set_balanced <- upSample(x = test_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
                   y = test_set$transport_mode,
                   yname = "transport_mode")
 # Fit the multinomial logit regression
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
+multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
 print(summary(multinom_fit_balanced))
 ```
 
 ## Python Code
 ```{python}
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
 from imblearn.over_sampling import RandomOverSampler
-import statsmodels.formula.api as smf
 
-# Upsample the outcome classes
-ros = RandomOverSampler(random_state=352)  # set a seed for sampling
+ros = RandomOverSampler(random_state=352)
 X_resampled, y_resampled = ros.fit_resample(
-    train_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
+    test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
     test_set["transport_mode"]
 )
 
-train_set_balanced = X_resampled.copy()
-train_set_balanced["transport_mode"] = y_resampled
+# Response must be numeric class codes for sm.MNLogit
+transport_mode_labels = dict(enumerate(pd.Categorical(y_resampled).categories))
+y_codes = pd.Categorical(y_resampled).codes
 
-# Fit the multinomial logit regression
-multinom_fit_balanced = smf.mnlogit(
-    "transport_mode ~ age + commute_distance + has_car_available + weekend_commuter",
-    data=train_set_balanced
-).fit(method="bfgs")
+# Predictors: encode categoricals manually, then add intercept
+X = pd.get_dummies(X_resampled, columns=["has_car_available", "weekend_commuter"], drop_first=True)
+X = sm.add_constant(X).astype(float)
 
+multinom_fit_balanced = sm.MNLogit(y_codes, X).fit(method="bfgs")
 print(multinom_fit_balanced.summary())
+print(transport_mode_labels)
 ```
 
 ## R Output
@@ -2003,11 +2008,11 @@ print(multinom_fit_balanced.summary())
 
 # Upsample the outcome classes
 set.seed(352) # set a seed for sampling
-train_set_balanced <- upSample(x = train_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
+test_set_balanced <- upSample(x = test_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
                   y = test_set$transport_mode,
                   yname = "transport_mode")
 # Fit the multinomial logit regression
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
+multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
 print(summary(multinom_fit_balanced))
 ```
 
@@ -2017,26 +2022,28 @@ print(summary(multinom_fit_balanced))
 #| message: false
 #| warning: false
 
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
 from imblearn.over_sampling import RandomOverSampler
-import statsmodels.formula.api as smf
 
-# Upsample the outcome classes
-ros = RandomOverSampler(random_state=352)  # set a seed for sampling
+ros = RandomOverSampler(random_state=352)
 X_resampled, y_resampled = ros.fit_resample(
-    train_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
+    test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
     test_set["transport_mode"]
 )
 
-train_set_balanced = X_resampled.copy()
-train_set_balanced["transport_mode"] = y_resampled
+# Response must be numeric class codes for sm.MNLogit
+transport_mode_labels = dict(enumerate(pd.Categorical(y_resampled).categories))
+y_codes = pd.Categorical(y_resampled).codes
 
-# Fit the multinomial logit regression
-multinom_fit_balanced = smf.mnlogit(
-    "transport_mode ~ age + commute_distance + has_car_available + weekend_commuter",
-    data=train_set_balanced
-).fit(method="bfgs")
+# Predictors: encode categoricals manually, then add intercept
+X = pd.get_dummies(X_resampled, columns=["has_car_available", "weekend_commuter"], drop_first=True)
+X = sm.add_constant(X).astype(float)
 
+multinom_fit_balanced = sm.MNLogit(y_codes, X).fit(method="bfgs")
 print(multinom_fit_balanced.summary())
+print(transport_mode_labels)
 ```
 
 ### Interpreting the Coefficients
