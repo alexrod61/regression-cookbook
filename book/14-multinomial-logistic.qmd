@@ -1983,23 +1983,27 @@ import pandas as pd
 import statsmodels.api as sm
 from imblearn.over_sampling import RandomOverSampler
 
-ros = RandomOverSampler(random_state=352)
+ros = RandomOverSampler(random_state=42)
 X_resampled, y_resampled = ros.fit_resample(
     test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
     test_set["transport_mode"]
 )
 
-# Response must be numeric class codes for sm.MNLogit
-transport_mode_labels = dict(enumerate(pd.Categorical(y_resampled).categories))
-y_codes = pd.Categorical(y_resampled).codes
+# Add intercept
+X_resampled = sm.add_constant(X_resampled)
 
-# Predictors: encode categoricals manually, then add intercept
-X = pd.get_dummies(X_resampled, columns=["has_car_available", "weekend_commuter"], drop_first=True)
-X = sm.add_constant(X).astype(float)
+# Convert categorical variables to numeric codes for statsmodels MNLogit
+X_numeric = X_resampled.copy()
+for col in ['has_car_available', 'weekend_commuter']:
+    X_numeric[col] = X_numeric[col].cat.codes
 
-multinom_fit_balanced = sm.MNLogit(y_codes, X).fit(method="bfgs")
-print(multinom_fit_balanced.summary())
-print(transport_mode_labels)
+# Fit multinomial logistic regression
+model_resampled = sm.MNLogit(y_resampled, X_numeric)
+multinom_fit = model_resampled.fit()
+
+# Print the fitted model
+print(multinom_fit.summary())
+```
 ```
 
 :::
@@ -2033,23 +2037,26 @@ import pandas as pd
 import statsmodels.api as sm
 from imblearn.over_sampling import RandomOverSampler
 
-ros = RandomOverSampler(random_state=352)
+ros = RandomOverSampler(random_state=42)
 X_resampled, y_resampled = ros.fit_resample(
     test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]],
     test_set["transport_mode"]
 )
 
-# Response must be numeric class codes for sm.MNLogit
-transport_mode_labels = dict(enumerate(pd.Categorical(y_resampled).categories))
-y_codes = pd.Categorical(y_resampled).codes
+# Add intercept
+X_resampled = sm.add_constant(X_resampled)
 
-# Predictors: encode categoricals manually, then add intercept
-X = pd.get_dummies(X_resampled, columns=["has_car_available", "weekend_commuter"], drop_first=True)
-X = sm.add_constant(X).astype(float)
+# Convert categorical variables to numeric codes for statsmodels MNLogit
+X_numeric = X_resampled.copy()
+for col in ['has_car_available', 'weekend_commuter']:
+    X_numeric[col] = X_numeric[col].cat.codes
 
-multinom_fit_balanced = sm.MNLogit(y_codes, X).fit(method="bfgs")
-print(multinom_fit_balanced.summary())
-print(transport_mode_labels)
+# Fit multinomial logistic regression
+model_resampled = sm.MNLogit(y_resampled, X_numeric)
+multinom_fit = model_resampled.fit()
+
+# Print the fitted model
+print(multinom_fit.summary())
 ```
 
 :::
