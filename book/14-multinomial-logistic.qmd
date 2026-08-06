@@ -1215,7 +1215,24 @@ print(summary(multinom_fit_balanced))
 train_set_balanced = r.train_set_balanced.reset_index(drop=True)
 
 X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-y_bal = train_set_balanced["transport_mode"]
+
+# Re-anchor the response to the canonical Car/Bicycle/Public_Transit/Walking
+# order used everywhere else in this chapter. train_set_balanced inherits its
+# factor levels from R's train_set$transport_mode, which was releveled by
+# descending frequency earlier for the EDA bar charts (see @sec-eda). This
+# must be wrapped in a pd.Series (not passed as a bare pd.Categorical) -
+# statsmodels only respects the given category order when endog is a
+# named Series; a bare Categorical gets silently re-sorted alphabetically
+# (Bicycle, Car, Public_Transit, Walking) instead, which would make
+# Bicycle the baseline and swap the Car/Bicycle codes relative to y_test.
+y_bal = pd.Series(
+    pd.Categorical(
+        train_set_balanced["transport_mode"],
+        categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+        ordered=False
+    ),
+    name="transport_mode"
+)
 X_bal = sm.add_constant(X_bal)
 
 # Convert categorical variables to numeric codes for statsmodels MNLogit
@@ -1259,7 +1276,24 @@ print(summary(multinom_fit_balanced))
 train_set_balanced = r.train_set_balanced.reset_index(drop=True)
 
 X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-y_bal = train_set_balanced["transport_mode"]
+
+# Re-anchor the response to the canonical Car/Bicycle/Public_Transit/Walking
+# order used everywhere else in this chapter. train_set_balanced inherits its
+# factor levels from R's train_set$transport_mode, which was releveled by
+# descending frequency earlier for the EDA bar charts (see @sec-eda). This
+# must be wrapped in a pd.Series (not passed as a bare pd.Categorical) -
+# statsmodels only respects the given category order when endog is a
+# named Series; a bare Categorical gets silently re-sorted alphabetically
+# (Bicycle, Car, Public_Transit, Walking) instead, which would make
+# Bicycle the baseline and swap the Car/Bicycle codes relative to y_test.
+y_bal = pd.Series(
+    pd.Categorical(
+        train_set_balanced["transport_mode"],
+        categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+        ordered=False
+    ),
+    name="transport_mode"
+)
 X_bal = sm.add_constant(X_bal)
 
 X_bal_num = X_bal.copy()
@@ -1960,7 +1994,7 @@ print(results_sig)
 
 On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The `R` output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation, the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above.
 
-To handle the imbalanced groups in the test set, we use the `caret::upSample` function in `R` and the `RandomOverSampler` function in Python.
+To handle the imbalanced groups in the test set, we use the `caret::upSample` function in `R` and the `RandomOverSampler` function in `Python`.
 
 ::: {.panel-tabset}
 
@@ -1972,8 +2006,8 @@ test_set_balanced <- upSample(x = test_set[, c("age","commute_distance","has_car
                   y = test_set$transport_mode,
                   yname = "transport_mode")
 # Fit the multinomial logit regression
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
-print(summary(multinom_fit_balanced))
+multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
+print(summary(multinom_fit))
 ```
 
 ## Python Code
@@ -2021,8 +2055,8 @@ test_set_balanced <- upSample(x = test_set[, c("age","commute_distance","has_car
                   y = test_set$transport_mode,
                   yname = "transport_mode")
 # Fit the multinomial logit regression
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
-print(summary(multinom_fit_balanced))
+multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set_balanced)
+print(summary(multinom_fit))
 ```
 
 ## Python Output
@@ -2381,7 +2415,7 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the test set, the model achieves an overall accuracy of **67.6\%**, a macro recall of **33.5\%**, and a macro F1 of **66.5\%**. 
+On the test set, the model achieves an overall accuracy of **67.7\%**, a macro recall of **33.5\%**, and a macro F1 of **66.5\%**. 
 
 The `Car` and `Public Transit` classes are predicted most reliably with recalls of $77.5\%$ and $56.6\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. All $4$ `Bicycle` observations in the test set are classified as `Car` and the `Walking` observation is misclassified as `Public_Transit`. The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the equation
 
@@ -2390,6 +2424,189 @@ $$
 $$
 
 where $n_j$ is the number of training observations in category $j$. Consequently, the fitted probabilities of each category average exactly its sample proportion in the training set, which is roughly $3\%$ for `Bicycle` and under $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above this small average, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, and therefore these minority classes are not predicted at all in the test set.
+
+Now let's use the `multinom_fit_balanced` model from the Estimation section to predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+
+::: {.panel-tabset}
+
+## R Code
+```{.r}
+# Predict on the test set using the fitted multinom_fit_balanced model
+y_pred <- predict(multinom_fit_balanced, newdata = test_set)
+
+# Compute confusion matrix
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(test_set$transport_mode, levels = mode_levels))
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted label", y = "True label") +
+  theme_bw(base_size = 13)
+```
+
+## Python Code
+```{.python}
+# Predict on the test set using the fitted model
+y_pred_test = multinom_fit_balanced.predict(X_test_num).idxmax(axis=1)
+
+# Confusion matrix
+labels = y_test.cat.categories
+cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y_test.cat.categories)
+disp.plot(cmap="Blues")
+disp.ax_.set_title("Confusion Matrix (Test Set)")
+fig = disp.figure_
+fig.tight_layout()
+fig
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+# Predict on the test set using the fitted multinom_fit_balanced model
+y_pred <- predict(multinom_fit_balanced, newdata = test_set)
+
+# Compute confusion matrix
+mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
+                              factor(test_set$transport_mode, levels = mode_levels))
+
+# Visualise
+cm_df <- as.data.frame(as.table(conf_matrix$table))
+colnames(cm_df) <- c("Predicted", "Actual", "Freq")
+
+# Order axes so the main diagonal (correct matches) runs top-left to
+# bottom-right: Predicted increases left -> right (Car -> Walking), and
+# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
+# factor level at the bottom of the y-axis, so we reverse Actual's levels to
+# place "Car" at the top.
+cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
+cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
+
+cm_df |>
+  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = Freq), color = "black", size = 5) +
+  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
+  labs(title = "Confusion Matrix (Test Set)",
+       x = "Predicted label", y = "True label") +
+  theme_bw(base_size = 13)
+```
+
+## Python Output
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+# Predict on the test set using the fitted model
+y_pred_test = multinom_fit_balanced.predict(X_test_num).idxmax(axis=1)
+
+# Confusion matrix
+labels = y_test.cat.categories
+cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                              display_labels=y_test.cat.categories)
+disp.plot(cmap="Blues")
+disp.ax_.set_title("Confusion Matrix (Test Set)")
+fig = disp.figure_
+fig.tight_layout()
+fig
+```
+:::
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Compute the performance metrics
+overall_accuracy <- conf_matrix$overall['Accuracy']
+macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
+macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:", round(macro_recall, 3), "\n")
+cat("Macro F1:", round(macro_f1, 3), "\n")
+```
+
+## Python Code
+
+```{.python}
+# Compute the performance metrics
+acc = accuracy_score(y_test.cat.codes, y_pred_test)
+recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred_test)
+f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall: {recall:.3f}")
+print(f"Macro F1-score: {f1:.3f}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+overall_accuracy <- conf_matrix$overall['Accuracy']
+macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
+macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
+cat("Macro Recall:", round(macro_recall, 3), "\n")
+cat("Macro F1:", round(macro_f1, 3), "\n")
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+acc = accuracy_score(y_test.cat.codes, y_pred_test)
+recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
+# Average F1 only over the classes the model actually predicts, so a
+# never-predicted class (undefined precision) is dropped rather than
+# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
+predicted_labels = np.unique(y_pred_test)
+f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
+print(f"Overall Accuracy: {acc:.3f}")
+print(f"Macro Recall: {recall:.3f}")
+print(f"Macro F1-score: {f1:.3f}")
+```
+
+:::
+
+On the test set, the `multinom_fit_balanced` model achieves an overall accuracy of **38.3\%**, a macro recall of **27.5\%**, and a macro F1 of **32.5\%**. 
 
 ## Storytelling
 
