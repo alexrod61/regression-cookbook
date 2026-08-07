@@ -336,21 +336,20 @@ for col in categorical_cols:
 
 :::
 
-Now, we split the dataset into train and test sets, use train set to fit the model, and use test set to assess the model performance. 
+Now, we will split the dataset into train and test sets. We will use the train set to fit the model, and the test set to assess model performance.
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-set.seed(352)
-
 # Randomly split the data into train and test sets
+set.seed(352)
 train_idx <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
 train_set <- data[train_idx, ]
 test_set  <- data[-train_idx, ]
 
-cat("Training set size:", nrow(train_set))
+cat("train set size:", nrow(train_set))
 cat("Test set size:", nrow(test_set))
 ```
 
@@ -363,7 +362,7 @@ cat("Test set size:", nrow(test_set))
 train_set = r.train_set.reset_index(drop=True)
 test_set  = r.test_set.reset_index(drop=True)
 
-print(f"Training set size: {len(train_set)}")
+print(f"train set size: {len(train_set)}")
 print(f"Test set size: {len(test_set)}")
 ```
 
@@ -384,8 +383,11 @@ train_idx <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
 train_set <- data[train_idx, ]
 test_set  <- data[-train_idx, ]
 
-cat("Training set size:", nrow(train_set))
+cat("train set size:", nrow(train_set))
 cat("Test set size:", nrow(test_set))
+
+print(filter(test_set, transport_mode=="Bicycle"))
+print(filter(test_set, transport_mode=="Walking"))
 ```
 
 ## Python Output
@@ -400,7 +402,7 @@ cat("Test set size:", nrow(test_set))
 train_set = r.train_set.reset_index(drop=True)
 test_set  = r.test_set.reset_index(drop=True)
 
-print(f"Training set size: {len(train_set)}")
+print(f"train set size: {len(train_set)}")
 print(f"Test set size: {len(test_set)}")
 ```
 
@@ -1012,7 +1014,7 @@ The full Newton–Raphson/IRLS procedure is:
 ::::
 :::
 
-## Estimation
+## Estimation {#sec-estimation}
 
 ### Fitting the Model
 
@@ -1115,7 +1117,7 @@ print(multinom_fit.summary())
 
 :::
 
-The output reports the estimated parameters: for each non-baseline category $k$, a category-specific intercept $\hat{\beta}_{0}^{(k,1)}$ together with the slope coefficients $\hat{\beta}_{1}^{(k,1)}, \ldots, \hat{\beta}_{K}^{(k,1)}$ (one per regressor), each with its standard error. Since `Car` was set as the baseline category, the output contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`; the coefficients of the baseline category itself are fixed at zero for identifiability and therefore do not appear in the output. With $m = 4$ response categories and $K = 4$ regressors, the fitted model comprises $(m - 1) \times (K + 1) = 15$ estimated parameters, which is consistent with the parameter count derived above.
+The output reports the estimated parameters. For each non-baseline category $k$, a category-specific intercept $\hat{\beta}_{0}^{(k,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(k,1)}, \ldots, \hat{\beta}_{K}^{(k,1)}$ (one per regressor) are reported, each with its standard error. Since `Car` was set as the baseline category, the output contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`; the coefficients of the baseline category itself are fixed at zero for identifiability and therefore do not appear in the output. With $m = 4$ response categories and $K = 4$ regressors, the fitted model comprises $(m - 1) \times (K + 1) = 15$ estimated parameters, which is consistent with the parameter count derived above.
 
 In the case study model with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt{age}}$, $Z_{i,\texttt{car}}$, and $Z_{i,\texttt{weekend}}$, the fitted model can be written as
 
@@ -1132,7 +1134,7 @@ If one category is much more frequent than the others (i.e., unbalanced outcomes
 3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
 4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates (complete separation).
 
-For example, if 95\% of the observations are `Car`, then the model has little incentive to adjust parameters for `Walk` and `Bus`, so estimates for those categories can be unstable. There are two common approaches: 
+For example, if 95\% of the observations are `Car`, then the model has little incentive to adjust parameters for `Walking` and `Bus`, so estimates for those categories can be unstable. There are two common approaches: 
 
 1. Downsampling: Reduce the majority class size so that each class is roughly balanced. This risks throwing away data, but helps balance influence.
 2. Upsampling: Duplicate (or synthetically generate) minority class cases until classes are balanced. This risks overfitting, but improves minority estimation.
@@ -1181,7 +1183,7 @@ print(y.value_counts())
 
 :::
 
-To handle the imbalanced groups, we resample the training sets to balance out the groups to eliminate the bias in modelling. The fitted model on upsampled training set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so that both languages fit the model on the identical balanced training set and produce matching estimates. The upsampling can be performed in `Python` with `RandomOverSampler` from the imbalanced-learn (`imblearn`) package. For more details on the `RandomOverSampler` function, refer to its [documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.RandomOverSampler.html).
+To handle the imbalanced groups, we resample the train sets to balance out the groups to eliminate the bias in modelling. The fitted model on upsampled train set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so that both languages fit the model on the identical balanced train set and produce matching estimates. The upsampling can be performed in `Python` with `RandomOverSampler` from the imbalanced-learn (`imblearn`) package. For more details on the `RandomOverSampler` function, refer to its [documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.RandomOverSampler.html).
 
 ::: {.panel-tabset}
 
@@ -1201,9 +1203,9 @@ print(summary(multinom_fit_balanced))
 ## Python Code
 
 ```{.python}
-# The upsampled training set is created once in R (caret::upSample; see the
+# The upsampled train set is created once in R (caret::upSample; see the
 # R tab) and pulled into Python via reticulate's `r` object, so both languages
-# fit the model on the identical balanced training set.
+# fit the model on the identical balanced train set.
 train_set_balanced = r.train_set_balanced.reset_index(drop=True)
 
 X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
@@ -1253,9 +1255,9 @@ print(summary(multinom_fit_balanced))
 #| echo: false
 #| message: false
 #| warning: false
-# The upsampled training set is created once in R (caret::upSample; see the
+# The upsampled train set is created once in R (caret::upSample; see the
 # R tab) and pulled into Python via reticulate's `r` object, so both languages
-# fit the model on the identical balanced training set.
+# fit the model on the identical balanced train set.
 train_set_balanced = r.train_set_balanced.reset_index(drop=True)
 
 X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
@@ -1283,7 +1285,7 @@ print(multinom_fit_balanced.summary())
 
 ## Goodness of Fit
 
-Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes on the training set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
+Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
 
 ### Likelihood-Based Measures
 
@@ -1442,7 +1444,7 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by $201.99$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 201.99$ on 12 degrees of freedom ($p < 0.001$), providing strong evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's $R^2 = 0.156$ is still below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC ($1120.09$) and BIC ($1190.38$) reported here describe the imbalanced training model; they are most useful later for comparing this fit against the upsampled model or other model specifications.
+The residual deviance is smaller than the null deviance by $193.87$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 193.87$ on 12 degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's $R^2 = 0.152$ is below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC and BIC scores of $1111.19$ and $1181.46$ respectively describe the imbalanced training model, and they are useful later for comparing this fit against the upsampled model or other model specifications.
 
 ### Classification-Based Measures
 
@@ -1477,7 +1479,7 @@ cm_df |>
   geom_tile(color = "white") +
   geom_text(aes(label = Freq), color = "black", size = 5) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Training Set)",
+  labs(title = "Confusion Matrix (Train Set)",
        x = "Predicted label", y = "True label") +
   theme_bw(base_size = 13)
 ```
@@ -1492,7 +1494,7 @@ cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
                               display_labels=y.cat.categories)
 disp.plot(cmap="Blues")
-disp.ax_.set_title("Confusion Matrix (Training Set)")
+disp.ax_.set_title("Confusion Matrix (Train Set)")
 fig = disp.figure_
 fig.tight_layout()
 fig
@@ -1506,7 +1508,7 @@ fig
 
 ```{r}
 #| label: fig-confusion-matrix-train-R
-#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the training set."
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the train set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1531,7 +1533,7 @@ cm_df |>
   geom_tile(color = "white") +
   geom_text(aes(label = Freq), color = "black", size = 5) +
   scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Training Set)",
+  labs(title = "Confusion Matrix (Train Set)",
        x = "Predicted label", y = "True label") +
   theme_bw(base_size = 13)
 ```
@@ -1540,7 +1542,7 @@ cm_df |>
 
 ```{python}
 #| label: fig-confusion-matrix-train-py
-#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the training set."
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the train set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -1551,7 +1553,7 @@ cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
                               display_labels=y.cat.categories)
 disp.plot(cmap="Blues")
-disp.ax_.set_title("Confusion Matrix (Training Set)")
+disp.ax_.set_title("Confusion Matrix (Train Set)")
 fig = disp.figure_
 fig.tight_layout()
 fig
@@ -1559,7 +1561,7 @@ fig
 
 :::
 
-You're encouraged to repeat these diagnostics on the balanced (upsampled) model and on the held‑out test set to compare whether balancing improves minority class recall without overly harming overall calibration.
+You are encouraged to repeat these diagnostics on the balanced (upsampled) model to determine if balancing improves minority class recall without overly harming the overall calibration.
 
 Let's compute the performance metrics.
 
@@ -1643,10 +1645,9 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the training set, the model achieves an overall accuracy of about **67.3\%**. On average, the model correctly identifies **33.1\%** of instances for each transport mode. Macro recall is relatively low, which suggests that the model is biased to the majority classes, even though the overall accuracy is decent. Macro F1 score is **65.6\%**, which means the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall, and this can happen if precision is high for the majority class, but recall for minority classes is low.
+On the train set, the model achieves an overall accuracy of about **68.1\%**. On average, the model correctly identifies **33.6\%** of instances for each transport mode, which means that the macro recall is **33.6\%**. Macro recall is relatively low, which suggests that the model is biased to the majority classes, even though the overall accuracy is decent. Macro F1 score is **66.6\%**, which means the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall, and this can happen if precision is high for the majority class, but recall for the minority classes is low.
 
-In summary, the model performs okay overall but is biased toward the dominant classes. It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes.
-You are encouraged to explore the performance of the fitted model on the balanced sets. 
+In summary, the model performs okay overall but is biased toward the dominant classes. It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes. You are encouraged to explore the performance of the fitted model on the balanced sets. 
 
 ## Inference
 
@@ -1678,7 +1679,7 @@ where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal dis
 
 ### Fitting the Model
 
-Now we will fit the model on the test set using the `nnet` package in `R` or the `statsmodel` package in `Python`. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients at the 5\% significance level.
+Now we will fit the model on the test set using the `nnet` package in `R` or the `statsmodel` package in `Python`. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients at the $5\%$ significance level.
 
 ::: {.panel-tabset}
 
@@ -1699,7 +1700,7 @@ cat("\nSignificant coefficients (5% threshold):\n")
 
 broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
-  dplyr::filter(p.value < 0.05) |>          # keep only significant coefficients
+  dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
   rename(outcome_class = y.level) |>
   print(n = Inf, width = Inf)               # show full term names without truncation
 ```
@@ -1713,11 +1714,6 @@ test_set["transport_mode"] = pd.Categorical(
     categories=["Car", "Bicycle", "Public_Transit", "Walking"],
     ordered=False
 )
-
-# Drop outcome categories with no observations in this set. A class present in
-# the full data may be absent from the smaller test set; statsmodels cannot
-# estimate coefficients for an empty category and would otherwise return NaN.
-test_set["transport_mode"] = test_set["transport_mode"].cat.remove_unused_categories()
 
 # Design matrix and response
 y = test_set["transport_mode"]
@@ -1733,89 +1729,10 @@ for col in ['has_car_available', 'weekend_commuter']:
 
 # Fit multinomial logistic regression
 model = sm.MNLogit(y, X_numeric)
-
-# Fit with BFGS rather than the default Newton-Raphson method. Under
-# quasi-complete separation the Newton-Raphson iterations overflow the
-# log-likelihood and Hessian, returning NaN for every coefficient. If
-# the BFGS solution itself overflows the observed information matrix,
-# retry with fewer iterations; the likelihood is essentially flat along
-# the separated directions, so stopping earlier sacrifices nothing.
-for max_iterations in (1000, 200, 100, 50, 25, 10):
-    multinom_test = model.fit(method="bfgs", maxiter=max_iterations, disp=False)
-    information = -multinom_test.model.hessian(
-        multinom_test.params.values.ravel(order="F"))
-    if np.all(np.isfinite(information)):
-        break
-
-# statsmodels declines to invert an observed information matrix that is
-# not strictly positive definite, which is exactly what quasi-complete
-# separation produces: the log-likelihood is flat along the separated
-# directions, so the corresponding eigenvalues are numerically zero. In
-# that case, invert the information matrix with its eigenvalues floored
-# at a small positive value. Directions in which the data carry
-# essentially no information then receive very large variances, so the
-# separated terms are reported with enormous standard errors and
-# p-values near one instead of aborting the computation. The check must
-# bypass the results wrapper via ._results, because the wrapper
-# converts a missing covariance into a data frame of NaNs.
-if multinom_test._results.normalized_cov_params is None:
-    eigenvalues, eigenvectors = np.linalg.eigh(information)
-    eigenvalues = np.maximum(eigenvalues, 1e-8)
-    multinom_test._results.normalized_cov_params = (
-        eigenvectors @ np.diag(1.0 / eigenvalues) @ eigenvectors.T)
+multinom_fit = model.fit()
 
 # Print the fitted model
-print(multinom_test.summary())
-
-data_dict = {
-    "estimate": np.exp(multinom_test.params),      # odds ratios
-    "pvalue": multinom_test.pvalues,
-    "std_err": multinom_test.bse,
-    "statistic": multinom_test.tvalues
-}
-
-# Outcome class mapping. With "Car" as the baseline, the remaining (non-empty)
-# categories are the comparison classes, in categorical order.
-class_map = dict(enumerate(y.cat.categories[1:]))
-
-# Container for processed tidy tables
-tidy_dict = {}
-
-for name, df in data_dict.items():
-    tidy = (
-        df.stack()               # long form
-        .swaplevel()             # variable first, outcome second
-        .reset_index()           # convert MultiIndex to columns
-        .rename(columns={"level_0": "outcome_class", 
-                         "level_1": "term", 
-                         0: name})
-    )
-    tidy["outcome_class"] = tidy["outcome_class"].replace(class_map)
-    tidy = tidy.sort_values(by="outcome_class").reset_index(drop=True)
-    
-    tidy_dict[name] = tidy
-
-# CIs
-conf = multinom_test.conf_int()
-or_conf = np.exp(conf)
-ci_lower_stacked = or_conf["lower"].reset_index()
-ci_lower_stacked.columns = ['outcome_class', 'term', 'ci_lower']
-ci_upper_stacked = or_conf["upper"].reset_index()
-ci_upper_stacked.columns = ['outcome_class', 'term', 'ci_upper']
-
-# Merge the result tables
-ref_cols = ["outcome_class", "term"]
-results = tidy_dict['estimate'] \
-    .merge(tidy_dict['pvalue'], on=ref_cols) \
-    .merge(tidy_dict['std_err'], on=ref_cols) \
-    .merge(tidy_dict['statistic'], on=ref_cols) \
-    .merge(ci_lower_stacked, on=ref_cols) \
-    .merge(ci_upper_stacked, on=ref_cols)
-
-# Keep only coefficients significant at the 5% level
-results_sig = results[results["pvalue"] < 0.05].round(3)
-print("\nSignificant coefficients (5% threshold):")
-print(results_sig)
+print(multinom_fit.summary())
 ```
 
 :::
@@ -1842,7 +1759,7 @@ cat("\nSignificant coefficients (5% threshold):\n")
 
 broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
-  dplyr::filter(p.value < 0.05) |>          # keep only significant coefficients
+  dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
   rename(outcome_class = y.level) |>
   print(n = Inf, width = Inf)               # show full term names without truncation
 ```
@@ -1860,11 +1777,6 @@ test_set["transport_mode"] = pd.Categorical(
     ordered=False
 )
 
-# Drop outcome categories with no observations in this set. A class present in
-# the full data may be absent from the smaller test set; statsmodels cannot
-# estimate coefficients for an empty category and would otherwise return NaN.
-test_set["transport_mode"] = test_set["transport_mode"].cat.remove_unused_categories()
-
 # Design matrix and response
 y = test_set["transport_mode"]
 X = test_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
@@ -1879,96 +1791,55 @@ for col in ['has_car_available', 'weekend_commuter']:
 
 # Fit multinomial logistic regression
 model = sm.MNLogit(y, X_numeric)
-
-# Fit with BFGS rather than the default Newton-Raphson method. Under
-# quasi-complete separation the Newton-Raphson iterations overflow the
-# log-likelihood and Hessian, returning NaN for every coefficient. If
-# the BFGS solution itself overflows the observed information matrix,
-# retry with fewer iterations; the likelihood is essentially flat along
-# the separated directions, so stopping earlier sacrifices nothing.
-for max_iterations in (1000, 200, 100, 50, 25, 10):
-    multinom_test = model.fit(method="bfgs", maxiter=max_iterations, disp=False)
-    information = -multinom_test.model.hessian(
-        multinom_test.params.values.ravel(order="F"))
-    if np.all(np.isfinite(information)):
-        break
-
-# statsmodels declines to invert an observed information matrix that is
-# not strictly positive definite, which is exactly what quasi-complete
-# separation produces: the log-likelihood is flat along the separated
-# directions, so the corresponding eigenvalues are numerically zero. In
-# that case, invert the information matrix with its eigenvalues floored
-# at a small positive value. Directions in which the data carry
-# essentially no information then receive very large variances, so the
-# separated terms are reported with enormous standard errors and
-# p-values near one instead of aborting the computation. The check must
-# bypass the results wrapper via ._results, because the wrapper
-# converts a missing covariance into a data frame of NaNs.
-if multinom_test._results.normalized_cov_params is None:
-    eigenvalues, eigenvectors = np.linalg.eigh(information)
-    eigenvalues = np.maximum(eigenvalues, 1e-8)
-    multinom_test._results.normalized_cov_params = (
-        eigenvectors @ np.diag(1.0 / eigenvalues) @ eigenvectors.T)
+multinom_fit = model.fit()
 
 # Print the fitted model
-print(multinom_test.summary())
-
-data_dict = {
-    "estimate": np.exp(multinom_test.params),      # odds ratios
-    "pvalue": multinom_test.pvalues,
-    "std_err": multinom_test.bse,
-    "statistic": multinom_test.tvalues
-}
-
-# Outcome class mapping. With "Car" as the baseline, the remaining (non-empty)
-# categories are the comparison classes, in categorical order.
-class_map = dict(enumerate(y.cat.categories[1:]))
-
-# Container for processed tidy tables
-tidy_dict = {}
-
-for name, df in data_dict.items():
-    tidy = (
-        df.stack()               # long form
-        .swaplevel()             # variable first, outcome second
-        .reset_index()           # convert MultiIndex to columns
-        .rename(columns={"level_0": "outcome_class", 
-                         "level_1": "term", 
-                         0: name})
-    )
-    tidy["outcome_class"] = tidy["outcome_class"].replace(class_map)
-    tidy = tidy.sort_values(by="outcome_class").reset_index(drop=True)
-    
-    tidy_dict[name] = tidy
-
-# CIs
-conf = multinom_test.conf_int()
-or_conf = np.exp(conf)
-ci_lower_stacked = or_conf["lower"].reset_index()
-ci_lower_stacked.columns = ['outcome_class', 'term', 'ci_lower']
-ci_upper_stacked = or_conf["upper"].reset_index()
-ci_upper_stacked.columns = ['outcome_class', 'term', 'ci_upper']
-
-# Merge the result tables
-ref_cols = ["outcome_class", "term"]
-results = tidy_dict['estimate'] \
-    .merge(tidy_dict['pvalue'], on=ref_cols) \
-    .merge(tidy_dict['std_err'], on=ref_cols) \
-    .merge(tidy_dict['statistic'], on=ref_cols) \
-    .merge(ci_lower_stacked, on=ref_cols) \
-    .merge(ci_upper_stacked, on=ref_cols)
-
-# Keep only coefficients significant at the 5% level
-results_sig = results[results["pvalue"] < 0.05].round(3)
-print("\nSignificant coefficients (5% threshold):")
-print(results_sig)
+print(multinom_fit.summary())
 ```
 
 :::
 
-On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. The test set contains only one `Walking` observation and four `Bicycle` observations, and none of these $5$ observations are weekend commuters; therefore, the `Walking` equation suffers from quasi-complete separation. The `R` output consequently flags these coefficients as significant, with implausible odds ratios (essentially zero, or an odds ratio near 20 per year of age for `Walking`), standard errors of essentially zero, and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output. Note that the `Python` model is fitted with the BFGS optimizer rather than the default Newton-Raphson method. Under quasi-complete separation, the maximum likelihood estimates for the separated terms do not exist, and the Newton-Raphson iterations push these coefficients toward infinity until the log-likelihood and the Hessian overflow, at which point every entry of the summary table is reported as `nan`. BFGS does not rely on inverting the Hessian during the iterations and instead settles at finite, albeit extreme, estimates for the separated terms, which yields the very large standard errors and near-one $p$-values described above.
+On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. As shown in the outputs below, the test set contains only two `Walking` observations and seven `Bicycle` observations, and none of these nine observations are weekend commuters; therefore, the `Walking` and `Bicycle` equations suffers from quasi-complete separation. 
 
-To handle the imbalanced groups in the test set, we use the `caret::upSample` function in `R` and the `RandomOverSampler` function in `Python`.
+::: {.panel-tabset}
+
+## R Code
+```{.r}
+test_set |> filter(transport_mode == "Walking" | transport_mode == "Bicycle")
+```
+
+## Python Code
+```{.python}
+test_set[(test_set["transport_mode"] == "Walking") |
+         (test_set["transport_mode"] == "Bicycle")]
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+test_set |> filter(transport_mode == "Walking" | transport_mode == "Bicycle")
+```
+
+## Python Output
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+test_set[(test_set["transport_mode"] == "Walking") |
+         (test_set["transport_mode"] == "Bicycle")]
+```
+
+:::
+
+The `R` output consequently flags the `weekend_commuter` coefficients as significant for both `Bicycle` and `Walking` with standard errors of essentially zero and extreme test statistics. On the other hand, `statsmodels` handles the separation differently by assigning the separated terms very large standard errors, and yielding $p$-values close to $1$, so that they are correctly excluded from the significant coefficients in the `Python` output.  
+
+To handle the imbalanced groups in the test set, let's upsample the test set by using the `caret::upSample` function in `R` and the `RandomOverSampler` function in `Python`.
 
 ::: {.panel-tabset}
 
@@ -2072,15 +1943,15 @@ print(multinom_fit.summary())
 
 The multinomial logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so that each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category $k$ relative to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `Public Transit` equation, and we will interpret them below. 
 
-**Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = 1.09$, $z = 3.51$, $p < 0.001$, 95% CI: $1.04, 1.14$). It has the following interpretation.
+**Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = 1.19$, $z = 5.84$, $p < 0.001$, 95% CI: $1.12, 1.26$). It has the following interpretation.
 
-> *Holding age, car availability, and weekend commuting status constant, each additional kilometre of one-way commute distance is associated with 1.09 times higher odds of choosing public transit over car.*
+> *Holding age, car availability, and weekend commuting status constant, each additional kilometre of one-way commute distance is associated with 1.19 times higher odds of choosing public transit over car.*
 
-Although the per-kilometre effect appears modest, it compounds over realistic differences in commute length: a commute that is $10$ kilometres longer multiplies the odds of choosing public transit over the car by approximately $1.09^{10} \approx 2.4$.
+Although the per-kilometre effect appears modest, it compounds over larger differences in commute length. For example, a commute that is $10$ kilometres longer multiplies the odds of choosing public transit over the car by approximately $1.19^{10} \approx 2.6$, assuming that age, car availability, and weekend commuting status are held constant. 
 
 **Car availability:** Car availability is a significant predictor of choosing public transit over the car ($\text{OR} = 0.193$, $z = -4.79$, $p < 0.001$, 95% CI: $0.098, 0.378$). It has the following interpretation.
 
-> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have 0.193 times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately 81% in these odds.*
+> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have 0.128 times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately 87.2% in the odds of choosing public transit over car.*
 
 The remaining rows of the significant coefficients table in the `R` output are artifacts of the quasi-complete separation discussed above and are therefore not interpreted.
 
@@ -2092,50 +1963,47 @@ $$
 $$ {#eq-fitted-model}
 where $k$ is one of the non-baseline levels: `Bicycle`, `Public Transit`, or `Walking`, and the regressors are denoted as $x_{i,\texttt{distance}}, x_{i,\texttt{age}}, Z_{i,\texttt{car}},$ and $Z_{i,\texttt{weekend}}$.
 
-The estimated intercepts and slope coefficients of the multinomial logistic regression model fitted on the test set in the Inference section are summarized in the three tables below, one per non-baseline category. Every estimate is interpreted relative to the baseline category `Car`, and the $z$ statistics, $p$-values, odds ratios, and $95\%$ confidence intervals are computed from the estimates and standard errors reported in the `R` output:
+The estimated intercepts and slope coefficients of the multinomial logistic regression model fitted on the test set in the Inference section are summarized in the three tables below. Every estimate is interpreted relative to the baseline category `Car`, and the $z$ statistics, $p$-values, odds ratios, and $95\%$ confidence intervals are computed from the estimates and standard errors reported in the `R` output:
 
 **`Bicycle` versus `Car`:**
-
 | Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
 |-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Bicycle},\,\text{Car})}$ (intercept) | $-3.520$ | $2.095$ | $-1.68$ | $0.093$ | $0.030$ | $(0.000, 1.797)$ |
-| $\hat{\beta}_{1}^{(\text{Bicycle},\,\text{Car})}$ (`commute_distance`) | $-0.110$ | $0.096$ | $-1.14$ | $0.252$ | $0.896$ | $(0.743, 1.081)$ |
-| $\hat{\beta}_{2}^{(\text{Bicycle},\,\text{Car})}$ (`age`) | $0.029$ | $0.038$ | $0.76$ | $0.446$ | $1.029$ | $(0.956, 1.108)$ |
-| $\hat{\beta}_{3}^{(\text{Bicycle},\,\text{Car})}$ (`has_car_availableYes`) | $-0.405$ | $1.192$ | $-0.34$ | $0.734$ | $0.667$ | $(0.065, 6.900)$ |
-| $\hat{\beta}_{4}^{(\text{Bicycle},\,\text{Car})}$ (`weekend_commuterYes`) | $1.173$ | $1.251$ | $0.94$ | $0.349$ | $3.231$ | $(0.278, 37.510)$ |
+| $\hat{\beta}_{0}^{(\text{Bicycle},\,\text{Car})}$ (intercept) | $-0.502$ | $1.576$ | $-0.32$ | $0.750$ | $0.606$ | $(0.028, 13.290)$ |
+| $\hat{\beta}_{1}^{(\text{Bicycle},\,\text{Car})}$ (`commute_distance`) | $-0.152$ | $0.088$ | $-1.73$ | $0.084$ | $0.859$ | $(0.723, 1.020)$ |
+| $\hat{\beta}_{2}^{(\text{Bicycle},\,\text{Car})}$ (`age`) | $-0.049$ | $0.033$ | $-1.50$ | $0.132$ | $0.952$ | $(0.892, 1.015)$ |
+| $\hat{\beta}_{3}^{(\text{Bicycle},\,\text{Car})}$ (`has_car_availableYes`) | $1.096$ | $1.160$ | $0.94$ | $0.345$ | $2.992$ | $(0.308, 29.049)$ |
+| $\hat{\beta}_{4}^{(\text{Bicycle},\,\text{Car})}$ (`weekend_commuterYes`) | $-22.109$ | $4.54 \times 10^{4}$ | $\approx 0$ | $1.000$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
 
 **`Public Transit` versus `Car`:**
-
 | Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
 |-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Public\_Transit},\,\text{Car})}$ (intercept) | $-0.386$ | $0.617$ | $-0.63$ | $0.532$ | $0.680$ | $(0.203, 2.278)$ |
-| $\hat{\beta}_{1}^{(\text{Public\_Transit},\,\text{Car})}$ (`commute_distance`) | $0.082$ | $0.024$ | $3.51$ | $< 0.001$ | $1.086$ | $(1.037, 1.137)$ |
-| $\hat{\beta}_{2}^{(\text{Public\_Transit},\,\text{Car})}$ (`age`) | $-0.004$ | $0.012$ | $-0.37$ | $0.709$ | $0.996$ | $(0.973, 1.019)$ |
-| $\hat{\beta}_{3}^{(\text{Public\_Transit},\,\text{Car})}$ (`has_car_availableYes`) | $-1.646$ | $0.343$ | $-4.79$ | $< 0.001$ | $0.193$ | $(0.098, 0.378)$ |
-| $\hat{\beta}_{4}^{(\text{Public\_Transit},\,\text{Car})}$ (`weekend_commuterYes`) | $0.575$ | $0.486$ | $1.18$ | $0.236$ | $1.778$ | $(0.686, 4.608)$ |
+| $\hat{\beta}_{0}^{(\text{Public\_Transit},\,\text{Car})}$ (intercept) | $-1.666$ | $0.695$ | $-2.40$ | $0.016$ | $0.189$ | $(0.048, 0.737)$ |
+| $\hat{\beta}_{1}^{(\text{Public\_Transit},\,\text{Car})}$ (`commute_distance`) | $0.175$ | $0.030$ | $5.83$ | $< 0.001$ | $1.191$ | $(1.123, 1.264)$ |
+| $\hat{\beta}_{2}^{(\text{Public\_Transit},\,\text{Car})}$ (`age`) | $0.002$ | $0.013$ | $0.12$ | $0.903$ | $1.002$ | $(0.975, 1.028)$ |
+| $\hat{\beta}_{3}^{(\text{Public\_Transit},\,\text{Car})}$ (`has_car_availableYes`) | $-2.056$ | $0.411$ | $-5.00$ | $< 0.001$ | $0.128$ | $(0.057, 0.287)$ |
+| $\hat{\beta}_{4}^{(\text{Public\_Transit},\,\text{Car})}$ (`weekend_commuterYes`) | $-0.573$ | $0.508$ | $-1.13$ | $0.259$ | $0.564$ | $(0.208, 1.525)$ |
 
 **`Walking` versus `Car`:**
-
 | Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
 |-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Walking},\,\text{Car})}$ (intercept) | $-562.911$ | $0.004$ | $-1.61 \times 10^{5}$ | $< 0.001$ | $\approx 0$ | $(\approx 0, \approx 0)$ |
-| $\hat{\beta}_{1}^{(\text{Walking},\,\text{Car})}$ (`commute_distance`) | $-0.406$ | $0.825$ | $-0.49$ | $0.623$ | $0.667$ | $(0.132, 3.357)$ |
-| $\hat{\beta}_{2}^{(\text{Walking},\,\text{Car})}$ (`age`) | $8.880$ | $0.144$ | $61.51$ | $< 0.001$ | $7190$ | $(5418, 9541)$ |
-| $\hat{\beta}_{3}^{(\text{Walking},\,\text{Car})}$ (`has_car_availableYes`) | $-24.968$ | $1.23 \times 10^{-5}$ | $-2.04 \times 10^{6}$ | $< 0.001$ | $\approx 0$ | $(\approx 0, \approx 0)$ |
-| $\hat{\beta}_{4}^{(\text{Walking},\,\text{Car})}$ (`weekend_commuterYes`) | $-4.396$ | $6.74 \times 10^{-16}$ | $-6.53 \times 10^{15}$ | $< 0.001$ | $0.012$ | $(0.012, 0.012)$ |
+| $\hat{\beta}_{0}^{(\text{Walking},\,\text{Car})}$ (intercept) | $-3.378$ | $2.643$ | $-1.28$ | $0.201$ | $0.034$ | $(0.000, 6.068)$ |
+| $\hat{\beta}_{1}^{(\text{Walking},\,\text{Car})}$ (`commute_distance`) | $-0.085$ | $0.171$ | $-0.50$ | $0.621$ | $0.919$ | $(0.656, 1.285)$ |
+| $\hat{\beta}_{2}^{(\text{Walking},\,\text{Car})}$ (`age`) | $0.037$ | $0.059$ | $0.63$ | $0.528$ | $1.038$ | $(0.925, 1.165)$ |
+| $\hat{\beta}_{3}^{(\text{Walking},\,\text{Car})}$ (`has_car_availableYes`) | $-42.504$ | $6.37 \times 10^{8}$ | $-6.67 \times 10^{-8}$ | $1.000$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
+| $\hat{\beta}_{4}^{(\text{Walking},\,\text{Car})}$ (`weekend_commuterYes`) | $-14.941$ | $2840.984$ | $-0.005$ | $0.996$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
 
-The `Bicycle` and `Public Transit` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `Public Transit` equation are significant at the $5\%$ level. As discussed in the Inference section, the `Walking` equation suffers from quasi-complete separation, and its extreme estimates, essentially zero standard errors, and astronomical $z$ statistics are artifacts of a maximum likelihood estimate that does not exist rather than genuine effects.
+The `Bicycle` and `Public Transit` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `Public Transit` equation are significant at the $5\%$ level. As discussed in the Inference section, the `Walking` equation and the `weekend_commuterYes` term in the `Bicycle` equation suffer from quasi-complete separation; the resulting extreme coefficient magnitudes paired with astronomical standard errors drive the associated $z$-statistics toward zero and the $p$-values toward one, which is a symptom of a maximum likelihood estimate that does not exist rather than genuine null effects.
 
 ### Prediction 
 
-Let's fit the model on the training set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+We will fit the model on the train set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-# Fit the model on the training set
+# Fit the model on the train set
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
 
 # Predict on the test set using the fitted model
@@ -2150,11 +2018,7 @@ conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
 cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
 
-# Order axes so the main diagonal (correct matches) runs top-left to
-# bottom-right: Predicted increases left -> right (Car -> Walking), and
-# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
-# factor level at the bottom of the y-axis, so we reverse Actual's levels to
-# place "Car" at the top.
+# Order axes so the main diagonal (correct matches) runs top-left to bottom-right
 cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
 cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
 
@@ -2233,7 +2097,6 @@ fig
 #| message: false
 #| warning: false
 
-# Fit the model on the training set
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
 
 y_pred <- predict(multinom_fit, newdata = test_set)
@@ -2244,11 +2107,6 @@ conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
 cm_df <- as.data.frame(as.table(conf_matrix$table))
 colnames(cm_df) <- c("Predicted", "Actual", "Freq")
 
-# Order axes so the main diagonal (correct matches) runs top-left to
-# bottom-right: Predicted increases left -> right (Car -> Walking), and
-# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
-# factor level at the bottom of the y-axis, so we reverse Actual's levels to
-# place "Car" at the top.
 cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
 cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
 
@@ -2391,15 +2249,15 @@ print(f"Macro F1-score: {f1:.3f}")
 
 On the test set, the model achieves an overall accuracy of **73.0\%**, a macro recall of **36.9\%**, and a macro F1 of **72.4\%**. 
 
-The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $64.7\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. All $7$ `Bicycle` observations in the test set are misclassified as `Car` or `Public Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the equation
+The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $64.7\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. All $7$ `Bicycle` observations in the test set are misclassified as `Car` or `Public Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation
 
 $$
 \sum_{i=1}^n \hat{p}_{i,j} = \sum_{i=1}^n y_{i,j} = n_j,
 $$
 
-where $n_j$ is the number of training observations in category $j$. Consequently, the fitted probabilities of each category average exactly its sample proportion in the training set, which is $14\%$ for `Bicycle` and $2\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, and therefore these minority classes are not predicted at all in the test set.
+where $n_j$ is the number of observations in category $j$ in the train set. Consequently, the fitted probabilities of each category average exactly its sample proportion in the train set, which is roughly $2.4\%$ for `Bicycle` and less than $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, due to which these minority classes are not predicted at all in the test set.
 
-Now let's use the upsampled model (`multinom_fit_balanced`) from the Estimation section to predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+Now let's use the upsampled model (`multinom_fit_balanced`) from @sec-estimation to predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
 ::: {.panel-tabset}
 
@@ -2580,7 +2438,7 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the test set, the `multinom_fit_balanced` model achieves an overall accuracy of **38.3\%**, a macro recall of **27.5\%**, and a macro F1 of **32.5\%**. 
+On the test set, the `multinom_fit_balanced` model achieves an overall accuracy of **45.5\%**, a macro recall of **52.2\%**, and a macro F1 of **33.4\%**. Overall this upsampled model has a lower accuracy on the test set than the original `multinom_fit` model; however, it correctly classifies some of the `Bicycle` and `Walking` observations in the test set with recalls of roughly $66.7\%$ and $50\%$ respectively.
 
 ## Storytelling
 
