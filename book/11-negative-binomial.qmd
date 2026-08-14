@@ -185,7 +185,8 @@ print_as_dt_all <- function(x){
 import numpy as np
 from plotnine import *
 import statsmodels.api as sm
-from statsmodels.formula.api import glm, ols
+import statsmodels.formula.api as smf
+# from statsmodels.formula.api import glm, ols
 from statsmodels.genmod.families import Poisson
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -2424,7 +2425,7 @@ Overall, the EDA gives us a coherent modelling story. The response is a non-nega
 
 Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001
 
--   We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`).
+-   We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`). Note that `statsmodels` does not ship an equivalent function, so the `Python` code defines the same regression-based test as a small helper of the same name.
 -   Let $Y_i$ be the $i$th Poisson response in the count regression model.
 
 . . .
@@ -2463,18 +2464,58 @@ dispersiontest(extended_poisson_model)
 ## **`Python` Code**
 
 ``` {.python}
-#import statsmodels.api as sm
-#from statsmodels.stats.diagnostic import het_overdispersion
+import numpy as np
+import scipy.stats as stats
+
+
+def dispersiontest(results, alternative="greater"):
+    """Cameron and Trivedi (1990) regression-based dispersion test.
+
+    This is the `Python` counterpart of `AER::dispersiontest()` with
+    `trafo = NULL`, i.e., the alternative is Var(Y_i) = (1 + gamma) * lambda_i.
+    """
+    y = np.asarray(results.model.endog, dtype=float)
+    y_hat = np.asarray(results.fittedvalues, dtype=float)
+
+    # Auxiliary quantity behind the test
+    aux = ((y - y_hat) ** 2 - y) / y_hat
+
+    test_statistic = np.sqrt(aux.size) * aux.mean() / aux.std(ddof=1)
+    dispersion = aux.mean() + 1
+
+    if alternative == "greater":
+        p_value = stats.norm.sf(test_statistic)
+    elif alternative == "less":
+        p_value = stats.norm.cdf(test_statistic)
+    elif alternative == "two-sided":
+        p_value = 2 * stats.norm.sf(abs(test_statistic))
+    else:
+        raise ValueError(
+            "alternative must be 'greater', 'less', or 'two-sided'."
+        )
+
+    return test_statistic, p_value, dispersion
+
 
 # Fit Poisson model
-#model = sm.GLM(y, X, family=sm.families.Poisson())
-#results = model.fit()
+extended_poisson_model = smf.glm(
+    formula=(
+        "satellites ~ width_cm + weight_kg "
+        "+ C(color, Treatment(reference='Light')) "
+        "+ C(spine, Treatment(reference='Both good'))"
+    ),
+    data=training_data,
+    family=sm.families.Poisson()
+).fit()
 
-# Overdispersion test
-#stat, pvalue = het_overdispersion(results)
+# Dispersion test
+test_statistic, p_value, dispersion = dispersiontest(
+    extended_poisson_model
+)
 
-#print(f"Test statistic: {stat}")
-#print(f"P-value: {pvalue}")
+print(f"Test statistic (z): {test_statistic:.4f}")
+print(f"P-value: {p_value:.4g}")
+print(f"Sample estimate (dispersion): {dispersion:.4f}")
 ```
 
 :::
@@ -2502,18 +2543,58 @@ dispersiontest(extended_poisson_model)
 #| echo: false
 #| message: false
 #| warning: false
-#import statsmodels.api as sm
-#from statsmodels.stats.diagnostic import het_overdispersion
+import numpy as np
+import scipy.stats as stats
+
+
+def dispersiontest(results, alternative="greater"):
+    """Cameron and Trivedi (1990) regression-based dispersion test.
+
+    This is the `Python` counterpart of `AER::dispersiontest()` with
+    `trafo = NULL`, i.e., the alternative is Var(Y_i) = (1 + gamma) * lambda_i.
+    """
+    y = np.asarray(results.model.endog, dtype=float)
+    y_hat = np.asarray(results.fittedvalues, dtype=float)
+
+    # Auxiliary quantity behind the test
+    aux = ((y - y_hat) ** 2 - y) / y_hat
+
+    test_statistic = np.sqrt(aux.size) * aux.mean() / aux.std(ddof=1)
+    dispersion = aux.mean() + 1
+
+    if alternative == "greater":
+        p_value = stats.norm.sf(test_statistic)
+    elif alternative == "less":
+        p_value = stats.norm.cdf(test_statistic)
+    elif alternative == "two-sided":
+        p_value = 2 * stats.norm.sf(abs(test_statistic))
+    else:
+        raise ValueError(
+            "alternative must be 'greater', 'less', or 'two-sided'."
+        )
+
+    return test_statistic, p_value, dispersion
+
 
 # Fit Poisson model
-#model = sm.GLM(y, X, family=sm.families.Poisson())
-#results = model.fit()
+extended_poisson_model = smf.glm(
+    formula=(
+        "satellites ~ width_cm + weight_kg "
+        "+ C(color, Treatment(reference='Light')) "
+        "+ C(spine, Treatment(reference='Both good'))"
+    ),
+    data=training_data,
+    family=sm.families.Poisson()
+).fit()
 
-# Overdispersion test
-#stat, pvalue = het_overdispersion(results)
+# Dispersion test
+test_statistic, p_value, dispersion = dispersiontest(
+    extended_poisson_model
+)
 
-#print(f"Test statistic: {stat}")
-#print(f"P-value: {pvalue}")
+print(f"Test statistic (z): {test_statistic:.4f}")
+print(f"P-value: {p_value:.4g}")
+print(f"Sample estimate (dispersion): {dispersion:.4f}")
 ```
 :::
 
@@ -2526,16 +2607,56 @@ With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, 
 ## **`R` Code**
 
 ```{.r}
-negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+negative_binomial_model <- glm.nb(satellites ~ width_cm,
   data = training_data
 )
 summary(negative_binomial_model)
+
+extended_negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+  data = training_data
+)
+summary(extended_negative_binomial_model)
 ```
 
 ## **`Python` Code**
 
 ``` {.python}
+negative_binomial_training_data = training_data.copy()
 
+negative_binomial_model = smf.negativebinomial(
+    formula="satellites ~ width_cm",
+    data=negative_binomial_training_data
+).fit()
+
+negative_binomial_summary = pd.DataFrame(
+    {
+        "Term": negative_binomial_model.params.index,
+        "Estimate": negative_binomial_model.params.values,
+        "Standard error": negative_binomial_model.bse.values,
+        "Exponentiated estimate": np.exp(
+            negative_binomial_model.params.values
+        ),
+    }
+)
+
+extended_negative_binomial_model = smf.negativebinomial(
+    formula="satellites ~ width_cm + weight_kg + color + spine",
+    data=negative_binomial_training_data
+).fit()
+
+negative_binomial_summary = pd.DataFrame(
+    {
+        "Term": negative_binomial_model.params.index,
+        "Estimate": negative_binomial_model.params.values,
+        "Standard error": negative_binomial_model.bse.values,
+        "Exponentiated estimate": np.exp(
+            negative_binomial_model.params.values
+        ),
+    }
+)
+
+negative_binomial_summary
+extended_negative_binomial_model
 ```
 
 :::
@@ -2548,10 +2669,15 @@ summary(negative_binomial_model)
 #| echo: false
 #| message: false
 #| warning: false
-negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+negative_binomial_model <- glm.nb(satellites ~ width_cm,
   data = training_data
 )
 summary(negative_binomial_model)
+
+extended_negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+  data = training_data
+)
+summary(extended_negative_binomial_model)
 ```
 
 ## **`Python` Output**
@@ -2560,7 +2686,42 @@ summary(negative_binomial_model)
 #| echo: false
 #| message: false
 #| warning: false
+negative_binomial_training_data = training_data.copy()
 
+negative_binomial_model = smf.negativebinomial(
+    formula="satellites ~ width_cm",
+    data=negative_binomial_training_data
+).fit()
+
+negative_binomial_summary = pd.DataFrame(
+    {
+        "Term": negative_binomial_model.params.index,
+        "Estimate": negative_binomial_model.params.values,
+        "Standard error": negative_binomial_model.bse.values,
+        "Exponentiated estimate": np.exp(
+            negative_binomial_model.params.values
+        ),
+    }
+)
+
+extended_negative_binomial_model = smf.negativebinomial(
+    formula="satellites ~ width_cm + weight_kg + color + spine",
+    data=negative_binomial_training_data
+).fit()
+
+negative_binomial_summary = pd.DataFrame(
+    {
+        "Term": negative_binomial_model.params.index,
+        "Estimate": negative_binomial_model.params.values,
+        "Standard error": negative_binomial_model.bse.values,
+        "Exponentiated estimate": np.exp(
+            negative_binomial_model.params.values
+        ),
+    }
+)
+
+negative_binomial_summary
+extended_negative_binomial_model
 ```
 
 :::
