@@ -117,6 +117,8 @@ library(gridExtra) # combine ggplot2 figures
 library(ggExtra) # draw marginal histograms
 library(broom)
 library(knitr)
+library(AER) # dispersiontest
+library(MASS)
 
 library(reticulate)
 py_config()
@@ -209,7 +211,7 @@ Note that this case study works well for our cookbook because it is small enough
 - On the **inferential side**, the model can help us describe how the expected number of satellites is associated with female crab characteristics. 
 - On the **predictive side**, the same regressors can be used to predict the expected number of satellites for a female crab and then evaluate how accurate those predictions are. W
 
-We will formalize the two inquiries above in @sec-classical-poisson-study-design.
+We will formalize the two inquiries above in @sec-negative-binomial-study-design.
 
 ::: {.Tip}
 :::: {.Tip-header}
@@ -228,7 +230,71 @@ For our purposes, the key statistical lesson is that the response is a count. Th
 ::::
 :::
 
-## Study Design: Framing the Inferential and Predictive Inquiries
+## Study Design: Framing the Inferential and Predictive Inquiries {#sec-negative-binomial-study-design}
+
+Before fitting a Negative Binomial regression model, we need to clarify what the model is supposed to help us learn. This is the **study design** (as shown in @fig-ds-workflow-study-design) step of the data science workflow introduced in @sec-ds-workflow-study-design. At this stage, we are not yet choosing software functions or interpreting coefficients. Instead, we are defining the modelling purpose, the observational unit, the response variable, and the role of the regressors. 
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
+
+Hence, for the horseshoe crab case study, the study-design elements are summarized in @tbl-classical-poisson-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Poisson regression model will be used. Note that @tbl-classical-poisson-study-design-variables is intentionally simple. At this point in the workflow, we are not yet fitting a model or interpreting coefficients. We are just making sure that the observational unit, response variable, and regressors are clear.
+
+| **Role in the study design** | **Variable(s)** | **Description** |
+|:---:|:---:|:---:|
+| **Observational unit** | Female horseshoe crab | Each row corresponds to one female crab observed in the study. |
+| **Response variable** | Number of satellite males | The count outcome: how many satellite males were observed near the female crab. |
+| **Main regressors** | Body width, weight, colour category, spine condition | Observable characteristics of the female crab that may be associated with the expected number of satellite males. |
+
+: Key elements of the horseshoe crab study design for the Poisson regression chapter. {#tbl-classical-poisson-study-design-variables .striped .hover}
+
+Note that a single dataset can support different kinds of modelling inquiries. Therefore, we will use the same count response to illustrate two related but distinct modelling purposes: an **inferential inquiry** and a **predictive inquiry** as shown in @tbl-classical-poisson-study-design-inquiries. This distinction is critical since the modelling workflow is not judged in exactly the same way for both purposes.
+
+| **Inquiry type** | **Main question** | **Main modelling emphasis** | **What we will look for later in the chapter** |
+|:---:|:---:|:---:|:---:|
+| **Inferential inquiry** | How is the expected number of satellite males associated with female crab characteristics? | Coefficients, uncertainty, hypothesis tests, confidence intervals, and interpretation. | Whether the estimated associations are meaningful, how uncertain they are, and whether they can be interpreted responsibly. |
+| **Predictive inquiry** | How well can the available regressors predict the expected number of satellite males for a female crab? | Predicted expected counts, test-set accuracy, and comparison against a simple baseline. | Whether the fitted model improves predictive performance beyond a simple benchmark and whether the prediction errors are practically acceptable. |
+
+: Two modelling inquiries supported by the horseshoe crab satellites case study. {#tbl-classical-poisson-study-design-inquiries .striped .hover}
+
+The above inferential and predictive inquiries are connected but not interchangeable. A model can have interpretable coefficients but only modest predictive performance. Conversely, a model can give useful predictions without answering every scientific question about the mechanisms behind satellite male behaviour. Keeping the two inquiries separate helps us decide which results belong in the inferential interpretation and which results belong in the prediction-accuracy discussion.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on inference versus prediction!
+::::
+:::: {.Heads-up-container}
+For the inferential inquiry, the main object of interest is the relationship between the expected count and the regressors. We will pay attention to coefficient estimates, standard errors, confidence intervals, hypothesis tests, and the assumptions needed for the interpretation to be reasonable.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
+
+On the other hand, for the predictive inquiry, the main object of interest is how well the model predicts expected counts for observations not used to fit the model. We will therefore use a training/testing split, compute predicted expected counts on the test set, compare prediction errors against a baseline model, and summarize prediction accuracy with metrics such as **mean absolute error (MAE)** and **root mean squared error (RMSE)**.
+
+Both inquiries require model checking. If the Poisson model fits the data poorly, then both the inferential interpretation and the predictive results may become less useful.
+::::
+:::
+
+### Inferential Inquiry {#sec-classical-poisson-inferential-inquiry}
+
+Specifically, the inferential inquiry asks:
+
+> **How is the expected number of satellite males associated with female crab characteristics, holding other regressors fixed?**
+
+This question is about **association and interpretation**. It does not ask whether a female crab characteristic causes satellite males to appear. The data are **observational**, and the case study does not establish a causal design. Instead, the inferential goal is to describe how the expected count of satellite males changes across observed female crab characteristics within a Poisson regression framework.
+
+For example, one inferential question is whether wider female crabs tend to have a larger expected number of satellite males. Later, when we introduce the simple Poisson regression model in @sec-classical-poisson-simple-model, body width will be used as the first regressor because it gives a clear one-regressor entry point into the model. In the extended model in @sec-classical-poisson-additional-regressors, we will add more female crab characteristics so that we can interpret associations while holding other regressors fixed.
+
+For this inquiry, the **results stage** will focus on coefficient estimates, uncertainty, and statistical interpretation. We will ask whether the estimated associations are consistent with the scientific question, whether the confidence intervals are informative, and whether hypothesis tests provide evidence for associations between the regressors and the expected count.
+
+### Predictive Inquiry {#sec-classical-poisson-predictive-inquiry}
+
+Now, the predictive inquiry asks:
+
+> **How well can the available regressors be used to predict the expected number of satellite males for a female crab?**
+
+This question is about **prediction accuracy**. The target of prediction in Poisson regression is the expected count, **not necessarily the exact observed count**. For a given female crab, the observed number of satellite males may differ from the model-predicted expected count because count outcomes are variable even when the model is well specified.
+
+For this inquiry, the **results stage** will focus on out-of-sample prediction. We will fit the model using a training set and evaluate prediction accuracy on a testing set. The testing-set predictions will be compared against a simple baseline that predicts the training-set mean count for every test observation. This comparison is necessary because an accuracy metric is easier to interpret when we can ask whether the regression model does better than a simple benchmark.
+
+The predictive inquiry will use metrics such as MAE and RMSE. MAE summarizes the typical absolute distance between the observed count and the predicted expected count, while RMSE penalizes larger prediction errors more strongly. These metrics will help us judge whether the Poisson regression model is useful for prediction, not only whether its coefficients are interpretable.
 
 ## Data Collection and Wrangling
 
@@ -471,8 +537,7 @@ crabs = (
 #| echo: false
 
 # Showing the full dataset
-tmp <- py$crabs$to_dict(orient = "list")
-crabs_py <- as.data.frame(reticulate::py_to_r(tmp), check.names = FALSE)
+crabs_py <- py$crabs
 print_as_dt(crabs_py)
 ```
 
@@ -782,9 +847,9 @@ cat(
 
 :::
 
-The table above gives a quick numerical profile of the training data before we fit any model. The training set contains `r nrow(training_data)` female crabs. The average number of satellite males is `r round(mean(training_data$satellites), 2)`, but the sample variance is `r round(var(training_data$satellites), 2)`, which is noticeably larger than the mean. This is only an exploratory comparison, but it is already relevant because the Classical Poisson regression model assumes a tight connection between the conditional mean and conditional variance. We will return to this issue more formally in @sec-classical-poisson-equidispersion.
+The table above gives a quick numerical profile of the training data before we fit any model. The training set contains `r nrow(training_data)` female crabs. The average number of satellite males is `r round(mean(training_data$satellites), 2)`, but the sample variance is `r round(var(training_data$satellites), 2)`, which is noticeably larger than the mean. We will return to this issue more formally in @sec-negative-binomial-overdispersion.
 
-The proportion of crabs with zero satellite males is also important. In the training data, approximately `r round(mean(training_data$satellites == 0), 2)` of female crabs have no satellite males. This does not automatically mean that a Poisson regression model is inappropriate, but it gives us a first reason to pay attention to the number of zeros when checking model adequacy later in the chapter.
+The proportion of crabs with zero satellite males is also important. In the training data, approximately `r round(mean(training_data$satellites == 0), 2)` of female crabs have no satellite males. This does not automatically mean that a Negative Binomial regression model is inappropriate, but it gives us a first reason to pay attention to the number of zeros when checking model adequacy later in the chapter.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-lecture-lecture-hall-3976296/).](img/sample.png){width="500"}
 
@@ -948,7 +1013,7 @@ cat(
 
 :::
 
-The above categorical summaries show that the training data **are not evenly distributed** across the female crab colour and spine categories. For colour, most crabs are in the `Medium light` category, followed by `Medium dark`, while the `Light` and `Dark` categories are less common. For spine condition, most crabs are in the `Both worn or broken` category, with fewer observations in the `Both good` and `One worn or broken` categories. This imbalance is not unusual in observational data, but it is worth noting before fitting the extended Poisson regression model in @sec-classical-poisson-additional-regressors. Sparse categories can make coefficient estimates less stable and can make category-level comparisons harder to interpret. For now, we treat these summaries as exploratory checks; later, the model will help us assess whether colour and spine condition appear associated with the expected number of satellite males after accounting for the other regressors.
+The above categorical summaries show that the training data **are not evenly distributed** across the female crab colour and spine categories. For colour, most crabs are in the `Medium light` category, followed by `Medium dark`, while the `Light` and `Dark` categories are less common. For spine condition, most crabs are in the `Both worn or broken` category, with fewer observations in the `Both good` and `One worn or broken` categories. Sparse categories can make coefficient estimates less stable and can make category-level comparisons harder to interpret. For now, we treat these summaries as exploratory checks; later, the model will help us assess whether colour and spine condition appear associated with the expected number of satellite males after accounting for the other regressors.
 
 ### Distribution of the Count Response {#sec-classical-poisson-eda-response}
 
@@ -2352,6 +2417,9 @@ Overall, the EDA gives us a coherent modelling story. The response is a non-nega
 
 ## Data Modelling
 
+
+## Estimation
+
 ### Overdispersion
 
 Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001
@@ -2366,8 +2434,6 @@ Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-po
     \text{Var}(Y_i) = \lambda_i.
     \end{gather*}
 
-#### Test Specifics
-
 -   The test uses the following mathematical expression: $$
     \text{Var}(Y_i) = \overbrace{(1 + \gamma)}^\text{Dispersion Factor} \lambda_i,
     $$
@@ -2380,16 +2446,124 @@ Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-po
     \end{gather*}
 -   When there is evidence of overdispersion in our data, [we will reject $H_0$]{style="color: purple;"} under a pre-specified significance level $\alpha$.
 
-#### Running the test on `poisson_model_2`
+::: {.panel-tabset}
 
-```{python}
-dispersiontest(poisson_model_2)
+## **`R` Code**
+
+```{.r}
+extended_poisson_model <- glm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = poisson(link = "log"),
+  data = training_data
+)
+
+dispersiontest(extended_poisson_model)
 ```
 
-With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, the `poisson_model_2` has overdispersion.
+## **`Python` Code**
 
+``` {.python}
+#import statsmodels.api as sm
+#from statsmodels.stats.diagnostic import het_overdispersion
 
-## Estimation
+# Fit Poisson model
+#model = sm.GLM(y, X, family=sm.families.Poisson())
+#results = model.fit()
+
+# Overdispersion test
+#stat, pvalue = het_overdispersion(results)
+
+#print(f"Test statistic: {stat}")
+#print(f"P-value: {pvalue}")
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+extended_poisson_model <- glm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = poisson(link = "log"),
+  data = training_data
+)
+
+dispersiontest(extended_poisson_model)
+```
+
+## **`Python` Output**
+
+``` {python}
+#| echo: false
+#| message: false
+#| warning: false
+#import statsmodels.api as sm
+#from statsmodels.stats.diagnostic import het_overdispersion
+
+# Fit Poisson model
+#model = sm.GLM(y, X, family=sm.families.Poisson())
+#results = model.fit()
+
+# Overdispersion test
+#stat, pvalue = het_overdispersion(results)
+
+#print(f"Test statistic: {stat}")
+#print(f"P-value: {pvalue}")
+```
+:::
+
+With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, the `extended_poisson_model` has overdispersion.
+
+### Fitting the Model
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{.r}
+negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+  data = training_data
+)
+summary(negative_binomial_model)
+```
+
+## **`Python` Code**
+
+``` {.python}
+
+```
+
+:::
+
+::: {.panel-tabset}
+
+## **`R` Output*
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine,
+  data = training_data
+)
+summary(negative_binomial_model)
+```
+
+## **`Python` Output**
+
+``` {python}
+#| echo: false
+#| message: false
+#| warning: false
+
+```
+
+:::
 
 
 ## Goodness of Fit
@@ -2399,5 +2573,6 @@ With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, 
 
 
 ## Storytelling
+
 
 ## Practice Problems
