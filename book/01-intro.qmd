@@ -744,9 +744,7 @@ library(rsample)
 set.seed(123)
 
 # Randomly splitting into training and testing sets
-housing_data_splitting <- initial_split(housing_data,
-  prop = 0.8
-)
+housing_data_splitting <- initial_split(housing_data, prop = 0.8)
 
 # Assigning data points to training and testing sets
 training_data <- training(housing_data_splitting)
@@ -758,11 +756,8 @@ n_train <- nrow(training_data)
 n_test <- nrow(testing_data)
 cat(sprintf(
   "Training shape: %d %d\nTesting shape:  %d %d\n\nTraining proportion: %.3f\nTesting proportion:  %.3f\n",
-  nrow(training_data), ncol(training_data),
-  nrow(testing_data),  ncol(testing_data),
-  n_train / n_total,
-  n_test / n_total
-))
+  nrow(training_data), ncol(training_data), nrow(testing_data),  ncol(testing_data),
+  n_train / n_total, n_test / n_total))
 ```
 
 ## **`Python`**
@@ -781,23 +776,17 @@ import numpy as np
 random_state = 123
 
 # Randomly splitting into training and testing sets
-training_data, testing_data = train_test_split(
-    housing_data,
-    test_size=0.2,
-    random_state=random_state
-)
+training_data, testing_data = train_test_split(housing_data, test_size=0.2,
+    random_state=random_state)
 
 # Sanity checks
 n_total = len(housing_data)
 n_train = len(training_data)
 n_test  = len(testing_data)
 
-print(
-    f"Training shape: {training_data.shape}\n"
-    f"Testing shape:  {testing_data.shape}\n\n"
+print(f"Training shape: {training_data.shape}\n" f"Testing shape:  {testing_data.shape}\n\n"
     f"Training proportion: {n_train/n_total:.3f}\n"
-    f"Testing proportion:  {n_test/n_total:.3f}"
-)
+    f"Testing proportion:  {n_test/n_total:.3f}")
 ```
 
 :::
@@ -1336,11 +1325,8 @@ Having set up the coding starting point for this estimation, we need to use the 
 library(reticulate)
 
 # Fitting the OLS model
-training_OLS_model <- lm(
-  formula = sale_price ~ bedrooms + sqft +
-    school_distance + neighbourhood,
-  data = training_data
-)
+training_OLS_model <- lm(formula = sale_price ~ bedrooms + sqft +
+    school_distance + neighbourhood, data = training_data)
 training_OLS_model
 ```
 
@@ -1360,8 +1346,7 @@ training_data = r.training_data
 # Fitting the OLS model
 training_OLS_model = smf.ols(
     formula="sale_price ~ bedrooms + sqft + school_distance + neighbourhood",
-    data=training_data
-).fit()
+    data=training_data).fit()
 training_OLS_model.params
 ```
 
@@ -1735,40 +1720,19 @@ library(broom)
 library(dplyr)
 
 # Extracting residuals from training model
-training_residuals <- residuals(
-  training_OLS_model
-)
+training_residuals <- residuals(training_OLS_model)
 
 # Running Shapiro–Wilk test
-training_OLS_model_shapiro <- shapiro.test(
-  training_residuals
-)
+training_OLS_model_shapiro <- shapiro.test(training_residuals)
 
 # Preparing a reader-facing diagnostic table
-training_OLS_model_shapiro_display <- tidy(
-  training_OLS_model_shapiro
-) |>
-  transmute(
-    `W statistic` = formatC(
-      statistic,
-      format = "f",
-      digits = 4
-    ),
-    `p-value` = case_when(
-      p.value < 0.0001 ~ "< 0.0001",
-      TRUE ~ formatC(
-        p.value,
-        format = "f",
-        digits = 4
-      )
-    )
-  )
+training_OLS_model_shapiro_display <- tidy(training_OLS_model_shapiro) |>
+  transmute(`W statistic` = formatC(statistic, format = "f", digits = 4),
+    `p-value` = case_when(p.value < 0.0001 ~ "< 0.0001",
+      TRUE ~ formatC(p.value, format = "f", digits = 4)))
 
 training_OLS_model_shapiro_display |>
-  knitr::kable(
-    align = c("c", "c"),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("c", "c"), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -1786,33 +1750,17 @@ from scipy.stats import shapiro
 training_residuals = training_OLS_model.resid
 
 # Running Shapiro–Wilk test
-training_OLS_model_shapiro_result = shapiro(
-    training_residuals
-)
+training_OLS_model_shapiro_result = shapiro(training_residuals)
 
 # Preparing a reader-facing diagnostic table
 training_OLS_model_shapiro_display = pd.DataFrame(
-    {
-        "W statistic": [
-            f"{training_OLS_model_shapiro_result.statistic:.4f}"
-        ],
-        "p-value": [
-            (
-                "< 0.0001"
-                if training_OLS_model_shapiro_result.pvalue < 0.0001
-                else (
-                    f"{training_OLS_model_shapiro_result.pvalue:.4f}"
-                )
-            )
-        ],
-    }
-)
+    {"W statistic": [f"{training_OLS_model_shapiro_result.statistic:.4f}"],
+        "p-value": [("< 0.0001" if training_OLS_model_shapiro_result.pvalue < 0.0001
+                else (f"{training_OLS_model_shapiro_result.pvalue:.4f}"))],
+    })
 
 training_OLS_model_shapiro_py_html = (
-    scrollable_table_html(
-        training_OLS_model_shapiro_display
-    )
-)
+    scrollable_table_html(training_OLS_model_shapiro_display))
 ```
 
 ```{r}
@@ -1864,35 +1812,16 @@ In both languages, the core computational idea is the same: use the fitted resid
 library(lmtest)
 
 # Running Breusch–Pagan test
-training_OLS_model_bp <- bptest(
-  training_OLS_model
-)
+training_OLS_model_bp <- bptest(training_OLS_model)
 
 # Preparing a reader-facing diagnostic table
-training_OLS_model_bp_display <- broom::tidy(
-  training_OLS_model_bp
-) |>
-  transmute(
-    `Test statistic` = formatC(
-      statistic,
-      format = "f",
-      digits = 4
-    ),
-    `p-value` = case_when(
-      p.value < 0.0001 ~ "< 0.0001",
-      TRUE ~ formatC(
-        p.value,
-        format = "f",
-        digits = 4
-      )
-    )
-  )
+training_OLS_model_bp_display <- broom::tidy(training_OLS_model_bp) |>
+  transmute(`Test statistic` = formatC(statistic, format = "f", digits = 4),
+    `p-value` = case_when(p.value < 0.0001 ~ "< 0.0001",
+      TRUE ~ formatC(p.value, format = "f", digits = 4)))
 
 training_OLS_model_bp_display |>
-  knitr::kable(
-    align = c("c", "c"),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("c", "c"), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -1911,35 +1840,18 @@ residuals = training_OLS_model.resid
 exog = training_OLS_model.model.exog
 
 # Running Breusch–Pagan test
-bp_test = het_breuschpagan(
-    residuals,
-    exog,
+bp_test = het_breuschpagan(residuals, exog,
 )
 
 # Unpacking the studentized test results
 bp_statistic, bp_pvalue, _, _ = bp_test
 
 # Preparing a reader-facing diagnostic table
-training_OLS_model_bp_display = pd.DataFrame(
-    {
-        "Test statistic": [
-            f"{bp_statistic:.4f}"
-        ],
-        "p-value": [
-            (
-                "< 0.0001"
-                if bp_pvalue < 0.0001
-                else f"{bp_pvalue:.4f}"
-            )
-        ],
-    }
-)
+training_OLS_model_bp_display = pd.DataFrame({"Test statistic": [f"{bp_statistic:.4f}"],
+        "p-value": [("< 0.0001" if bp_pvalue < 0.0001 else f"{bp_pvalue:.4f}")],
+    })
 
-training_OLS_model_bp_py_html = (
-    scrollable_table_html(
-        training_OLS_model_bp_display
-    )
-)
+training_OLS_model_bp_py_html = (scrollable_table_html(training_OLS_model_bp_display))
 ```
 
 ```{r}
@@ -1996,35 +1908,16 @@ A small practical difference is that the `R` implementation reports both a **tes
 #| warning: false
 
 # Running the Durbin–Watson test
-training_OLS_model_dw <- dwtest(
-  training_OLS_model
-)
+training_OLS_model_dw <- dwtest(training_OLS_model)
 
 # Preparing a reader-facing diagnostic table
-training_OLS_model_dw_display <- broom::tidy(
-  training_OLS_model_dw
-) |>
-  transmute(
-    `Durbin–Watson statistic` = formatC(
-      statistic,
-      format = "f",
-      digits = 4
-    ),
-    `p-value` = case_when(
-      p.value < 0.0001 ~ "< 0.0001",
-      TRUE ~ formatC(
-        p.value,
-        format = "f",
-        digits = 4
-      )
-    )
-  )
+training_OLS_model_dw_display <- broom::tidy(training_OLS_model_dw) |>
+  transmute(`Durbin–Watson statistic` = formatC(statistic, format = "f", digits = 4),
+    `p-value` = case_when(p.value < 0.0001 ~ "< 0.0001",
+      TRUE ~ formatC(p.value, format = "f", digits = 4)))
 
 training_OLS_model_dw_display |>
-  knitr::kable(
-    align = c("c", "c"),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("c", "c"), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -2039,24 +1932,14 @@ training_OLS_model_dw_display |>
 from statsmodels.stats.stattools import durbin_watson
 
 # Computing the Durbin–Watson statistic
-dw_statistic = durbin_watson(
-    training_OLS_model.resid
-)
+dw_statistic = durbin_watson(training_OLS_model.resid)
 
 # Preparing a reader-facing diagnostic table
 training_OLS_model_dw_display = pd.DataFrame(
-    {
-        "Durbin–Watson statistic": [
-            f"{dw_statistic:.4f}"
-        ],
-    }
-)
+    {"Durbin–Watson statistic": [f"{dw_statistic:.4f}"],
+    })
 
-training_OLS_model_dw_py_html = (
-    scrollable_table_html(
-        training_OLS_model_dw_display
-    )
-)
+training_OLS_model_dw_py_html = (scrollable_table_html(training_OLS_model_dw_display))
 ```
 
 ```{r}
@@ -2202,40 +2085,21 @@ def car_like_gvif(result):
 library(car)
 
 # Obtaining generalized VIFs per model term
-training_OLS_model_vif <- vif(
-  training_OLS_model
-)
+training_OLS_model_vif <- vif(training_OLS_model)
 
 # Preparing a reader-facing diagnostic table
 training_OLS_model_vif_display <-
   as.data.frame(training_OLS_model_vif) |>
   tibble::rownames_to_column("term") |>
   transmute(
-    Term = case_when(
-      term == "bedrooms" ~ "Bedrooms",
-      term == "sqft" ~ "Square footage",
+    Term = case_when(term == "bedrooms" ~ "Bedrooms", term == "sqft" ~ "Square footage",
       term == "school_distance" ~ "School distance",
-      term == "neighbourhood" ~ "Neighbourhood",
-      TRUE ~ term
-    ),
-    GVIF = formatC(
-      GVIF,
-      format = "f",
-      digits = 4
-    ),
-    `Degrees of freedom` = as.integer(Df),
-    `Adjusted GVIF` = formatC(
-      `GVIF^(1/(2*Df))`,
-      format = "f",
-      digits = 4
-    )
-  )
+      term == "neighbourhood" ~ "Neighbourhood", TRUE ~ term),
+    GVIF = formatC(GVIF, format = "f", digits = 4), `Degrees of freedom` = as.integer(Df),
+    `Adjusted GVIF` = formatC(`GVIF^(1/(2*Df))`, format = "f", digits = 4))
 
 training_OLS_model_vif_display |>
-  knitr::kable(
-    align = c("l", "c", "c", "c"),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("l", "c", "c", "c"), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -2247,57 +2111,28 @@ training_OLS_model_vif_display |>
 #| warning: false
 
 # Computing the GVIF summary
-gvif_table = car_like_gvif(
-    training_OLS_model
-)
+gvif_table = car_like_gvif(training_OLS_model)
 
 # Preparing a reader-facing diagnostic table
-gvif_table_display = (
-    gvif_table.reset_index()
-    .rename(
-        columns={
-            "term": "Term",
-            "Df": "Degrees of freedom",
+gvif_table_display = (gvif_table.reset_index()
+    .rename(columns={"term": "Term", "Df": "Degrees of freedom",
             "GVIF^(1/(2*Df))": "Adjusted GVIF",
-        }
-    )
-    .copy()
-)
+        }).copy())
 
 gvif_table_display["Term"] = (
-    gvif_table_display["Term"].replace(
-        {
-            "bedrooms": "Bedrooms",
-            "sqft": "Square footage",
-            "school_distance": "School distance",
-            "neighbourhood": "Neighbourhood",
-        }
-    )
-)
+    gvif_table_display["Term"].replace({"bedrooms": "Bedrooms", "sqft": "Square footage",
+            "school_distance": "School distance", "neighbourhood": "Neighbourhood",
+        }))
 
-gvif_table_display["GVIF"] = (
-    gvif_table_display["GVIF"].map(
-        lambda value: f"{value:.4f}"
-    )
-)
+gvif_table_display["GVIF"] = (gvif_table_display["GVIF"].map(lambda value: f"{value:.4f}"))
 
 gvif_table_display["Degrees of freedom"] = (
-    gvif_table_display["Degrees of freedom"].map(
-        lambda value: f"{value:.0f}"
-    )
-)
+    gvif_table_display["Degrees of freedom"].map(lambda value: f"{value:.0f}"))
 
 gvif_table_display["Adjusted GVIF"] = (
-    gvif_table_display["Adjusted GVIF"].map(
-        lambda value: f"{value:.4f}"
-    )
-)
+    gvif_table_display["Adjusted GVIF"].map(lambda value: f"{value:.4f}"))
 
-gvif_table_py_html = (
-    scrollable_table_html(
-        gvif_table_display
-    )
-)
+gvif_table_py_html = (scrollable_table_html(gvif_table_display))
 ```
 
 ```{r}
@@ -2384,28 +2219,13 @@ A large $R^2$ does **not** guarantee that the model assumptions are appropriate,
 
 # Preparing a reader-facing model-fit table
 training_OLS_r_squared_display <- tibble::tibble(
-  Quantity = c(
-    "R-squared",
-    "Adjusted R-squared"
-  ),
-  Value = c(
-    summary(training_OLS_model)$r.squared,
-    summary(training_OLS_model)$adj.r.squared
-  )
-) |>
-  mutate(
-    Value = formatC(
-      Value,
-      format = "f",
-      digits = 4
-    )
-  )
+  Quantity = c("R-squared", "Adjusted R-squared"),
+  Value = c(summary(training_OLS_model)$r.squared, summary(training_OLS_model)$adj.r.squared
+  )) |>
+  mutate(Value = formatC(Value, format = "f", digits = 4))
 
 training_OLS_r_squared_display |>
-  knitr::kable(
-    align = c("l", "c"),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("l", "c"), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -2418,23 +2238,13 @@ training_OLS_r_squared_display |>
 
 # Preparing a reader-facing model-fit table
 training_OLS_r_squared_display = pd.DataFrame(
-    {
-        "Quantity": [
-            "R-squared",
-            "Adjusted R-squared",
-        ],
-        "Value": [
-            f"{training_OLS_model.rsquared:.4f}",
+    {"Quantity": ["R-squared", "Adjusted R-squared",
+        ], "Value": [f"{training_OLS_model.rsquared:.4f}",
             f"{training_OLS_model.rsquared_adj:.4f}",
         ],
-    }
-)
+    })
 
-training_OLS_r_squared_py_html = (
-    scrollable_table_html(
-        training_OLS_r_squared_display
-    )
-)
+training_OLS_r_squared_py_html = (scrollable_table_html(training_OLS_r_squared_display))
 ```
 
 ```{r}
@@ -2581,80 +2391,29 @@ library(tidyverse)
 library(broom)
 
 # Fitting the OLS model
-testing_OLS_model <- lm(
-  formula = sale_price ~ bedrooms + sqft +
-    school_distance + neighbourhood,
-  data = testing_data
-)
+testing_OLS_model <- lm(formula = sale_price ~ bedrooms + sqft +
+    school_distance + neighbourhood, data = testing_data)
 
 # Creating a numeric inferential summary
-testing_OLS_tidy <- tidy(
-  testing_OLS_model,
-  conf.int = TRUE,
-  conf.level = 0.95
-)
+testing_OLS_tidy <- tidy(testing_OLS_model, conf.int = TRUE, conf.level = 0.95)
 
 # Preparing a reader-facing inferential table
 testing_OLS_tidy_display <- testing_OLS_tidy |>
   transmute(
-    Term = case_when(
-      term == "(Intercept)" ~ "Intercept",
-      term == "bedrooms" ~ "Bedrooms",
-      term == "sqft" ~ "Square footage",
-      term == "school_distance" ~ "School distance",
-      term == "neighbourhoodSuburban" ~
-        "Neighbourhood: Suburban vs Rural",
-      term == "neighbourhoodUrban" ~
-        "Neighbourhood: Urban vs Rural",
-      TRUE ~ term
-    ),
-    Estimate = formatC(
-      estimate,
-      format = "f",
-      digits = 2,
-      big.mark = ","
-    ),
-    `Standard error` = formatC(
-      std.error,
-      format = "f",
-      digits = 2,
-      big.mark = ","
-    ),
-    `t-statistic` = formatC(
-      statistic,
-      format = "f",
-      digits = 2
-    ),
-    `p-value` = case_when(
-      p.value < 0.0001 ~ "< 0.0001",
-      TRUE ~ formatC(
-        p.value,
-        format = "f",
-        digits = 4
-      )
-    ),
-    `95% CI lower` = formatC(
-      conf.low,
-      format = "f",
-      digits = 2,
-      big.mark = ","
-    ),
-    `95% CI upper` = formatC(
-      conf.high,
-      format = "f",
-      digits = 2,
-      big.mark = ","
-    )
-  )
+    Term = case_when(term == "(Intercept)" ~ "Intercept", term == "bedrooms" ~ "Bedrooms",
+      term == "sqft" ~ "Square footage", term == "school_distance" ~ "School distance",
+      term == "neighbourhoodSuburban" ~ "Neighbourhood: Suburban vs Rural",
+      term == "neighbourhoodUrban" ~ "Neighbourhood: Urban vs Rural", TRUE ~ term),
+    Estimate = formatC(estimate, format = "f", digits = 2, big.mark = ","),
+    `Standard error` = formatC(std.error, format = "f", digits = 2, big.mark = ","),
+    `t-statistic` = formatC(statistic, format = "f", digits = 2),
+    `p-value` = case_when(p.value < 0.0001 ~ "< 0.0001",
+      TRUE ~ formatC(p.value, format = "f", digits = 4)),
+    `95% CI lower` = formatC(conf.low, format = "f", digits = 2, big.mark = ","),
+    `95% CI upper` = formatC(conf.high, format = "f", digits = 2, big.mark = ","))
 
 testing_OLS_tidy_display |>
-  knitr::kable(
-    align = c(
-      "l",
-      rep("c", 6)
-    ),
-    row.names = FALSE
-  )
+  knitr::kable(align = c("l", rep("c", 6)), row.names = FALSE)
 ```
 
 ## **`Python`**
@@ -2670,98 +2429,51 @@ testing_data = r.testing_data
 
 # Fitting the OLS model
 testing_OLS_model = smf.ols(
-    formula=(
-        "sale_price ~ bedrooms + sqft + "
-        "school_distance + neighbourhood"
-    ),
+    formula=("sale_price ~ bedrooms + sqft + " "school_distance + neighbourhood"),
     data=testing_data,
 ).fit()
 
 # Obtaining 95% confidence intervals
-testing_OLS_ci = testing_OLS_model.conf_int(
-    alpha=0.05
-)
-testing_OLS_ci.columns = [
-    "conf.low",
-    "conf.high",
+testing_OLS_ci = testing_OLS_model.conf_int(alpha=0.05)
+testing_OLS_ci.columns = ["conf.low", "conf.high",
 ]
 
 # Creating a numeric inferential summary
 testing_OLS_tidy = pd.DataFrame(
-    {
-        "term": testing_OLS_model.params.index,
-        "estimate": testing_OLS_model.params.values,
+    {"term": testing_OLS_model.params.index, "estimate": testing_OLS_model.params.values,
         "std.error": testing_OLS_model.bse.values,
         "statistic": testing_OLS_model.tvalues.values,
         "p.value": testing_OLS_model.pvalues.values,
         "conf.low": testing_OLS_ci["conf.low"].values,
         "conf.high": testing_OLS_ci["conf.high"].values,
-    }
-)
+    })
 
 # Preparing a reader-facing inferential table
-testing_OLS_tidy_display = (
-    testing_OLS_tidy.rename(
-        columns={
-            "term": "Term",
-            "estimate": "Estimate",
-            "std.error": "Standard error",
-            "statistic": "t-statistic",
-            "p.value": "p-value",
-            "conf.low": "95% CI lower",
+testing_OLS_tidy_display = (testing_OLS_tidy.rename(
+        columns={"term": "Term", "estimate": "Estimate", "std.error": "Standard error",
+            "statistic": "t-statistic", "p.value": "p-value", "conf.low": "95% CI lower",
             "conf.high": "95% CI upper",
-        }
-    ).copy()
-)
+        }).copy())
 
-testing_OLS_tidy_display["Term"] = (
-    testing_OLS_tidy_display["Term"].replace(
-        {
-            "Intercept": "Intercept",
-            "bedrooms": "Bedrooms",
-            "sqft": "Square footage",
-            "school_distance": "School distance",
-            "neighbourhood[T.Suburban]":
-                "Neighbourhood: Suburban vs Rural",
-            "neighbourhood[T.Urban]":
+testing_OLS_tidy_display["Term"] = (testing_OLS_tidy_display["Term"].replace(
+        {"Intercept": "Intercept", "bedrooms": "Bedrooms", "sqft": "Square footage",
+            "school_distance": "School distance", "neighbourhood[T.Suburban]":
+                "Neighbourhood: Suburban vs Rural", "neighbourhood[T.Urban]":
                 "Neighbourhood: Urban vs Rural",
-        }
-    )
-)
+        }))
 
-for column in [
-    "Estimate",
-    "Standard error",
-    "95% CI lower",
-    "95% CI upper",
+for column in ["Estimate", "Standard error", "95% CI lower", "95% CI upper",
 ]:
     testing_OLS_tidy_display[column] = (
-        testing_OLS_tidy_display[column].map(
-            lambda value: f"{value:,.2f}"
-        )
-    )
+        testing_OLS_tidy_display[column].map(lambda value: f"{value:,.2f}"))
 
 testing_OLS_tidy_display["t-statistic"] = (
-    testing_OLS_tidy_display["t-statistic"].map(
-        lambda value: f"{value:.2f}"
-    )
-)
+    testing_OLS_tidy_display["t-statistic"].map(lambda value: f"{value:.2f}"))
 
-testing_OLS_tidy_display["p-value"] = (
-    testing_OLS_tidy_display["p-value"].map(
-        lambda value: (
-            "< 0.0001"
-            if value < 0.0001
-            else f"{value:.4f}"
-        )
-    )
-)
+testing_OLS_tidy_display["p-value"] = (testing_OLS_tidy_display["p-value"].map(
+        lambda value: ("< 0.0001" if value < 0.0001 else f"{value:.4f}")))
 
-testing_OLS_tidy_py_html = (
-    scrollable_table_html(
-        testing_OLS_tidy_display
-    )
-)
+testing_OLS_tidy_py_html = (scrollable_table_html(testing_OLS_tidy_display))
 ```
 
 ```{r}
@@ -2910,57 +2622,39 @@ testing_predictions <- testing_data |>
   mutate(predicted_sale_price = predict(training_OLS_model, newdata = testing_data))
 
 # Computing predictive accuracy metrics on the testing set
-housing_predictive_accuracy <- tibble(
-  Metric = c("RMSE", "MAE", "Test R-squared"),
+housing_predictive_accuracy <- tibble(Metric = c("RMSE", "MAE", "Test R-squared"),
   Value = c(
     sqrt(mean((testing_predictions$sale_price - testing_predictions$predicted_sale_price)^2)),
     mean(abs(testing_predictions$sale_price - testing_predictions$predicted_sale_price)),
     1 - sum((testing_predictions$sale_price - testing_predictions$predicted_sale_price)^2) /
-      sum((testing_predictions$sale_price - mean(testing_predictions$sale_price))^2)
-  )
-) |>
+      sum((testing_predictions$sale_price - mean(testing_predictions$sale_price))^2))) |>
   mutate(Value = round(Value, 2))
 
 # Defining a new house profile for prediction
-new_house <- tibble(
-  bedrooms = 3,
-  sqft = 3500,
-  school_distance = 2.5,
-  neighbourhood = factor("Rural", levels = levels(training_data$neighbourhood))
-)
+new_house <- tibble(bedrooms = 3, sqft = 3500, school_distance = 2.5,
+  neighbourhood = factor("Rural", levels = levels(training_data$neighbourhood)))
 
 # Obtaining a point prediction and a 95% confidence interval for the expected mean response
 new_house_confidence <- as_tibble(
   predict(training_OLS_model, newdata = new_house, interval = "confidence", level = 0.95)
 ) |>
-  rename(
-    predicted_sale_price = fit,
-    mean_ci_lower = lwr,
-    mean_ci_upper = upr
-  )
+  rename(predicted_sale_price = fit, mean_ci_lower = lwr, mean_ci_upper = upr)
 
 # Obtaining a 95% prediction interval for a new individual house
 new_house_prediction <- as_tibble(
   predict(training_OLS_model, newdata = new_house, interval = "prediction", level = 0.95)
 ) |>
-  rename(
-    predicted_sale_price = fit,
-    pred_pi_lower = lwr,
-    pred_pi_upper = upr
-  )
+  rename(predicted_sale_price = fit, pred_pi_lower = lwr, pred_pi_upper = upr)
 
 # Combining interval outputs into one summary table
-new_house_predictive_summary <- tibble(
-  bedrooms = new_house$bedrooms,
-  sqft = new_house$sqft,
+new_house_predictive_summary <- tibble(bedrooms = new_house$bedrooms, sqft = new_house$sqft,
   school_distance = new_house$school_distance,
   neighbourhood = as.character(new_house$neighbourhood),
   predicted_sale_price = round(new_house_confidence$predicted_sale_price, 2),
   mean_ci_lower = round(new_house_confidence$mean_ci_lower, 2),
   mean_ci_upper = round(new_house_confidence$mean_ci_upper, 2),
   pred_pi_lower = round(new_house_prediction$pred_pi_lower, 2),
-  pred_pi_upper = round(new_house_prediction$pred_pi_upper, 2)
-)
+  pred_pi_upper = round(new_house_prediction$pred_pi_upper, 2))
 ```
 
 ## **`Python`**
@@ -2978,40 +2672,31 @@ testing_predictions = testing_data.copy()
 testing_predictions["predicted_sale_price"] = training_OLS_model.predict(testing_data)
 
 # Computing predictive accuracy metrics on the testing set
-housing_predictive_accuracy = pd.DataFrame({
-    "Metric": ["RMSE", "MAE", "Test R-squared"],
+housing_predictive_accuracy = pd.DataFrame({"Metric": ["RMSE", "MAE", "Test R-squared"],
     "Value": [
         np.sqrt(np.mean((testing_predictions["sale_price"] - testing_predictions["predicted_sale_price"]) ** 2)),
         np.mean(np.abs(testing_predictions["sale_price"] - testing_predictions["predicted_sale_price"])),
         1 - np.sum((testing_predictions["sale_price"] - testing_predictions["predicted_sale_price"]) ** 2) /
             np.sum((testing_predictions["sale_price"] - np.mean(testing_predictions["sale_price"])) ** 2)
-    ]
-})
+    ]})
 housing_predictive_accuracy["Value"] = np.round(housing_predictive_accuracy["Value"], 2)
 
 # Defining a new house profile for prediction
-new_house = pd.DataFrame({
-    "bedrooms": [3],
-    "sqft": [3500],
-    "school_distance": [2.5],
-    "neighbourhood": ["Rural"]
-})
+new_house = pd.DataFrame({"bedrooms": [3], "sqft": [3500], "school_distance": [2.5],
+    "neighbourhood": ["Rural"]})
 
 # Obtaining mean-response and individual-prediction intervals
 new_house_prediction = training_OLS_model.get_prediction(new_house).summary_frame(alpha=0.05)
 
 # Creating a compact summary table
-new_house_predictive_summary = pd.DataFrame({
-    "bedrooms": new_house["bedrooms"],
-    "sqft": new_house["sqft"],
-    "school_distance": new_house["school_distance"],
+new_house_predictive_summary = pd.DataFrame({"bedrooms": new_house["bedrooms"],
+    "sqft": new_house["sqft"], "school_distance": new_house["school_distance"],
     "neighbourhood": new_house["neighbourhood"],
     "predicted_sale_price": np.round(new_house_prediction["mean"], 2),
     "mean_ci_lower": np.round(new_house_prediction["mean_ci_lower"], 2),
     "mean_ci_upper": np.round(new_house_prediction["mean_ci_upper"], 2),
     "pred_pi_lower": np.round(new_house_prediction["obs_ci_lower"], 2),
-    "pred_pi_upper": np.round(new_house_prediction["obs_ci_upper"], 2)
-})
+    "pred_pi_upper": np.round(new_house_prediction["obs_ci_upper"], 2)})
 ```
 
 :::
