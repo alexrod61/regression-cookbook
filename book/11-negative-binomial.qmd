@@ -33,7 +33,7 @@ Negative Binomial regression is useful when:
 
 - The outcome variable is **discrete** and **count-type**, taking values $0, 1, 2, \dots$.
 - The scientific or data-science inquiry focuses on how the expected count changes with a set of regressors.
-- The outcome is **overdispersed**, meaning that the variance in the outcome variable is higher than what is plausible for a Classical Poisson model.
+- The outcome is **overdispersed**, meaning that the variance in the outcome variable is higher than what is plausible for a Classical Negative Binomial model.
 
 However, a negative binomial regression regression should not be used in the following scenarios:
 
@@ -191,6 +191,18 @@ from statsmodels.genmod.families import Poisson
 from matplotlib import pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 import scipy.stats as stats
+
+def scrollable_table_html(data, **kwargs):
+    kwargs.setdefault("index", False)
+    kwargs.setdefault("border", 0)
+
+    return (
+        '<div class="table-responsive">'
+        + data.to_html(
+            **kwargs
+        )
+        + '</div>'
+    )
 ```
 
 ## Introduction {#sec-negative-binomial-introduction}
@@ -235,7 +247,7 @@ Before fitting a Negative Binomial regression model, we need to clarify what the
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
 
-Hence, for the horseshoe crab case study, the study-design elements are summarized in @tbl-negative-binomial-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Poisson regression model will be used. Note that @tbl-negative-binomial-study-design-variables is intentionally simple. At this point in the workflow, we are not yet fitting a model or interpreting coefficients. We are just making sure that the observational unit, response variable, and regressors are clear.
+Hence, for the horseshoe crab case study, the study-design elements are summarized in @tbl-negative-binomial-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Negative Binomial regression model will be used. Note that @tbl-negative-binomial-study-design-variables is intentionally simple. At this point in the workflow, we are not yet fitting a model or interpreting coefficients. We are just making sure that the observational unit, response variable, and regressors are clear.
 
 | **Role in the study design** | **Variable(s)** | **Description** |
 |:---:|:---:|:---:|
@@ -293,7 +305,7 @@ This question is about **prediction accuracy**. The target of prediction in Pois
 
 For this inquiry, the **results stage** will focus on out-of-sample prediction. We will fit the model using a training set and evaluate prediction accuracy on a testing set. The testing-set predictions will be compared against a simple baseline that predicts the training-set mean count for every test observation. This comparison is necessary because an accuracy metric is easier to interpret when we can ask whether the regression model does better than a simple benchmark.
 
-The predictive inquiry will use metrics such as MAE and RMSE. MAE summarizes the typical absolute distance between the observed count and the predicted expected count, while RMSE penalizes larger prediction errors more strongly. These metrics will help us judge whether the Poisson regression model is useful for prediction, not only whether its coefficients are interpretable.
+The predictive inquiry will use metrics such as MAE and RMSE. MAE summarizes the typical absolute distance between the observed count and the predicted expected count, while RMSE penalizes larger prediction errors more strongly. These metrics will help us judge whether the Negative Binomial regression model is useful for prediction, not only whether its coefficients are interpretable.
 
 ## Data Collection and Wrangling
 
@@ -1016,7 +1028,7 @@ The above categorical summaries show that the training data **are not evenly dis
 
 ### Distribution of the Count Response {#sec-negative-binomial-eda-response}
 
-We now examine the distribution of the response variable `satellites` in the **training data**. This is the first EDA output that directly speaks to the Poisson regression model. Before thinking about regressors, we need to understand the count we are trying to model: 
+We now examine the distribution of the response variable `satellites` in the **training data**. This is the first EDA output that directly speaks to the Negative Binomial regression model. Before thinking about regressors, we need to understand the count we are trying to model: 
 
 - *how often zero counts occur*, 
 - *how concentrated the response is around small values*, 
@@ -1451,7 +1463,7 @@ Heads-up on smoothing and count-response scatterplots!
 :::: {.Heads-up-container}
 In both @fig-negative-binomial-satellites-width-r (or @fig-negative-binomial-satellites-width-py), the orange curve is a **LOWESS/LOESS** smooth. **LOWESS** stands for **locally weighted scatterplot smoothing**, and **LOESS** stands for **locally estimated scatterplot smoothing**. Both refer to closely related smoothing methods that draw a flexible trend line through a scatterplot by fitting many small local regressions, each using observations close to a given value on the horizontal axis.
 
-In this chapter, we use the LOWESS/LOESS curve only as a visual guide. It is not the Poisson regression model, and we will not interpret it as a fitted statistical model. Its purpose is simply to help us see whether satellite counts tend to be higher for wider female crabs.
+In this chapter, we use the LOWESS/LOESS curve only as a visual guide. It is not the Negative Binomial regression model, and we will not interpret it as a fitted statistical model. Its purpose is simply to help us see whether satellite counts tend to be higher for wider female crabs.
 
 Because we show this plot in both `R` and `Python`, we make the smoothing settings explicit. Although `R`'s `geom_smooth(method = "loess")` and Python's `lowess()` from [{statsmodels}](https://www.statsmodels.org/stable/index.html) are based on closely related ideas, their default settings are not identical. To make the two fitted curves visually comparable, we use the same smoothing fraction in both languages and align the local regression structure as closely as possible.
 
@@ -1586,7 +1598,7 @@ plt.show()
 
 :::
 
-The width plot (from @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py) should be read together with the quartile (from @tbl-negative-binomial-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Poisson regression model (see @sec-negative-binomial-simple-model), while leaving formal model specification and interpretation for the next sections.
+The width plot (from @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py) should be read together with the quartile (from @tbl-negative-binomial-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Negative Binomial regression model (see @sec-negative-binomial-simple-model), while leaving formal model specification and interpretation for the next sections.
 
 We now repeat the same EDA logic for female crab weight. Since width and weight both describe body size, we should expect them to tell related but not necessarily identical stories.
 
@@ -2404,7 +2416,7 @@ Before moving to the GLM formulation of Poisson regression, it is useful to summ
 |:---:|:---:|:---:|
 | Response distribution | The response `satellites` is a **non-negative integer count**. The training data contain `r sum(training_data$satellites == 0)` zero counts out of `r nrow(training_data)` observations. The mean number of satellite males is `r round(mean(training_data$satellites), 2)`, while the variance is `r round(var(training_data$satellites), 2)`, giving a variance-to-mean ratio of `r round(var(training_data$satellites) / mean(training_data$satellites), 2)`. | Poisson regression is a **natural starting point** because the response is a count. However, the variance is much larger than the mean, so the Classical Poisson mean-variance structure will need to be checked carefully later. |
 | Count-response plot | The bar plot shows **many zero and small positive counts**, with a **thinner right tail** extending to larger satellite counts. | This reinforces that we are modelling a **discrete, right-skewed count response**. The large counts and the visible number of zeros motivate later observed-versus-fitted checks. |
-| Width and satellite counts | The width-quartile summary shows a **clear positive descriptive pattern**: the mean satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. The width scatterplot shows the same general upward pattern, while preserving the horizontal bands created by the count response. | Width has the clearest descriptive body-size pattern in the EDA, so it is a sensible **first regressor for the simple Poisson regression model**. The vertical spread at similar widths also warns us that width alone will not fully explain the response. |
+| Width and satellite counts | The width-quartile summary shows a **clear positive descriptive pattern**: the mean satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. The width scatterplot shows the same general upward pattern, while preserving the horizontal bands created by the count response. | Width has the clearest descriptive body-size pattern in the EDA, so it is a sensible **first regressor for the simple Negative Binomial regression model**. The vertical spread at similar widths also warns us that width alone will not fully explain the response. |
 | Weight and satellite counts | The weight-quartile summary also suggests a **positive descriptive association**: the mean satellite count changes from `r weight_quartile_summary$mean_satellites[weight_quartile_summary$weight_quartile == "Q1: smallest weights"]` in the smallest-weight quartile to `r weight_quartile_summary$mean_satellites[weight_quartile_summary$weight_quartile == "Q4: largest weights"]` in the largest-weight quartile. The weight plot shows a related body-size pattern, again with substantial variability around the visual trend. | Weight is a **candidate body-size regressor for the extended model**. However, width and weight should not be interpreted in isolation because they both describe body size and may partly carry overlapping information. |
 | Female crab colour | Colour groups have **uneven sample sizes**. The category with the highest mean satellite count is ``r as.character(color_satellite_summary$color[which.max(color_satellite_summary$mean_satellites)])``, with a mean of `r max(color_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(color_satellite_summary$color[which.min(color_satellite_summary$mean_satellites)])``, with a mean of `r min(color_satellite_summary$mean_satellites)`. | Colour may be useful in the **extended model**, but category-level comparisons should be treated cautiously because some colour groups are **sparse** and the boxplots show **overlap** across categories. |
 | Female crab spine condition | Spine groups are also **imbalanced**. The category with the highest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.max(spine_satellite_summary$mean_satellites)])``, with a mean of `r max(spine_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.min(spine_satellite_summary$mean_satellites)])``, with a mean of `r min(spine_satellite_summary$mean_satellites)`. | Spine condition is worth checking in the **extended model**, but the EDA does not suggest that it should dominate the body-size regressors. The **imbalance** across spine categories also means coefficient-level interpretations should be cautious. |
@@ -2421,22 +2433,22 @@ Overall, the EDA gives us a coherent modelling story. The response is a non-nega
 Let $Y_i$ denote the number of satellite males observed for the $i$th female crab in the training data, for $i = 1, 2, \ldots, n$. We treat $Y_i$ as a random variable because a different sample of female crabs, or a repeated version of the same observational process, could produce different satellite counts. In Negative Binomial regression, the random component assumes that the conditional distribution of $Y_i$ is Negative Binomial:
 
 $$
-Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
-$${#eq-classical-poisson-random-component}
+Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\theta,\mu_i),
+$${#eq-negative-binomial-random-component}
 
 where $\mu_i > 0$ is the conditional expected number of satellite males for the $i$th female crab. The value of $\mu_i$ is allowed to change from crab to crab because different female crabs can have different regressor values.
 
-Let's imagine a series of independent Bernoulli trials. A Negative Binomial distribution is commonly parameterized as $Z\sim\operatorname{Negative Binomial}(\theta,p)$, where $Z$ is the number of failed Bernoulli trials before experiencing $\theta$ independent wins and $p$ is the probability of success in each Bernoulli trial. The mean of $Z$ is given by
+Let's imagine a series of independent Bernoulli trials, each with probability $p$ of success, such that $0<p<1$. A Negative Binomial distribution is commonly parameterized as $Z\sim\operatorname{Negative Binomial}(\theta,p)$, where $Z$ is the number of failed Bernoulli trials before experiencing $\theta$ independent wins. The expected of $Z$ is the expected number of failed Bernoulli trials before experiencing $\theta$ independent wins, and is given by
 
 $$
 \mu=\mathbb{E}(Z)=\frac{\theta(1-p)}{ p}
 $$
-Rearranging the equation for conditional mean and isolating for $p$ gives
+Rearranging this equation and isolating for $p$ gives
 
 $$
-p=\frac{1}{1+\frac{\mu}{\theta}}
+p=\left(\frac{1}{1+\frac{\mu}{\theta}}\right)
 $$
-For a constant value of $\theta$, there is a one-to-one correspondence between $p$ and $\mu$ and therefore our Negative Binomial model can be parameterized by $\mu_i$ and $\theta$, where $\mu_i$ is the conditional expected number of satellite males for the $i$th female crab.
+For a constant value of $\theta$, there is a one-to-one correspondence between $p$ and $\mu$ and therefore the random component can be parameterized by $\mu_i$ and $\theta$, where $\mu_i$ is the conditional expected number of satellite males for the $i$th female crab and $\theta$ is the dispersion parameter.
 
 Equivalently, for a possible count $y_i \in \{0, 1, 2, \ldots\}$, the conditional probability mass function (PMF) is
 
@@ -2461,6 +2473,7 @@ and
 $$
 \operatorname{Var}(Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k}) = \mu_i+\frac{\mu_i^2}{\theta}.
 $$
+For the horseshoe crab data, the random component says that each observed satellite count is **a realization of a Negative Binomial random variable**, with **its own conditional mean $\mu_i$**. This is different from saying that all female crabs have the same expected number of satellite males. The whole purpose of the regression model is to let $\mu_i$ vary systematically with female crab characteristics such as width, weight, colour, and spine condition.
 
 ### The Systematic Component
 
@@ -2509,7 +2522,7 @@ $$
 
 ### The Log Link Function
 
-The link function connects the conditional mean $\mu_i$ to the systematic component $\eta_i$. Like [Classical Poisson regression](@sec-classical-poisson), the standard link function in Negative Binomial regression is the **log link**:
+The link function connects the conditional mean $\mu_i$ to the systematic component $\eta_i$. Like [Classical Poisson regression](@sec-classical-poisson), the standard link function in Negative Binomial regression is the **log link** because the log function maps each $\mu_i>0$ in a one-to-one fashion onto the set of real numbers between $-\infty$ and $\infty$:
 
 $$
 \log(\mu_i) = \eta_i.
@@ -2561,14 +2574,14 @@ $$
 \mu_i = \exp(\eta_i)
 $$
 
-is always positive. This is one reason the log link is the standard link function for Classical Poisson regression.
+is always positive. This is one reason the log link is the standard link function for **count regression** models, such as Negative Binomial and Classical Poisson.
 ::::
 :::
 
 Putting the three GLM pieces together, the Negative Binomial regression model with $k$ regressors is
 
 $$
-Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
+Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\theta,\mu_i),
 $$
 
 with
@@ -2595,16 +2608,530 @@ These equations summarize the model we will fit next:
 2. The **systematic component** tells us how the regressors are combined. 
 3. The **log link** tells us how that linear predictor becomes a positive expected count.
 
-In @sec-negative-binomial-eda, the EDA helped us decide that this model is a reasonable starting point, especially because the response is a count and width shows a clear descriptive association with satellite counts (see @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py). But the EDA also warned us that the Classical Poisson assumptions may be strained. After fitting the model, we will need to examine whether the fitted values reproduce the main features of the observed counts and whether the mean-variance structure is adequate enough for the chapter's inferential and predictive goals.
+In @sec-negative-binomial-eda, the EDA helped us decide that this model is a reasonable choice, especially because the response is a count and width shows a clear descriptive association with satellite counts (see @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py). The EDA also showed us that the Classical Poisson assumptions may be strained because of possible overdispersion in the counts of satellite crabs. After fitting the model, we will need to examine whether the fitted values reproduce the main features of the observed counts and whether the mean-variance structure is adequate enough for the chapter's inferential and predictive goals.
 
-## Data Modelling
+## Fitting a Simple Negative Binomial Regression Model {#sec-negative-binomial-simple-model}
+
+Let's recall from [Section 10.8.2](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html#sec-classical-poisson-equidispersion) in the Classical Poisson Regression Chapter that there is statistical evidence of **overdispersion** in the training data. The overdispersion test $p-$value is $8.61e-19$ in this model, which provides formal evidence against the equidispersion assumption. 
+
+Now, we will fit the first Negative Binomial regression model using the crabs data from [Chapter 10](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html). The purpose of this model is deliberately modest: we begin with **female crab width** as the only regressor because the EDA in @sec-negative-binomial-eda showed the clearest descriptive body-size pattern for width. This simple model gives us a transparent starting point for studying estimation, fitted expected counts, and goodness-of-fit before moving to a richer model with additional regressors.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-coffee-3702057/).](img/coffee.png){width="610"}
+
+At this point, we will **not** provide a full substantive interpretation of the estimate width regression coefficient coming from this model. That interpretation belongs later, after we have checked whether the simple Negative Binomial regression model is adequate and after we have considered an extended model with additional regressors. This ordering is critical for the workflow of the chapter:
+
+1. Use the **training data** for EDA, model fitting, and goodness-of-fit checks.
+2. Fit a simple Negative Binomial regression model with width as the only regressor.
+3. Check whether the fitted model reproduces important features of the observed count response.
+4. Extend the model if needed by adding other regressors such as weight, colour, and spine condition.
+5. Save final coefficient-level interpretation for the later modelling sections, after model adequacy has been discussed.
+
+This is necessary for the inferential inquiry. We should not use the same data both to explore the model structure and to produce the final inferential claims. Recall that, for the inferential inquiry, the training set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later after the model-building workflow has been completed.
+
+### Model Specification 
+
+Before fitting the width-only model, we first write the general Negative Binomial regression model with $k$ regressors. Let
+
+$$
+\mathbf{x}_i
+=
+\begin{bmatrix}
+1 \\
+x_{i,1} \\
+x_{i,2} \\
+\vdots \\
+x_{i,k}
+\end{bmatrix}
+$$
+
+be the regressor vector for the $i$th observation, **including the leading $1$ for the intercept**. Then, let
+
+$$
+\boldsymbol{\beta}
+=
+\begin{bmatrix}
+\beta_0 \\
+\beta_1 \\
+\beta_2 \\
+\vdots \\
+\beta_k
+\end{bmatrix}
+$$
+
+be the vector of regression coefficients. The systematic component can then be written compactly as
+
+$$
+\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta},
+$$
+
+where
+
+$$
+\mathbf{x}_i^\top \boldsymbol{\beta}
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
+$$
+
+For the **full training sample** with $n$ observations, we can collect the response values into
+
+$$
+\mathbf{y}
+=
+\begin{bmatrix}
+y_1 \\
+y_2 \\
+\vdots \\
+y_n
+\end{bmatrix},
+$$
+
+and the regressors into the design matrix
+
+$$
+\mathbf{X}
+=
+\begin{bmatrix}
+1 & x_{1,1} & x_{1,2} & \cdots & x_{1,k} \\
+1 & x_{2,1} & x_{2,2} & \cdots & x_{2,k} \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+1 & x_{n,1} & x_{n,2} & \cdots & x_{n,k}
+\end{bmatrix}.
+$$
+
+The $i$th row of $\mathbf{X}$ is $\mathbf{x}_i^\top$. The vector of **systematic scores** is
+
+$$
+\boldsymbol{\eta}
+=
+\mathbf{X}\boldsymbol{\beta}.
+$$
+
+As indicated in @sec-negative-binomial-log-link, in Negative Binomial regression, the conditional mean for the $i$th observation is
+
+$$
+\mu_i
+=
+\exp(\eta_i)
+=
+\exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$$
+
+Thus, the general model with $k$ regressors is
+
+$$
+Y_i \mid \mathbf{x}_i \sim \operatorname{Negative Binomial}(\theta,\mu_i),
+$$
+
+with
+
+$$
+\log(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}.
+$$
+The width-only model is the special case with one regressor. Let $x_{i,1}$ denote the female crab width in centimetres for the $i$th female crab. The simple model is
+
+$$
+Y_i \mid x_{i,1} \sim \operatorname{Negative Binomial}(\theta,\mu_i),
+$$
+
+with
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 x_{i,1}.
+$${#eq-negative-binomial-simple-width-model}
+
+Equivalently,
+
+$$
+\mu_i
+=
+\exp(\beta_0 + \beta_1 x_{i,1}).
+$${#eq-negative-binomial-simple-width-mean}
+
+In @eq-negative-binomial-simple-width-model and @eq-negative-binomial-simple-width-mean, $\mu_i$ is the expected number of satellite males for a female crab with width $x_{i,1}$. The model assumes
+
+$$
+\operatorname{Var}(Y_i \mid x_{i,1}) = \mu_i+\frac{\mu_i^2}{\theta}.
+$$
+
+Therefore, a Negative Binomial model assumes **overdispersion** in the response variable. Once width is included, the model assumes that the conditional variance of the satellite count is higher than the conditional mean for crabs with the same width value. This is stronger than merely saying that the raw sample variance should be higher than the raw sample mean. It is a model statement about the distribution of counts **after conditioning on width**.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why we do not interpret the width coefficient yet!
+::::
+:::: {.Heads-up-container}
+The simple width-only model is handy because it lets us introduce maximum likelihood estimation in a transparent setting. However, we will not yet use this fitted model to make final claims about the association between female crab width and the expected number of satellite males.
+
+There are two reasons for waiting. First, we still need to check whether the simple Classical Poisson model fits the training data adequately. Second, the EDA suggested that other female crab characteristics, such as weight, colour, and spine condition, may also matter. A width-only coefficient can change once additional regressors are included.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-upset-6230193/).](img/surprise-2.png){width="300"}
+
+For now, the fitted width coefficient is an estimation output. We will return to substantive coefficient interpretation after the goodness-of-fit checks and the extended model.
+::::
+:::
+
+### Estimation {#sec-negative-binomialsimple-estimation}
+
+Negative Binomial regression is estimated by **maximum likelihood estimation (MLE)**. The basic idea is to choose the coefficient vector $\boldsymbol{\beta}$ that makes the observed training data most compatible with the model. Following up with @eq-negative-binomial-pmf-regression, for one observation, the probability mass function (PMF) is
+
+$$
+p_Y(y_i; \mu_i, \theta)
+=
+\Pr(Y_i = y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k})
+=
+\frac{\Gamma(y_i + \theta)}{\Gamma(\theta) \, \Gamma(y_i+1)}
+\left( \frac{\theta}{\theta + \mu_i} \right)^{\theta}
+\left( \frac{\mu_i}{\theta + \mu_i} \right)^{y_i},
+$$
+
+where
+
+$$
+\mu_i = \exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$$
+
+Assuming the training observations are independent conditional on their regressors, the likelihood function for $\boldsymbol{\beta}$, $\theta$ is
+
+$$
+\mathcal{L}(\boldsymbol{\beta},\theta;\mathbf{y})
+=
+\prod_{i=1}^n
+\frac{\Gamma(y_i + \theta)}{\Gamma(\theta) \, y_i!}
+\left( \frac{\theta}{\theta + \mu_i} \right)^{\theta}
+\left( \frac{\mu_i}{\theta + \mu_i} \right)^{y_i}.
+$${#eq-negative-binomial-likelihood}
+
+As products can be hard to work with directly, we usually maximize the log-likelihood function. Taking the logarithm of @eq-negative-binomial-likelihood gives
+
+$$
+\ell(\boldsymbol{\beta}, \theta; \mathbf{y})
+=
+\sum_{i=1}^{n}
+\left[
+\log \Gamma(y_i + \theta)
+- \log \Gamma(\theta)
+- \log \Gamma(y_i + 1)
++ \theta \log \theta
++ y_i \log(\mu_i)
+- (y_i + \theta) \log \left( \theta + \mu_i \right)
+\right].
+$${#eq-negative-binomial-log-likelihood-mu}
+
+Using $\log(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}$ and $\mu_i = \exp(\mathbf{x}_i^\top \boldsymbol{\beta})$, we can rewrite @eq-negative-binomial-log-likelihood-mu as
+
+$$
+\ell(\boldsymbol{\beta}, \theta)
+=
+\sum_{i=1}^{n}
+\left[
+\log \Gamma(y_i + \theta)
+- \log \Gamma(\theta)
+- \log \Gamma(y_i + 1)
++ \theta \log \theta
++ y_i \, \mathbf{x}_i^\top \boldsymbol{\beta}
+- (y_i + \theta) \log \left( \theta + \exp(\mathbf{x}_i^\top \boldsymbol{\beta}) \right)
+\right].
+$${#eq-negative-binomial-log-likelihood-beta}
+
+The MLE is the set of values of $\boldsymbol{\beta}$ and $\theta$ that maximize this log-likelihood:
+
+$$
+\hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}
+=
+\underset{\boldsymbol{\beta},\theta}{\operatorname{argmax}}
+\;
+\ell(\boldsymbol{\beta},\theta;\mathbf{y}).
+$${#eq-negative-binomial-beta-mle}
+
+There is no OLS-style closed-form solution for @eq-negative-binomial-beta-mle. 
+
+*** Template ***
+
+Therefore, software uses iterative numerical algorithms, such as Fisher scoring or **Iteratively Reweighted Least Squares (IRLS)** [@nelder1972], to find the coefficient estimates. The IRLS algorithm starts with an initial guess for the coefficient vector $\boldsymbol{\beta}$, updates the fitted expected counts, builds a locally weighted least-squares problem, updates the coefficients, and repeats this process until the coefficient estimates stop changing in a meaningful way.
 
 
-## Estimation
+To see the estimating logic without going into matrix calculus, let $x_{i,j}$ denote the value of the $j$th regressor for observation $i$, with $x_{i,0}=1$ for the intercept. Since
+
+$$
+\mu_i = \exp(\beta_0 + \beta_1 x_{i,1} + \cdots + \beta_k x_{i,k}),
+$$
+
+the derivative of $\mu_i$ with respect to $\beta_j$ is
+
+$$
+\frac{\partial \mu_i}{\partial \beta_j}
+=
+x_{i,j}\mu_i.
+$$
+
+Differentiating the log-likelihood in @eq-negative-binomial-log-likelihood-beta with respect to $\beta_j$ gives the score component
+
+$$
+\frac{\partial \ell(\boldsymbol{\beta};\mathbf{y})}{\partial \beta_j}
+=
+\sum_{i=1}^n
+x_{i,j}
+(y_i - \mu_i),
+\qquad j = 0, 1, \ldots, k.
+$$
+
+At the MLE, the score equations are set to zero:
+
+$$
+\sum_{i=1}^n
+x_{i,j}
+(y_i - \hat{\mu}_i)
+=
+0,
+\qquad j = 0, 1, \ldots, k,
+$$
+
+where
+
+$$
+\hat{\mu}_i
+=
+\exp(\mathbf{x}_i^\top \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}).
+$$
+
+These equations show that the fitted model balances observed and fitted counts **after weighting those differences by each regressor**. Equivalently,
+
+$$
+\sum_{i=1}^n
+x_{i,j}y_i
+=
+\sum_{i=1}^n
+x_{i,j}\hat{\mu}_i,
+\qquad j = 0, 1, \ldots, k.
+$$
+
+This is more general than the intercept-only intuition. For the intercept, since $x_{i,0}=1$, the score equation becomes
+
+$$
+\sum_{i=1}^n
+(y_i - \hat{\mu}_i)
+=
+0,
+$$
+
+so that
+
+$$
+\sum_{i=1}^n y_i
+=
+\sum_{i=1}^n \hat{\mu}_i.
+$$
+
+This means that an intercept-only Negative Binomial regression model balances the **total observed count** and the **total fitted expected count**. But the other score equations are also necessary. For example, in the simple width-only model, the width score equation is
+
+$$
+\sum_{i=1}^n
+x_{i,1}y_i
+=
+\sum_{i=1}^n
+x_{i,1}\hat{\mu}_i.
+$$
+
+Thus, the fitted model also balances the observed and fitted counts after multiplying them by female crab width. With more regressors, the same kind of balancing condition holds for each regressor in the model.
+
+*** Template ****
+
+We now fit the simple width-only model to the training data. The fitted model is
+
+$$
+Y_i \mid x_{i,1} \sim \operatorname{Negative Binomial}(\theta,\mu_i),
+$$
+
+with
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 x_{i,1},
+$$
+
+where $x_{i,1}$ is female crab width in centimetres.
+
+Note the following:
+
+- In the `R` code below, the `formula = satellites ~ width_cm` specifies the response on the left-hand side and the regressor on the right-hand side. As in previous chapters, function `glm()` fits GLMs. The argument `family = poisson(link = "log")` tells `R` to use a Poisson random component with a log link, and `data = training_data` ensures that the model is fitted only on the training set. Note that we use `tidy()` from [{broom}](https://broom.tidymodels.org/reference/broom.html) for a clean tabular display.
+- The `Python` code uses the analogous [{statsmodels}](https://www.statsmodels.org/stable/index.html) formula interface. The function `smf.glm()` specifies the GLM, `formula="satellites ~ width_cm"` gives the response-regressor relationship, `data=training_data` identifies the training dataset, and `family=sm.families.Poisson()` specifies the Poisson GLM. The final `.fit()` call runs the numerical MLE routine and stores the fitted model object.
+
+@tbl-negative-binomial-simple-width-fit-r gives the MLEs and their model-based standard errors for the intercept and width terms. These are the basic numerical ingredients needed for later inference, but we should not jump directly to substantive interpretation. The next step is to check whether the fitted model is adequate enough to support the chapter's inferential and predictive goals.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomialsimple-width-fit-r
+#| tbl-cap: "Maximum likelihood estimates from the simple width-only Negative Binomial regression model fitted on the training data."
+#| message: false
+#| warning: false
+
+library(broom)
+
+simple_negative_binomial_width_model <- glm.nb(formula = satellites ~ width_cm,
+                                               data = training_data)
+
+simple_negative_binomial_width_summary <- tidy(simple_negative_binomial_width_model) |>
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+simple_negative_binomial_width_summary |>
+  rename(`Term` = term, `Estimate` = estimate, `Standard error` = std.error,
+    `Wald statistic` = statistic, `p-value` = p.value) |>
+  kable(align = c("c", "c", "c", "c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+# import statsmodels.api as sm
+# import statsmodels.formula.api as smf
+# 
+# simple_negative_binomial_width_model = smf.glm(formula="satellites ~ width_cm", data=training_data,
+#     family=sm.families.Poisson()).fit()
+# 
+# simple_negative_binomial_width_summary = pd.DataFrame(
+#     {"Term": simple_negative_binomial_width_model.params.index,
+#         "Estimate": simple_negative_binomial_width_model.params.values,
+#         "Standard error": simple_negative_binomial_width_model.bse.values,
+#         "Wald statistic": simple_negative_binomial_width_model.tvalues.values,
+#         "p-value": simple_negative_binomial_width_model.pvalues.values,
+#     })
+# 
+# simple_negative_binomial_width_summary = simple_negative_binomial_width_summary.round(3)
+# 
+# classical_poisson_simple_width_fit_py_html = (
+#     scrollable_table_html(simple_negative_binomial_width_summary))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-negative-binomial-simple-width-fit-py
+#| tbl-cap: "Maximum likelihood estimates from the simple width-only Negative Binomial regression model fitted on the training data."
+#| message: false
+#| warning: false
+#| results: asis
+
+# cat(
+#   "\n",
+#   py$classical_poisson_simple_width_fit_py_html,
+#   "\n",
+#   sep = ""
+# )
+```
+
+:::
+
+Having said that, it will be necessary to store the fitted expected counts, because these will be used in @sec-negative-binomial-gof.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomial-simple-fitted-values-r
+#| tbl-cap: "First 10 fitted expected counts from the simple width-only Negative Binomial regression model via training set."
+#| message: false
+#| warning: false
+
+simple_negative_binomial_width_fitted <- training_data |>
+mutate(fitted_expected_count = fitted(simple_negative_binomial_width_model)) |>
+   dplyr::select(satellites, width_cm, fitted_expected_count) |>
+   slice_head(n = 10) |>
+   mutate(fitted_expected_count = round(fitted_expected_count, 3))
+ 
+simple_negative_binomial_width_fitted |>
+  rename(`Observed satellite count` = satellites, `Female crab width (cm)` = width_cm,
+   `Fitted expected count` = fitted_expected_count) |>
+   kable(align = c("c", "c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+# simple_negative_binomial_width_fitted = (training_data
+#     .assign(fitted_expected_count=simple_negative_binomial_width_model.fittedvalues)
+#     [["satellites", "width_cm", "fitted_expected_count",
+#         ]].head(10).copy())
+# 
+# simple_negative_binomial_width_fitted["fitted_expected_count"] = (
+#     simple_negative_binomial_width_fitted["fitted_expected_count"].round(3))
+# 
+# simple_negative_binomial_width_fitted_display = (simple_negative_binomial_width_fitted
+#     .rename(columns={"satellites": "Observed satellite count",
+#             "width_cm": "Female crab width (cm)",
+#             "fitted_expected_count": "Fitted expected count",
+#         }))
+# 
+# classical_negative_binomial_simple_fitted_values_py_html = (
+#     scrollable_table_html(simple_negative_binomial_width_fitted_display))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-classical-negative_binomial-simple-fitted-values-py
+#| tbl-cap: "First 10 fitted expected counts from the simple width-only Negative Binomial regression model via training set."
+#| message: false
+#| warning: false
+#| results: asis
+
+# cat(
+#   "\n",
+#   py$classical_poisson_simple_fitted_values_py_html,
+#   "\n",
+#   sep = ""
+# )
+```
+
+:::
+
+The above fitted expected counts are not rounded counts and **should not be forced to be integers**. They are estimates of $\mu_i$, the expected number of satellite males for crabs with the corresponding width values. The observed response remains a count, but the fitted conditional mean is allowed to be fractional. This is the quantity we will compare against the observed counts when checking model adequacy.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on decimal expected counts!
+::::
+:::: {.Heads-up-container}
+A Negative Binomial random variable can only take non-negative integer values:
+
+$$
+0, 1, 2, 3, \ldots
+$$
+
+However, the mean $\mu_i$ does **not** need to be an integer. It can be any non-negative real number. For example, a fitted expected count such as
+
+$$
+\hat{\mu}_i = 2.73
+$$
+
+does not mean that the model predicts exactly $2.73$ satellite males for that crab. Instead, it means that, under the fitted model, the **expected number of satellite males** for crabs with those regressor values is $2.73$.
+
+The count outcome itself remains discrete, but the fitted expectation can have decimal places. What cannot happen is a negative fitted expected count. This is one reason the log link is useful in Classical Poisson regression: it keeps
+
+$$
+\hat{\mu}_i
+=
+\exp(\mathbf{x}_i^\top \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}})
+$$
+
+strictly positive.
+::::
+:::
+
 
 ### Dispersion Test
 
-Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001. We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`). Note that `statsmodels` does not ship an equivalent function, so the `Python` code defines the same regression-based test as a small helper of the same name.
+Let's revisit the `extended_poisson_model` which was fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001. We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`). As the `statsmodels` does not have an equivalent function, the `Python` code defines the same regression-based test as a function with the same name.
 -   Let $Y_i$ be the $i$th Poisson response in the count regression model.
 
 . . .
@@ -2779,162 +3306,6 @@ print(f"Sample estimate (dispersion): {dispersion:.4f}")
 
 With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, the `extended_poisson_model` has overdispersion.
 
-### Fitting a Simple Negative Binomial Regression Model {#sec-negative-binomial-simple-model}
-
-Now, we fit the first Negative Binomial regression model in the chapter. The purpose of this model is deliberately modest: we begin with **female crab width** as the only regressor because the EDA in @sec-negative-binomial-eda showed the clearest descriptive body-size pattern for width. This simple model gives us a transparent starting point for studying estimation, fitted expected counts, and goodness-of-fit before moving to a richer model with additional regressors.
-
-![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-coffee-3702057/).](img/coffee.png){width="610"}
-
-At this point, we will **not** provide a full substantive interpretation of the estimate width regression coefficient coming from this model. That interpretation belongs later, after we have checked whether the simple Negative Binomial regression model is adequate and after we have considered an extended model with additional regressors. This ordering is critical for the workflow of the chapter:
-
-1. Use the **training data** for EDA, model fitting, and goodness-of-fit checks.
-2. Fit a simple Poisson regression model with width as the only regressor.
-3. Check whether the fitted model reproduces important features of the observed count response.
-4. Extend the model if needed by adding other regressors such as weight, colour, and spine condition.
-5. Save final coefficient-level interpretation for the later modelling sections, after model adequacy has been discussed.
-
-This is necessary for the inferential inquiry. We should not use the same data both to explore the model structure and to produce the final inferential claims. Recall that, for the inferential inquiry, the training set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later after the model-building workflow has been completed.
-
-Before fitting the width-only model, we first write the general Classical Poisson regression model with $k$ regressors. Let
-
-$$
-\mathbf{x}_i
-=
-\begin{bmatrix}
-1 \\
-x_{i,1} \\
-x_{i,2} \\
-\vdots \\
-x_{i,k}
-\end{bmatrix}
-$$
-
-be the regressor vector for the $i$th observation, **including the leading $1$ for the intercept**. Then, let
-
-$$
-\boldsymbol{\beta}
-=
-\begin{bmatrix}
-\beta_0 \\
-\beta_1 \\
-\beta_2 \\
-\vdots \\
-\beta_k
-\end{bmatrix}
-$$
-
-be the vector of regression coefficients. The systematic component can then be written compactly as
-
-$$
-\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta},
-$$
-
-where
-
-$$
-\mathbf{x}_i^\top \boldsymbol{\beta}
-=
-\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
-$$
-
-For the **full training sample** with $n$ observations, we can collect the response values into
-
-$$
-\mathbf{y}
-=
-\begin{bmatrix}
-y_1 \\
-y_2 \\
-\vdots \\
-y_n
-\end{bmatrix},
-$$
-
-and the regressors into the design matrix
-
-$$
-\mathbf{X}
-=
-\begin{bmatrix}
-1 & x_{1,1} & x_{1,2} & \cdots & x_{1,k} \\
-1 & x_{2,1} & x_{2,2} & \cdots & x_{2,k} \\
-\vdots & \vdots & \vdots & \ddots & \vdots \\
-1 & x_{n,1} & x_{n,2} & \cdots & x_{n,k}
-\end{bmatrix}.
-$$
-
-The $i$th row of $\mathbf{X}$ is $\mathbf{x}_i^\top$. The vector of **systematic scores** is
-
-$$
-\boldsymbol{\eta}
-=
-\mathbf{X}\boldsymbol{\beta}.
-$$
-
-As indicated in @sec-negative-binomial-log-link, in Classical Poisson regression, the conditional mean for the $i$th observation is
-
-$$
-\mu_i
-=
-\exp(\eta_i)
-=
-\exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
-$$
-
-Thus, the general model with $k$ regressors is
-
-$$
-Y_i \mid \mathbf{x}_i \sim \operatorname{Negative Binomial}(\mu_i,\theta),
-$$
-
-with
-
-$$
-\log(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}.
-$$
-The width-only model is the special case with one regressor. Let $x_{i,1}$ denote the female crab width in centimetres for the $i$th female crab. The simple model is
-
-$$
-Y_i \mid x_{i,1} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
-$$
-
-with
-
-$$
-\log(\mu_i) = \beta_0 + \beta_1 x_{i,1}.
-$${#eq-negative-binomial-simple-width-model}
-
-Equivalently,
-
-$$
-\mu_i
-=
-\exp(\beta_0 + \beta_1 x_{i,1}).
-$${#eq-negative-binomial-simple-width-mean}
-
-In @eq-negative-binomial-simple-width-model and @eq-negative-binomial-simple-width-mean, $\mu_i$ is the expected number of satellite males for a female crab with width $x_{i,1}$. The model assumes
-
-$$
-\operatorname{Var}(Y_i \mid x_{i,1}) = \mu_i+\frac{\mu_i^2}{\theta}.
-$$
-
-Therefore, a Negative Binomial model assumes **overdispersion**. Once width is included, the model assumes that the conditional variance of the satellite count is higher than the conditional mean for crabs with the same width value. This is stronger than merely saying that the raw sample variance should be higher than the raw sample mean. It is a model statement about the distribution of counts **after conditioning on width**.
-
-::: {.Heads-up}
-:::: {.Heads-up-header}
-Heads-up on why we do not interpret the width coefficient yet!
-::::
-:::: {.Heads-up-container}
-The simple width-only model is handy because it lets us introduce maximum likelihood estimation in a transparent setting. However, we will not yet use this fitted model to make final claims about the association between female crab width and the expected number of satellite males.
-
-There are two reasons for waiting. First, we still need to check whether the simple Classical Poisson model fits the training data adequately. Second, the EDA suggested that other female crab characteristics, such as weight, colour, and spine condition, may also matter. A width-only coefficient can change once additional regressors are included.
-
-![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-upset-6230193/).](img/surprise-2.png){width="300"}
-
-For now, the fitted width coefficient is an estimation output. We will return to substantive coefficient interpretation after the goodness-of-fit checks and the extended model.
-::::
-:::
-
 ::: {.panel-tabset}
 
 ## **`R` Code**
@@ -3060,7 +3431,580 @@ extended_negative_binomial_summary
 :::
 
 
-## Goodness of Fit
+## Checking Goodness of Fit {#sec-negative-binomial-gof}
+
+
+Once we have fitted the **simple width-only Negative Binomial regression model**, we move into goodness of fit. This stage asks whether the fitted model behaves in a way that is compatible with the modelling story we wrote down. For the simple Negative Binomial regression model, that story has three main pieces:
+
+1. the response is **conditionally Negative Binomial**;
+2. the **log of the expected count** is described by female crab width;
+3. the conditional mean and conditional variance are **equal** after conditioning on width.
+
+All checks in this section still use the **training data**. We are not yet measuring prediction accuracy on the test set. The goal here is diagnostic: we are stress-testing the model we just fitted before using it for final inferential or predictive conclusions. This is not data leakage. Data leakage would occur if we used the testing set to make modelling decisions and then treated it as an untouched assessment set. Here, the training set is where model development, model fitting, and goodness-of-fit checking belong.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-feedback-to-learn-3699331/).](img/thumbs-up-down.png){width="500"}
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on training-set diagnostics versus test-set prediction!
+::::
+:::: {.Heads-up-container}
+The goodness-of-fit checks in this section are based on the **training data** because the model was fitted on the training data. We use these checks to decide whether the fitted modelling assumptions look plausible enough to continue.
+
+This is different from predictive assessment. Predictive assessment asks how well the model performs on held-out observations that were not used to build or check the model. That comes later, in the **results stage**. For now, we are still inside the model-building loop of the data science workflow: if the fitted model shows serious diagnostic problems, we may need to return to the modelling stage rather than move directly to final results (see @fig-ds-workflow-goodness-of-fit).
+::::
+:::
+
+For the simple width-only model, we will look at **four diagnostic questions**:
+
+1. Do the **fitted expected counts** track the **observed counts** in a reasonable way?
+2. Is there evidence that the counts are **more variable** than the Classical Poisson model allows?
+3. Does the model understate the number of **zero counts**?
+4. Is the residual deviance unusually large relative to its degrees of freedom?
+
+These checks are complementary. A single diagnostic rarely decides everything by itself. Instead, we combine plots, summary tables, formal tests, and the purpose of the analysis to decide whether the simple model is adequate enough to move forward.
+
+### Observed versus Fitted Counts {#sec-classical-poisson-observed-fitted}
+
+The first check compares the observed satellite counts with the fitted expected counts from the simple width-only model. Note that the fitted expected count for the $i$th female crab is
+
+$$
+\hat{\mu}_i
+=
+\exp(\hat{\beta}_0 + \hat{\beta}_1 x_{i,1}),
+$$
+
+where $x_{i,1}$ is female crab width in centimetres.
+
+::: {#Definition-fitted-expected-count .definition}
+:::: {.definition-header}
+Definition of fitted expected count
+::::
+:::: {.definition-container}
+In a fitted Classical Poisson regression model with $k$ regressors, the **fitted expected count** for the $i$th observation is
+
+$$
+\hat{\mu}_i
+=
+\exp(\mathbf{x}_i^\top \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}).
+$$
+
+Here, $\hat{\mu}_i$ is the fitted expected number of events for the $i$th observation, $\mathbf{x}_i$ is the regressor vector
+
+$$
+\mathbf{x}_i^\top
+=
+\begin{bmatrix}
+1 &
+x_{i,1} &
+x_{i,2} &
+\cdots &
+x_{i,k}
+\end{bmatrix},
+$$
+
+and $\hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}$ is the vector of maximum likelihood estimates
+
+$$
+\hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}^\top
+=
+\begin{bmatrix}
+\hat{\beta}_{0,\operatorname{MLE,obs}} &
+\hat{\beta}_{1,\operatorname{MLE,obs}} &
+\hat{\beta}_{2,\operatorname{MLE,obs}} &
+\cdots &
+\hat{\beta}_{k,\operatorname{MLE,obs}}
+\end{bmatrix}.
+$$
+
+Equivalently, in scalar notation,
+
+$$
+\hat{\mu}_i
+=
+\exp\left(
+\hat{\beta}_{0,\operatorname{MLE,obs}}
++
+\hat{\beta}_{1,\operatorname{MLE,obs}}x_{i,1}
++
+\hat{\beta}_{2,\operatorname{MLE,obs}}x_{i,2}
++
+\cdots
++
+\hat{\beta}_{k,\operatorname{MLE,obs}}x_{i,k}
+\right).
+$$
+
+The fitted expected count estimates the conditional expected value $\mathbb{E}(Y_i \mid \mathbf{x}_i)$ under the fitted model, where $Y_i$ is the count response for observation $i$. The observed response $y_i$ is a count, but the fitted expected count $\hat{\mu}_i$ does not need to be an integer.
+::::
+:::
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
+
+A useful way to start is to compare the observed counts and fitted expected counts across groups of similar fitted values. This is a descriptive calibration check on the training data.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomialfitted-count-calibration-r
+#| tbl-cap: "Observed and fitted satellite counts across fitted expected count quartiles in the training data."
+#| message: false
+#| warning: false
+
+simple_negative_binomial_gof_data <- training_data |>
+  mutate(fitted_expected_count = fitted(simple_negative_binomial_width_model),
+    pearson_residual = (satellites - fitted_expected_count) / sqrt(fitted_expected_count),
+    fitted_zero_probability = exp(-fitted_expected_count))
+
+fitted_count_calibration <- simple_negative_binomial_gof_data |>
+  mutate(fitted_count_quartile = ntile(fitted_expected_count, 4),
+    fitted_count_quartile = factor(fitted_count_quartile, levels = 1:4,
+      labels = c("Q1: smallest fitted counts", "Q2", "Q3", "Q4: largest fitted counts"))) |>
+  group_by(fitted_count_quartile) |>
+  summarise(n = n(), mean_observed_count = mean(satellites),
+    mean_fitted_expected_count = mean(fitted_expected_count),
+    observed_zero_proportion = mean(satellites == 0),
+    mean_fitted_zero_probability = mean(fitted_zero_probability),.groups = "drop") |>
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+fitted_count_calibration |>
+  rename(`Fitted-count quartile` = fitted_count_quartile, `Number of female crabs` = n,
+    `Mean observed count` = mean_observed_count,
+    `Mean fitted expected count` = mean_fitted_expected_count,
+    `Observed zero proportion` = observed_zero_proportion,
+    `Mean fitted zero probability` = mean_fitted_zero_probability) |>
+  kable(align = c("c", "c", "c", "c", "c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+simple_negative_binomial_gof_data = training_data.copy()
+
+simple_negative_binomial_gof_data["fitted_expected_count"] = (simple_negative_binomial_width_model.fittedvalues)
+
+simple_negative_binomial_gof_data["pearson_residual"] = ((simple_negative_binomial_gof_data["satellites"]
+        - simple_negative_binomial_gof_data["fitted_expected_count"])
+    / np.sqrt(simple_negative_binomial_gof_data["fitted_expected_count"]))
+
+simple_negative_binomial_gof_data["fitted_zero_probability"] = np.exp(
+    -simple_negative_binomial_gof_data["fitted_expected_count"])
+
+simple_negative_binomial_gof_data = (simple_negative_binomial_gof_data
+    .sort_values("fitted_expected_count", kind="mergesort").reset_index(drop=True))
+
+number_of_rows = len(simple_negative_binomial_gof_data)
+number_of_groups = 4
+
+base_group_size = number_of_rows // number_of_groups
+remainder = number_of_rows % number_of_groups
+
+group_sizes = [base_group_size + 1 if group_index < remainder else base_group_size
+    for group_index in range(number_of_groups)]
+
+quartile_labels = ["Q1: smallest fitted counts", "Q2", "Q3", "Q4: largest fitted counts",
+]
+
+simple_negative_binomial_gof_data["fitted_count_quartile"] = np.repeat(quartile_labels, group_sizes)
+
+fitted_count_calibration = (simple_negative_binomial_gof_data
+    .groupby("fitted_count_quartile", observed=False)
+    .agg(n=("satellites", "size"), mean_observed_count=("satellites", "mean"),
+        mean_fitted_expected_count=("fitted_expected_count", "mean"),
+        observed_zero_proportion=("satellites", lambda x: (x == 0).mean()),
+        mean_fitted_zero_probability=("fitted_zero_probability", "mean"),
+    ).reset_index().round(3))
+
+fitted_count_calibration_display = fitted_count_calibration.rename(
+    columns={"fitted_count_quartile": "Fitted-count quartile",
+        "n": "Number of female crabs", "mean_observed_count": "Mean observed count",
+        "mean_fitted_expected_count": "Mean fitted expected count",
+        "observed_zero_proportion": "Observed zero proportion",
+        "mean_fitted_zero_probability": "Mean fitted zero probability",
+    })
+
+classical_poisson_fitted_count_calibration_py_html = (
+    scrollable_table_html(fitted_count_calibration_display))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-negative-binomial-fitted-count-calibration-py
+#| tbl-cap: "Observed and fitted satellite counts across fitted expected count quartiles in the training data."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$classical_poisson_fitted_count_calibration_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+:::
+
+The grouped comparison in @tbl-negative-binomial-fitted-count-calibration-r shows that the simple width-only model captures the broad increase in mean satellite counts across fitted-count quartiles, but it does not reproduce all parts of the response distribution equally well. The mean fitted expected count is too high in Q1, where the mean observed count is `r fitted_count_calibration$mean_observed_count[fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]` and the mean fitted expected count is `r fitted_count_calibration$mean_fitted_expected_count[fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`. The mean fitted expected count is too low in Q3, where the mean observed count is `r fitted_count_calibration$mean_observed_count[fitted_count_calibration$fitted_count_quartile == "Q3"]` and the mean fitted expected count is `r fitted_count_calibration$mean_fitted_expected_count[fitted_count_calibration$fitted_count_quartile == "Q3"]`. In Q4, the two values are much closer: the mean observed count is `r fitted_count_calibration$mean_observed_count[fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`, while the mean fitted expected count is `r fitted_count_calibration$mean_fitted_expected_count[fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`. **Thus, the fitted mean pattern is directionally useful but not perfectly calibrated.**
+
+Also, the zero-count columns in @tbl-negative-binomial-fitted-count-calibration-r show a **stronger diagnostic concern**. In every fitted-count quartile, the observed zero proportion is larger than the mean fitted zero probability. The discrepancy is especially large in Q1 and Q2. In Q1, the observed zero proportion is `r fitted_count_calibration$observed_zero_proportion[fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`, while the mean fitted zero probability is only `r fitted_count_calibration$mean_fitted_zero_probability[fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`. In Q2, the observed zero proportion is `r fitted_count_calibration$observed_zero_proportion[fitted_count_calibration$fitted_count_quartile == "Q2"]`, while the mean fitted zero probability is only `r fitted_count_calibration$mean_fitted_zero_probability[fitted_count_calibration$fitted_count_quartile == "Q2"]`. This suggests that the simple Classical Poisson model is substantially understating the number of zero satellite counts in the training data.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on Pearson residuals and mean fitted zero probabilities!
+::::
+:::: {.Heads-up-container}
+The goodness-of-fit dataset created above includes two quantities that will be used in different diagnostic checks.
+
+The first quantity is the **Pearson residual**,
+
+$$
+r_i^{(P)}
+=
+\frac{y_i - \hat{\mu}_i}{\sqrt{\hat{\mu}_i}}.
+$${#eq-pearson-residual}
+
+Here, $y_i$ is the observed satellite count for the $i$th female crab, and $\hat{\mu}_i$ is the fitted expected count from the simple width-only Poisson regression model. The denominator $\sqrt{\hat{\mu}_i}$ comes from the Classical Poisson mean-variance assumption:
+
+$$
+\mu_i =
+\operatorname{Var}(Y_i \mid \mathbf{x}_i).
+$$
+
+After fitting the model, we replace $\mu_i$ with $\hat{\mu}_i$, so the fitted Poisson standard deviation is $\sqrt{\hat{\mu}_i}$. Pearson residuals therefore measure how far the observed count is from the fitted expected count **in units of the fitted Poisson standard deviation**. They will be used later to assess whether the residual variation is larger than the Classical Poisson model expects.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-fear-expression-6230192/).](img/curious.png){width="250"}
+
+The second quantity is the **fitted zero probability**,
+
+$$
+\Pr(Y_i = 0 \mid \mathbf{x}_i; \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}})
+=
+\exp(-\hat{\mu}_i).
+$$
+
+This comes directly from the Poisson PMF. If $Y_i \mid \mathbf{x}_i \sim \operatorname{Poisson}(\hat{\mu}_i)$, then the fitted probability of observing zero satellite males for the $i$th female crab is $\exp(-\hat{\mu}_i)$.
+
+In the grouped table, the column called **mean fitted zero probability** averages these fitted zero probabilities within each fitted-count quartile. It is not the probability of a "*mean zero*." Rather, it is the average of the model-implied zero probabilities for the female crabs in that group:
+
+$$
+\frac{1}{n_g}
+\sum_{i \in g}
+\exp(-\hat{\mu}_i),
+$$
+
+where $g$ denotes one fitted-count quartile and $n_g$ is the number of observations in that quartile.
+
+This average can be compared with the **observed zero proportion** in the same group,
+
+$$
+\frac{1}{n_g}
+\sum_{i \in g}
+\mathbb{1}(y_i = 0).
+$$
+
+If the observed zero proportion is much larger than the mean fitted zero probability, the fitted Poisson model is understating how often zero satellite counts occur.
+::::
+:::
+
+Now, the same comparison can be viewed graphically in @fig-negative-binomial-observed-fitted-r (or @fig-negative-binomial-observed-fitted-py). The dashed line is a visual reference where the observed count would equal the fitted expected count. Points above the line correspond to female crabs whose observed satellite count is larger than the model's fitted expected count. Points below the line correspond to female crabs whose observed satellite count is smaller than the fitted expected count.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-negative-binomial-observed-fitted-r
+#| fig-cap: "Observed satellite counts versus fitted expected counts for the simple width-only Poisson regression model."
+#| warning: false
+#| message: false
+#| echo: true
+#| fig.height: 8
+#| fig.width: 14
+
+observed_fitted_plot <- ggplot(simple_negative_binomial_gof_data,
+  aes(x = fitted_expected_count, y = satellites)) +
+  geom_point(alpha = 0.65, size = 2.3, colour = "#0072B2") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1,
+    colour = "#D55E00") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15.5), axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5, margin = margin(r = 12)),
+    panel.grid.minor = element_blank()) +
+  labs(x = "\n Fitted expected count", y = "Observed satellite count") +
+  scale_y_continuous(breaks = seq(0, 12, by = 2))
+
+observed_fitted_plot
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-negative-binomial-observed-fitted-py
+#| fig-cap: "Observed satellite counts versus fitted expected counts for the simple width-only Poisson regression model."
+#| warning: false
+#| message: false
+#| echo: true
+#| fig.height: 8
+#| fig.width: 14
+
+observed_fitted_figure, observed_fitted_axis = plt.subplots(figsize=(14, 8))
+
+observed_fitted_axis.scatter(simple_negative_binomial_gof_data["fitted_expected_count"],
+    simple_negative_binomial_gof_data["satellites"], alpha=0.65, s=35, color="#0072B2")
+
+line_max = max(simple_negative_binomial_gof_data["fitted_expected_count"].max(),
+    simple_negative_binomial_gof_data["satellites"].max())
+
+observed_fitted_axis.plot([0, line_max], [0, line_max], linestyle="--", linewidth=1,
+    color="#D55E00")
+
+observed_fitted_axis.set_xlabel("\n Fitted expected count", fontsize=20)
+
+observed_fitted_axis.set_ylabel("Observed satellite count", fontsize=20, labelpad=12)
+
+observed_fitted_axis.tick_params(axis="both", labelsize=15.5)
+observed_fitted_axis.set_yticks(range(0, 13, 2))
+
+observed_fitted_axis.grid(True, which="major", axis="both", alpha=0.3)
+
+observed_fitted_axis.grid(False, which="minor")
+
+observed_fitted_figure.tight_layout()
+plt.show()
+```
+
+:::
+
+In @fig-negative-binomial-observed-fitted-r or @fig-negative-binomial-observed-fitted-py, the simple width-only model shows clear signs of strain. For fitted expected counts between roughly $1.5$ and $4$, there are many observed zeros sitting well below the dashed line, which is consistent with @tbl-negative-binomial-fitted-count-calibration-r showing that the model understates the number of zero satellite counts. At the same time, several observations in this same fitted-count range have much larger observed counts, including values around $6$, $8$, $10$, and higher. This produces a large vertical spread among crabs with similar fitted expected counts.
+
+The horizontal bands in the plot are expected because the observed response is a count. The fitted expected count on the $x$-axis is allowed to be fractional, but the observed satellite count on the $y$-axis can only take values such as $0$, $1$, $2$, $3$, and so on. What is concerning is not the banding itself, but the amount of vertical spread around similar fitted expected counts. This pattern suggests that the simple width-only Classical Poisson model is not capturing all the structure in the training data and may be too restrictive in its variance assumption.
+
+### Excess Zero Counts
+
+
+In @sec-negative-binomial-eda-general, the EDA also showed many zero satellite counts. We now check whether the fitted simple Classical Poisson model expects a similar number of zeros in the **training data**. Hence, this diagnostic focuses on the number of observed zero counts,
+
+$$
+z_{\operatorname{obs}}
+=
+\sum_{i=1}^n
+\mathbb{1}(y_i = 0),
+$$
+
+where $\mathbb{1}(y_i = 0)$ is an indicator that equals $1$ when the $i$th observed satellite count is zero and equals $0$ otherwise.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/tablet-games-tetris-building-blocks-7426706/).](img/tablet.png){width="300"}
+
+Under the fitted Classical Poisson model, the probability that the $i$th female crab has zero satellite males is
+
+$$
+\Pr(Y_i = 0 \mid \mathbf{x}_i; \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}})
+=
+\exp(-\hat{\mu}_i).
+$$
+
+Now, let
+
+$$
+\hat{\pi}_{0,i}
+=
+\exp(-\hat{\mu}_i)
+$$
+
+denote this fitted zero probability for observation $i$. Then, the fitted expected number of zeros in the training data is
+
+$$
+\widehat{\mathbb{E}}(Z)
+=
+\sum_{i=1}^n
+\hat{\pi}_{0,i}.
+$$
+
+The question is whether the observed number of zeros is unusually large compared with what the fitted Classical Poisson model expects. We can frame this as a one-sided diagnostic test:
+
+$$
+\begin{gather}
+H_0\text{: } \text{the fitted Classical Poisson model adequately describes} \\
+\text{the frequency of zero counts}, \\
+\text{versus} \\
+H_1\text{: } \text{there are more zero counts than the} \\
+\text{fitted Classical Poisson model expects}.
+\end{gather}
+$$
+
+Under $H_0$, the zero-count indicators $\mathbb{1}(Y_i = 0)$ are treated as independent Bernoulli random variables with fitted probabilities $\hat{\pi}_{0,i}$. Because these probabilities can differ across observations, the total number of zeros is a sum of Bernoulli variables with unequal probabilities. Its fitted mean is
+
+$$
+\widehat{\mathbb{E}}(Z)
+=
+\sum_{i=1}^n
+\hat{\pi}_{0,i},
+$$
+
+and its fitted variance is
+
+$$
+\widehat{\operatorname{Var}}(Z)
+=
+\sum_{i=1}^n
+\hat{\pi}_{0,i}
+(1 - \hat{\pi}_{0,i}).
+$$
+
+This gives the approximate $z$-statistic
+
+$$
+z_{\operatorname{zero}}
+=
+\frac{
+z_{\operatorname{obs}} - \widehat{\mathbb{E}}(Z)
+}{
+\sqrt{
+\widehat{\operatorname{Var}}(Z)
+}
+}.
+$${#eq-z-statistic-zero-counts}
+
+Large positive values of $z_{\operatorname{zero}}$ indicate that the training data contain more zero counts than the fitted Poisson model expects. The corresponding one-sided $p$-value is
+
+$$
+\begin{gather}
+Z_{\operatorname{zero}} \sim \operatorname{Normal}\left(0,1\right) \\
+p\text{-value}
+=
+\Pr
+\left(
+Z_{\operatorname{zero}}
+\geq
+z_{\operatorname{zero}}
+\right),
+\end{gather}
+$$
+
+where $\operatorname{Normal}(0,1)$ denotes a standard Normal random variable.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on what this zero-count test is checking!
+::::
+
+:::: {.Heads-up-container}
+This diagnostic is not testing whether the response variable can take the value zero. A Poisson model always allows zero counts. Instead, it asks whether the **number of zeros observed in the training data** is unusually large compared with the number of zeros expected under the fitted Classical Poisson model.
+
+The fitted model can assign a different zero probability to each female crab because each crab has its own fitted expected count $\hat{\mu}_i$. For the $i$th crab, that fitted zero probability is
+
+$$
+\hat{\pi}_{0i}
+=
+\exp(-\hat{\mu}_i).
+$$
+
+The fitted expected number of zeros is obtained by adding these fitted zero probabilities across the training observations. If the observed zero count is much larger than this fitted expectation, then the model may be missing a feature of the data-generating process. This can happen, for example, when some female crabs have zero satellite males for reasons not captured by width alone.
+
+This check is a diagnostic, not a final model-selection rule. A large excess of zeros would motivate considering zero-inflated count models (see @sec-zero-inflated-poisson), but it should be interpreted alongside the overdispersion check, residual deviance, residual plots, and the scientific context.
+::::
+:::
+
+The following table computes the observed zero count, the fitted expected zero count, the approximate $z$-statistic, and the one-sided $p$-value.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomial-zero-count-check-r
+#| tbl-cap: "Observed and fitted zero counts for the simple width-only Poisson regression model."
+#| message: false
+#| warning: false
+
+observed_zero_count <- sum(simple_poisson_gof_data$satellites == 0)
+
+expected_zero_count <- sum(simple_poisson_gof_data$fitted_zero_probability)
+
+zero_count_variance <- sum(simple_poisson_gof_data$fitted_zero_probability *
+    (1 - simple_poisson_gof_data$fitted_zero_probability))
+
+zero_count_z <- (observed_zero_count - expected_zero_count) / sqrt(zero_count_variance)
+
+zero_count_p_value <- pnorm(zero_count_z, lower.tail = FALSE)
+
+zero_count_summary <- tibble::tibble(`Observed zero count` = observed_zero_count,
+  `Fitted expected zero count` = expected_zero_count,
+  `Observed minus fitted zeros` = observed_zero_count - expected_zero_count,
+  `Approximate z-statistic` = zero_count_z, `One-sided p-value` = zero_count_p_value) |>
+  mutate(`Observed zero count` = formatC(`Observed zero count`, format = "f", digits = 0),
+    `Fitted expected zero count` = formatC(`Fitted expected zero count`, format = "f",
+      digits = 2),
+    `Observed minus fitted zeros` = formatC(`Observed minus fitted zeros`, format = "f",
+      digits = 2),
+    `Approximate z-statistic` = formatC(`Approximate z-statistic`, format = "f", digits = 2
+    ), `One-sided p-value` = formatC(`One-sided p-value`, format = "e", digits = 2)) |>
+  pivot_longer(cols = everything(), names_to = "Quantity", values_to = "Value")
+
+zero_count_summary |>
+  kable(align = c("c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+observed_zero_count = (simple_poisson_gof_data["satellites"] == 0).sum()
+
+expected_zero_count = (simple_poisson_gof_data["fitted_zero_probability"].sum())
+
+zero_count_variance = (simple_poisson_gof_data["fitted_zero_probability"]
+    * (1 - simple_poisson_gof_data["fitted_zero_probability"])).sum()
+
+zero_count_z = (observed_zero_count - expected_zero_count) / np.sqrt(zero_count_variance)
+
+zero_count_p_value = stats.norm.sf(zero_count_z)
+
+zero_count_summary = pd.DataFrame(
+    {"Quantity": ["Observed zero count", "Fitted expected zero count",
+            "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value",
+        ], "Value": [f"{observed_zero_count:.0f}", f"{expected_zero_count:.2f}",
+            f"{observed_zero_count - expected_zero_count:.2f}", f"{zero_count_z:.2f}",
+            f"{zero_count_p_value:.2e}",
+        ],
+    })
+
+classical_poisson_zero_count_check_py_html = (scrollable_table_html(zero_count_summary))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-negative-binomial-zero-count-check-py
+#| tbl-cap: "Observed and fitted zero counts for the simple width-only Poisson regression model."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$classical_poisson_zero_count_check_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+:::
+
+This zero-count check gives strong evidence that the simple width-only Classical Poisson model is not reproducing the zero-count part of the response distribution. In the **training data**, the observed number of female crabs with zero satellite males is `r observed_zero_count`, while the fitted model expects only `r formatC(expected_zero_count, format = "f", digits = 2)` zeros. The difference is therefore `r formatC(observed_zero_count - expected_zero_count, format = "f", digits = 2)` additional zero counts beyond what the fitted model expects. Then, the approximate $z$-statistic is `r formatC(zero_count_z, format = "f", digits = 2)`, with a one-sided $p$-value of `r formatC(zero_count_p_value, format = "e", digits = 2)`. This provides strong diagnostic evidence of **excess zero counts** relative to the simple Classical Poisson model. In practical terms, the model is not only struggling with the overall mean-variance structure; it is also substantially understating how often zero satellite counts occur in the training data.
+
+Furthermore, this zero-count check should still be interpreted as one diagnostic rather than as the only criterion for choosing a model. This situation motivates a closer look at alternatives such as zero-inflated count models.
 
 
 ## Results
