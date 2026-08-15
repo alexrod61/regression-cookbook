@@ -91,7 +91,7 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
-- Determine when Classical Poisson regression is an **appropriate modelling choice**, and recognize situations where a Negative Binomial Regression model is a more appropriate modelling choice.
+- Determine when Negative Binomial Regression is an **appropriate modelling choice**, and recognize situations where a Classical Poisson model is a more appropriate choice.
 - Frame **inferential** and **predictive inquiries** for a count-regression problem using the **data science workflow**.
 - Specify a Negative Binomial regression model as a generalized linear model with a **Negative Binomial random component**, a **linear predictor**, and a **log link function**.
 - Write and interpret the **likelihood** and **log-likelihood functions** for a Negative Binomial regression model.
@@ -195,17 +195,17 @@ import scipy.stats as stats
 
 ## Introduction {#sec-negative-binomial-introduction}
 
+**Negative Binomial regression** belongs to the generalized linear model (GLM) family, but it uses a Negative Binomial random component and a log link function instead of the Normal random component and identity link that appear in Ordinary Least-squares (OLS) regression. This allows the model to connect a set of regressors to the expected count while respecting the fact that fitted counts should not be negative.
+
 ## Case Study: Horseshoe Crab Satellites
 
-The running case study in this chapter uses data on **horseshoe crab satellites** from [Chapter 10](#sec-classical-poisson). It is a strong example for this chapter because it a **count regression** problem with an **overdispersed** response variable: 
+The running case study in this chapter uses the dataset on **horseshoe crab satellites** from [Chapter 10](#sec-classical-poisson). It is a good example for this chapter because it a **count regression** problem with an **overdispersed** response variable: 
 
 > **For each female horseshoe crab, we observe the *number of satellite males* around her.**
 
 ![Image by [*BarelyDevi*](https://pixabay.com/users/barelydevi-14723734/) via [*Pixabay*](https://pixabay.com/illustrations/crab-sea-seafood-ocean-beach-fish-5030504/).](img/crab.png){width="500"}
 
 In the biological setting, a female horseshoe crab may arrive at a nesting site with an attached male. Other unattached males may gather around the nesting pair and compete for fertilization opportunities. These unattached males are called **satellite males**. Some female crabs have no satellite males nearby, while others have several. Therefore, the response variable is a non-negative integer count. It can be $0$, $1$, $2$, and so on, but it cannot be negative and it is not naturally continuous. This makes the dataset a useful starting point for Poisson regression.
-
-The dataset used in this chapter comes from Brockmann's study of satellite male groups in *Limulus polyphemus* [@brockmann1996]. The version commonly used in statistics teaching contains one row per female crab. For each female crab, we observe the number of satellite males and several characteristics of the female, including body width, body weight, colour category, and spine condition. These variables let us study whether **observable female crab characteristics** are associated with the **expected number of satellite males**.
 
 In [Chapter 10](#sec-classical-poisson), we saw that the variance in the number of satellite males is much larger than the mean number of satellite males. We will formally test **overdispersion** in @sec-overdispersion, and Negative Binomial regression can be a better modelling choice than Poisson regression if there is statistical evidence of **overdispersion** in the data. The response is a count, the regressors include both continuous and categorical variables, and the scientific question(s) can be approached from more than one modelling purpose:
 
@@ -235,7 +235,7 @@ Before fitting a Negative Binomial regression model, we need to clarify what the
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
 
-Hence, for the horseshoe crab case study, the study-design elements are summarized in @tbl-classical-poisson-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Poisson regression model will be used. Note that @tbl-classical-poisson-study-design-variables is intentionally simple. At this point in the workflow, we are not yet fitting a model or interpreting coefficients. We are just making sure that the observational unit, response variable, and regressors are clear.
+Hence, for the horseshoe crab case study, the study-design elements are summarized in @tbl-negative-binomial-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Poisson regression model will be used. Note that @tbl-negative-binomial-study-design-variables is intentionally simple. At this point in the workflow, we are not yet fitting a model or interpreting coefficients. We are just making sure that the observational unit, response variable, and regressors are clear.
 
 | **Role in the study design** | **Variable(s)** | **Description** |
 |:---:|:---:|:---:|
@@ -243,16 +243,16 @@ Hence, for the horseshoe crab case study, the study-design elements are summariz
 | **Response variable** | Number of satellite males | The count outcome: how many satellite males were observed near the female crab. |
 | **Main regressors** | Body width, weight, colour category, spine condition | Observable characteristics of the female crab that may be associated with the expected number of satellite males. |
 
-: Key elements of the horseshoe crab study design for the Poisson regression chapter. {#tbl-classical-poisson-study-design-variables .striped .hover}
+: Key elements of the horseshoe crab study design for the Poisson regression chapter. {#tbl-negative-binomial-study-design-variables .striped .hover}
 
-Note that a single dataset can support different kinds of modelling inquiries. Therefore, we will use the same count response to illustrate two related but distinct modelling purposes: an **inferential inquiry** and a **predictive inquiry** as shown in @tbl-classical-poisson-study-design-inquiries. This distinction is critical since the modelling workflow is not judged in exactly the same way for both purposes.
+Note that a single dataset can support different kinds of modelling inquiries. Therefore, we will use the same count response to illustrate two related but distinct modelling purposes: an **inferential inquiry** and a **predictive inquiry** as shown in @tbl-negative-binomial-study-design-inquiries. This distinction is critical since the modelling workflow is not judged in exactly the same way for both purposes.
 
 | **Inquiry type** | **Main question** | **Main modelling emphasis** | **What we will look for later in the chapter** |
 |:---:|:---:|:---:|:---:|
 | **Inferential inquiry** | How is the expected number of satellite males associated with female crab characteristics? | Coefficients, uncertainty, hypothesis tests, confidence intervals, and interpretation. | Whether the estimated associations are meaningful, how uncertain they are, and whether they can be interpreted responsibly. |
 | **Predictive inquiry** | How well can the available regressors predict the expected number of satellite males for a female crab? | Predicted expected counts, test-set accuracy, and comparison against a simple baseline. | Whether the fitted model improves predictive performance beyond a simple benchmark and whether the prediction errors are practically acceptable. |
 
-: Two modelling inquiries supported by the horseshoe crab satellites case study. {#tbl-classical-poisson-study-design-inquiries .striped .hover}
+: Two modelling inquiries supported by the horseshoe crab satellites case study. {#tbl-negative-binomial-study-design-inquiries .striped .hover}
 
 The above inferential and predictive inquiries are connected but not interchangeable. A model can have interpretable coefficients but only modest predictive performance. Conversely, a model can give useful predictions without answering every scientific question about the mechanisms behind satellite male behaviour. Keeping the two inquiries separate helps us decide which results belong in the inferential interpretation and which results belong in the prediction-accuracy discussion.
 
@@ -271,7 +271,7 @@ Both inquiries require model checking. If the Negative Binomial model fits the d
 ::::
 :::
 
-### Inferential Inquiry {#sec-classical-poisson-inferential-inquiry}
+### Inferential Inquiry {#sec-negative-binomial-inferential-inquiry}
 
 Specifically, the inferential inquiry asks:
 
@@ -279,11 +279,11 @@ Specifically, the inferential inquiry asks:
 
 This question is about **association and interpretation**. It does not ask whether a female crab characteristic causes satellite males to appear. The data are **observational**, and the case study does not establish a causal design. Instead, the inferential goal is to describe how the expected count of satellite males changes across observed female crab characteristics within a Poisson regression framework.
 
-For example, one inferential question is whether wider female crabs tend to have a larger expected number of satellite males. Later, when we introduce the simple Poisson regression model in @sec-classical-poisson-simple-model, body width will be used as the first regressor because it gives a clear one-regressor entry point into the model. In the extended model in @sec-classical-poisson-additional-regressors, we will add more female crab characteristics so that we can interpret associations while holding other regressors fixed.
+For example, one inferential question is whether wider female crabs tend to have a larger expected number of satellite males. Later, when we introduce the simple Negative Binomial regression model in @sec-negative-binomial-simple-model, body width will be used as the first regressor because it gives a clear one-regressor entry point into the model. In the extended model in @sec-negative-binomial-additional-regressors, we will add more female crab characteristics so that we can interpret associations while holding other regressors fixed.
 
 For this inquiry, the **results stage** will focus on coefficient estimates, uncertainty, and statistical interpretation. We will ask whether the estimated associations are consistent with the scientific question, whether the confidence intervals are informative, and whether hypothesis tests provide evidence for associations between the regressors and the expected count.
 
-### Predictive Inquiry {#sec-classical-poisson-predictive-inquiry}
+### Predictive Inquiry {#sec-negative-binomial-predictive-inquiry}
 
 Now, the predictive inquiry asks:
 
@@ -303,7 +303,7 @@ The data used in this chapter are **secondary observational data**. They were or
 
 According to the documentation for the teaching version of the dataset, each row corresponds to one female horseshoe crab [@agresti2013]. The variables record the female crab's colour, spine condition, carapace width, number of satellite males, and weight. The original data also include a binary indicator for whether at least one satellite male was present. That said, in this chapter, our response variable is the **count** of satellite males, so the binary indicator is not the primary outcome.
 
-Now, before doing EDA, we will complete a small amount of data wrangling (as shown in @fig-ds-workflow-data-collection-wrangling). The goal is not to create a training/testing split yet. As in the data science workflow from @sec-intro (more specifically in @sec-ds-workflow-eda), the data split belongs to the EDA stage because we first need to inspect the data structure and then decide how to separate observations for modelling and evaluation. In this section, we only load the data, rename variables, and prepare the categorical regressors so that they are easier to interpret later. The main variables used in the chapter are summarized in @tbl-classical-poisson-wrangled-variables.
+Now, before doing EDA, we will complete a small amount of data wrangling (as shown in @fig-ds-workflow-data-collection-wrangling). The goal is not to create a training/testing split yet. As in the data science workflow from @sec-intro (more specifically in @sec-ds-workflow-eda), the data split belongs to the EDA stage because we first need to inspect the data structure and then decide how to separate observations for modelling and evaluation. In this section, we only load the data, rename variables, and prepare the categorical regressors so that they are easier to interpret later. The main variables used in the chapter are summarized in @tbl-negative-binomial-wrangled-variables.
 
 | **Variable after wrangling** | **Role** | **Description** |
 |:---:|:---:|:---:|
@@ -313,7 +313,7 @@ Now, before doing EDA, we will complete a small amount of data wrangling (as sho
 | `color` | Regressor | Female crab colour category, treated as categorical. |
 | `spine` | Regressor | Female crab spine condition, treated as categorical. |
 
-: Main variables used after wrangling the horseshoe crab dataset. {#tbl-classical-poisson-wrangled-variables .striped .hover}
+: Main variables used after wrangling the horseshoe crab dataset. {#tbl-negative-binomial-wrangled-variables .striped .hover}
 
 The `R` and `Python` code below follow the same wrangling logic. First, the data are read from the public teaching data file associated with the categorical-data examples in @agresti2013. Second, the columns are assigned readable names. Third, the colour and spine variables are converted to categorical variables with descriptive labels. Finally, the dataset is restricted to the variables needed for this chapter. More specifically, we have the following:
 
@@ -473,7 +473,7 @@ crabs |>
 ## **`Python` Output**
 
 ```{python}
-#| label: lst-classical-poisson-data-wrangling-py
+#| label: lst-negative-binomial-data-wrangling-py
 #| lst-cap: "Loading and wrangling the horseshoe crab satellite data in Python."
 #| echo: false
 #| message: false
@@ -553,17 +553,17 @@ EDA begins after the data have been collected and wrangled into the working obje
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-outlook-success-3704053/).](img/explore.png){width="400"}
 
-Before splitting the data, it is useful to classify the variables that will appear throughout the chapter. For the $i$th female crab, @tbl-classical-poisson-variables summarizes the response and the main regressors. Note that the response variable is the number of satellite males. This is the main reason Poisson regression is a natural starting point: $Y_i$ is a non-negative integer count. Then, the continuous regressors `width_cm` and `weight_kg` will help us examine whether larger female crabs tend to have higher expected numbers of satellites. On the other hand, the categorical regressors `color` and `spine` will help us examine whether visible phenotypic characteristics are associated with the response.
+Before splitting the data, it is useful to classify the variables that will appear throughout the chapter. For the $i$th female crab, @tbl-negative-binomial-variables summarizes the response and the main regressors. Note that the response variable is the number of satellite males. This is the main reason Poisson regression is a natural starting point: $Y_i$ is a non-negative integer count. Then, the continuous regressors `width_cm` and `weight_kg` will help us examine whether larger female crabs tend to have higher expected numbers of satellites. On the other hand, the categorical regressors `color` and `spine` will help us examine whether visible phenotypic characteristics are associated with the response.
 
 | **Variable** | **Role** | **Type** | **Notation** | **Description** |
 |:---:|:---:|:---:|:---:|:---:|
 | `satellites` | Response | Discrete count | $Y_i$ | Number of satellite males observed near the female crab. |
 | `width_cm` | Regressor | Continuous | $x_{i,1}$ | Female crab carapace width, measured in centimetres. |
 | `weight_kg` | Regressor | Continuous | $x_{i,2}$ | Female crab weight, measured in kilograms. |
-| `color` | Regressor | Categorical | Encoded in @sec-classical-poisson-categorical-regressors using indicator regressors | Female crab colour category. |
-| `spine` | Regressor | Categorical | Encoded in @sec-classical-poisson-categorical-regressors using indicator regressors | Female crab spine condition. |
+| `color` | Regressor | Categorical | Encoded in @sec-negative-binomial-categorical-regressors using indicator regressors | Female crab colour category. |
+| `spine` | Regressor | Categorical | Encoded in @sec-negative-binomial-categorical-regressors using indicator regressors | Female crab spine condition. |
 
-: Variables used in the horseshoe crab Poisson regression workflow. {#tbl-classical-poisson-variables .striped .hover}
+: Variables used in the horseshoe crab Poisson regression workflow. {#tbl-negative-binomial-variables .striped .hover}
 
 ::: {.Tip}
 :::: {.Tip-header}
@@ -584,8 +584,8 @@ A more careful split could stratify the data by an important categorical regress
 
 The `R` and `Python` code below first produce independent 50/50 random splits. These two splits use the same conceptual allocation and the same seed value, but they are not expected to select exactly the same observations because `R` and `Python` use different random-number machinery and different splitting implementations:
 
-- @lst-classical-poisson-data-splitting-r uses the [{rsample}](https://rsample.tidymodels.org/) package to split the wrangled `crabs` dataset into training and testing sets. The argument `prop = 0.5` requests that approximately half of the observations be assigned to the training set. The remaining observations are assigned to the testing set. The sanity check prints the dimensions of both subsets and their observed proportions.
-- @lst-classical-poisson-data-splitting-py performs the analogous 50/50 split in `Python` using `train_test_split()` from [{scikit-learn}](https://scikit-learn.org/stable/). The argument `test_size = 0.5` assigns approximately half of the observations to the testing set, with the rest assigned to the training set. The output is used only to demonstrate the analogous Python splitting workflow.
+- @lst-negative-binomial-data-splitting-r uses the [{rsample}](https://rsample.tidymodels.org/) package to split the wrangled `crabs` dataset into training and testing sets. The argument `prop = 0.5` requests that approximately half of the observations be assigned to the training set. The remaining observations are assigned to the testing set. The sanity check prints the dimensions of both subsets and their observed proportions.
+- @lst-negative-binomial-data-splitting-py performs the analogous 50/50 split in `Python` using `train_test_split()` from [{scikit-learn}](https://scikit-learn.org/stable/). The argument `test_size = 0.5` assigns approximately half of the observations to the testing set, with the rest assigned to the training set. The output is used only to demonstrate the analogous Python splitting workflow.
 
 ::: {.panel-tabset}
 
@@ -593,7 +593,7 @@ The `R` and `Python` code below first produce independent 50/50 random splits. T
 
 ```{r}
 #| echo: true
-#| lst-label: lst-classical-poisson-data-splitting-r
+#| lst-label: lst-negative-binomial-data-splitting-r
 #| lst-cap: "Code to randomly split the horseshoe crab data into training and testing sets."
 #| message: false
 #| warning: false
@@ -633,7 +633,7 @@ cat(sprintf(
 
 ```{python}
 #| echo: true
-#| lst-label: lst-classical-poisson-data-splitting-py
+#| lst-label: lst-negative-binomial-data-splitting-py
 #| lst-cap: "Code to randomly split the horseshoe crab data into training and testing sets."
 #| message: false
 #| warning: false
@@ -675,7 +675,7 @@ Using the same seed and split proportion in `R` and `Python` does not guarantee 
 ::::
 :::
 
-Via [{reticulate}](https://rstudio.github.io/reticulate/), @lst-classical-poisson-import-r-split-py imports the `R`-generated training and testing sets into the `Python` environment. This ensures the `R` and `Python` results are comparable since summaries, plots, fitted models, and prediction metrics will be based on the same observations. Henceforth, the `Python` code uses the same `training_data` and `testing_data` objects as the `R` workflow.
+Via [{reticulate}](https://rstudio.github.io/reticulate/), @lst-negative-binomial-import-r-split-py imports the `R`-generated training and testing sets into the `Python` environment. This ensures the `R` and `Python` results are comparable since summaries, plots, fitted models, and prediction metrics will be based on the same observations. Henceforth, the `Python` code uses the same `training_data` and `testing_data` objects as the `R` workflow.
 
 ::: {.panel-tabset}
 
@@ -683,7 +683,7 @@ Via [{reticulate}](https://rstudio.github.io/reticulate/), @lst-classical-poisso
 
 ```{python}
 #| echo: true
-#| lst-label: lst-classical-poisson-import-r-split-py
+#| lst-label: lst-negative-binomial-import-r-split-py
 #| lst-cap: "Code to import the R-generated training and testing sets into Python."
 #| message: false
 #| warning: false
@@ -710,24 +710,24 @@ Heads-up on how the split is used later!
 :::: {.Heads-up-container}
 The same training/testing split supports both inquiry flavours, but the two flavours use the subsets differently after EDA:
 
-- For the **predictive inquiry**, the Poisson regression model fitted on the training set will later be used to predict expected counts for the testing set. These test-set predictions will be used to compute prediction accuracy metrics in the results stage.
+- For the **predictive inquiry**, the Negative Binomial regression model fitted on the training set will later be used to predict expected counts for the testing set. These test-set predictions will be used to compute prediction accuracy metrics in the results stage.
 - For the **inferential inquiry**, the training set is used to explore the data, fit the candidate model, and run goodness-of-fit checks. If the model is adequate enough to proceed, the selected model specification will then be refit on the testing set to generate the final inferential outputs reported in the results stage. This helps avoid double dipping by separating the data used for exploration and diagnostics from the data used for final inferential reporting.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-to-learn-3674106/).](img/pieces.png){width="250"}
 ::::
 :::
 
-### Descriptive Summaries {#sec-classical-poisson-eda-general}
+### Descriptive Summaries {#sec-negative-binomial-eda-general}
 
-We begin with descriptive summaries because they tell us whether the data look compatible with the modelling task:
+We begin with descriptive summaries because they tell us whether the data looks compatible with the modelling task:
 
 - For the **response**, we are especially interested in the number of zeros, the typical count, and the relationship between the sample mean and sample variance. 
 - For the **regressors**, we want to understand the scale of the continuous variables and the distribution of the categorical variables.
 
 Thus, we have the following:
 
-- @tbl-classical-poisson-training-summary-r shows the training-set summaries for the response and the two continuous regressors. in `R`. For the count response, it reports the mean and variance because the Classical Poisson regression model will later require us to think carefully about the mean-variance relationship.
-- @tbl-classical-poisson-training-summary-py shows the same summaries in `Python`. The code uses the `training_data` object imported from `R`, so the values should match the `R` summaries up to formatting.
+- @tbl-negative-binomial-training-summary-r shows the training-set summaries for the response and the two continuous regressors. in `R`. For the count response, it reports the mean and variance because the Negative Binomial regression model will later require us to think carefully about the mean-variance relationship.
+- @tbl-negative-binomial-training-summary-py shows the same summaries in `Python`. The code uses the `training_data` object imported from `R`, so the values should match the `R` summaries up to formatting.
 
 ::: {.panel-tabset}
 
@@ -735,7 +735,7 @@ Thus, we have the following:
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-training-summary-r
+#| label: tbl-negative-binomial-training-summary-r
 #| tbl-cap: "Descriptive summary statistics for the horseshoe crab training data."
 #| message: false
 #| warning: false
@@ -820,7 +820,7 @@ training_summary["Value"] = [
     )
 ]
 
-classical_poisson_training_summary_py_html = (
+negative_binomial_training_summary_py_html = (
     training_summary.to_html(
         index=False,
         border=0,
@@ -830,7 +830,7 @@ classical_poisson_training_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-training-summary-py
+#| label: tbl-negative-binomial-training-summary-py
 #| tbl-cap: "Descriptive summary statistics for the horseshoe crab training data."
 #| message: false
 #| warning: false
@@ -838,7 +838,7 @@ classical_poisson_training_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_training_summary_py_html,
+  py$negative_binomial_training_summary_py_html,
   "\n",
   sep = ""
 )
@@ -862,7 +862,7 @@ Next, we summarize the categorical regressors `color` and `spine`. These summari
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-color-summary-r
+#| label: tbl-negative-binomial-color-summary-r
 #| tbl-cap: "Descriptive summary of female crab colour categories in the training data."
 #| message: false
 #| warning: false
@@ -908,7 +908,7 @@ color_summary_display = color_summary.rename(
     }
 )
 
-classical_poisson_color_summary_py_html = (
+negative_binomial_color_summary_py_html = (
     color_summary_display.to_html(
         index=False,
         border=0,
@@ -918,7 +918,7 @@ classical_poisson_color_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-color-summary-py
+#| label: tbl-negative-binomial-color-summary-py
 #| tbl-cap: "Descriptive summary of female crab colour categories in the training data."
 #| message: false
 #| warning: false
@@ -926,7 +926,7 @@ classical_poisson_color_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_color_summary_py_html,
+  py$negative_binomial_color_summary_py_html,
   "\n",
   sep = ""
 )
@@ -940,7 +940,7 @@ cat(
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-spine-summary-r
+#| label: tbl-negative-binomial-spine-summary-r
 #| tbl-cap: "Descriptive summary of female crab spine condition categories in the training data."
 #| message: false
 #| warning: false
@@ -986,7 +986,7 @@ spine_summary_display = spine_summary.rename(
     }
 )
 
-classical_poisson_spine_summary_py_html = (
+negative_binomial_spine_summary_py_html = (
     spine_summary_display.to_html(
         index=False,
         border=0,
@@ -996,7 +996,7 @@ classical_poisson_spine_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-spine-summary-py
+#| label: tbl-negative-binomial-spine-summary-py
 #| tbl-cap: "Descriptive summary of female crab spine condition categories in the training data."
 #| message: false
 #| warning: false
@@ -1004,7 +1004,7 @@ classical_poisson_spine_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_spine_summary_py_html,
+  py$negative_binomial_spine_summary_py_html,
   "\n",
   sep = ""
 )
@@ -1014,7 +1014,7 @@ cat(
 
 The above categorical summaries show that the training data **are not evenly distributed** across the female crab colour and spine categories. For colour, most crabs are in the `Medium light` category, followed by `Medium dark`, while the `Light` and `Dark` categories are less common. For spine condition, most crabs are in the `Both worn or broken` category, with fewer observations in the `Both good` and `One worn or broken` categories. Sparse categories can make coefficient estimates less stable and can make category-level comparisons harder to interpret. For now, we treat these summaries as exploratory checks; later, the model will help us assess whether colour and spine condition appear associated with the expected number of satellite males after accounting for the other regressors.
 
-### Distribution of the Count Response {#sec-classical-poisson-eda-response}
+### Distribution of the Count Response {#sec-negative-binomial-eda-response}
 
 We now examine the distribution of the response variable `satellites` in the **training data**. This is the first EDA output that directly speaks to the Poisson regression model. Before thinking about regressors, we need to understand the count we are trying to model: 
 
@@ -1025,7 +1025,7 @@ We now examine the distribution of the response variable `satellites` in the **t
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teaching-to-learn-wiki-3976301/).](img/board.png){width="500"}
 
-The response summaries, in @tbl-classical-poisson-response-summary-r, give a compact numerical view before we look at the response plot. The most important quantities for the Poisson regression story are the **mean**, the **variance**, the **proportion of zeros**, and the **maximum observed count**.
+The response summaries, in @tbl-negative-binomial-response-summary-r, give a compact numerical view before we look at the response plot. The most important quantities for the Poisson regression story are the **mean**, the **variance**, the **proportion of zeros**, and the **maximum observed count**.
 
 ::: {.panel-tabset}
 
@@ -1033,7 +1033,7 @@ The response summaries, in @tbl-classical-poisson-response-summary-r, give a com
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-response-summary-r
+#| label: tbl-negative-binomial-response-summary-r
 #| tbl-cap: "Descriptive summary statistics for the distribution of male satellite counts in the training data."
 #| message: false
 #| warning: false
@@ -1133,7 +1133,7 @@ response_summary["Value"] = [
     )
 ]
 
-classical_poisson_response_summary_py_html = (
+negative_binomial_response_summary_py_html = (
     response_summary.to_html(
         index=False,
         border=0,
@@ -1143,7 +1143,7 @@ classical_poisson_response_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-response-summary-py
+#| label: tbl-negative-binomial-response-summary-py
 #| tbl-cap: "Descriptive summary statistics for the distribution of male satellite counts in the training data."
 #| message: false
 #| warning: false
@@ -1151,7 +1151,7 @@ classical_poisson_response_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_response_summary_py_html,
+  py$negative_binomial_response_summary_py_html,
   "\n",
   sep = ""
 )
@@ -1159,16 +1159,16 @@ cat(
 
 :::
 
-The above response summaries already tell us several important things. First, **zero counts are common**: `r sum(training_data$satellites == 0)` out of `r nrow(training_data)` female crabs in the training set have no satellite males, corresponding to a proportion of `r round(mean(training_data$satellites == 0), 2)`. Second, **the response is right-skewed**: the median number of satellite males is `r median(training_data$satellites)`, while the maximum observed training-set count is `r max(training_data$satellites)`. Third, **the sample variance, `r round(var(training_data$satellites), 2)`, is much larger than the sample mean, `r round(mean(training_data$satellites), 2)`**. The variance-to-mean ratio is approximately `r round(var(training_data$satellites) / mean(training_data$satellites), 2)`, which is an early warning sign that the Classical Poisson mean-variance structure will need to be checked carefully in @sec-classical-poisson-equidispersion.
+The above response summaries already tell us several important things. First, **zero counts are common**: `r sum(training_data$satellites == 0)` out of `r nrow(training_data)` female crabs in the training set have no satellite males, corresponding to a proportion of `r round(mean(training_data$satellites == 0), 2)`. Second, **the response is right-skewed**: the median number of satellite males is `r median(training_data$satellites)`, while the maximum observed training-set count is `r max(training_data$satellites)`. Third, **the sample variance, `r round(var(training_data$satellites), 2)`, is much larger than the sample mean, `r round(mean(training_data$satellites), 2)`**. The variance-to-mean ratio is approximately `r round(var(training_data$satellites) / mean(training_data$satellites), 2)`, which is an early warning sign of **overdispersion** in the data.
 
-Note that the bar plot in @fig-classical-poisson-response-distribution-r (or @fig-classical-poisson-response-distribution-py) gives the same information visually. A bar plot is more appropriate than a smooth density plot because the response is a count. Each bar corresponds to a possible number of satellite males.
+Note that the bar plot in @fig-negative-binomial-response-distribution-r (or @fig-negative-binomial-response-distribution-py) gives the same information visually. A bar plot is more appropriate than a smooth density plot because the response is a count. Each bar corresponds to a possible number of satellite males.
 
 ::: {.panel-tabset}
 
 ## **`R`**
 
 ```{r}
-#| label: fig-classical-poisson-response-distribution-r
+#| label: fig-negative-binomial-response-distribution-r
 #| fig-cap: "Distribution of the number of satellite males in the training data."
 #| warning: false
 #| echo: true
@@ -1212,7 +1212,7 @@ response_distribution_plot
 ## **`Python`**
 
 ```{python}
-#| label: fig-classical-poisson-response-distribution-py
+#| label: fig-negative-binomial-response-distribution-py
 #| fig-cap: "Distribution of the number of satellite males in the training data."
 #| warning: false
 #| echo: true
@@ -1277,9 +1277,9 @@ plt.show()
 
 The bar plot confirms that the training-set response is concentrated at zero and relatively small positive counts, with a thinner right tail extending to larger numbers of satellite males. This is critical for the **inferential inquiry** because the model must describe how the expected count changes with female crab characteristics while respecting the count scale. It is also important for the **predictive inquiry** because exact observed counts may be difficult to predict: many crabs have no satellites, while a smaller number have much larger counts. Therefore, later predictive results should focus on predicted **expected counts** and prediction errors, not on pretending that the model can deterministically identify the exact count for each crab.
 
-We have to stress that, at this stage, the above response distribution does not prove that Poisson regression is inappropriate. It tells us what to look for. The large variance relative to the mean suggests **possible overdispersion**, and the visible number of zeros indicates we should later compare observed and fitted counts carefully. These issues will become part of the goodness-of-fit story before we decide whether the Classical Poisson model is adequate enough for the chapter's two inquiries.
+We have to stress that, at this stage, the above response distribution does not prove that Negative Binomial regression is appropriate. The large variance relative to the mean suggests **possible overdispersion**, and the visible number of zeros indicates we should later compare observed and fitted counts carefully. These issues will become part of the goodness-of-fit story before we decide whether the Negative Binomial model is adequate enough for the chapter's two inquiries.
 
-### Satellite Counts and Continuous Regressors {#sec-classical-poisson-eda-continuous}
+### Satellite Counts and Continuous Regressors {#sec-negative-binomial-eda-continuous}
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-problem-technology-3974187/).](img/plug-2.png){width="400"}
 
@@ -1291,7 +1291,7 @@ The next part of the EDA examines the response against the two continuous regres
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-width-quartile-summary-r
+#| label: tbl-negative-binomial-width-quartile-summary-r
 #| tbl-cap: "Descriptive summary statistics of male satellite counts across width quartiles in the training data."
 #| message: false
 #| warning: false
@@ -1409,7 +1409,7 @@ width_quartile_summary_display = width_quartile_summary.rename(
     }
 )
 
-classical_poisson_width_quartile_summary_py_html = (
+negative_binomial_width_quartile_summary_py_html = (
     width_quartile_summary_display.to_html(
         index=False,
         border=0,
@@ -1419,7 +1419,7 @@ classical_poisson_width_quartile_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-width-quartile-summary-py
+#| label: tbl-negative-binomial-width-quartile-summary-py
 #| tbl-cap: "Descriptive summary statistics of male satellite counts across width quartiles in the training data."
 #| message: false
 #| warning: false
@@ -1427,7 +1427,7 @@ classical_poisson_width_quartile_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_width_quartile_summary_py_html,
+  py$negative_binomial_width_quartile_summary_py_html,
   "\n",
   sep = ""
 )
@@ -1449,7 +1449,7 @@ This monotone increase across width quartiles suggests that female crab width is
 Heads-up on smoothing and count-response scatterplots!
 ::::
 :::: {.Heads-up-container}
-In both @fig-classical-poisson-satellites-width-r (or @fig-classical-poisson-satellites-width-py), the orange curve is a **LOWESS/LOESS** smooth. **LOWESS** stands for **locally weighted scatterplot smoothing**, and **LOESS** stands for **locally estimated scatterplot smoothing**. Both refer to closely related smoothing methods that draw a flexible trend line through a scatterplot by fitting many small local regressions, each using observations close to a given value on the horizontal axis.
+In both @fig-negative-binomial-satellites-width-r (or @fig-negative-binomial-satellites-width-py), the orange curve is a **LOWESS/LOESS** smooth. **LOWESS** stands for **locally weighted scatterplot smoothing**, and **LOESS** stands for **locally estimated scatterplot smoothing**. Both refer to closely related smoothing methods that draw a flexible trend line through a scatterplot by fitting many small local regressions, each using observations close to a given value on the horizontal axis.
 
 In this chapter, we use the LOWESS/LOESS curve only as a visual guide. It is not the Poisson regression model, and we will not interpret it as a fitted statistical model. Its purpose is simply to help us see whether satellite counts tend to be higher for wider female crabs.
 
@@ -1466,7 +1466,7 @@ Since `satellites` is a count response, the points naturally fall on horizontal 
 ## **`R`**
 
 ```{r}
-#| label: fig-classical-poisson-satellites-width-r
+#| label: fig-negative-binomial-satellites-width-r
 #| fig-cap: "Number of satellite males versus female crab width in the training data."
 #| warning: false
 #| message: false
@@ -1516,7 +1516,7 @@ satellites_width_plot
 ## **`Python`**
 
 ```{python}
-#| label: fig-classical-poisson-satellites-width-py
+#| label: fig-negative-binomial-satellites-width-py
 #| fig-cap: "Number of satellite males versus female crab width in the training data."
 #| warning: false
 #| message: false
@@ -1586,7 +1586,7 @@ plt.show()
 
 :::
 
-The width plot (from @fig-classical-poisson-satellites-width-r or @fig-classical-poisson-satellites-width-py) should be read together with the quartile (from @tbl-classical-poisson-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Poisson regression model (see @sec-classical-poisson-simple-model), while leaving formal model specification and interpretation for the next sections.
+The width plot (from @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py) should be read together with the quartile (from @tbl-negative-binomial-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Poisson regression model (see @sec-negative-binomial-simple-model), while leaving formal model specification and interpretation for the next sections.
 
 We now repeat the same EDA logic for female crab weight. Since width and weight both describe body size, we should expect them to tell related but not necessarily identical stories.
 
@@ -1596,7 +1596,7 @@ We now repeat the same EDA logic for female crab weight. Since width and weight 
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-weight-quartile-summary-r
+#| label: tbl-negative-binomial-weight-quartile-summary-r
 #| tbl-cap: "Descriptive summary statistics of male satellite counts across weight quartiles in the training data."
 #| message: false
 #| warning: false
@@ -1714,7 +1714,7 @@ weight_quartile_summary_display = weight_quartile_summary.rename(
     }
 )
 
-classical_poisson_weight_quartile_summary_py_html = (
+negative_binomial_weight_quartile_summary_py_html = (
     weight_quartile_summary_display.to_html(
         index=False,
         border=0,
@@ -1724,7 +1724,7 @@ classical_poisson_weight_quartile_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-weight-quartile-summary-py
+#| label: tbl-negative-binomial-weight-quartile-summary-py
 #| tbl-cap: "Descriptive summary statistics of male satellite counts across weight quartiles in the training data."
 #| message: false
 #| warning: false
@@ -1732,7 +1732,7 @@ classical_poisson_weight_quartile_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_weight_quartile_summary_py_html,
+  py$negative_binomial_weight_quartile_summary_py_html,
   "\n",
   sep = ""
 )
@@ -1745,14 +1745,14 @@ The weight-quartile summary also points toward a **positive body-size pattern**:
 - In the **smallest-weight quartile**, the average satellite count is `r weight_quartile_summary$mean_satellites[weight_quartile_summary$weight_quartile == "Q1: smallest weights"]`, with a median of `r weight_quartile_summary$median_satellites[weight_quartile_summary$weight_quartile == "Q1: smallest weights"]`. 
 - In the **largest-weight quartile**, the average satellite count is `r weight_quartile_summary$mean_satellites[weight_quartile_summary$weight_quartile == "Q4: largest weights"]`, with a median of `r weight_quartile_summary$median_satellites[weight_quartile_summary$weight_quartile == "Q4: largest weights"]`. 
 
-Thus, in the training data, heavier female crabs tend to have higher satellite counts. However, this is still an exploratory pattern, **not a biological conclusion**. @tbl-classical-poisson-weight-quartile-summary-r groups a continuous regressor into four broad bins, and it does not adjust for other female crab characteristics. In particular, the weight summary should be interpreted alongside the width summary, not in isolation. Width and weight are both body-size measurements, so part of the apparent weight pattern may overlap with the width pattern. This is one reason the chapter begins with a simple width-only model before considering an extended model with additional regressors. We will treat weight as a candidate body-size regressor to examine later, while leaving formal interpretation to the fitted regression model.
+Thus, in the training data, heavier female crabs tend to have higher satellite counts. However, this is still an exploratory pattern, **not a biological conclusion**. @tbl-negative-binomial-weight-quartile-summary-r groups a continuous regressor into four broad bins, and it does not adjust for other female crab characteristics. In particular, the weight summary should be interpreted alongside the width summary, not in isolation. Width and weight are both body-size measurements, so part of the apparent weight pattern may overlap with the width pattern. This is one reason the chapter begins with a simple width-only model before considering an extended model with additional regressors. We will treat weight as a candidate body-size regressor to examine later, while leaving formal interpretation to the fitted regression model.
 
 ::: {.panel-tabset}
 
 ## **`R`**
 
 ```{r}
-#| label: fig-classical-poisson-satellites-weight-r
+#| label: fig-negative-binomial-satellites-weight-r
 #| fig-cap: "Number of satellite males versus female crab weight in the training data."
 #| warning: false
 #| message: false
@@ -1805,7 +1805,7 @@ satellites_weight_plot
 ## **`Python`**
 
 ```{python}
-#| label: fig-classical-poisson-satellites-weight-py
+#| label: fig-negative-binomial-satellites-weight-py
 #| fig-cap: "Number of satellite males versus female crab weight in the training data."
 #| warning: false
 #| message: false
@@ -1873,13 +1873,13 @@ plt.show()
 
 :::
 
-The weight plot, in @fig-classical-poisson-satellites-weight-r or @fig-classical-poisson-satellites-weight-py, should be read with the same caution as the width plot. The horizontal bands again show that the response is a count, not a continuous outcome. The orange smooth gives an exploratory body-size trend, and the quartile table gives the corresponding numerical summary. The main EDA message is that **heavier female crabs tend to have higher satellite counts**, but the relationship is not deterministic. There are still zero counts and small positive counts across much of the weight range. Therefore, weight may add useful information in an extended model, but it should not be treated as a complete explanation of satellite counts.
+The weight plot, in @fig-negative-binomial-satellites-weight-r or @fig-negative-binomial-satellites-weight-py, should be read with the same caution as the width plot. The horizontal bands again show that the response is a count, not a continuous outcome. The orange smooth gives an exploratory body-size trend, and the quartile table gives the corresponding numerical summary. The main EDA message is that **heavier female crabs tend to have higher satellite counts**, but the relationship is not deterministic. There are still zero counts and small positive counts across much of the weight range. Therefore, weight may add useful information in an extended model, but it should not be treated as a complete explanation of satellite counts.
 
-### Satellite Counts and Categorical Regressors {#sec-classical-poisson-eda-categorical}
+### Satellite Counts and Categorical Regressors {#sec-negative-binomial-eda-categorical}
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-college-3702064/).](img/plug.png){width="500"}
 
-Now, we compare satellite counts across the categorical regressors `color` and `spine`. Earlier, in @sec-classical-poisson-eda-general, the marginal summaries showed that these categories are not evenly represented in the training data. That imbalance is critical here because a category with few observations can have an unstable mean satellite count. Therefore, in this subsection, we combine two pieces of information: the number of observations in each category and the distribution of satellite counts within each category.
+Now, we compare satellite counts across the categorical regressors `color` and `spine`. Earlier, in @sec-negative-binomial-eda-general, the marginal summaries showed that these categories are not evenly represented in the training data. That imbalance is critical here because a category with few observations can have an unstable mean satellite count. Therefore, in this subsection, we combine two pieces of information: the number of observations in each category and the distribution of satellite counts within each category.
 
 We begin with female crab colour.
 
@@ -1889,7 +1889,7 @@ We begin with female crab colour.
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-color-satellite-summary-r
+#| label: tbl-negative-binomial-color-satellite-summary-r
 #| tbl-cap: "Descriptive summary statistics of male satellite counts by female crab colour in the training data."
 #| message: false
 #| warning: false
@@ -1955,7 +1955,7 @@ color_satellite_summary_display = color_satellite_summary.rename(
     }
 )
 
-classical_poisson_color_satellite_summary_py_html = (
+negative_binomial_color_satellite_summary_py_html = (
     color_satellite_summary_display.to_html(
         index=False,
         border=0,
@@ -1965,7 +1965,7 @@ classical_poisson_color_satellite_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-color-satellite-summary-py
+#| label: tbl-negative-binomial-color-satellite-summary-py
 #| tbl-cap: "Descriptive summary statistics of male satellite counts by female crab colour in the training data."
 #| message: false
 #| warning: false
@@ -1973,7 +1973,7 @@ classical_poisson_color_satellite_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_color_satellite_summary_py_html,
+  py$negative_binomial_color_satellite_summary_py_html,
   "\n",
   sep = ""
 )
@@ -1981,7 +1981,7 @@ cat(
 
 :::
 
-The colour summary, in @tbl-classical-poisson-color-satellite-summary-r, must be read in light of the category sizes reported earlier. In this training split, the most common colour category is `Medium light`, while `Light` and `Dark` are much less common. The satellite-count summaries suggest that colour may be associated with the response, but the evidence is uneven across categories. The category with the highest mean satellite count is ``r as.character(color_satellite_summary$color[which.max(color_satellite_summary$mean_satellites)])``, with a mean of `r max(color_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(color_satellite_summary$color[which.min(color_satellite_summary$mean_satellites)])``, with a mean of `r min(color_satellite_summary$mean_satellites)`. These are descriptive differences only. **Because some colour categories are sparse, the extended model should treat colour comparisons cautiously.**
+The colour summary, in @tbl-negative-binomial-color-satellite-summary-r, must be read in light of the category sizes reported earlier. In this training split, the most common colour category is `Medium light`, while `Light` and `Dark` are much less common. The satellite-count summaries suggest that colour may be associated with the response, but the evidence is uneven across categories. The category with the highest mean satellite count is ``r as.character(color_satellite_summary$color[which.max(color_satellite_summary$mean_satellites)])``, with a mean of `r max(color_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(color_satellite_summary$color[which.min(color_satellite_summary$mean_satellites)])``, with a mean of `r min(color_satellite_summary$mean_satellites)`. These are descriptive differences only. **Because some colour categories are sparse, the extended model should treat colour comparisons cautiously.**
 
 ::: {.Heads-up}
 :::: {.Heads-up-header}
@@ -2001,7 +2001,7 @@ We use a seed in the plotting code so that the small left-right movements are re
 ## **`R`**
 
 ```{r}
-#| label: fig-classical-poisson-satellites-color-r
+#| label: fig-negative-binomial-satellites-color-r
 #| fig-cap: "Number of satellite males by female crab colour in the training data."
 #| warning: false
 #| message: false
@@ -2053,7 +2053,7 @@ satellites_color_plot
 ## **`Python`**
 
 ```{python}
-#| label: fig-classical-poisson-satellites-color-py
+#| label: fig-negative-binomial-satellites-color-py
 #| fig-cap: "Number of satellite males by female crab colour in the training data."
 #| warning: false
 #| message: false
@@ -2141,7 +2141,7 @@ plt.show()
 
 :::
 
-The colour plot, in @fig-classical-poisson-satellites-color-r or @fig-classical-poisson-satellites-color-py, reinforces the table's cautionary message. The boxplots and horizontally jittered points show **substantial overlap** in satellite counts across colour categories. This means colour may still be useful in an extended model, but it is unlikely to separate the response cleanly on its own. The horizontal jitter is used only to reduce overlap within each colour category; it does not move the counts vertically, so the integer count bands remain visible.
+The colour plot, in @fig-negative-binomial-satellites-color-r or @fig-negative-binomial-satellites-color-py, reinforces the table's cautionary message. The boxplots and horizontally jittered points show **substantial overlap** in satellite counts across colour categories. This means colour may still be useful in an extended model, but it is unlikely to separate the response cleanly on its own. The horizontal jitter is used only to reduce overlap within each colour category; it does not move the counts vertically, so the integer count bands remain visible.
 
 We now repeat the same comparison for female crab spine condition.
 
@@ -2151,7 +2151,7 @@ We now repeat the same comparison for female crab spine condition.
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-spine-satellite-summary-r
+#| label: tbl-negative-binomial-spine-satellite-summary-r
 #| tbl-cap: "Descriptive summary statistics of male satellite counts by female crab spine condition in the training data."
 #| message: false
 #| warning: false
@@ -2217,7 +2217,7 @@ spine_satellite_summary_display = spine_satellite_summary.rename(
     }
 )
 
-classical_poisson_spine_satellite_summary_py_html = (
+negative_binomial_spine_satellite_summary_py_html = (
     spine_satellite_summary_display.to_html(
         index=False,
         border=0,
@@ -2227,7 +2227,7 @@ classical_poisson_spine_satellite_summary_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-spine-satellite-summary-py
+#| label: tbl-negative-binomial-spine-satellite-summary-py
 #| tbl-cap: "Descriptive summary statistics of male satellite counts by female crab spine condition in the training data."
 #| message: false
 #| warning: false
@@ -2235,7 +2235,7 @@ classical_poisson_spine_satellite_summary_py_html = (
 
 cat(
   "\n",
-  py$classical_poisson_spine_satellite_summary_py_html,
+  py$negative_binomial_spine_satellite_summary_py_html,
   "\n",
   sep = ""
 )
@@ -2243,14 +2243,14 @@ cat(
 
 :::
 
-The spine summary, in @tbl-classical-poisson-spine-satellite-summary-r, is dominated by the `Both worn or broken` category, which was already the largest group in the marginal spine table. This imbalance is important. The category with the highest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.max(spine_satellite_summary$mean_satellites)])``, with a mean of `r max(spine_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.min(spine_satellite_summary$mean_satellites)])``, with a mean of `r min(spine_satellite_summary$mean_satellites)`. However, because at least one spine category has relatively few observations, these descriptive differences should not be over-interpreted before modelling.
+The spine summary, in @tbl-negative-binomial-spine-satellite-summary-r, is dominated by the `Both worn or broken` category, which was already the largest group in the marginal spine table. This imbalance is important. The category with the highest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.max(spine_satellite_summary$mean_satellites)])``, with a mean of `r max(spine_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.min(spine_satellite_summary$mean_satellites)])``, with a mean of `r min(spine_satellite_summary$mean_satellites)`. However, because at least one spine category has relatively few observations, these descriptive differences should not be over-interpreted before modelling.
 
 ::: {.panel-tabset}
 
 ## **`R`**
 
 ```{r}
-#| label: fig-classical-poisson-satellites-spine-r
+#| label: fig-negative-binomial-satellites-spine-r
 #| fig-cap: "Number of satellite males by female crab spine condition in the training data."
 #| warning: false
 #| message: false
@@ -2302,7 +2302,7 @@ satellites_spine_plot
 ## **`Python`**
 
 ```{python}
-#| label: fig-classical-poisson-satellites-spine-py
+#| label: fig-negative-binomial-satellites-spine-py
 #| fig-cap: "Number of satellite males by female crab spine condition in the training data."
 #| warning: false
 #| message: false
@@ -2392,13 +2392,13 @@ plt.show()
 
 :::
 
-The spine plot, in @fig-classical-poisson-satellites-spine-r or @fig-classical-poisson-satellites-spine-py, again shows **overlap** across categories. The largest category contains crabs with a wide range of satellite counts, including zero counts and larger positive counts. The smaller categories are harder to compare because they contain fewer observations. This makes spine a reasonable candidate regressor for the extended model, but not one that should be expected to dominate the body-size pattern seen for width and weight.
+The spine plot, in @fig-negative-binomial-satellites-spine-r or @fig-negative-binomial-satellites-spine-py, again shows **overlap** across categories. The largest category contains crabs with a wide range of satellite counts, including zero counts and larger positive counts. The smaller categories are harder to compare because they contain fewer observations. This makes spine a reasonable candidate regressor for the extended model, but not one that should be expected to dominate the body-size pattern seen for width and weight.
 
-### Summary {#sec-classical-poisson-eda-summary}
+### Summary {#sec-negative-binomial-eda-summary}
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-blended-learning-6230153/).](img/blender.png){width="400"}
 
-Before moving to the GLM formulation of Poisson regression, it is useful to summarize the main EDA findings. @tbl-classical-poisson-eda-summary records what we learned from the **training data** and how each finding will guide the next parts of the workflow.
+Before moving to the GLM formulation of Poisson regression, it is useful to summarize the main EDA findings. @tbl-negative-binomial-eda-summary records what we learned from the **training data** and how each finding will guide the next parts of the workflow.
 
 | EDA component | Main finding from the training data | Why it matters for the Poisson regression workflow |
 |:---:|:---:|:---:|
@@ -2410,7 +2410,7 @@ Before moving to the GLM formulation of Poisson regression, it is useful to summ
 | Female crab spine condition | Spine groups are also **imbalanced**. The category with the highest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.max(spine_satellite_summary$mean_satellites)])``, with a mean of `r max(spine_satellite_summary$mean_satellites)`. The category with the lowest mean satellite count is ``r as.character(spine_satellite_summary$spine[which.min(spine_satellite_summary$mean_satellites)])``, with a mean of `r min(spine_satellite_summary$mean_satellites)`. | Spine condition is worth checking in the **extended model**, but the EDA does not suggest that it should dominate the body-size regressors. The **imbalance** across spine categories also means coefficient-level interpretations should be cautious. |
 | Predictive challenge | Across the continuous and categorical plots, female crabs with similar regressor values can still have quite different satellite counts. Zero counts also occur across multiple regions of the regressor space. | The predictive inquiry should be evaluated with **held-out testing data** and **prediction-error summaries**. Visual patterns from the training data can motivate model choices, but they are not enough to assess predictive performance. |
 
-: Summary of the main EDA findings and their implications for the Poisson regression workflow. {#tbl-classical-poisson-eda-summary .striped .hover}
+: Summary of the main EDA findings and their implications for the Poisson regression workflow. {#tbl-negative-binomial-eda-summary .striped .hover}
 
 Overall, the EDA gives us a coherent modelling story. The response is a non-negative integer count with many zeros and variability that is much larger than the mean. Width shows the clearest descriptive association with satellite counts, while weight provides a related body-size signal that should be interpreted alongside width. Colour and spine condition may also contribute, but their category imbalance and overlapping count distributions call for caution. These findings do not establish final inferential conclusions; rather, they motivate the model-building sequence that follows. We now move to the GLM formulation so that the response distribution, regression structure, and coefficient interpretation are made explicit before estimation.
 
@@ -2418,20 +2418,193 @@ Overall, the EDA gives us a coherent modelling story. The response is a non-nega
 
 ### The Random Component
 
+Let $Y_i$ denote the number of satellite males observed for the $i$th female crab in the training data, for $i = 1, 2, \ldots, n$. We treat $Y_i$ as a random variable because a different sample of female crabs, or a repeated version of the same observational process, could produce different satellite counts. In Negative Binomial regression, the random component assumes that the conditional distribution of $Y_i$ is Negative Binomial:
+
+$$
+Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
+$${#eq-classical-poisson-random-component}
+
+where $\mu_i > 0$ is the conditional expected number of satellite males for the $i$th female crab. The value of $\mu_i$ is allowed to change from crab to crab because different female crabs can have different regressor values.
+
+Let's imagine a series of independent Bernoulli trials. A Negative Binomial distribution is commonly parameterized as $Z\sim\operatorname{Negative Binomial}(\theta,p)$, where $Z$ is the number of failed Bernoulli trials before experiencing $\theta$ independent wins and $p$ is the probability of success in each Bernoulli trial. The mean of $Z$ is given by
+
+$$
+\mu=\mathbb{E}(Z)=\frac{\theta(1-p)}{ p}
+$$
+Rearranging the equation for conditional mean and isolating for $p$ gives
+
+$$
+p=\frac{1}{1+\frac{\mu}{\theta}}
+$$
+For a constant value of $\theta$, there is a one-to-one correspondence between $p$ and $\mu$ and therefore our Negative Binomial model can be parameterized by $\mu_i$ and $\theta$, where $\mu_i$ is the conditional expected number of satellite males for the $i$th female crab.
+
+Equivalently, for a possible count $y_i \in \{0, 1, 2, \ldots\}$, the conditional probability mass function (PMF) is
+
+$$
+p_Y(y_i; \mu_i, \theta)
+=
+\Pr(Y_i = y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k})
+=
+\frac{\Gamma(y_i + \theta)}{\Gamma(\theta) \, y_i!}
+\left( \frac{\theta}{\theta + \mu_i} \right)^{\theta}
+\left( \frac{\mu_i}{\theta + \mu_i} \right)^{y_i},
+$${#eq-negative-binomial-pmf-regression}
+
+The parameter $\mu_i$ has two roles in the Negative Binomial model:
+
+$$
+\mathbb{E}(Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k}) = \mu_i,
+$$
+
+and
+
+$$
+\operatorname{Var}(Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k}) = \mu_i+\frac{\mu_i^2}{\theta}.
+$$
+
 ### The Systematic Component
 
+The systematic component describes how the regressors are combined before being linked to the conditional mean. With $k$ regressors, the systematic component is
+
+$$
+\eta_i
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k},
+$${#eq--systematic-component}
+
+where:
+
+- $\eta_i$ is called the **linear predictor** for the $i$th female crab;
+- $\beta_0$ is the intercept;
+- $\beta_1, \beta_2, \ldots, \beta_k$ are fixed but unknown regression coefficients;
+- $x_{i,1}, x_{i,2}, \ldots, x_{i,k}$ are the observed regressor values for the $i$th female crab.
+
+The term **linear predictor** can be confusing at first. It means that the regressors are combined linearly in the regression coefficients. Thus, it does not mean that the expected count itself must be a linear function of the regressors on the original count scale.
+
+In the horseshoe crab case study, a simple model may use only female crab width:
+
+$$
+\eta_i = \beta_0 + \beta_1 x_{i,1},
+$$
+
+where $x_{i,1}$ represents female crab width in centimetres. An extended model may include additional regressors, such as weight, colour indicators, and spine-condition indicators. In that case, $k$ is larger and the systematic component includes more terms.
+
+For example, using generic regressor notation, we can write the extended model as
+
+$$
+\eta_i
+=
+\beta_0
++
+\beta_1 x_{i,1}
++
+\beta_2 x_{i,2}
++
+\cdots
++
+\beta_k x_{i,k}.
+$$
+
+**This notation deliberately uses $x_{i,1}, x_{i,2}, \ldots, x_{i,k}$ rather than variable names in the equation.** Some of these regressors may be continuous, such as width or weight, while others may be indicator (or dummy) variables created from categorical regressors such as colour or spine condition. We will make the exact model specification explicit when fitting the simple and extended models.
+
 ### The Log Link Function
+
+The link function connects the conditional mean $\mu_i$ to the systematic component $\eta_i$. Like [Classical Poisson regression](@sec-classical-poisson), the standard link function in Negative Binomial regression is the **log link**:
+
+$$
+\log(\mu_i) = \eta_i.
+$${#eq-negative-binomial-log-link}
+
+Combining @eq-negative-binomial-log-link with the systematic component in @eq-negative-binomial-systematic-component gives
+
+$$
+\log(\mu_i)
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
+$$
+
+Since the logarithm is applied to $\mu_i$, we can rewrite the model on the expected-count scale by exponentiating both sides:
+
+$$
+\mu_i
+=
+\exp\left(
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}
+\right).
+$${#eq-negative-binomial-mean-model}
+
+This form in @eq-negative-binomial-mean-model shows why the log link is useful. The expected count $\mu_i$ must be positive, and the exponential function always produces a positive value. Thus, the model can use a linear predictor $\eta_i$ that may be any real number while still producing a valid positive conditional mean. Furthermore, the log link also changes how coefficients are interpreted:
+
+- In OLS, a **one-unit increase** in a regressor is usually interpreted as an **additive change in the conditional mean of the response**. 
+- In Negative Binomial regression with a log link, coefficients are interpreted through **multiplicative changes in the expected count after exponentiation**. 
+
+We will return to this point when interpreting the different fitted coefficients in subsequent sections.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why we do not use an identity link here!
+::::
+:::: {.Heads-up-container}
+A tempting alternative would be to use an **identity link**, which would set the conditional mean directly equal to the systematic component:
+
+$$
+\mu_i
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
+$$
+
+This may look familiar because it resembles the conditional mean structure used in OLS. However, **it is usually not a good default choice for Negative Binomial regression**. The main issue is that $\mu_i$ is an expected count, so it must be positive. A linear expression can be negative for some regressor values, which would produce an invalid expected count.
+
+Hence, the log link avoids this problem. It lets the systematic component $\eta_i$ take any real value, while the expected count
+
+$$
+\mu_i = \exp(\eta_i)
+$$
+
+is always positive. This is one reason the log link is the standard link function for Classical Poisson regression.
+::::
+:::
+
+Putting the three GLM pieces together, the Negative Binomial regression model with $k$ regressors is
+
+$$
+Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,k} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
+$$
+
+with
+
+$$
+\log(\mu_i)
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
+$$
+
+Equivalently,
+
+$$
+\mu_i
+=
+\exp\left(
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}
+\right).
+$$
+
+These equations summarize the model we will fit next:
+
+1. The **random component** tells us that the response is conditionally Negative Binomial. 
+2. The **systematic component** tells us how the regressors are combined. 
+3. The **log link** tells us how that linear predictor becomes a positive expected count.
+
+In @sec-negative-binomial-eda, the EDA helped us decide that this model is a reasonable starting point, especially because the response is a count and width shows a clear descriptive association with satellite counts (see @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py). But the EDA also warned us that the Classical Poisson assumptions may be strained. After fitting the model, we will need to examine whether the fitted values reproduce the main features of the observed counts and whether the mean-variance structure is adequate enough for the chapter's inferential and predictive goals.
 
 ## Data Modelling
 
 
 ## Estimation
 
-### Overdispersion
+### Dispersion Test
 
-Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001
-
--   We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`). Note that `statsmodels` does not ship an equivalent function, so the `Python` code defines the same regression-based test as a small helper of the same name.
+Let's revisit the `extended_poisson_model` fit in [Chapter 10](#sec-classical-poisson). This model showed substantial overdispersion relative to the Classical Poisson mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001. We will test whether there is overdispersion in this Poisson regression model via function `dispersiontest()`, (from package `{AER}`). Note that `statsmodels` does not ship an equivalent function, so the `Python` code defines the same regression-based test as a small helper of the same name.
 -   Let $Y_i$ be the $i$th Poisson response in the count regression model.
 
 . . .
@@ -2606,7 +2779,161 @@ print(f"Sample estimate (dispersion): {dispersion:.4f}")
 
 With $\alpha = 0.05$, we reject $H_0$ since the $p\text{-value} < .001$. Hence, the `extended_poisson_model` has overdispersion.
 
-### Fitting the Model
+### Fitting a Simple Negative Binomial Regression Model {#sec-negative-binomial-simple-model}
+
+Now, we fit the first Negative Binomial regression model in the chapter. The purpose of this model is deliberately modest: we begin with **female crab width** as the only regressor because the EDA in @sec-negative-binomial-eda showed the clearest descriptive body-size pattern for width. This simple model gives us a transparent starting point for studying estimation, fitted expected counts, and goodness-of-fit before moving to a richer model with additional regressors.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-coffee-3702057/).](img/coffee.png){width="610"}
+
+At this point, we will **not** provide a full substantive interpretation of the estimate width regression coefficient coming from this model. That interpretation belongs later, after we have checked whether the simple Negative Binomial regression model is adequate and after we have considered an extended model with additional regressors. This ordering is critical for the workflow of the chapter:
+
+1. Use the **training data** for EDA, model fitting, and goodness-of-fit checks.
+2. Fit a simple Poisson regression model with width as the only regressor.
+3. Check whether the fitted model reproduces important features of the observed count response.
+4. Extend the model if needed by adding other regressors such as weight, colour, and spine condition.
+5. Save final coefficient-level interpretation for the later modelling sections, after model adequacy has been discussed.
+
+This is necessary for the inferential inquiry. We should not use the same data both to explore the model structure and to produce the final inferential claims. Recall that, for the inferential inquiry, the training set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later after the model-building workflow has been completed.
+
+Before fitting the width-only model, we first write the general Classical Poisson regression model with $k$ regressors. Let
+
+$$
+\mathbf{x}_i
+=
+\begin{bmatrix}
+1 \\
+x_{i,1} \\
+x_{i,2} \\
+\vdots \\
+x_{i,k}
+\end{bmatrix}
+$$
+
+be the regressor vector for the $i$th observation, **including the leading $1$ for the intercept**. Then, let
+
+$$
+\boldsymbol{\beta}
+=
+\begin{bmatrix}
+\beta_0 \\
+\beta_1 \\
+\beta_2 \\
+\vdots \\
+\beta_k
+\end{bmatrix}
+$$
+
+be the vector of regression coefficients. The systematic component can then be written compactly as
+
+$$
+\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta},
+$$
+
+where
+
+$$
+\mathbf{x}_i^\top \boldsymbol{\beta}
+=
+\beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}.
+$$
+
+For the **full training sample** with $n$ observations, we can collect the response values into
+
+$$
+\mathbf{y}
+=
+\begin{bmatrix}
+y_1 \\
+y_2 \\
+\vdots \\
+y_n
+\end{bmatrix},
+$$
+
+and the regressors into the design matrix
+
+$$
+\mathbf{X}
+=
+\begin{bmatrix}
+1 & x_{1,1} & x_{1,2} & \cdots & x_{1,k} \\
+1 & x_{2,1} & x_{2,2} & \cdots & x_{2,k} \\
+\vdots & \vdots & \vdots & \ddots & \vdots \\
+1 & x_{n,1} & x_{n,2} & \cdots & x_{n,k}
+\end{bmatrix}.
+$$
+
+The $i$th row of $\mathbf{X}$ is $\mathbf{x}_i^\top$. The vector of **systematic scores** is
+
+$$
+\boldsymbol{\eta}
+=
+\mathbf{X}\boldsymbol{\beta}.
+$$
+
+As indicated in @sec-negative-binomial-log-link, in Classical Poisson regression, the conditional mean for the $i$th observation is
+
+$$
+\mu_i
+=
+\exp(\eta_i)
+=
+\exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$$
+
+Thus, the general model with $k$ regressors is
+
+$$
+Y_i \mid \mathbf{x}_i \sim \operatorname{Negative Binomial}(\mu_i,\theta),
+$$
+
+with
+
+$$
+\log(\mu_i) = \mathbf{x}_i^\top \boldsymbol{\beta}.
+$$
+The width-only model is the special case with one regressor. Let $x_{i,1}$ denote the female crab width in centimetres for the $i$th female crab. The simple model is
+
+$$
+Y_i \mid x_{i,1} \sim \operatorname{Negative Binomial}(\mu_i,\theta),
+$$
+
+with
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1 x_{i,1}.
+$${#eq-negative-binomial-simple-width-model}
+
+Equivalently,
+
+$$
+\mu_i
+=
+\exp(\beta_0 + \beta_1 x_{i,1}).
+$${#eq-negative-binomial-simple-width-mean}
+
+In @eq-negative-binomial-simple-width-model and @eq-negative-binomial-simple-width-mean, $\mu_i$ is the expected number of satellite males for a female crab with width $x_{i,1}$. The model assumes
+
+$$
+\operatorname{Var}(Y_i \mid x_{i,1}) = \mu_i+\frac{\mu_i^2}{\theta}.
+$$
+
+Therefore, a Negative Binomial model assumes **overdispersion**. Once width is included, the model assumes that the conditional variance of the satellite count is higher than the conditional mean for crabs with the same width value. This is stronger than merely saying that the raw sample variance should be higher than the raw sample mean. It is a model statement about the distribution of counts **after conditioning on width**.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why we do not interpret the width coefficient yet!
+::::
+:::: {.Heads-up-container}
+The simple width-only model is handy because it lets us introduce maximum likelihood estimation in a transparent setting. However, we will not yet use this fitted model to make final claims about the association between female crab width and the expected number of satellite males.
+
+There are two reasons for waiting. First, we still need to check whether the simple Classical Poisson model fits the training data adequately. Second, the EDA suggested that other female crab characteristics, such as weight, colour, and spine condition, may also matter. A width-only coefficient can change once additional regressors are included.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-upset-6230193/).](img/surprise-2.png){width="300"}
+
+For now, the fitted width coefficient is an estimation output. We will return to substantive coefficient interpretation after the goodness-of-fit checks and the extended model.
+::::
+:::
 
 ::: {.panel-tabset}
 
