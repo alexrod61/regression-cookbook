@@ -3586,52 +3586,52 @@ fitted_count_calibration |>
 #| message: false
 #| warning: false
 
-simple_negative_binomial_gof_data = training_data.copy()
-
-simple_negative_binomial_gof_data["fitted_expected_count"] = (simple_negative_binomial_width_model.fittedvalues)
-
-simple_negative_binomial_gof_data["pearson_residual"] = ((simple_negative_binomial_gof_data["satellites"]
-        - simple_negative_binomial_gof_data["fitted_expected_count"])
-    / np.sqrt(simple_negative_binomial_gof_data["fitted_expected_count"]))
-
-simple_negative_binomial_gof_data["fitted_zero_probability"] = np.exp(
-    -simple_negative_binomial_gof_data["fitted_expected_count"])
-
-simple_negative_binomial_gof_data = (simple_negative_binomial_gof_data
-    .sort_values("fitted_expected_count", kind="mergesort").reset_index(drop=True))
-
-number_of_rows = len(simple_negative_binomial_gof_data)
-number_of_groups = 4
-
-base_group_size = number_of_rows // number_of_groups
-remainder = number_of_rows % number_of_groups
-
-group_sizes = [base_group_size + 1 if group_index < remainder else base_group_size
-    for group_index in range(number_of_groups)]
-
-quartile_labels = ["Q1: smallest fitted counts", "Q2", "Q3", "Q4: largest fitted counts",
-]
-
-simple_negative_binomial_gof_data["fitted_count_quartile"] = np.repeat(quartile_labels, group_sizes)
-
-fitted_count_calibration = (simple_negative_binomial_gof_data
-    .groupby("fitted_count_quartile", observed=False)
-    .agg(n=("satellites", "size"), mean_observed_count=("satellites", "mean"),
-        mean_fitted_expected_count=("fitted_expected_count", "mean"),
-        observed_zero_proportion=("satellites", lambda x: (x == 0).mean()),
-        mean_fitted_zero_probability=("fitted_zero_probability", "mean"),
-    ).reset_index().round(3))
-
-fitted_count_calibration_display = fitted_count_calibration.rename(
-    columns={"fitted_count_quartile": "Fitted-count quartile",
-        "n": "Number of female crabs", "mean_observed_count": "Mean observed count",
-        "mean_fitted_expected_count": "Mean fitted expected count",
-        "observed_zero_proportion": "Observed zero proportion",
-        "mean_fitted_zero_probability": "Mean fitted zero probability",
-    })
-
-classical_poisson_fitted_count_calibration_py_html = (
-    scrollable_table_html(fitted_count_calibration_display))
+# simple_negative_binomial_gof_data = training_data.copy()
+# 
+# simple_negative_binomial_gof_data["fitted_expected_count"] = (simple_negative_binomial_width_model.fittedvalues)
+# 
+# simple_negative_binomial_gof_data["pearson_residual"] = ((simple_negative_binomial_gof_data["satellites"]
+#         - simple_negative_binomial_gof_data["fitted_expected_count"])
+#     / np.sqrt(simple_negative_binomial_gof_data["fitted_expected_count"]))
+# 
+# simple_negative_binomial_gof_data["fitted_zero_probability"] = np.exp(
+#     -simple_negative_binomial_gof_data["fitted_expected_count"])
+# 
+# simple_negative_binomial_gof_data = (simple_negative_binomial_gof_data
+#     .sort_values("fitted_expected_count", kind="mergesort").reset_index(drop=True))
+# 
+# number_of_rows = len(simple_negative_binomial_gof_data)
+# number_of_groups = 4
+# 
+# base_group_size = number_of_rows // number_of_groups
+# remainder = number_of_rows % number_of_groups
+# 
+# group_sizes = [base_group_size + 1 if group_index < remainder else base_group_size
+#     for group_index in range(number_of_groups)]
+# 
+# quartile_labels = ["Q1: smallest fitted counts", "Q2", "Q3", "Q4: largest fitted counts",
+# ]
+# 
+# simple_negative_binomial_gof_data["fitted_count_quartile"] = np.repeat(quartile_labels, group_sizes)
+# 
+# fitted_count_calibration = (simple_negative_binomial_gof_data
+#     .groupby("fitted_count_quartile", observed=False)
+#     .agg(n=("satellites", "size"), mean_observed_count=("satellites", "mean"),
+#         mean_fitted_expected_count=("fitted_expected_count", "mean"),
+#         observed_zero_proportion=("satellites", lambda x: (x == 0).mean()),
+#         mean_fitted_zero_probability=("fitted_zero_probability", "mean"),
+#     ).reset_index().round(3))
+# 
+# fitted_count_calibration_display = fitted_count_calibration.rename(
+#     columns={"fitted_count_quartile": "Fitted-count quartile",
+#         "n": "Number of female crabs", "mean_observed_count": "Mean observed count",
+#         "mean_fitted_expected_count": "Mean fitted expected count",
+#         "observed_zero_proportion": "Observed zero proportion",
+#         "mean_fitted_zero_probability": "Mean fitted zero probability",
+#     })
+# 
+# classical_poisson_fitted_count_calibration_py_html = (
+#     scrollable_table_html(fitted_count_calibration_display))
 ```
 
 ```{r}
@@ -3642,12 +3642,12 @@ classical_poisson_fitted_count_calibration_py_html = (
 #| warning: false
 #| results: asis
 
-cat(
-  "\n",
-  py$classical_poisson_fitted_count_calibration_py_html,
-  "\n",
-  sep = ""
-)
+# cat(
+#   "\n",
+#   py$classical_poisson_fitted_count_calibration_py_html,
+#   "\n",
+#   sep = ""
+# )
 ```
 
 :::
@@ -3755,30 +3755,30 @@ observed_fitted_plot
 #| fig.height: 8
 #| fig.width: 14
 
-observed_fitted_figure, observed_fitted_axis = plt.subplots(figsize=(14, 8))
-
-observed_fitted_axis.scatter(simple_negative_binomial_gof_data["fitted_expected_count"],
-    simple_negative_binomial_gof_data["satellites"], alpha=0.65, s=35, color="#0072B2")
-
-line_max = max(simple_negative_binomial_gof_data["fitted_expected_count"].max(),
-    simple_negative_binomial_gof_data["satellites"].max())
-
-observed_fitted_axis.plot([0, line_max], [0, line_max], linestyle="--", linewidth=1,
-    color="#D55E00")
-
-observed_fitted_axis.set_xlabel("\n Fitted expected count", fontsize=20)
-
-observed_fitted_axis.set_ylabel("Observed satellite count", fontsize=20, labelpad=12)
-
-observed_fitted_axis.tick_params(axis="both", labelsize=15.5)
-observed_fitted_axis.set_yticks(range(0, 13, 2))
-
-observed_fitted_axis.grid(True, which="major", axis="both", alpha=0.3)
-
-observed_fitted_axis.grid(False, which="minor")
-
-observed_fitted_figure.tight_layout()
-plt.show()
+# observed_fitted_figure, observed_fitted_axis = plt.subplots(figsize=(14, 8))
+# 
+# observed_fitted_axis.scatter(simple_negative_binomial_gof_data["fitted_expected_count"],
+#     simple_negative_binomial_gof_data["satellites"], alpha=0.65, s=35, color="#0072B2")
+# 
+# line_max = max(simple_negative_binomial_gof_data["fitted_expected_count"].max(),
+#     simple_negative_binomial_gof_data["satellites"].max())
+# 
+# observed_fitted_axis.plot([0, line_max], [0, line_max], linestyle="--", linewidth=1,
+#     color="#D55E00")
+# 
+# observed_fitted_axis.set_xlabel("\n Fitted expected count", fontsize=20)
+# 
+# observed_fitted_axis.set_ylabel("Observed satellite count", fontsize=20, labelpad=12)
+# 
+# observed_fitted_axis.tick_params(axis="both", labelsize=15.5)
+# observed_fitted_axis.set_yticks(range(0, 13, 2))
+# 
+# observed_fitted_axis.grid(True, which="major", axis="both", alpha=0.3)
+# 
+# observed_fitted_axis.grid(False, which="minor")
+# 
+# observed_fitted_figure.tight_layout()
+# plt.show()
 ```
 
 :::
@@ -3926,12 +3926,12 @@ The following table computes the observed zero count, the fitted expected zero c
 #| message: false
 #| warning: false
 
-observed_zero_count <- sum(simple_poisson_gof_data$satellites == 0)
+observed_zero_count <- sum(simple_negative_binomial_gof_data$satellites == 0)
 
-expected_zero_count <- sum(simple_poisson_gof_data$fitted_zero_probability)
+expected_zero_count <- sum(simple_negative_binomial_gof_data$fitted_zero_probability)
 
-zero_count_variance <- sum(simple_poisson_gof_data$fitted_zero_probability *
-    (1 - simple_poisson_gof_data$fitted_zero_probability))
+zero_count_variance <- sum(simple_negative_binomial_gof_data$fitted_zero_probability *
+    (1 - simple_negative_binomial_gof_data$fitted_zero_probability))
 
 zero_count_z <- (observed_zero_count - expected_zero_count) / sqrt(zero_count_variance)
 
@@ -3961,27 +3961,27 @@ zero_count_summary |>
 #| message: false
 #| warning: false
 
-observed_zero_count = (simple_poisson_gof_data["satellites"] == 0).sum()
-
-expected_zero_count = (simple_poisson_gof_data["fitted_zero_probability"].sum())
-
-zero_count_variance = (simple_poisson_gof_data["fitted_zero_probability"]
-    * (1 - simple_poisson_gof_data["fitted_zero_probability"])).sum()
-
-zero_count_z = (observed_zero_count - expected_zero_count) / np.sqrt(zero_count_variance)
-
-zero_count_p_value = stats.norm.sf(zero_count_z)
-
-zero_count_summary = pd.DataFrame(
-    {"Quantity": ["Observed zero count", "Fitted expected zero count",
-            "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value",
-        ], "Value": [f"{observed_zero_count:.0f}", f"{expected_zero_count:.2f}",
-            f"{observed_zero_count - expected_zero_count:.2f}", f"{zero_count_z:.2f}",
-            f"{zero_count_p_value:.2e}",
-        ],
-    })
-
-classical_poisson_zero_count_check_py_html = (scrollable_table_html(zero_count_summary))
+# observed_zero_count = (simple_poisson_gof_data["satellites"] == 0).sum()
+# 
+# expected_zero_count = (simple_poisson_gof_data["fitted_zero_probability"].sum())
+# 
+# zero_count_variance = (simple_poisson_gof_data["fitted_zero_probability"]
+#     * (1 - simple_poisson_gof_data["fitted_zero_probability"])).sum()
+# 
+# zero_count_z = (observed_zero_count - expected_zero_count) / np.sqrt(zero_count_variance)
+# 
+# zero_count_p_value = stats.norm.sf(zero_count_z)
+# 
+# zero_count_summary = pd.DataFrame(
+#     {"Quantity": ["Observed zero count", "Fitted expected zero count",
+#             "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value",
+#         ], "Value": [f"{observed_zero_count:.0f}", f"{expected_zero_count:.2f}",
+#             f"{observed_zero_count - expected_zero_count:.2f}", f"{zero_count_z:.2f}",
+#             f"{zero_count_p_value:.2e}",
+#         ],
+#     })
+# 
+# classical_poisson_zero_count_check_py_html = (scrollable_table_html(zero_count_summary))
 ```
 
 ```{r}
@@ -3992,12 +3992,12 @@ classical_poisson_zero_count_check_py_html = (scrollable_table_html(zero_count_s
 #| warning: false
 #| results: asis
 
-cat(
-  "\n",
-  py$classical_poisson_zero_count_check_py_html,
-  "\n",
-  sep = ""
-)
+# cat(
+#   "\n",
+#   py$classical_poisson_zero_count_check_py_html,
+#   "\n",
+#   sep = ""
+# )
 ```
 
 :::
