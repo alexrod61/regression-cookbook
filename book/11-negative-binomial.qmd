@@ -38,7 +38,7 @@ Negative Binomial regression is useful when:
 However, a negative binomial regression regression should not be used in the following scenarios:
 
 - If the outcome is **binary**, use a [Negative Binomial regression](#sec-negative-binomial) model.
-- If the outcome is count-type but the data does not exhibit overdispersion, start with a [Classical Poisson regression](#sec-classical-poisson) model introduced in @sec-classical-poisson.
+- If the outcome is count-type but the data does not exhibit overdispersion, begin with a [Classical Poisson regression](#sec-classical-poisson) model.
 - If the outcome is a count-type and the data exhibits **underdispersion**, meaning that the the variance in the outcome variable is lower than what is plausible for a Classical Poisson model, use a [Generalized Poisson regression](#sec-generalized-poisson) model.
 :::
 :::::
@@ -91,14 +91,14 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
-- Determine when Classical Poisson regression is an **appropriate modelling choice**, and recognize situations where a Negative Binomial Regression model is a more appropriate choice.
+- Determine when Classical Poisson regression is an **appropriate modelling choice**, and recognize situations where a Negative Binomial Regression model is a more appropriate modelling choice.
 - Frame **inferential** and **predictive inquiries** for a count-regression problem using the **data science workflow**.
-- Specify a Poisson regression model as a generalized linear model with a **Negative Binomial random component**, a **linear predictor**, and a **log link function**.
+- Specify a Negative Binomial regression model as a generalized linear model with a **Negative Binomial random component**, a **linear predictor**, and a **log link function**.
 - Write and interpret the **likelihood** and **log-likelihood functions** for a Negative Binomial regression model.
 - Explain how **maximum likelihood estimation** is used to estimate Poisson regression coefficients.
 - Interpret Poisson regression coefficients as **multiplicative changes in the expected count**, holding other regressors fixed.
 - Assess model adequacy using **goodness-of-fit checks**, **residual-based summaries**, and the **Poisson mean-variance assumption**.
-- Construct and interpret **confidence intervals** and **hypothesis tests** for Poisson regression coefficients.
+- Construct and interpret **confidence intervals** and **hypothesis tests** for Negative Binomial regression coefficients.
 - Evaluate **predictive performance** using test-set prediction accuracy metrics and baseline comparisons.
 - Communicate Negative Binomial regression results responsibly for both inferential and predictive inquiries.
 ::::
@@ -197,7 +197,7 @@ import scipy.stats as stats
 
 ## Case Study: Horseshoe Crab Satellites
 
-The running case study in this chapter uses data on **horseshoe crab satellites**. At first glance, this dataset may feel quite different from the applied examples that data science students are used to seeing. It is not a web analytics dataset, a health-care dashboard, or a business experiment. However, it is a strong teaching example precisely because it gives us a clean and concrete count-regression problem: 
+The running case study in this chapter uses data on **horseshoe crab satellites** from [Chapter 10](#sec-classical-poisson). It is a strong example for this chapter because it a **count regression** problem with an **overdispersed** response variable: 
 
 > **For each female horseshoe crab, we observe the *number of satellite males* around her.**
 
@@ -207,7 +207,7 @@ In the biological setting, a female horseshoe crab may arrive at a nesting site 
 
 The dataset used in this chapter comes from Brockmann's study of satellite male groups in *Limulus polyphemus* [@brockmann1996]. The version commonly used in statistics teaching contains one row per female crab. For each female crab, we observe the number of satellite males and several characteristics of the female, including body width, body weight, colour category, and spine condition. These variables let us study whether **observable female crab characteristics** are associated with the **expected number of satellite males**.
 
-Note that this case study works well for our cookbook because it is small enough to explain carefully but rich enough to support a complete data science workflow. The response is a count, the regressors include both continuous and categorical variables, and the scientific question(s) can be approached from more than one modelling purpose:
+In [Chapter 10](#sec-classical-poisson), we saw that the variance in the number of satellite males is much larger than the mean number of satellite males. We will formally test **overdispersion** in @sec-overdispersion, and Negative Binomial regression can be a better modelling choice than Poisson regression if there is statistical evidence of **overdispersion** in the data. The response is a count, the regressors include both continuous and categorical variables, and the scientific question(s) can be approached from more than one modelling purpose:
 
 - On the **inferential side**, the model can help us describe how the expected number of satellites is associated with female crab characteristics. 
 - On the **predictive side**, the same regressors can be used to predict the expected number of satellites for a female crab and then evaluate how accurate those predictions are. W
@@ -226,8 +226,6 @@ The dataset is especially useful for learning because the statistical structure 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-nerd-3699334/).](img/feature.png){width="350"}
 
 Horseshoe crabs also matter beyond this single modelling example. Their eggs are ecologically important food resources for migratory shorebirds in coastal systems, and horseshoe crab blood has historically been used in biomedical endotoxin testing [@botton2009; @maloney2018]. This broader context helps make the dataset less like an isolated classroom object and more like a compact entry point into ecological data analysis with count outcomes.
-
-For our purposes, the key statistical lesson is that the response is a count. The number of satellite males can be $0$, $1$, $2$, and so on, but it cannot be negative and it is not naturally continuous. That is exactly the kind of modelling situation where Poisson regression becomes a meaningful starting point.
 ::::
 :::
 
@@ -269,7 +267,7 @@ For the inferential inquiry, the main object of interest is the relationship bet
 
 On the other hand, for the predictive inquiry, the main object of interest is how well the model predicts expected counts for observations not used to fit the model. We will therefore use a training/testing split, compute predicted expected counts on the test set, compare prediction errors against a baseline model, and summarize prediction accuracy with metrics such as **mean absolute error (MAE)** and **root mean squared error (RMSE)**.
 
-Both inquiries require model checking. If the Poisson model fits the data poorly, then both the inferential interpretation and the predictive results may become less useful.
+Both inquiries require model checking. If the Negative Binomial model fits the data poorly, then both the inferential interpretation and the predictive results may become less useful.
 ::::
 :::
 
@@ -548,7 +546,7 @@ After this wrangling step, the object `crabs` is the working dataset for subsequ
 
 ## Exploratory Data Analysis
 
-EDA begins after the data have been collected and wrangled into the working object `crabs`. Following the workflow in @fig-ds-workflow-eda, this is also the stage where we create the training/testing split. The training set will be used for EDA, model fitting, and goodness-of-fit checking. These goodness-of-fit checks are applied to the model fitted on the training set because they act as the **workflow gate** before we decide whether the fitted Poisson regression model is adequate enough to use for the chapter's inferential and predictive purposes. Then, the testing set is held aside until the results stage, but it plays different roles for the two inquiries:
+EDA begins after the data have been collected and wrangled into the working object `crabs`. Following the workflow in @fig-ds-workflow-eda, this is also the stage where we create the training/testing split. The training set will be used for EDA, model fitting, and goodness-of-fit checking. These goodness-of-fit checks are applied to the model fitted on the training set because they act as the **workflow gate** before we decide whether the fitted Negative Binomial regression model is adequate enough to use for the chapter's inferential and predictive purposes. Then, the testing set is held aside until the results stage, but it plays different roles for the two inquiries:
 
 - For the **predictive inquiry**, the model fitted on the training set will be used to generate predicted expected counts for the testing observations, and the corresponding prediction accuracy outputs will be reported in the results stage. 
 - For the **inferential inquiry**, after the training-set model has passed the goodness-of-fit stage, we will refit the selected model on the testing set to generate the inferential outputs reported in the results stage. This protects the final inferential claims from double dipping: the same observations used for EDA, model fitting, and diagnostics are not reused for the final coefficient-level inferential statements.
@@ -2415,6 +2413,14 @@ Before moving to the GLM formulation of Poisson regression, it is useful to summ
 : Summary of the main EDA findings and their implications for the Poisson regression workflow. {#tbl-classical-poisson-eda-summary .striped .hover}
 
 Overall, the EDA gives us a coherent modelling story. The response is a non-negative integer count with many zeros and variability that is much larger than the mean. Width shows the clearest descriptive association with satellite counts, while weight provides a related body-size signal that should be interpreted alongside width. Colour and spine condition may also contribute, but their category imbalance and overlapping count distributions call for caution. These findings do not establish final inferential conclusions; rather, they motivate the model-building sequence that follows. We now move to the GLM formulation so that the response distribution, regression structure, and coefficient interpretation are made explicit before estimation.
+
+## Negative Binomial Regression as a Generalized Linear Model
+
+### The Random Component
+
+### The Systematic Component
+
+### The Log Link Function
 
 ## Data Modelling
 
