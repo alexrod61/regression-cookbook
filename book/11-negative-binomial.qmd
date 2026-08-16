@@ -3012,8 +3012,7 @@ simple_negative_binomial_width_summary = pd.DataFrame(
 
 simple_negative_binomial_width_summary = simple_negative_binomial_width_summary.round(3)
 
-classical_negative_binomial_simple_width_fit_py_html = (
-    scrollable_table_html(simple_negative_binomial_width_summary))
+classical_negative_binomial_simple_width_fit_py_html=scrollable_table_html(simple_negative_binomial_width_summary)
 ```
 
 ```{r}
@@ -3579,7 +3578,7 @@ def dispersiontest(results, alternative="greater"):
     return test_statistic, p_value, dispersion
 
 
-# Fit the simple Poisson model
+# Fit the width-only Poisson model
 simple_poisson_width_model = smf.glm(formula="satellites ~ width_cm", data=training_data,
     family=sm.families.Poisson()).fit()
 
@@ -4128,7 +4127,7 @@ The code below extracts the residual deviance from the simple fitted model and c
 ```{r}
 #| echo: true
 #| label: tbl-negative-binomial-residual-deviance-r
-#| tbl-cap: "Residual deviance goodness-of-fit check for the simple width-only Poisson regression model."
+#| tbl-cap: "Residual deviance goodness-of-fit check for the simple width-only Negative Binomial regression model."
 #| message: false
 #| warning: false
 
@@ -4194,7 +4193,7 @@ classical_negative_binomial_residual_deviance_py_html = (
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-negative_binomial-residual-deviance-py
+#| label: tbl-classical-negative-binomial-residual-deviance-py
 #| tbl-cap: "Residual deviance goodness-of-fit check for the simple width-only Poisson regression model."
 #| message: false
 #| warning: false
@@ -4234,7 +4233,7 @@ $$
 #| fig.height: 8
 #| fig.width: 14
 
-pearson_residual_plot <- ggplot(simple_poisson_gof_data,
+pearson_residual_plot <- ggplot(simple_negative_binomial_gof_data,
   aes(x = fitted_expected_count, y = pearson_residual)) +
   geom_hline(yintercept = 0, linetype = "solid", linewidth = 0.8, colour = "grey40") +
   geom_hline(yintercept = c(-2, 2), linetype = "dashed", linewidth = 0.8, colour = "#D55E00"
@@ -4287,7 +4286,7 @@ plt.show()
 
 :::
 
-In @fig-negative-binomial-pearson-residuals-r (or @fig-negative-binomial-pearson-residuals-py) the solid horizontal line at $0$ represents a perfect residual balance: the observed count equals the fitted expected count after standardizing by the fitted Negative Binomial standard deviation. The two dashed horizontal lines are visual reference bands at approximately $-2$ and $2$. They are not formal decision cutoffs, but they help us identify observations whose Pearson residuals are large in magnitude. Under a reasonably adequate Classical Poisson variance structure, we would expect most Pearson residuals to fall inside these bands, without a strong pattern across fitted expected counts.
+In @fig-negative-binomial-pearson-residuals-r (or @fig-negative-binomial-pearson-residuals-py), the solid horizontal line at $0$ represents a perfect residual balance: the observed count equals the fitted expected count after standardizing by the fitted Negative Binomial standard deviation. The two dashed horizontal lines are visual reference bands at approximately $-2$ and $2$. They are not formal decision cutoffs, but they help us identify observations whose Pearson residuals are large in magnitude. Under a reasonably adequate Classical Poisson variance structure, we would expect most Pearson residuals to fall inside these bands, without a strong pattern across fitted expected counts.
 
 However, in the above plot, the residual pattern is not reassuring. Several observations have Pearson residuals above $2$, including one very large positive residual above $6$. These are female crabs whose observed satellite counts are much larger than the fitted Poisson model expects, after accounting for the fitted Poisson standard deviation. At the same time, many observations with fitted expected counts between roughly $1.5$ and $4$ have negative Pearson residuals, forming a visible lower band. These are mostly zero or small observed counts sitting below their fitted expected counts.
 
@@ -4384,21 +4383,21 @@ Before interpreting the coefficients on the expected-count scale, we first refit
 #| message: false
 #| warning: false
 
-final_poisson_inference_model <- glm(satellites ~ width_cm + weight_kg + color + spine,
-  family = poisson(link = "log"), data = testing_data)
-
-final_poisson_inference_summary <- tidy(final_poisson_inference_model) |>
-  mutate(conf_low = estimate - qnorm(0.975) * std.error,
-    conf_high = estimate + qnorm(0.975) * std.error, exponentiated_estimate = exp(estimate),
-    exponentiated_conf_low = exp(conf_low), exponentiated_conf_high = exp(conf_high),
-    percent_change = 100 * (exponentiated_estimate - 1),
-    across(where(is.numeric), ~ round(.x, 2)))
-
-final_poisson_inference_summary |>
-  select(term, estimate, std.error, statistic, p.value) |>
-  rename(`Term` = term, `Log-scale estimate` = estimate, `Standard error` = std.error,
-    `Wald statistic` = statistic, `p-value` = p.value) |>
-  kable(align = c("c", "c", "c", "c", "c"))
+# final_poisson_inference_model <- glm(satellites ~ width_cm + weight_kg + color + spine,
+#   family = poisson(link = "log"), data = testing_data)
+# 
+# final_poisson_inference_summary <- tidy(final_poisson_inference_model) |>
+#   mutate(conf_low = estimate - qnorm(0.975) * std.error,
+#     conf_high = estimate + qnorm(0.975) * std.error, exponentiated_estimate = exp(estimate),
+#     exponentiated_conf_low = exp(conf_low), exponentiated_conf_high = exp(conf_high),
+#     percent_change = 100 * (exponentiated_estimate - 1),
+#     across(where(is.numeric), ~ round(.x, 2)))
+# 
+# final_poisson_inference_summary |>
+#   select(term, estimate, std.error, statistic, p.value) |>
+#   rename(`Term` = term, `Log-scale estimate` = estimate, `Standard error` = std.error,
+#     `Wald statistic` = statistic, `p-value` = p.value) |>
+#   kable(align = c("c", "c", "c", "c", "c"))
 ```
 
 ## **`Python`**
@@ -4408,53 +4407,53 @@ final_poisson_inference_summary |>
 #| message: false
 #| warning: false
 
-final_negative_binomial_inference_data = testing_data.copy()
-
-final_negative_binomial_inference_data["color"] = pd.Categorical(
-    final_poisson_inference_data["color"], categories=color_order)
-
-final_negative_binomial_inference_data["spine"] = pd.Categorical(
-    final_poisson_inference_data["spine"], categories=spine_order)
-
-final_negative_binomial_inference_model = smf.glm(formula=("satellites ~ width_cm + weight_kg "
-        "+ C(color, Treatment(reference='Light')) "
-        "+ C(spine, Treatment(reference='Both good'))"), data=final_negative_binomial_inference_data,
-    family=sm.families.negative_binomial()).fit()
-
-final_negative_binomial_inference_summary = pd.DataFrame(
-    {"Term": final_negative_binomial_inference_model.params.index,
-        "Log-scale estimate": final_negative_binomial_inference_model.params.values,
-        "Standard error": final_negative_binomial_inference_model.bse.values,
-        "Wald statistic": final_negative_binomial_inference_model.tvalues.values,
-        "p-value": final_negative_binomial_inference_model.pvalues.values,
-    })
-
-final_negative_binomial_inference_summary["Lower 95% CI on log scale"] = (
-    final_negative_binomial_inference_summary["Log-scale estimate"] - stats.norm.ppf(0.975)
-    * final_negative_binomial_inference_summary["Standard error"])
-
-final_negative_binomial_inference_summary["Upper 95% CI on log scale"] = (
-    final_negative_binomial_inference_summary["Log-scale estimate"] + stats.norm.ppf(0.975)
-    * final_negative_binomial_inference_summary["Standard error"])
-
-final_negative_binomial_inference_summary["Exponentiated estimate"] = np.exp(
-    final_negative_binomial_inference_summary["Log-scale estimate"])
-
-final_negative_binomial_inference_summary["Lower 95% CI for exponentiated estimate"] = np.exp(
-    final_negative_binomial_inference_summary["Lower 95% CI on log scale"])
-
-final_negative_binomial_inference_summary["Upper 95% CI for exponentiated estimate"] = np.exp(
-    final_negative_binomial_inference_summary["Upper 95% CI on log scale"])
-
-final_negative_binomial_inference_summary["Percent change"] = (100
-    * (final_negative_binomial_inference_summary["Exponentiated estimate"] - 1))
-
-final_negative_binomial_inference_log_scale_display = (final_negative_binomial_inference_summary
-    [["Term", "Log-scale estimate", "Standard error", "Wald statistic", "p-value",
-        ]].round(2))
-
-classical_negative_binomial_test_refit_log_scale_py_html = (
-    scrollable_table_html(final_negative_binomial_inference_log_scale_display))
+# final_negative_binomial_inference_data = testing_data.copy()
+# 
+# final_negative_binomial_inference_data["color"] = pd.Categorical(
+#     final_poisson_inference_data["color"], categories=color_order)
+# 
+# final_negative_binomial_inference_data["spine"] = pd.Categorical(
+#     final_poisson_inference_data["spine"], categories=spine_order)
+# 
+# final_negative_binomial_inference_model = smf.glm(formula=("satellites ~ width_cm + weight_kg "
+#         "+ C(color, Treatment(reference='Light')) "
+#         "+ C(spine, Treatment(reference='Both good'))"), data=final_negative_binomial_inference_data,
+#     family=sm.families.negative_binomial()).fit()
+# 
+# final_negative_binomial_inference_summary = pd.DataFrame(
+#     {"Term": final_negative_binomial_inference_model.params.index,
+#         "Log-scale estimate": final_negative_binomial_inference_model.params.values,
+#         "Standard error": final_negative_binomial_inference_model.bse.values,
+#         "Wald statistic": final_negative_binomial_inference_model.tvalues.values,
+#         "p-value": final_negative_binomial_inference_model.pvalues.values,
+#     })
+# 
+# final_negative_binomial_inference_summary["Lower 95% CI on log scale"] = (
+#     final_negative_binomial_inference_summary["Log-scale estimate"] - stats.norm.ppf(0.975)
+#     * final_negative_binomial_inference_summary["Standard error"])
+# 
+# final_negative_binomial_inference_summary["Upper 95% CI on log scale"] = (
+#     final_negative_binomial_inference_summary["Log-scale estimate"] + stats.norm.ppf(0.975)
+#     * final_negative_binomial_inference_summary["Standard error"])
+# 
+# final_negative_binomial_inference_summary["Exponentiated estimate"] = np.exp(
+#     final_negative_binomial_inference_summary["Log-scale estimate"])
+# 
+# final_negative_binomial_inference_summary["Lower 95% CI for exponentiated estimate"] = np.exp(
+#     final_negative_binomial_inference_summary["Lower 95% CI on log scale"])
+# 
+# final_negative_binomial_inference_summary["Upper 95% CI for exponentiated estimate"] = np.exp(
+#     final_negative_binomial_inference_summary["Upper 95% CI on log scale"])
+# 
+# final_negative_binomial_inference_summary["Percent change"] = (100
+#     * (final_negative_binomial_inference_summary["Exponentiated estimate"] - 1))
+# 
+# final_negative_binomial_inference_log_scale_display = (final_negative_binomial_inference_summary
+#     [["Term", "Log-scale estimate", "Standard error", "Wald statistic", "p-value",
+#         ]].round(2))
+# 
+# classical_negative_binomial_test_refit_log_scale_py_html = (
+#     scrollable_table_html(final_negative_binomial_inference_log_scale_display))
 ```
 
 ```{r}
@@ -4465,12 +4464,12 @@ classical_negative_binomial_test_refit_log_scale_py_html = (
 #| warning: false
 #| results: asis
 
-cat(
-  "\n",
-  py$classical_negative_binomial_test_refit_log_scale_py_html,
-  "\n",
-  sep = ""
-)
+# cat(
+#   "\n",
+#   py$classical_negative_binomial_test_refit_log_scale_py_html,
+#   "\n",
+#   sep = ""
+# )
 ```
 
 :::
@@ -4488,15 +4487,14 @@ cat(
 #| message: false
 #| warning: false
 
-final_poisson_inference_summary |>
-  select(term, exponentiated_estimate, exponentiated_conf_low, exponentiated_conf_high,
-    percent_change) |>
-  rename(`Term` = term, `Exponentiated estimate` = exponentiated_estimate,
-    `Lower 95% CI for exponentiated estimate` = exponentiated_conf_low,
-    `Upper 95% CI for exponentiated estimate` = exponentiated_conf_high,
-    `Percent change` = percent_change) |>
-  kable(align = c("c", "c", "c", "c", "c"))
-
+# final_poisson_inference_summary |>
+#   select(term, exponentiated_estimate, exponentiated_conf_low, exponentiated_conf_high,
+#     percent_change) |>
+#   rename(`Term` = term, `Exponentiated estimate` = exponentiated_estimate,
+#     `Lower 95% CI for exponentiated estimate` = exponentiated_conf_low,
+#     `Upper 95% CI for exponentiated estimate` = exponentiated_conf_high,
+#     `Percent change` = percent_change) |>
+#   kable(align = c("c", "c", "c", "c", "c"))
 ```
 
 ## **`Python`**
@@ -4506,13 +4504,13 @@ final_poisson_inference_summary |>
 #| message: false
 #| warning: false
 
-final_poisson_inference_expected_count_display = (final_poisson_inference_summary
-    [["Term", "Exponentiated estimate", "Lower 95% CI for exponentiated estimate",
-            "Upper 95% CI for exponentiated estimate", "Percent change",
-        ]].round(2))
-
-classical_poisson_test_refit_expected_count_py_html = (
-    scrollable_table_html(final_poisson_inference_expected_count_display))
+# final_poisson_inference_expected_count_display = (final_poisson_inference_summary
+#     [["Term", "Exponentiated estimate", "Lower 95% CI for exponentiated estimate",
+#             "Upper 95% CI for exponentiated estimate", "Percent change",
+#         ]].round(2))
+# 
+# classical_poisson_test_refit_expected_count_py_html = (
+#     scrollable_table_html(final_poisson_inference_expected_count_display))
 ```
 
 ```{r}
@@ -4523,32 +4521,31 @@ classical_poisson_test_refit_expected_count_py_html = (
 #| warning: false
 #| results: asis
 
-cat(
-  "\n",
-  py$classical_poisson_test_refit_expected_count_py_html,
-  "\n",
-  sep = ""
-)
+# cat(
+#   "\n",
+#   py$classical_poisson_test_refit_expected_count_py_html,
+#   "\n",
+#   sep = ""
+# )
 ```
 
 :::
 
-@tbl-classical-poisson-test-refit-expected-count-r translates the same testing-set refit into the scale used for **interpretation**: 
+@tbl-negative-binomial-test-refit-expected-count-r translates the same testing-set refit into the scale used for **interpretation**: 
 
 1. An exponentiated estimate of $1$ corresponds to **no multiplicative change** in the expected count. 
 2. Values above $1$ indicate a **larger expected count**, holding the other regressors fixed.
 3. Values below $1$ indicate a **smaller expected count**, holding the other regressors fixed.
 
-For example, the fitted exponentiated estimate for `width_cm` is `r final_poisson_inference_summary$exponentiated_estimate[final_poisson_inference_summary$term == "width_cm"]`. This means the following:
+For example, the fitted exponentiated estimate for `width_cm` is `.... This means the following:
 
-> *Holding weight, colour, and spine condition fixed, a one-centimetre increase in female crab width is associated with multiplying the expected number of satellite males by `r final_poisson_inference_summary$exponentiated_estimate[final_poisson_inference_summary$term == "width_cm"]` under the testing-set refit. Equivalently, this corresponds to an estimated percent change of `r final_poisson_inference_summary$percent_change[final_poisson_inference_summary$term == "width_cm"]`%.*
+> *Holding weight, colour, and spine condition fixed, a one-centimetre increase in female crab width is associated with multiplying the expected number of satellite males by ... under the testing-set refit. Equivalently, this corresponds to an estimated percent change of ...*
 
 For a categorical example, consider the `colorMedium dark` row. Its fitted exponentiated estimate is `r final_poisson_inference_summary$exponentiated_estimate[final_poisson_inference_summary$term == "colorMedium dark"]`. This means the following: 
 
-> *Holding width, weight, and spine condition fixed, female crabs in the `Medium dark` colour category are estimated to have an expected satellite count equal to `r final_negative_binomial_inference_summary$exponentiated_estimate[final_negative_binomial_inference_summary$term == "colorMedium dark"]` times the expected count for otherwise comparable female crabs in the `Light` reference category. Equivalently, this corresponds to an estimated percent difference of `r final_negative_binomial_inference_summary$percent_change[final_negative_binomial_inference_summary$term == "colorMedium dark"]`%.*
+> *Holding width, weight, and spine condition fixed, female crabs in the `Medium dark` colour category are estimated to have an expected satellite count equal to ... times the expected count for otherwise comparable female crabs in the `Light` reference category. Equivalently, this corresponds to an estimated percent difference of ...*
 
 These examples describe the **estimated coefficient interpretations** on the expected-count scale. They are not yet the final inferential conclusions. Statistical conclusions require reading these estimates together with their standard errors, confidence intervals, Wald tests, and the broader goodness-of-fit concerns. Having said all this, the model form was chosen during the **training-stage workflow**; this testing-set refit is used to report coefficient-level results for the inferential inquiry, not for additional model selection.
-
 
 
 ## Storytelling
