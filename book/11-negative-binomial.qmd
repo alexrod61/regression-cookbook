@@ -31,7 +31,7 @@ When to Use and Not Use Negative Binomial Regression
 ::: Warning-container
 Negative Binomial regression is useful when:
 
-- The outcome variable is **discrete** and **count-type**, taking values $0, 1, 2, \dots$.
+- The outcome variable is **discrete** and **count-type**, taking values $0, 1, 2, \dots$
 - The scientific or data-science inquiry focuses on how the expected count changes with a set of regressors.
 - The outcome is **overdispersed**, meaning that the variance in the outcome variable is higher than what is plausible for a [Classical Poisson](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html) model.
 
@@ -40,6 +40,7 @@ However, a negative binomial regression regression should not be used in the fol
 - If the outcome is **binary**, use a [Negative Binomial regression](#sec-negative-binomial) model.
 - If the outcome is count-type and the data exhibits **equidispersion**, meaning that the conditional variance in the outcome variable is equal to the conditional mean, begin with a [Classical  regression](#sec-classical-) model.
 - If the outcome is count-type and the data exhibits **underdispersion**, meaning that the the conditional variance in the outcome variable is lower than what is plausible for a Classical Poisson model, use a [Generalized Poisson regression](#sec-generalized-) model.
+- If the counts are **clustered**, **correlated** (eg. temporally, spatially) or otherwise **dependent** in a way the model does not account for, a generalized linear mixed model may be more appropriate because it can extend the generalized linear model framework to include random effects for grouped or dependent observations; see, for example, @bolker2009 for a practical introduction to generalized linear mixed models in ecological and evolutionary applications.
 :::
 :::::
 
@@ -95,7 +96,7 @@ By the end of this chapter, you will be able to:
 - Frame **inferential** and **predictive inquiries** for a count-regression problem using the **data science workflow**.
 - Specify a Negative Binomial regression model as a generalized linear model with a **Negative Binomial random component**, a **linear predictor**, and a **log link function**.
 - Write and interpret the **likelihood** and **log-likelihood functions** for a Negative Binomial regression model.
-- Explain how **maximum likelihood estimation** is used to estimate  regression coefficients.
+- Explain how **maximum likelihood estimation** is used to estimate regression coefficients.
 - Interpret  regression coefficients as **multiplicative changes in the expected count**, holding other regressors fixed.
 - Assess model adequacy using **goodness-of-fit checks**, **residual-based summaries**, and the ** mean-variance assumption**.
 - Construct and interpret **confidence intervals** and **hypothesis tests** for Negative Binomial regression coefficients.
@@ -1598,7 +1599,7 @@ plt.show()
 
 :::
 
-The width plot (from @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py) should be read together with the quartile (from @tbl-negative-binomial-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Negative Binomial regression model (see @sec-negative-binomial-simple-model), while leaving formal model specification and interpretation for the next sections.
+The width plot (from @fig-negative-binomial-satellites-width-r or @fig-negative-binomial-satellites-width-py) should be read together with the quartile (from @tbl-negative-binomial-width-quartile-summary-r). The blue points show the observed counts in the training set. Moreover, the orange LOWESS/LOESS curve is only an exploratory visual guide, but it suggests that **satellite male counts tend to increase as female crab width increases**. This agrees with the quartile summary: the average satellite count rises from `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q1: smallest widths"]` in the smallest-width quartile to `r width_quartile_summary$mean_satellites[width_quartile_summary$width_quartile == "Q4: largest widths"]` in the largest-width quartile. Then, the vertical spread around this increasing pattern is also important. Female crabs with similar widths can still have different numbers of satellite males. Some moderate-to-large crabs have zero or very few satellites, while some crabs have much larger counts. This tells us that width is a promising first regressor, but it will not fully explain the response on its own. We will use this EDA result to motivate the first Negative Binomial regression model (see @sec-negative-binomial-simple-model), while leaving formal model specification and interpretation for the next sections.
 
 We now repeat the same EDA logic for female crab weight. Since width and weight both describe body size, we should expect them to tell related but not necessarily identical stories.
 
@@ -3505,11 +3506,11 @@ observed_fitted_plot
 
 :::
 
-In @fig-negative-binomial-observed-fitted-r or @fig-negative-binomial-observed-fitted-py, the simple width-only model shows some signs of strain. For fitted expected counts between roughly $1.5$ and $4$, there are many observed zeros sitting well below the dashed line, which is consistent with @tbl-negative-binomial-fitted-count-calibration-r showing that the model understates the number of zero satellite counts. At the same time, several observations in this same fitted-count range have much larger observed counts, including values around $6$, $8$, $10$, and higher. This produces a large vertical spread among crabs with similar fitted expected counts. The horizontal bands in the plot are expected because the observed response is a count. The fitted expected count on the $x$-axis is allowed to be fractional, but the observed satellite count on the $y$-axis can only take values such as $0$, $1$, $2$, $3$, and so on. The amount of vertical spread around similar fitted expected counts suggests that the simple width-only Negative Binomial model suggests possible overdispersion in the training data, due to which this Negative Binomial model might be a better fit than the width-only Classical  Model. 
+In @fig-negative-binomial-observed-fitted-r or @fig-negative-binomial-observed-fitted-py, the simple width-only model shows some signs of strain. For fitted expected counts between roughly $1.5$ and $4$, there are many observed zeros sitting well below the dashed line, which is consistent with @tbl-negative-binomial-fitted-count-calibration-r showing that the model understates the number of zero satellite counts. At the same time, several observations in this same fitted-count range have much larger observed counts, including values around $6$, $8$, $10$, and higher. This produces a large vertical spread among crabs with similar fitted expected counts. The horizontal bands in the plot are expected because the observed response is a count. The fitted expected count on the $x$-axis is allowed to be fractional, but the observed satellite count on the $y$-axis can only take values such as $0$, $1$, $2$, $3$, and so on. The amount of vertical spread around similar fitted expected counts suggests possible overdispersion in the training data, due to which this Negative Binomial model might be a better fit than the [simple Classical Poisson Model](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html#sec-classical-poisson-simple-model). 
 
 ### Dispersion Test
 
-Let's revisit the `extended_model` which was fit in [Chapter 10](#sec-classical-). This model showed substantial overdispersion relative to the Classical  mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001. We will test whether there is overdispersion in this  regression model via function `dispersiontest()`, (from package `{AER}`). As the `statsmodels` does not have an equivalent function, the `Python` code defines the same regression-based test as a function with the same name.
+Let's revisit the `simple_poisson_width_model` which was fit in [Section 10.7](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html#sec-classical-poisson-simple-model). This model showed substantial overdispersion relative to the Classical  mean-variance assumption with a Pearson dispersion estimate of $3.082$ and a $p-$value < 0.001. We will test whether there is overdispersion in this  regression model via function `dispersiontest()`, (from package `{AER}`). As the `statsmodels` does not have an equivalent function, the `Python` code defines the same regression-based test as a function with the same name.
 -   Let $Y_i$ be the $i$th  response in the count regression model.
 
 . . .
@@ -3602,13 +3603,10 @@ print(f"Sample estimate (dispersion): {dispersion:.4f}")
 #| echo: false
 #| message: false
 #| warning: false
-extended__model <- glm(
-  satellites ~ width_cm + weight_kg + color + spine,
-  family = poisson(link = "log"),
-  data = training_data
-)
+simple_poisson_width_model <- glm(formula = satellites ~ width_cm,
+  family = stats::poisson(link = "log"), data = training_data)
 
-dispersiontest(extended__model)
+dispersiontest(simple_poisson_width_model)
 ```
 
 ## **`Python` Output**
@@ -3618,12 +3616,15 @@ dispersiontest(extended__model)
 #| message: false
 #| warning: false
 
+import numpy as np
+import scipy.stats as stats
+
+
 def dispersiontest(results, alternative="greater"):
     """Cameron and Trivedi (1990) regression-based dispersion test.
 
-    This is the Python counterpart of AER::dispersiontest() with
-    trafo = NULL, i.e., the alternative is
-    Var(Y_i) = (1 + gamma) * lambda_i.
+    This is the `Python` counterpart of `AER::dispersiontest()` with
+    `trafo = NULL`, i.e., the alternative is Var(Y_i) = (1 + gamma) * lambda_i.
     """
     y = np.asarray(results.model.endog, dtype=float)
     y_hat = np.asarray(results.fittedvalues, dtype=float)
@@ -3648,21 +3649,13 @@ def dispersiontest(results, alternative="greater"):
     return test_statistic, p_value, dispersion
 
 
-# Fit model
-extended_model = smf.glm(
-    formula=(
-        "satellites ~ width_cm + weight_kg "
-        "+ C(color, Treatment(reference='Light')) "
-        "+ C(spine, Treatment(reference='Both good'))"
-    ),
-    data=training_data,
-    family=sm.families.Poisson()
-).fit()
-
+# Fit the width-only Poisson model
+simple_poisson_width_model = smf.glm(formula="satellites ~ width_cm", data=training_data,
+    family=sm.families.Poisson()).fit()
 
 # Dispersion test
 test_statistic, p_value, dispersion = dispersiontest(
-    extended_model
+    simple_poisson_width_model
 )
 
 print(f"Test statistic (z): {test_statistic:.4f}")
@@ -4070,11 +4063,11 @@ D
 \left[
 y_i \log\left(\frac{y_i}{\hat{\mu}_i}\right)
 -
-(y_i - \hat{\mu}_i)
+(y_i + \theta)\log\left(\frac{y_i+\theta}{\hat{\mu}_i+\theta}\right)
 \right],
 $${#eq-classical-poisson-residual-deviance}
 
-where $n$ is the number of observations used to fit the model, $y_i$ is the observed count for observation $i$, and $\hat{\mu}_i$ is the fitted expected count for observation $i$. When $y_i = 0$, the term $y_i \log(y_i / \hat{\mu}_i)$ is defined to be $0$.
+where $n$ is the number of observations used to fit the model, $y_i$ is the observed count for observation $i$, $\hat{\mu}_i$ is the fitted expected count for observation $i$, and $\theta$ is the dispersion parameter. When $y_i = 0$, the term $y_i \log(y_i / \hat{\mu}_i)$ is defined to be $0$.
 
 In practical terms, in @eq-negative-binomial-residual-deviance, the residual deviance adds up how much the observed counts differ from the fitted expected counts on the likelihood scale. It is not simply a sum of squared residuals, but it serves a similar diagnostic purpose: **it helps us assess whether the fitted model is close enough to the observed data to be considered adequate**.
 
@@ -4288,83 +4281,251 @@ plt.show()
 
 In @fig-negative-binomial-pearson-residuals-r (or @fig-negative-binomial-pearson-residuals-py), the solid horizontal line at $0$ represents a perfect residual balance: the observed count equals the fitted expected count after standardizing by the fitted Negative Binomial standard deviation. The two dashed horizontal lines are visual reference bands at approximately $-2$ and $2$. They are not formal decision cutoffs, but they help us identify observations whose Pearson residuals are large in magnitude. Under a reasonably adequate Negative Binomial variance structure, we would expect most Pearson residuals to fall inside these bands, without a strong pattern across fitted expected counts. The residual pattern is reassuring because a majority of observations in the training are between $-2$ and $2$.
 
-## Results and Statistical Interpretation {#sec-negative-binomial-results}
 
-# Results and Statistical Interpretation {#sec-classical-poisson-results}
+### Practical Model Adequacy {#sec-negative-binomial-practical-adequacy}
 
-Now, we move from model building to results. Up to this point, the **training data** have been used to explore the response, fit the simple and extended Classical Poisson regression models, and diagnose goodness of fit. The extended model gave us a richer fitted mean structure than the simple width-only model, but the diagnostics still showed substantial overdispersion, excess zero counts, and global lack of fit.
+Now, we combine the diagnostic evidence. The goal is not to declare the model perfect or useless based on a single number. Instead, we ask whether the simple width-only Negative Binomial model is adequate enough for the next stage of the workflow.
 
-Recall that this chapter has two guiding inquiries as in @tbl-classical-poisson-results-inquiries.
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teaching-to-learn-wiki-3976301/).](img/board.png){width="500"}
 
-| Inquiry type | Research question | What the Results section must deliver |
-|:---:|:---:|:---:|
-| **Inferential inquiry** | How is the expected number of satellite males associated with female crab width, weight, colour, and spine condition? | A coefficient-level statistical interpretation of the extended Classical Poisson model, using the testing-set refit. |
-| **Predictive inquiry** | How accurately can female crab characteristics predict the number of satellite males for held-out crabs? | A held-out predictive assessment using the training-fitted extended model evaluated on the testing data. |
+| **Diagnostic** | **What we checked** | **What the training data suggest** | **Practical implication** |
+|:---:|:---:|:---:|:---:|
+| Observed versus fitted counts | Whether fitted expected counts track observed counts across the training data. | The model captures a broad increase in expected counts with width, and individual counts show large variability around the fitted expectations (see @fig-classical-poisson-observed-fitted-r or @fig-classical-poisson-observed-fitted-py). | Width is useful and the simple model is a good fit for the satellite counts. |
+| Pearson overdispersion test | Whether the conditional variance is compatible with the Negative Binomial mean-variance structure. | The Pearson dispersion estimate is close to $1$, and the overdispersion $p$-value is large. | The Negative Binomial model gives **larger standard errors** for regression coefficients than the Classical Poisson model, meaning that the Negative Binomial model is less prone to **false positive** errors. |
+| Zero-count check | Whether the fitted model expects a similar number of zeros as observed. | If the observed zero count is larger than the fitted expected zero count, the model is not reproducing the zero-count part of the distribution. | Excess zeros may motivate a **zero-inflated model** in a later chapter. |
+| Residual deviance | Whether the fitted model is close enough to a saturated benchmark. | The residual deviance is close to the degrees of freedom, with a goodness-of-fit $p$-value>0.05. | There is statistical evidence of good fit in the width-only Negative Binomial model. |
+| Pearson residual plot | Whether residuals show unusually large discrepancies relative to the fitted Poisson variance. | Large residuals and broad residual spread support the overdispersion conclusion (see @fig-classical-poisson-pearson-residuals-r or @fig-classical-poisson-pearson-residuals-py). | The simple model is adequate as an inferential model for the relationship between female crab width and satellite counts. |
 
-: The two guiding inquiries revisited for the Results section. {#tbl-classical-poisson-results-inquiries .striped .hover}
+: Summary of goodness-of-fit findings for the simple width-only Negative Binomial regression model fit on the training data. {#tbl-simple-classical-poisson-gof-summary .striped .hover}
 
-![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-digital-3704070/).](img/pinned-notes.png){width="500"}
+As the overall diagnostic picture was not favourable for the [Classical Poisson model](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html#sec-classical-poisson-practical-adequacy), we decided to fit the Negative Binomial model. The overall diagnostic picture is favourable for this simple Negative Binomial model. The model not only captures the relationship between **female crab width** and **satellite male counts** in the population but also adequately explains the large variability in the observed satellite counts in the train set. The zero-count check does not indicate substantial underestimation in the number of zero counts; however, there is some statistical evidence that this model is not reproducing the zero-count portion of the response distribution. There is statistical evidence to state that the simple Negative Binomial is correctly specified in comparison to the saturated model.
 
-Therefore, the **results stage** has two complementary goals:
+## Extending the Model with Additional Regressors {#sec-negative-binomial-additional-regressors}
 
-- For the **inferential inquiry**, we refit the extended Classical Poisson model on the **testing data** and summarize the coefficient-level results. 
-- For the **predictive inquiry**, we evaluate how well the training-fitted extended model predicts the held-out testing counts.
+In @tbl-simple-negative-binomial-gof-summary, the goodness-of-fit checks for the simple width-only model showed that it is a good start. The model captured a useful width-based mean pattern, and adequately reproduced the variability in the response variable. In the data science workflow, this is a natural point to return to the **data modelling** and **estimation** stages rather than moving directly to final conclusions.
 
-This separation follows the data science workflow used throughout the book. The training data supported model development and goodness-of-fit checks. The testing data are now used for final assessment: coefficient-level inferential summaries for the inferential inquiry, and held-out prediction accuracy for the predictive inquiry.
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-help-assistance-3974184/).](img/fixing.png){width="550"}
+
+We now extend the Negative Binomial regression model by adding the remaining regressors available in the horseshoe crab dataset. Hence, this means retaking the same modelling cycle: 
+
+1. Define the model notation carefully.
+2. Encode the categorical regressors using dummy variables.
+3. Estimate the extended model on the training data.
+4. Revisit goodness of fit on the training data.
+5. Interpret the fitted mean structure, and prepare predictions for held-out testing observations.
+
+We still fit and diagnose the model using the **training data**. Then, the testing data remain reserved for the later **results section**, where we will evaluate final predictive performance and produce final inferential outputs according to the chapter workflow.
+
+### Adding Phenotypic Regressors {#sec-classical-poisson-phenotypic-regressors}
+
+Recall the notation introduced in @tbl-negative-binomial-variables. The response is $Y_i$, the observed number of satellite males for the $i$th female crab. The continuous regressors are:
+
+- $x_{i,1}$: female crab carapace width in centimetres;
+- $x_{i,2}$: female crab weight in kilograms.
+
+The remaining regressors are categorical. As in the data modelling example from @sec-intro-negative-binomial, we represent categorical variables by creating binary dummy variables (see @tbl-negative-binomial-dummy-variables). If a categorical variable has $u$ levels, we use $u - 1$ dummy variables and leave one level as the baseline or reference category. The baseline category is represented by all zeros for that categorical variable.
+
+Before defining the dummy variables, we first verify the order of the categorical levels. This is necessary because the baseline category is the level represented by all dummy variables equal to zero. For this model, `Light` is the baseline category for `color` and `Both good` is the baseline category for `spine` since these two categories appear on the left-hand side of the coding output.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-levels-color-spine-r
+#| lst-cap: "Code to check colour and spine levels."
+#| message: false
+#| warning: false
+
+levels(training_data$color)
+levels(training_data$spine)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-levels-color-spine-py
+#| lst-cap: "Code to relevel colour and spine levels."
+#| message: false
+#| warning: false
+
+color_order = ["Light", "Medium light", "Medium dark", "Dark",
+]
+
+spine_order = ["Both good", "One worn or broken", "Both worn or broken",
+]
+
+training_data["color"] = pd.Categorical(training_data["color"], categories=color_order)
+
+training_data["spine"] = pd.Categorical(training_data["spine"], categories=spine_order)
+
+training_data["color"].cat.categories
+
+training_data["spine"].cat.categories
+```
+
+:::
+
+For `color`, we use `Light` as the baseline category. Since `color` has four levels, we need three dummy variables:
+
+$$
+x_{i,3}
+=
+\begin{cases}
+1, & \text{if the } i\text{th female crab has colour Medium light}, \\
+0, & \text{otherwise};
+\end{cases}
+$$
+
+$$
+x_{i,4}
+=
+\begin{cases}
+1, & \text{if the } i\text{th female crab has colour Medium dark}, \\
+0, & \text{otherwise};
+\end{cases}
+$$
+
+and
+
+$$
+x_{i,5}
+=
+\begin{cases}
+1, & \text{if the } i\text{th female crab has colour Dark}, \\
+0, & \text{otherwise}.
+\end{cases}
+$$
+
+Thus, a female crab in the `Light` colour category has
+
+$$
+x_{i,3}=x_{i,4}=x_{i,5}=0.
+$$
+
+For `spine`, we use `Both good` as the baseline category. Since `spine` has three levels, we need two dummy variables:
+
+$$
+x_{i,6}
+=
+\begin{cases}
+1, & \text{if the } i\text{th female crab has one worn or broken spine}, \\
+0, & \text{otherwise};
+\end{cases}
+$$
+
+and
+
+$$
+x_{i,7}
+=
+\begin{cases}
+1, & \text{if the } i\text{th female crab has both spines worn or broken}, \\
+0, & \text{otherwise}.
+\end{cases}
+$$
+
+Thus, a female crab in the `Both good` spine category has
+
+$$
+x_{i,6}=x_{i,7}=0.
+$$
+
+The full dummy-variable arrangement is summarized in @tbl-negative-binomial-dummy-variable-arrangement.
+
+| Original variable | Baseline category | Dummy variable | Dummy equals $1$ when... | Dummy equals $0$ when... |
+|:---:|:---:|:---:|:---:|:---:|
+| `color` | `Light` | $x_{i,3}$ | `color` is `Medium light` | otherwise |
+| `color` | `Light` | $x_{i,4}$ | `color` is `Medium dark` | otherwise |
+| `color` | `Light` | $x_{i,5}$ | `color` is `Dark` | otherwise |
+| `spine` | `Both good` | $x_{i,6}$ | `spine` is `One worn or broken` | otherwise |
+| `spine` | `Both good` | $x_{i,7}$ | `spine` is `Both worn or broken` | otherwise |
+
+: Dummy-variable arrangement for the categorical regressors in the extended horseshoe crab Negative Binomial regression model. {#tbl-negative-binomial-dummy-variable-arrangement .striped .hover}
 
 ::: {.Heads-up}
 :::: {.Heads-up-header}
-Heads-up on why the testing data appear in two roles here!
+Heads-up on reference categories and dummy variables!
 ::::
 :::: {.Heads-up-container}
-The testing data are used differently for the two workflow flavours:
+The reference category is not omitted because it is unimportant. It is omitted from the dummy-variable list because its information is carried by the intercept and by the fact that all dummy variables for that categorical regressor equal zero.
 
-- For the **inferential inquiry**, we refit the selected extended model on the testing data. This gives a final coefficient-level analysis on data that were not used for EDA, model development, or goodness-of-fit decisions.
-- For the **predictive inquiry**, we do not refit the model before predicting. We use the extended model fitted on the training data to generate predictions for the testing observations, and then compare those predictions with the observed testing counts.
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-upset-6230193/).](img/surprise-2.png){width="300"}
 
-These two uses should not be mixed. Refitting on the testing data is appropriate for the final inferential summary under this chapter's workflow. Predictive evaluation, however, must use predictions from a model trained before looking at the testing responses.
+For colour, `Light` is the reference category. For spine condition, `Both good` is the reference category. Therefore, categorical coefficients in the extended model are interpreted relative to these baseline categories, holding the other regressors fixed.
 ::::
 :::
 
-### Inferential Results: Refit the Extended Model on the Testing Data {#sec-classical-poisson-inferential-results}
-
-For the inferential inquiry, we refit the extended Classical Poisson model using the testing data. The model has the same systematic component developed earlier:
+Using this notation, the extended Negative Binomial regression model is
 
 $$
 Y_i \mid x_{i,1}, x_{i,2}, \ldots, x_{i,7}
 \sim
-\operatorname{Poisson}(\mu_i),
+\operatorname{Negative Binomial}(\mu_i, \theta),
 $$
 
 with
 
 $$
-\begin{align*}
+\begin{aligned}
 \log(\mu_i)
-&=
-\beta_0
+=
+&\ \beta_0
 +
 \beta_1 x_{i,1}
 +
 \beta_2 x_{i,2}
 +
 \beta_3 x_{i,3}
-+ \\
-& \beta_4 x_{i,4}
 +
+\beta_4 x_{i,4} \\
+&+
 \beta_5 x_{i,5}
 +
 \beta_6 x_{i,6}
 +
 \beta_7 x_{i,7}.
-\end{align*}
-$${#eq-classical-poisson-results-extended-model}
+\end{aligned}
+$${#eq-classical-poisson-extended-model}
 
-In @eq-classical-poisson-results-extended-model, $x_{i,1}$ is width, $x_{i,2}$ is weight, $x_{i,3}$, $x_{i,4}$, and $x_{i,5}$ are colour dummy variables, and $x_{i,6}$ and $x_{i,7}$ are spine-condition dummy variables (see @tbl-classical-poisson-dummy-variable-arrangement).
+Equivalently,
 
-![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/daycare-pixel-holding-hands-7464616/).](img/juggling.png){width="300"}
+$$
+\mu_i
+=
+\exp
+\left(
+\beta_0
++
+\beta_1 x_{i,1}
++
+\beta_2 x_{i,2}
++
+\cdots
++
+\beta_7 x_{i,7}
+\right).
+$${#eq-negative-binomial-extended-mean}
 
-Before interpreting the coefficients on the expected-count scale, we first refit the extended Classical Poisson model on the **testing data**. This refit uses the same model form selected during the training-stage workflow, but it is estimated using observations that were not used for EDA, model building, or goodness-of-fit decisions. @tbl-classical-poisson-test-refit-log-scale-r reports the coefficient estimates on the **log expected-count scale**. This is the scale on which the GLM is fitted and on which the Wald statistics are computed. The coefficient estimate tells us the estimated additive change in $\log(\mu_i)$, the standard error measures uncertainty on that same scale, and the Wald statistic compares the estimate with the null value $0$.
+This extended model uses the same Negative Binomial random component and log link as before. What changes is the **systematic component**: instead of using width alone, we now use width, weight, and dummy variables for colour and spine condition.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on adding regressors after a failed goodness-of-fit check!
+::::
+:::: {.Heads-up-container}
+Adding regressors can improve a model when the original systematic component was too simple. For example, if weight, colour, or spine condition explain differences in satellite counts that width alone did not capture, then the extended model may fit the training data better.
+
+However, adding regressors does not automatically fix overdispersion or excess zeros. Overdispersion and zero inflation are distributional problems, not only mean-structure problems. Therefore, after fitting the extended Negative Binomial model, we must repeat the goodness-of-fit checks rather than assuming that the additional regressors solved the diagnostic issues.
+::::
+:::
+
+Now, we fit the extended model on the training data:
+
+- In `R`, the formula `satellites ~ width_cm + weight_kg + color + spine` tells `glm()` to create the needed dummy variables for the categorical regressors automatically, using the first factor level as the reference category. 
+- In `Python`, via @lst-levels-color-spine-py, we explicitly set the categorical order and reference categories so that the fitted model matches the same dummy-variable setup. Then, we fit the corresponding extended model.
 
 ::: {.panel-tabset}
 
@@ -4372,26 +4533,24 @@ Before interpreting the coefficients on the expected-count scale, we first refit
 
 ```{r}
 #| echo: true
-#| label: tbl-classical-poisson-test-refit-log-scale-r
-#| tbl-cap: "Testing-set refit of the extended Classical Poisson regression model on the log expected-count scale."
+#| label: tbl-negative-binomial-extended-model-fit-r
+#| tbl-cap: "Maximum likelihood estimates from the extended Negative Binomial regression model fitted on the training data."
 #| message: false
 #| warning: false
 
-# final_poisson_inference_model <- glm(satellites ~ width_cm + weight_kg + color + spine,
-#   family = poisson(link = "log"), data = testing_data)
-# 
-# final_poisson_inference_summary <- tidy(final_poisson_inference_model) |>
-#   mutate(conf_low = estimate - qnorm(0.975) * std.error,
-#     conf_high = estimate + qnorm(0.975) * std.error, exponentiated_estimate = exp(estimate),
-#     exponentiated_conf_low = exp(conf_low), exponentiated_conf_high = exp(conf_high),
-#     percent_change = 100 * (exponentiated_estimate - 1),
-#     across(where(is.numeric), ~ round(.x, 2)))
-# 
-# final_poisson_inference_summary |>
-#   select(term, estimate, std.error, statistic, p.value) |>
-#   rename(`Term` = term, `Log-scale estimate` = estimate, `Standard error` = std.error,
-#     `Wald statistic` = statistic, `p-value` = p.value) |>
-#   kable(align = c("c", "c", "c", "c", "c"))
+extended_negative_binomial_model <- glm.nb(satellites ~ width_cm + weight_kg + color + spine, 
+                                           data = training_data)
+
+extended_negative_binomial_summary <- tidy(extended_negative_binomial_model) |>
+  dplyr::mutate(exponentiated_estimate = exp(estimate),
+    percent_change = 100 * (exponentiated_estimate - 1),
+    across(where(is.numeric), ~ round(.x, 2))) |>
+    dplyr::select(term, estimate, std.error, exponentiated_estimate, percent_change)
+
+extended_negative_binomial_summary |>
+  rename(`Term` = term, `Estimate` = estimate, `Standard error` = std.error,
+    `Exponentiated estimate` = exponentiated_estimate, `Percent change` = percent_change) |>
+  kable(align = c("c", "c", "c", "c", "c"))
 ```
 
 ## **`Python`**
@@ -4401,74 +4560,187 @@ Before interpreting the coefficients on the expected-count scale, we first refit
 #| message: false
 #| warning: false
 
-# final_negative_binomial_inference_data = testing_data.copy()
-# 
-# final_negative_binomial_inference_data["color"] = pd.Categorical(
-#     final_poisson_inference_data["color"], categories=color_order)
-# 
-# final_negative_binomial_inference_data["spine"] = pd.Categorical(
-#     final_poisson_inference_data["spine"], categories=spine_order)
-# 
-# final_negative_binomial_inference_model = smf.glm(formula=("satellites ~ width_cm + weight_kg "
-#         "+ C(color, Treatment(reference='Light')) "
-#         "+ C(spine, Treatment(reference='Both good'))"), data=final_negative_binomial_inference_data,
-#     family=sm.families.negative_binomial()).fit()
-# 
-# final_negative_binomial_inference_summary = pd.DataFrame(
-#     {"Term": final_negative_binomial_inference_model.params.index,
-#         "Log-scale estimate": final_negative_binomial_inference_model.params.values,
-#         "Standard error": final_negative_binomial_inference_model.bse.values,
-#         "Wald statistic": final_negative_binomial_inference_model.tvalues.values,
-#         "p-value": final_negative_binomial_inference_model.pvalues.values,
-#     })
-# 
-# final_negative_binomial_inference_summary["Lower 95% CI on log scale"] = (
-#     final_negative_binomial_inference_summary["Log-scale estimate"] - stats.norm.ppf(0.975)
-#     * final_negative_binomial_inference_summary["Standard error"])
-# 
-# final_negative_binomial_inference_summary["Upper 95% CI on log scale"] = (
-#     final_negative_binomial_inference_summary["Log-scale estimate"] + stats.norm.ppf(0.975)
-#     * final_negative_binomial_inference_summary["Standard error"])
-# 
-# final_negative_binomial_inference_summary["Exponentiated estimate"] = np.exp(
-#     final_negative_binomial_inference_summary["Log-scale estimate"])
-# 
-# final_negative_binomial_inference_summary["Lower 95% CI for exponentiated estimate"] = np.exp(
-#     final_negative_binomial_inference_summary["Lower 95% CI on log scale"])
-# 
-# final_negative_binomial_inference_summary["Upper 95% CI for exponentiated estimate"] = np.exp(
-#     final_negative_binomial_inference_summary["Upper 95% CI on log scale"])
-# 
-# final_negative_binomial_inference_summary["Percent change"] = (100
-#     * (final_negative_binomial_inference_summary["Exponentiated estimate"] - 1))
-# 
-# final_negative_binomial_inference_log_scale_display = (final_negative_binomial_inference_summary
-#     [["Term", "Log-scale estimate", "Standard error", "Wald statistic", "p-value",
-#         ]].round(2))
-# 
-# classical_negative_binomial_test_refit_log_scale_py_html = (
-#     scrollable_table_html(final_negative_binomial_inference_log_scale_display))
+extended_negative_binomial_alpha = smf.negativebinomial(
+    "satellites ~ width_cm + weight_kg + color + spine", data=training_data
+).fit(disp=0).params["alpha"]
+
+extended_negative_binomial_model = smf.glm(
+    "satellites ~ width_cm + weight_kg + color + spine",
+    data=training_data,
+    family=sm.families.NegativeBinomial(alpha=extended_negative_binomial_alpha),
+).fit()
+
+extended_negative_binomial_summary = (
+    pd.DataFrame(
+        {
+            "Term": extended_negative_binomial_model.params.index,
+            "Estimate": extended_negative_binomial_model.params.values,
+            "Standard error": extended_negative_binomial_model.bse.values,
+        }
+    )
+    .assign(
+        **{
+            "Exponentiated estimate": lambda df: np.exp(df["Estimate"]),
+            "Percent change": lambda df: 100 * (np.exp(df["Estimate"]) - 1),
+        }
+    )
+    .round(2)
+)
+
+negative_binomial_extended_model_fit_py_html = scrollable_table_html(extended_negative_binomial_summary)
 ```
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-negative_binomial-test-refit-log-scale-py
-#| tbl-cap: "Testing-set refit of the extended Classical negative_binomial regression model on the log expected-count scale."
+#| label: tbl-negative_binomial-extended-model-fit-py
+#| tbl-cap: "Maximum likelihood estimates from the extended Poisson regression model fitted on the training data."
 #| message: false
 #| warning: false
 #| results: asis
 
-# cat(
-#   "\n",
-#   py$classical_negative_binomial_test_refit_log_scale_py_html,
-#   "\n",
-#   sep = ""
-# )
+cat(
+  "\n",
+  py$negative_binomial_extended_model_fit_py_html,
+  "\n",
+  sep = "")
 ```
 
 :::
 
-@tbl-negative_binomial-test-refit-log-scale-r reports the **testing-set refit** on the scale used by the model. For each coefficient, the **Wald statistic** is the **ratio between the estimated coefficient and its model-based standard error**. Therefore, large positive or negative Wald statistics indicate estimates that are far from $0$ relative to their estimated uncertainty. However, the **log expected-count scale** is not always the easiest scale for substantive interpretation. Since the model uses a log link (see @eq-negative_binomial-results-extended-model), exponentiating a coefficient gives a multiplicative comparison on the expected-count scale (see @eq-classical-negative_binomial-extended-mean). Thus, @tbl-negative_binomial-test-refit-expected-count-r reports these exponentiated estimates, their approximate 95% confidence intervals, and the corresponding percent changes.
+@tbl-negative-binomial-extended-model-fit-r reports estimates, model-based standard errors, exponentiated estimates, and percent changes. We intentionally do **not** conduct Wald tests here. Hypothesis testing and final coefficient-level inferential decisions are saved for the later **results section**, after the model-building workflow has been completed.
+
+### Extended Goodness-of-Fit Checks {#sec-negative-binomial-extended-gof}
+
+Now, before interpreting the coefficients, we repeat the goodness-of-fit checks for the extended model. Since the simple width-only model showed overdispersion, excess zeros, and a large residual deviance, we now ask whether adding `weight_kg`, `color`, and `spine` improved those same diagnostics. We will use the same diagnostic tools developed for the simple model, but we will organize them more efficiently here. The goal is not to rederive the mathematics. Instead, we reuse the same ideas to assess whether the extended Negative Binomial model is more adequate on the training data.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teacher-acrobatics-3974168/).](img/sequence.png){width="700"}
+
+#### Regressor Correlation Structure
+
+Before computing any diagnostic quantities, it is worth looking at how the regressors in the extended model relate to one another. Recall from the exploratory data analysis in @sec-negative-binomial-eda-continuous that width and weight are both body-size measurements, so they may carry partly overlapping information. The heatmap below makes that overlap explicit by reporting the pairwise correlations among the **columns of the model matrix**, i.e., the two continuous regressors together with the five dummy variables from @tbl-negative-binomial-dummy-variable-arrangement. These are the quantities the model actually estimates coefficients for, so this is the correlation structure that is relevant when we interpret those coefficients.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-negative-binomial-extended-regressor-correlation-r
+#| fig-cap: "Pairwise correlations among the regressors in the extended Negative Binomial regression model, computed on the training data."
+#| echo: true
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+extended_regressor_matrix <- model.matrix(extended_negative_binomial_model)[, -1, drop = FALSE]
+
+colnames(extended_regressor_matrix) <- gsub("^(color|spine)", "\\1 ",
+  colnames(extended_regressor_matrix))
+
+extended_regressor_correlation <- cor(extended_regressor_matrix)
+
+extended_regressor_order <- colnames(extended_regressor_correlation)
+
+extended_regressor_correlation_long <- as.data.frame(extended_regressor_correlation,
+  check.names = FALSE) |>
+  tibble::rownames_to_column("regressor_row") |>
+  tidyr::pivot_longer(cols = -regressor_row, names_to = "regressor_column",
+    values_to = "correlation") |>
+  mutate(regressor_row = factor(regressor_row, levels = extended_regressor_order),
+    regressor_column = factor(regressor_column, levels = rev(extended_regressor_order)))
+
+extended_regressor_correlation_plot <- ggplot(extended_regressor_correlation_long,
+  aes(x = regressor_row, y = regressor_column, fill = correlation)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = formatC(correlation, format = "f", digits = 2)), size = 5) +
+  scale_fill_gradient2(low = "#0072B2", mid = "white", high = "#D55E00",
+    midpoint = 0, limits = c(-1, 1), name = "Correlation") +
+  theme_bw() +
+  theme(axis.title = element_blank(),
+    axis.text.x = element_text(size = 13, angle = 35, hjust = 1),
+    axis.text.y = element_text(size = 13),
+    legend.title = element_text(size = 16), legend.text = element_text(size = 13),
+    panel.grid = element_blank()) +
+  coord_fixed()
+
+extended_regressor_correlation_plot
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-negative-binomial-extended-regressor-correlation-py
+#| fig-cap: "Pairwise correlations among the regressors in the extended Negative Binomial regression model, computed on the training data."
+#| echo: true
+#| message: false
+#| warning: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Importing function
+from matplotlib.colors import LinearSegmentedColormap
+
+extended_regressor_matrix = pd.DataFrame(
+    extended_negative_binomial_model.model.exog,
+    columns=extended_negative_binomial_model.model.exog_names).drop(columns="Intercept")
+
+extended_regressor_matrix.columns = (extended_regressor_matrix.columns
+    .str.replace(r"\[T\.(.+)\]", r" \1", regex=True))
+
+extended_regressor_order = ["width_cm", "weight_kg", "color Medium light",
+    "color Medium dark", "color Dark", "spine One worn or broken",
+    "spine Both worn or broken"]
+
+extended_regressor_correlation = (extended_regressor_matrix[extended_regressor_order].corr())
+
+extended_correlation_colormap = LinearSegmentedColormap.from_list(
+    "extended_correlation_colormap", ["#0072B2", "#FFFFFF", "#D55E00"])
+
+extended_correlation_figure, extended_correlation_axis = plt.subplots(figsize=(14, 8))
+
+extended_correlation_image = extended_correlation_axis.imshow(
+    extended_regressor_correlation.values, cmap=extended_correlation_colormap,
+    vmin=-1, vmax=1)
+
+extended_correlation_axis.set_xticks(range(len(extended_regressor_correlation.columns)))
+
+extended_correlation_axis.set_xticklabels(extended_regressor_correlation.columns,
+    rotation=35, ha="right", fontsize=13)
+
+extended_correlation_axis.set_yticks(range(len(extended_regressor_correlation.index)))
+
+extended_correlation_axis.set_yticklabels(extended_regressor_correlation.index, fontsize=13)
+
+for row_index in range(len(extended_regressor_correlation.index)):
+    for column_index in range(len(extended_regressor_correlation.columns)):
+        extended_correlation_axis.text(column_index, row_index,
+            f"{extended_regressor_correlation.iloc[row_index, column_index]:.2f}",
+            ha="center", va="center", fontsize=13)
+
+extended_correlation_colorbar = extended_correlation_figure.colorbar(
+    extended_correlation_image, ax=extended_correlation_axis, shrink=0.85)
+
+extended_correlation_colorbar.set_label("Correlation", fontsize=16)
+
+extended_correlation_colorbar.ax.tick_params(labelsize=13)
+
+extended_correlation_axis.grid(False)
+
+extended_correlation_figure.tight_layout()
+plt.show()
+```
+
+:::
+
+Two points are worth making about @fig-negative-binomial-extended-regressor-correlation-r before we move on.
+
+First, the cell relating `width_cm` and `weight_kg` is the one that carries genuine information about the data. A large positive correlation there would confirm the EDA concern that the two body-size regressors overlap, which in turn means their individual coefficients in the extended model should be interpreted with care. Each coefficient is a *conditional* association, holding the other regressor fixed, and that conditioning becomes harder to interpret when the two regressors move together in the training data.
+
+Second, the blocks involving the `color` and `spine` dummy variables will show negative correlations **by construction**, not because of anything in the horseshoe crab data. Two dummy variables built from the same categorical regressor cannot both equal $1$ for the same female crab, so they are mechanically negatively related. This is a good reminder that a correlation heatmap describes the design matrix, not the scientific structure of the problem. When we want a formal collinearity diagnostic that handles categorical regressors properly, a variance inflation factor, such as the generalized variance inflation factor reported by `car::vif()`, is the more appropriate tool.
+
+#### Creating Extended-Model Diagnostic Quantities
+
+The first step is to create the **fitted expected counts**, **Pearson residuals**, and **fitted zero probabilities** for the extended model. These are the same diagnostic quantities used for the simple model in @sec-classical-poisson-gof, but now they come from the model with all available regressors.
 
 ::: {.panel-tabset}
 
@@ -4476,19 +4748,75 @@ Before interpreting the coefficients on the expected-count scale, we first refit
 
 ```{r}
 #| echo: true
-#| label: tbl-negative-binomial-test-refit-expected-count-r
-#| tbl-cap: "Testing-set refit of the extended Classical Poisson regression model on the expected-count ratio scale."
 #| message: false
 #| warning: false
 
-# final_poisson_inference_summary |>
-#   select(term, exponentiated_estimate, exponentiated_conf_low, exponentiated_conf_high,
-#     percent_change) |>
-#   rename(`Term` = term, `Exponentiated estimate` = exponentiated_estimate,
-#     `Lower 95% CI for exponentiated estimate` = exponentiated_conf_low,
-#     `Upper 95% CI for exponentiated estimate` = exponentiated_conf_high,
-#     `Percent change` = percent_change) |>
-#   kable(align = c("c", "c", "c", "c", "c"))
+extended_negative_binomial_gof_data <- training_data |>
+  mutate(fitted_expected_count = fitted(extended_negative_binomial_model),
+    pearson_residual = (satellites - fitted_expected_count) / sqrt(fitted_expected_count + fitted_expected_count^2 / extended_negative_binomial_model$theta),
+    fitted_zero_probability = (extended_negative_binomial_model$theta /
+      (extended_negative_binomial_model$theta + fitted_expected_count))^extended_negative_binomial_model$theta)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+extended_negative_binomial_alpha = extended_negative_binomial_model.family.alpha
+extended_negative_binomial_gof_data = training_data.copy()
+extended_negative_binomial_gof_data["fitted_expected_count"] = (extended_negative_binomial_model.fittedvalues)
+extended_negative_binomial_gof_data["pearson_residual"] = ((extended_negative_binomial_gof_data["satellites"]
+        - extended_negative_binomial_gof_data["fitted_expected_count"])
+    / np.sqrt(extended_negative_binomial_gof_data["fitted_expected_count"]
+        + extended_negative_binomial_alpha * extended_negative_binomial_gof_data["fitted_expected_count"] ** 2))
+extended_negative_binomial_gof_data["fitted_zero_probability"] = (
+    1 + extended_negative_binomial_alpha * extended_negative_binomial_gof_data["fitted_expected_count"]) ** (
+    -1 / extended_negative_binomial_alpha)
+```
+
+:::
+
+These quantities let us reuse the same goodness-of-fit logic from the simple model from @sec-negative-binomial-observed-fitted. The fitted expected counts $\hat{\mu}_i$ summarize the fitted mean structure, the Pearson residuals (see @eq-pearson-residual) compare observed and fitted counts relative to the fitted Negative Binomial standard deviation, and the fitted zero probabilities $\exp(-\hat{\mu}_i)$ tell us how often the extended model expects zero satellite counts.
+
+#### Extended Observed versus Fitted Counts
+
+Before revisiting overdispersion, zero counts, and residual deviance, we first compare the **observed satellite counts** with the **fitted expected counts** from the extended model. This mirrors the observed-versus-fitted check from @sec--observed-fitted, but now the fitted expected counts come from the model that includes width, weight, colour, and spine condition. This check is still based on the **training data**. The goal is not to measure held-out prediction accuracy yet. Instead, we are asking whether the extended model’s fitted expected counts are better aligned with the observed count distribution than the simple width-only model.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-star-star-hour-reward-3974182/).](img/stars.png){width="550"}
+
+We start by grouping observations into quartiles based on their fitted expected counts. Within each group, we compare the mean observed count with the mean fitted expected count and also compare the observed zero proportion with the average fitted probability of zero satellite counts.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl--extended-fitted-count-calibration-r
+#| tbl-cap: "Observed and fitted satellite counts across fitted expected count quartiles for the extended Negative Binomial regression model."
+#| message: false
+#| warning: false
+
+extended_fitted_count_calibration <- extended_negative_binomial_gof_data |>
+  mutate(fitted_count_quartile = ntile(fitted_expected_count, 4),
+    fitted_count_quartile = factor(fitted_count_quartile, levels = 1:4,
+      labels = c("Q1: smallest fitted counts", "Q2", "Q3", "Q4: largest fitted counts"))) |>
+  group_by(fitted_count_quartile) |>
+  summarise(n = n(), mean_observed_count = mean(satellites),
+    mean_fitted_expected_count = mean(fitted_expected_count),
+    observed_zero_proportion = mean(satellites == 0),
+    mean_fitted_zero_probability = mean(fitted_zero_probability),.groups = "drop") |>
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+extended_fitted_count_calibration |>
+  rename(`Fitted-count quartile` = fitted_count_quartile, `Number of female crabs` = n,
+    `Mean observed count` = mean_observed_count,
+    `Mean fitted expected count` = mean_fitted_expected_count,
+    `Observed zero proportion` = observed_zero_proportion,
+    `Average fitted probability of zero satellites` = mean_fitted_zero_probability) |>
+  kable(align = c("c", "c", "c", "c", "c", "c"))
 ```
 
 ## **`Python`**
@@ -4498,48 +4826,527 @@ Before interpreting the coefficients on the expected-count scale, we first refit
 #| message: false
 #| warning: false
 
-# final_poisson_inference_expected_count_display = (final_poisson_inference_summary
-#     [["Term", "Exponentiated estimate", "Lower 95% CI for exponentiated estimate",
-#             "Upper 95% CI for exponentiated estimate", "Percent change",
-#         ]].round(2))
-# 
-# classical_poisson_test_refit_expected_count_py_html = (
-#     scrollable_table_html(final_poisson_inference_expected_count_display))
+extended_fitted_count_calibration_data = extended_negative_binomial_gof_data.copy()
+
+extended_fitted_count_calibration_data = (extended_fitted_count_calibration_data
+    .sort_values("fitted_expected_count", kind="mergesort").reset_index(drop=True))
+
+number_of_rows = len(extended_fitted_count_calibration_data)
+number_of_groups = 4
+
+base_group_size = number_of_rows // number_of_groups
+remainder = number_of_rows % number_of_groups
+
+group_sizes = [base_group_size + 1 if group_index < remainder else base_group_size
+    for group_index in range(number_of_groups)]
+
+fitted_count_quartile_labels = ["Q1: smallest fitted counts", "Q2", "Q3",
+    "Q4: largest fitted counts",
+]
+
+extended_fitted_count_calibration_data["fitted_count_quartile"] = np.repeat(
+    fitted_count_quartile_labels, group_sizes)
+
+extended_fitted_count_calibration_data["fitted_count_quartile"] = (
+    pd.Categorical(extended_fitted_count_calibration_data["fitted_count_quartile"],
+        categories=fitted_count_quartile_labels, ordered=True))
+
+extended_fitted_count_calibration = (extended_fitted_count_calibration_data
+    .groupby("fitted_count_quartile", observed=False)
+    .agg(n=("satellites", "size"), mean_observed_count=("satellites", "mean"),
+        mean_fitted_expected_count=("fitted_expected_count", "mean"),
+        observed_zero_proportion=("satellites", lambda x: (x == 0).mean()),
+        mean_fitted_zero_probability=("fitted_zero_probability", "mean"),
+    ).reset_index().round(3))
+
+extended_fitted_count_calibration_display = (extended_fitted_count_calibration
+    .rename(columns={"fitted_count_quartile": "Fitted-count quartile",
+            "n": "Number of female crabs", "mean_observed_count": "Mean observed count",
+            "mean_fitted_expected_count": "Mean fitted expected count",
+            "observed_zero_proportion": "Observed zero proportion",
+            "mean_fitted_zero_probability": ("Average fitted probability of zero satellites"
+            ),
+        }))
+
+classical_negative_binomial_extended_fitted_count_calibration_py_html = (
+    scrollable_table_html(extended_fitted_count_calibration_display))
 ```
 
 ```{r}
 #| echo: false
-#| label: tbl-classical-poisson-test-refit-expected-count-py
-#| tbl-cap: "Testing-set refit of the extended Classical Poisson regression model on the expected-count ratio scale."
+#| label: tbl-classical-negative-binomial-extended-fitted-count-calibration-py
+#| tbl-cap: "Observed and fitted satellite counts across fitted expected count quartiles for the extended Negative Binomial regression model."
 #| message: false
 #| warning: false
 #| results: asis
 
-# cat(
-#   "\n",
-#   py$classical_poisson_test_refit_expected_count_py_html,
-#   "\n",
-#   sep = ""
-# )
+cat(
+  "\n",
+  py$classical_negative_binomial_extended_fitted_count_calibration_py_html,
+  "\n",
+  sep = ""
+)
 ```
 
 :::
 
-@tbl-negative-binomial-test-refit-expected-count-r translates the same testing-set refit into the scale used for **interpretation**: 
 
-1. An exponentiated estimate of $1$ corresponds to **no multiplicative change** in the expected count. 
-2. Values above $1$ indicate a **larger expected count**, holding the other regressors fixed.
-3. Values below $1$ indicate a **smaller expected count**, holding the other regressors fixed.
+We can also inspect the same comparison graphically.
 
-For example, the fitted exponentiated estimate for `width_cm` is `.... This means the following:
+::: {.panel-tabset}
 
-> *Holding weight, colour, and spine condition fixed, a one-centimetre increase in female crab width is associated with multiplying the expected number of satellite males by ... under the testing-set refit. Equivalently, this corresponds to an estimated percent change of ...*
+## **`R`**
 
-For a categorical example, consider the `colorMedium dark` row. Its fitted exponentiated estimate is .... This means the following: 
+```{r}
+#| label: fig-classical-negative-binomial-extended-observed-fitted-r
+#| fig-cap: "Observed satellite counts versus fitted expected counts for the extended Negative Binomial regression model."
+#| warning: false
+#| message: false
+#| echo: true
+#| fig.height: 8
+#| fig.width: 14
 
-> *Holding width, weight, and spine condition fixed, female crabs in the `Medium dark` colour category are estimated to have an expected satellite count equal to ... times the expected count for otherwise comparable female crabs in the `Light` reference category. Equivalently, this corresponds to an estimated percent difference of ...*
+extended_observed_fitted_plot <- ggplot(extended_negative_binomial_gof_data,
+  aes(x = fitted_expected_count, y = satellites)) +
+  geom_point(alpha = 0.65, size = 2.3, colour = "#0072B2") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", linewidth = 1,
+    colour = "#D55E00") +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15.5), axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5, margin = margin(r = 12)),
+    panel.grid.minor = element_blank()) +
+  labs(x = "\n Fitted expected count", y = "Observed satellite count") +
+  scale_y_continuous(breaks = seq(0, 12, by = 2))
 
-These examples describe the **estimated coefficient interpretations** on the expected-count scale. They are not yet the final inferential conclusions. Statistical conclusions require reading these estimates together with their standard errors, confidence intervals, Wald tests, and the broader goodness-of-fit concerns. Having said all this, the model form was chosen during the **training-stage workflow**; this testing-set refit is used to report coefficient-level results for the inferential inquiry, not for additional model selection.
+extended_observed_fitted_plot
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-negative-binomial-extended-observed-fitted-py
+#| fig-cap: "Observed satellite counts versus fitted expected counts for the extended Negative Binomial regression model."
+#| warning: false
+#| message: false
+#| echo: true
+#| fig.height: 8
+#| fig.width: 14
+
+extended_observed_fitted_figure, extended_observed_fitted_axis = (
+    plt.subplots(figsize=(14, 8)))
+
+extended_observed_fitted_axis.scatter(extended_negative_binomial_gof_data["fitted_expected_count"],
+    extended_negative_binomial_gof_data["satellites"], alpha=0.65, s=35, color="#0072B2")
+
+extended_line_max = max(extended_negative_binomial_gof_data["fitted_expected_count"].max(),
+    extended_negative_binomial_gof_data["satellites"].max())
+
+extended_observed_fitted_axis.plot([0, extended_line_max], [0, extended_line_max],
+    linestyle="--", linewidth=1, color="#D55E00")
+
+extended_observed_fitted_axis.set_xlabel("\n Fitted expected count", fontsize=20)
+
+extended_observed_fitted_axis.set_ylabel("Observed satellite count", fontsize=20,
+    labelpad=12)
+
+extended_observed_fitted_axis.tick_params(axis="both", labelsize=15.5)
+
+extended_observed_fitted_axis.set_yticks(range(0, 13, 2))
+
+extended_observed_fitted_axis.grid(True, which="major", axis="both", alpha=0.3)
+
+extended_observed_fitted_axis.grid(False, which="minor")
+
+extended_observed_fitted_figure.tight_layout()
+plt.show()
+```
+
+:::
+
+In @fig-negative-binomial-extended-observed-fitted-r, the dashed line marks where the observed satellite count would equal the fitted expected count. Points above the line correspond to female crabs whose observed counts are larger than the extended model expects, while points below the line correspond to female crabs whose observed counts are smaller than expected. The plot shows that the extended model still has important calibration problems. Many observations with fitted expected counts between roughly $1.5$ and $4$ have observed counts of $0$, so they sit below the dashed line. This agrees with the grouped calibration in @tbl-negative-binomial-extended-fitted-count-calibration-r; the extended model underestimates the proportions of zero counts in the lower half of the fitted values and overestimates zero counts in the upper half of fitted values. At the same time, several observations in the same fitted-count range have observed counts around $6$, $8$, $10$, or even $12$, placing them far above the dashed line.
+
+The horizontal bands are expected because the observed response is a count. The fitted expected count on the $x$-axis is allowed to be fractional, but the observed satellite count on the $y$-axis can only take values such as $0, 1, 2, 3$, and so on. What is concerning is not the banding itself, but the wide vertical spread among observations with similar fitted expected counts.
+
+#### Extended Overdispersion Check
+
+
+#### Extended Zero-Count Check
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-download-data-transfer-3947910/).](img/pulling.png){width="600"}
+
+Next, we check whether the extended model expects **enough zero counts** as in @sec-negative-binomial-excess-zeros. Recall that this diagnostic focuses on the number of observed zero counts,
+
+$$
+z_{\operatorname{obs}}
+=
+\sum_{i=1}^n
+\mathbb{1}(y_i = 0),
+$$
+
+where $\mathbb{1}(y_i = 0)$ is an indicator that equals $1$ when the $i$th observed satellite count is zero and equals $0$ otherwise. Furthermore, in this goodness-of-fit check for a one-sided test, the hypotheses are:
+
+$$
+\begin{gather}
+H_0\text{: } \text{the fitted Negative Binomial model adequately describes} \\
+\text{the frequency of zero counts}, \\
+\text{versus} \\
+H_1\text{: } \text{there are more zero counts than the} \\
+\text{fitted Negative Binomial model expects},
+\end{gather}
+$$
+
+with an approximate $z$-statistic as in @eq-z-statistic-zero-counts.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomial-extended-zero-count-r
+#| tbl-cap: "Excess zero-count diagnostic for the extended Negative Binomial regression model."
+#| message: false
+#| warning: false
+
+extended_observed_zero_count <- sum(extended_negative_binomial_gof_data$satellites == 0)
+
+extended_expected_zero_count <- sum(extended_negative_binomial_gof_data$fitted_zero_probability)
+
+extended_zero_count_variance <- sum(extended_negative_binomial_gof_data$fitted_zero_probability *
+    (1 - extended_negative_binomial_gof_data$fitted_zero_probability))
+
+extended_zero_count_z <- (extended_observed_zero_count - extended_expected_zero_count
+) / sqrt(extended_zero_count_variance)
+
+extended_zero_count_p_value <- pnorm(extended_zero_count_z, lower.tail = FALSE)
+
+extended_zero_count_summary <- tibble::tibble(
+  `Observed zero count` = extended_observed_zero_count,
+  `Fitted expected zero count` = extended_expected_zero_count,
+  `Observed minus fitted zeros` = (
+    extended_observed_zero_count - extended_expected_zero_count),
+  `Zero-count z-statistic` = extended_zero_count_z,
+  `Zero-count p-value` = extended_zero_count_p_value) |>
+  mutate(`Observed zero count` = formatC(`Observed zero count`, format = "f", digits = 0),
+    `Fitted expected zero count` = formatC(`Fitted expected zero count`, format = "f",
+      digits = 2),
+    `Observed minus fitted zeros` = formatC(`Observed minus fitted zeros`, format = "f",
+      digits = 2),
+    `Zero-count z-statistic` = formatC(`Zero-count z-statistic`, format = "f", digits = 2),
+    `Zero-count p-value` = formatC(`Zero-count p-value`, format = "e", digits = 2)) |>
+  pivot_longer(cols = everything(), names_to = "Quantity", values_to = "Value")
+
+extended_zero_count_summary |>
+  kable(align = c("c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+extended_observed_zero_count = (extended_negative_binomial_gof_data["satellites"] == 0).sum()
+
+extended_expected_zero_count = (extended_negative_binomial_gof_data["fitted_zero_probability"].sum())
+
+extended_zero_count_variance = (extended_negative_binomial_gof_data["fitted_zero_probability"]
+    * (1 - extended_negative_binomial_gof_data["fitted_zero_probability"])).sum()
+
+extended_zero_count_z = (extended_observed_zero_count - extended_expected_zero_count
+) / np.sqrt(extended_zero_count_variance)
+
+extended_zero_count_p_value = stats.norm.sf(extended_zero_count_z)
+
+extended_zero_count_summary = pd.DataFrame(
+    {"Quantity": ["Observed zero count", "Fitted expected zero count",
+            "Observed minus fitted zeros", "Zero-count z-statistic", "Zero-count p-value",
+        ], "Value": [f"{extended_observed_zero_count:.0f}",
+            f"{extended_expected_zero_count:.2f}",
+            f"{extended_observed_zero_count - extended_expected_zero_count:.2f}",
+            f"{extended_zero_count_z:.2f}", f"{extended_zero_count_p_value:.2e}",
+        ],
+    })
+
+negative_binomial_extended_zero_count_py_html = (
+    scrollable_table_html(extended_zero_count_summary))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-negative-binomial-extended-zero-count-py
+#| tbl-cap: "Excess zero-count diagnostic for the extended Negative Binomial regression model."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$negative_binomial_extended_zero_count_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+:::
+
+
+The extended model shows a significant zero-count mismatch. In the **training data**, we observe `r extended_observed_zero_count` female crabs with zero satellite males, but the fitted extended Classical Poisson model expects only `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros. This leaves `r formatC(extended_observed_zero_count - extended_expected_zero_count, format = "f", digits = 2)` additional observed zeros beyond what the fitted model expects. Moreover, the approximate zero-count $z$-statistic is `r formatC(extended_zero_count_z, format = "f", digits = 2)`, with a one-sided $p$-value of `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. This provides strong evidence that the extended model is understating the zero-count part of the response distribution.
+
+Compared with the simple width-only model, adding weight, colour, and spine condition gives the fitted mean structure more flexibility; however, the extended Negative Binomial model still expects **far fewer zero satellite counts than we actually observe**. This suggests that the Negative Binomial distribution struggles to represent how often zero satellite counts occur in the train set.
+
+#### Model Selection
+
+We can use analysis of deviance for model selection when two models. The simple width-only Negative Binomial model (i.e. `simple_negative_binomial_model` from [Section 11.7](http://localhost:54321/book/11-negative-binomial.html#sec-negative-binomial-simple-model)) is nested within the extended Negative Binomial model (i.e. `extended_negative_binomial_model`). We will test our two Negative Binomial models using `deviance` function in `R` and .... in `Python`. The model section involves a hypothesis testing. The hypotheses are
+$$
+begin{gather*}
+H_0: \textbf{Simple Model} \text{ fits the data better than } \textbf{Extended Model} \\
+H_a: \textbf{Extended} \text{ fits the data better than } \textbf{Simple Model}.
+\end{gather*}
+$$
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: tbl-negative-binomial-nested-deviance-r
+#| tbl-cap: "Analysis of deviance comparing the simple width-only and extended Negative Binomial regression models on the training data."
+#| message: false
+#| warning: false
+
+# Dispersion parameter from the extended model, held common across both fits
+extended_negative_binomial_theta <- extended_negative_binomial_model$theta
+
+# Refitting the reduced width-only model at the common dispersion parameter
+nested_reduced_negative_binomial_model <- glm(formula = satellites ~ width_cm,
+  family = negative.binomial(theta = extended_negative_binomial_theta),
+  data = training_data)
+
+# Residual deviances from the reduced and extended models
+nested_reduced_deviance <- deviance(nested_reduced_negative_binomial_model)
+
+nested_extended_deviance <- deviance(extended_negative_binomial_model)
+
+# Deviance difference: the likelihood-ratio test statistic
+nested_deviance_statistic <- nested_reduced_deviance - nested_extended_deviance
+
+# Degrees of freedom: the number of additional estimated regression coefficients
+nested_deviance_df <- df.residual(nested_reduced_negative_binomial_model) -
+  df.residual(extended_negative_binomial_model)
+
+# Upper-tail p-value under the Chi-squared reference distribution
+nested_deviance_p_value <- pchisq(nested_deviance_statistic, df = nested_deviance_df,
+  lower.tail = FALSE)
+
+nested_deviance_summary <- tibble::tibble(
+  `Reduced model residual deviance` = nested_reduced_deviance,
+  `Extended model residual deviance` = nested_extended_deviance,
+  `Deviance difference` = nested_deviance_statistic,
+  `Degrees of freedom` = nested_deviance_df,
+  `p-value` = nested_deviance_p_value) |>
+  mutate(`Reduced model residual deviance` = formatC(`Reduced model residual deviance`,
+      format = "f", digits = 3),
+    `Extended model residual deviance` = formatC(`Extended model residual deviance`,
+      format = "f", digits = 3),
+    `Deviance difference` = formatC(`Deviance difference`, format = "f", digits = 3),
+    `Degrees of freedom` = formatC(`Degrees of freedom`, format = "f", digits = 0),
+    `p-value` = formatC(`p-value`, format = "e", digits = 2)) |>
+  pivot_longer(cols = everything(), names_to = "Quantity", values_to = "Value")
+
+nested_deviance_summary |>
+  kable(align = c("c", "c"))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+# Dispersion parameter from the extended model, held common across both fits
+extended_negative_binomial_alpha = extended_negative_binomial_model.family.alpha
+
+# Refitting the reduced width-only model at the common dispersion parameter
+nested_reduced_negative_binomial_model = smf.glm(formula="satellites ~ width_cm",
+    data=training_data, family=sm.families.NegativeBinomial(
+        alpha=extended_negative_binomial_alpha)).fit(scale=1.0)
+
+# Residual deviances from the reduced and extended models
+nested_reduced_deviance = nested_reduced_negative_binomial_model.deviance
+
+nested_extended_deviance = extended_negative_binomial_model.deviance
+
+# Deviance difference: the likelihood-ratio test statistic
+nested_deviance_statistic = nested_reduced_deviance - nested_extended_deviance
+
+# Degrees of freedom: the number of additional estimated regression coefficients
+nested_deviance_df = (nested_reduced_negative_binomial_model.df_resid
+    - extended_negative_binomial_model.df_resid)
+
+# Upper-tail p-value under the Chi-squared reference distribution
+nested_deviance_p_value = stats.chi2.sf(nested_deviance_statistic, nested_deviance_df)
+
+nested_deviance_summary = pd.DataFrame(
+    {"Quantity": ["Reduced model residual deviance", "Extended model residual deviance",
+            "Deviance difference", "Degrees of freedom", "p-value",
+        ], "Value": [f"{nested_reduced_deviance:.3f}", f"{nested_extended_deviance:.3f}",
+            f"{nested_deviance_statistic:.3f}", f"{nested_deviance_df:.0f}",
+            f"{nested_deviance_p_value:.2e}",
+        ],
+    })
+
+negative_binomial_nested_deviance_py_html = (
+    scrollable_table_html(nested_deviance_summary))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-negative-binomial-nested-deviance-py
+#| tbl-cap: "Analysis of deviance comparing the simple width-only and extended Negative Binomial regression models on the training data."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$negative_binomial_nested_deviance_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+:::
+
+The test statistic for the analysis of deviance is the difference between the residual deviance of `simple_negative_binomial_model` and the residual deviance `extended_negative_binomial_model`. The test statistic ($\Delta_D$) is asymptotically (i.e.,$n\rightarrow\infty$) Chi-squared distributed with $6$ degrees of freedom under the null hypothesis $H_0$. The value of $\Delta_D$ is `r round(nested_deviance_statistic,3)` with a $p-$value of `r round(nested_deviance_p_value,2)`. As the $p-$value is larger than $\alpha=0.05$, we fail to reject the null hypothesis and there is statistical evidence to state that the extended Negative Binomial model is misspecified for the crabs data in comparison to the width-only Negative Binomial Model.
+
+Let's compare the AIC scores of `simple_negative_binomial_model` and `extended_negative_binomial_model`.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+````{r}
+#| echo: true
+#| label: tbl-negative-binomial-aic-comparison-r
+#| tbl-cap: "Akaike Information Criterion for the simple width-only and extended Negative Binomial regression models fitted on the training data."
+#| message: false
+#| warning: false
+
+# AIC for each model, counting the estimated dispersion parameter
+simple_negative_binomial_aic <- AIC(simple_negative_binomial_width_model)
+
+extended_negative_binomial_aic <- AIC(extended_negative_binomial_model)
+
+# Estimated parameters: regression coefficients plus the dispersion parameter
+simple_negative_binomial_parameters <- length(coef(simple_negative_binomial_width_model)) + 1
+
+extended_negative_binomial_parameters <- length(coef(extended_negative_binomial_model)) + 1
+
+# Difference from the best-scoring model
+negative_binomial_minimum_aic <- min(c(simple_negative_binomial_aic,
+  extended_negative_binomial_aic))
+
+negative_binomial_aic_summary <- tibble::tibble(
+  `Model` = c("Simple (width only)", "Extended (all regressors)"),
+  `Estimated parameters` = c(simple_negative_binomial_parameters,
+    extended_negative_binomial_parameters),
+  `AIC` = c(simple_negative_binomial_aic, extended_negative_binomial_aic))|>
+  mutate(`Estimated parameters` = formatC(`Estimated parameters`, format = "f", digits = 0),
+    `AIC` = formatC(`AIC`, format = "f", digits = 3))
+
+negative_binomial_aic_summary |>
+  kable(align = c("l", "c", "c", "c"))
+````
+
+## **`Python`**
+
+````{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+# Estimated parameters: regression coefficients plus the dispersion parameter
+simple_negative_binomial_parameters = len(simple_negative_binomial_width_model.params) + 1
+
+extended_negative_binomial_parameters = len(extended_negative_binomial_model.params) + 1
+
+# AIC computed from the maximized log-likelihood so that the dispersion
+# parameter is counted, matching the convention used by glm.nb() in R
+simple_negative_binomial_aic = (-2 * simple_negative_binomial_width_model.llf
+    + 2 * simple_negative_binomial_parameters)
+
+extended_negative_binomial_aic = (-2 * extended_negative_binomial_model.llf
+    + 2 * extended_negative_binomial_parameters)
+
+# Difference from the best-scoring model
+negative_binomial_minimum_aic = min(simple_negative_binomial_aic,
+    extended_negative_binomial_aic)
+
+negative_binomial_aic_summary = pd.DataFrame(
+    {"Model": ["Simple (width only)", "Extended (all regressors)"],
+        "Estimated parameters": [f"{simple_negative_binomial_parameters:.0f}",
+            f"{extended_negative_binomial_parameters:.0f}",
+        ], "AIC": [f"{simple_negative_binomial_aic:.3f}",
+            f"{extended_negative_binomial_aic:.3f}",
+        ], "AIC difference": [
+            f"{simple_negative_binomial_aic - negative_binomial_minimum_aic:.3f}",
+            f"{extended_negative_binomial_aic - negative_binomial_minimum_aic:.3f}",
+        ],
+    })
+
+negative_binomial_aic_comparison_py_html = (
+    scrollable_table_html(negative_binomial_aic_summary))
+````
+
+````{r}
+#| echo: false
+#| label: tbl-negative-binomial-aic-comparison-py
+#| tbl-cap: "Akaike Information Criterion for the simple width-only and extended Negative Binomial regression models fitted on the training data."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$negative_binomial_aic_comparison_py_html,
+  "\n",
+  sep = ""
+)
+````
+
+:::
+
+The simple width-only model has an AIC of `r formatC(simple_negative_binomial_aic, format = "f", digits = 3)` against `r formatC(extended_negative_binomial_aic, format = "f", digits = 3)` for the extended model, which is a difference of `r formatC(abs(simple_negative_binomial_aic - extended_negative_binomial_aic), format = "f", digits = 2)`. The deviance test asks whether the additional regressors provide statistically significant increase in likelihood at a fixed $\alpha$ level, whereas AIC asks whether that improvement is large enough to justify the additional parameters under a specific complexity penalty. 
+
+#### Extended Goodness-of-Fit Summary
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-social-network-3704066/).](img/privacy.png){width="500"}
+
+The extended-model diagnostics are summarized in @tbl-negative-binomial-extended-gof-summary. This table brings together the main evidence from the observed-versus-fitted comparison, the Pearson overdispersion check, the zero-count check, and the residual deviance check.
+
+| Diagnostic | Main evidence | Conclusion |
+|:---:|:---:|:---:|
+| Observed versus fitted counts | In Q1, the observed zero proportion is `r extended_fitted_count_calibration$observed_zero_proportion[extended_fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`, while the average fitted probability of zero satellites is `r extended_fitted_count_calibration$mean_fitted_zero_probability[extended_fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`. In Q4, the observed zero proportion is `r extended_fitted_count_calibration$observed_zero_proportion[extended_fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`, while the average fitted probability of zero satellites is `r extended_fitted_count_calibration$mean_fitted_zero_probability[extended_fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`. | The extended model captures the ordering in the fitted mean structure, but it underestimates zero counts across the fitted-count range. |
+| Pearson overdispersion |  | The training counts remain much more variable than the Classical Poisson mean-variance structure allows. |
+| Excess zero counts | The training data contains `r extended_observed_zero_count` observed zero satellite counts, while the fitted extended model expects only `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros. The zero-count $p$-value is `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. | The extended model still expects far fewer zero satellite counts than observed in the training data. |
+| Analysis of Deviance |... | The extended model does not increase the **likelihood** function by a significant amount relative to the width-only model, so it likely **overfits** the noise in the training data.  |
+| Akaike Information Criterion (AIC) |The width-only model has an AIC of `r formatC(simple_negative_binomial_aic, format = "f", digits = 3)` and the extended model has an AIC of `r formatC(extended_negative_binomial_aic, format = "f", digits = 3)` | The width-only Negative Binomial model is likely to have a better predictive performance than the extended model.
+: Summary of goodness-of-fit conclusions for the extended Poisson regression model. {#tbl-negative-binomial-extended-gof-summary .striped .hover}
+
+Overall, the width-only Negative Binomial regression model is correctly specified for the crabs data. The analysis of deviance test provides statistical evidence that the additional regressors do not significantly increase the **Negative Binomial likelihood** in comparison to the simple model; therefore, the width-only model is adequate to infer the relationship between satellite male counts and female crab characteristics. Moreover the smaller AIC score of the width-only model suggests that it is less likely to overfit in the context of **predictive performance**.
+
+
+Let's continue with the simple Negative Binomial in our data science workflow, and use it to answer our **inferential** and **predictive inquiries** from [Section 11.3](http://localhost:54321/book/11-negative-binomial.html#sec-negative-binomial-study-design). There is some concern with zero counts in the train set, for which one can consider Zero-Inflated Poisson regression (@sec-zero-inflated-poisson) as an alternative.
+
+### Interpreting Continuous Regressors {#sec-classical-poisson-continuous-regressors}
+
+Because one kilogram is a large change for female crabs in this dataset, we should be careful not to compare the magnitude of the width and weight coefficients without considering their measurement units and the overlap between body-size measurements.
+
+## Inference
 
 
 ## Storytelling
