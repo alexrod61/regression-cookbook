@@ -343,13 +343,13 @@ According to the documentation for the teaching version of the dataset, each row
 
 Before doing EDA, we will complete a small amount of data wrangling (as shown in @fig-ds-workflow-data-collection-wrangling). The goal is not to create the training/testing split yet. As in the data science workflow from @sec-intro (more specifically in @sec-ds-workflow-eda), the data split belongs to the EDA stage because we first need to inspect the data structure and then decide how to separate observations for modelling and evaluation. In this section, we only load the data, rename variables, and prepare the categorical regressors so that they are easier to interpret later. The main variables used in the chapter are summarized in @tbl-generalized-poisson-wrangled-variables.
 
-| **Variable after wrangling** | **Role** | **Description** |
-|:---:|:---:|:---:|
-| `satellites` | Response | Number of satellite males observed near the female crab. |
-| `width_cm` | Regressor | Female crab carapace width, measured in centimetres. |
-| `weight_kg` | Regressor | Female crab weight, measured in kilograms. |
-| `color` | Regressor | Female crab colour category, treated as categorical. |
-| `spine` | Regressor | Female crab spine condition, treated as categorical. |
+| **Variable after wrangling** | **Role** | **Type** | **Notation** | **Description** |
+|:---:|:---:|:---:|:---:|:---:|
+| `satellites` | Response | Discrete count | $Y_i$ | Number of satellite males observed near the female crab. |
+| `width_cm` | Regressor | Continuous | $x_{i,1}$ | Female crab carapace width, measured in centimetres. |
+| `weight_kg` | Regressor | Continuous | $x_{i,2}$ | Female crab weight, measured in kilograms. |
+| `color` | Regressor | Categorical | Encoded using indicator regressors in @sec-generalized-poisson-extended-model | Female crab colour category, treated as categorical with `Light` as the reference level. |
+| `spine` | Regressor | Categorical | Encoded using indicator regressors in @sec-generalized-poisson-extended-model | Female crab spine condition, treated as categorical with `Both good` as the reference level. |
 
 : Main variables used after wrangling the horseshoe crab dataset. {#tbl-generalized-poisson-wrangled-variables .striped .hover}
 
@@ -1322,6 +1322,8 @@ There are two ways to compute the information matrix in @eq-generalized-poisson-
 ::::
 :::
 
+The second subtlety concerns the comparison we will lean on most: the GP model against its Poisson special case. That test is a regular one, and it is worth saying why explicitly, because several later chapters in this book face non-regular nesting.
+
 ::: {.Heads-up}
 :::: {.Heads-up-header}
 Heads-up on the Poisson-vs-GP comparison being regular!
@@ -1357,7 +1359,7 @@ which guarantees $\lambda_i > 0$ for any $(\boldsymbol{\beta}, z)$ the optimizer
 ```{python}
 #| echo: true
 #| lst-label: lst-generalized-poisson-gp-class-py
-#| lst-cap: "A GenericLikelihoodModel class for the Generalized Poisson regression with log link (consul1973). The logistic map on the last parameter keeps the dispersion parameter inside (-1, 1) and lambda_i positive."
+#| lst-cap: "A GenericLikelihoodModel class for the Generalized Poisson regression with log link; see Consul (1973). The logistic map on the last parameter keeps the dispersion parameter inside (-1, 1) and lambda_i positive."
 #| message: false
 #| warning: false
 import warnings
@@ -1408,12 +1410,12 @@ With the log-likelihood specified (@eq-generalized-poisson-loglik), the estimati
 
 ## Simple Model: Satellite Counts and Female Crab Width {#sec-generalized-poisson-simple-model}
 
-We begin with the same simple specification as @sec-classical-poisson-simple-model: the number of satellite males regressed on the female crab's shell width alone,
+We begin with the same simple specification as @sec-classical-poisson-simple-model: the number of satellite males regressed on the female crab's shell width alone. With the notation fixed in @tbl-generalized-poisson-wrangled-variables, $x_{i,1}$ denotes the female crab width in centimetres for the $i$th female crab, and the simple model is
 
 $$
-Y_i \mid x_i \sim \operatorname{GPO}(\lambda_i, \theta),
+Y_i \mid x_{i,1} \sim \operatorname{GPO}(\lambda_i, \theta),
 \qquad
-\log(\mu_i) = \beta_0 + \beta_1 \,\texttt{width\_cm}_i,
+\log(\mu_i) = \beta_0 + \beta_1 x_{i,1},
 \qquad
 \lambda_i = (1 - \theta)\,\mu_i.
 $${#eq-generalized-poisson-simple-model}
@@ -1970,18 +1972,31 @@ plt.show()
 
 ## Extending the Model with Additional Regressors {#sec-generalized-poisson-extended-model}
 
-The goodness-of-fit audit of @sec-generalized-poisson-gof found the dispersion problem repaired but two items unresolved: a zero surplus the dispersion parameter cannot fully absorb (`r observed_zeros` observed versus `r round(expected_zeros_gp, 1)` expected zeros), and a thin one-regressor mean model. Following the workflow, we return to data modelling and fit the **extended specification** — the same four regressors as the extended model of @sec-classical-poisson-additional-regressors, with `Light` and `Both good` as reference categories:
+The goodness-of-fit audit of @sec-generalized-poisson-gof found the dispersion problem repaired but two items unresolved: a zero surplus the dispersion parameter cannot fully absorb (`r observed_zeros` observed versus `r round(expected_zeros_gp, 1)` expected zeros), and a thin one-regressor mean model. Following the workflow, we return to data modelling and fit the **extended specification** — the same four regressors as the extended model of @sec-classical-poisson-additional-regressors, with `Light` and `Both good` as reference categories. Writing $x_{i,1}$ for width, $x_{i,2}$ for weight, and $x_{i,3}, \dots, x_{i,7}$ for the five indicator regressors that encode the colour and spine categories of female crab $i$ (the arrangement tabulated in @tbl-classical-poisson-dummy-variable-arrangement of @sec-classical-poisson), the extended systematic component is
 
 $$
-\log(\mu_i) = \beta_0 + \beta_1\, \texttt{width\_cm}_i + \beta_2\, \texttt{weight\_kg}_i
-+ \beta_3\, 1_{\{\texttt{Medium light}\}}(i)
-+ \beta_4\, 1_{\{\texttt{Medium dark}\}}(i)
-+ \beta_5\, 1_{\{\texttt{Dark}\}}(i)
-+ \beta_6\, 1_{\{\texttt{One worn or broken}\}}(i)
-+ \beta_7\, 1_{\{\texttt{Both worn or broken}\}}(i),
+\begin{aligned}
+\log(\mu_i)
+=
+&\ \beta_0
++
+\beta_1 x_{i,1}
++
+\beta_2 x_{i,2}
++
+\beta_3 x_{i,3}
++
+\beta_4 x_{i,4} \\
+&+
+\beta_5 x_{i,5}
++
+\beta_6 x_{i,6}
++
+\beta_7 x_{i,7},
+\end{aligned}
 $${#eq-generalized-poisson-extended-model}
 
-with the same GP random component $Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}((1 - \theta)\mu_i, \theta)$. The dummy-variable arrangement is exactly the one tabulated in @tbl-classical-poisson-dummy-variable-arrangement of @sec-classical-poisson.
+with the same GP random component $Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}((1 - \theta)\mu_i, \theta)$.
 
 ### Adding Phenotypic Regressors {#sec-generalized-poisson-phenotypic-regressors}
 
@@ -2468,7 +2483,7 @@ $$
 \widehat{\operatorname{SD}}(Y_i) = \frac{\sqrt{\hat\mu_i}}{1 - \hat\theta} = `r round(1 / (1 - theta_hat_ext), 2)`\,\sqrt{\hat\mu_i}.
 $${#eq-generalized-poisson-theta-reading}
 
-A concrete calibration makes the meaning tangible. For a profile with $\hat\mu_i = 3$: the GP model says counts fluctuate with variance `r round(3 / (1 - theta_hat_ext)^2, 1)` (SD $`r round(sqrt(3 / (1 - theta_hat_ext)^2), 1)`$), whereas a Poisson model with the same mean says variance $3$ (SD $`r round(sqrt(3), 2)`$). The GP model also implies $P(Y_i = 0) = \exp(-(1 - \hat\theta)\hat\mu_i) = `r round(exp(-(1 - theta_hat_ext) * 3), 3)`$ — versus `r round(exp(-3), 3)` under the Poisson model at the same mean. The dispersion parameter thus changes not only the widths of confidence intervals but the *shape* of every prediction this model makes: it more than quadruples the implied chance of an empty nest at this mean.
+A concrete calibration makes the meaning tangible. For a profile with $\hat\mu_i = 3$: the GP model says counts fluctuate with variance `r round(3 / (1 - theta_hat_ext)^2, 1)` (SD $`r round(sqrt(3 / (1 - theta_hat_ext)^2), 1)`$), whereas a Poisson model with the same mean says variance $3$ (SD $`r round(sqrt(3), 2)`$). The GP model also implies $\Pr(Y_i = 0) = \exp(-(1 - \hat\theta)\hat\mu_i) = `r round(exp(-(1 - theta_hat_ext) * 3), 3)`$ — versus `r round(exp(-3), 3)` under the Poisson model at the same mean. The dispersion parameter thus changes not only the widths of confidence intervals but the *shape* of every prediction this model makes: it more than quadruples the implied chance of an empty nest at this mean.
 
 :::{.Tip}
 ::::{.Tip-header}
@@ -2508,7 +2523,7 @@ $$
 = `r round(sum(beta_hat_r1 <- c(cs_ext["(Intercept):1","Estimate"]) + cs_ext["width_cm","Estimate"] * testing_data$width_cm[1] + cs_ext["weight_kg","Estimate"] * testing_data$weight_kg[1] + cs_ext["colorMedium light","Estimate"] + cs_ext["spineBoth worn or broken","Estimate"]), 3)`,
 $$
 
-so $\hat\mu_1 = \exp(`r round(beta_hat_r1, 3)`) = `r round(exp(beta_hat_r1), 3)`$ and $\hat\lambda_1 = (1 - `r round(theta_hat_ext, 4)`) \times `r round(exp(beta_hat_r1), 3)` = `r round((1 - theta_hat_ext) * exp(beta_hat_r1), 3)`$. Under the fitted GP, $P(Y_1 = 0) = \exp(-\hat\lambda_1) = `r round(exp(-(1 - theta_hat_ext) * exp(beta_hat_r1)), 3)`$ — where a Poisson model with the same mean would say `r round(exp(-exp(beta_hat_r1)), 3)` — and the predictive standard deviation is $\sqrt{`r round(exp(beta_hat_r1), 2)` \times `r round(1/(1-theta_hat_ext)^2, 2)`} \approx `r round(sqrt(exp(beta_hat_r1) / (1 - theta_hat_ext)^2), 2)`$ rather than the Poisson $\sqrt{`r round(exp(beta_hat_r1), 2)`} \approx `r round(sqrt(exp(beta_hat_r1)), 2)`$. The software calls below reproduce exactly this arithmetic.
+so $\hat\mu_1 = \exp(`r round(beta_hat_r1, 3)`) = `r round(exp(beta_hat_r1), 3)`$ and $\hat\lambda_1 = (1 - `r round(theta_hat_ext, 4)`) \times `r round(exp(beta_hat_r1), 3)` = `r round((1 - theta_hat_ext) * exp(beta_hat_r1), 3)`$. Under the fitted GP, $\Pr(Y_1 = 0) = \exp(-\hat\lambda_1) = `r round(exp(-(1 - theta_hat_ext) * exp(beta_hat_r1)), 3)`$ — where a Poisson model with the same mean would say `r round(exp(-exp(beta_hat_r1)), 3)` — and the predictive standard deviation is $\sqrt{`r round(exp(beta_hat_r1), 2)` \times `r round(1/(1-theta_hat_ext)^2, 2)`} \approx `r round(sqrt(exp(beta_hat_r1) / (1 - theta_hat_ext)^2), 2)`$ rather than the Poisson $\sqrt{`r round(exp(beta_hat_r1), 2)`} \approx `r round(sqrt(exp(beta_hat_r1)), 2)`$. The software calls below reproduce exactly this arithmetic.
 
 ::: {.Heads-up}
 :::: {.Heads-up-header}
@@ -2572,7 +2587,7 @@ gp_test_predictions_r |>
     `Colour` = color,
     `Spine condition` = spine,
     `Predicted expected count` = predicted_expected_count,
-    `GP predictive P(Y = 0)` = predictive_prob_zero
+    `GP predictive zero probability` = predictive_prob_zero
   ) |>
   print_as_dt()
 ```
@@ -2618,7 +2633,7 @@ gp_test_predictions_py_html = scrollable_table_html(
             "color": "Colour",
             "spine": "Spine condition",
             "predicted_expected_count": "Predicted expected count",
-            "predictive_prob_zero": "GP predictive P(Y = 0)",
+            "predictive_prob_zero": "GP predictive zero probability",
         }
     )
 )
@@ -3040,7 +3055,7 @@ p_test_obs_fitted_py.show()
 
 Reading the metric table honestly: the extended model and the baseline are close on every metric, and the ranking splits. On the absolute-error family the baseline is slightly better (MAE `r round(gp_prediction_metrics_table_r["Extended GP model", "MAE"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "MAE"], 3)`; RMSE `r round(gp_prediction_metrics_table_r["Extended GP model", "RMSE"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "RMSE"], 3)`); on the distribution-sensitive side the extended model wins the negative log predictive mass (`r round(gp_prediction_metrics_table_r["Extended GP model", "Mean negative log predictive mass"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "Mean negative log predictive mass"], 3)`) while losing the mean GP deviance (`r round(gp_prediction_metrics_table_r["Extended GP model", "Mean GP deviance"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "Mean GP deviance"], 3)`). The held-out correlation between observed and predicted counts is only `r round(cor(y_test_vec, mu_test_r), 2)`.
 
-The predictive answer is therefore sobering: **the crab regressors do not buy reliable held-out point predictions beyond the training-mean benchmark on this split** — the same conclusion Chapter 10 reached for the Classical Poisson model, reproduced here under a better-calibrated distribution. What the GP model buys is not a lower MAE; it is *correctly sized uncertainty*: predictive distributions whose spread matches the data (so a predictive $\hat P(Y = 0)$ of `r round(exp(-(1 - theta_hat_ext) * mu_test_r[1]), 2)` is defensible where the Poisson `r round(exp(-mu_test_r[1]), 3)` was not) and inferential standard errors that survive refits.
+The predictive answer is therefore sobering: **the crab regressors do not buy reliable held-out point predictions beyond the training-mean benchmark on this split** — the same conclusion Chapter 10 reached for the Classical Poisson model, reproduced here under a better-calibrated distribution. What the GP model buys is not a lower MAE; it is *correctly sized uncertainty*: predictive distributions whose spread matches the data (so a predictive $\widehat{\Pr}(Y = 0)$ of `r round(exp(-(1 - theta_hat_ext) * mu_test_r[1]), 2)` is defensible where the Poisson `r round(exp(-mu_test_r[1]), 3)` was not) and inferential standard errors that survive refits.
 
 | **Perspective** | **Deliverable** | **Conclusion for this case study** |
 |:---|:---|:---|
@@ -3712,8 +3727,8 @@ buses_py = pd.DataFrame(
     }
 )
 
-generalized_poisson_bline_first_rows_py_html = buses_py.head(10).to_html(
-    index=False, border=0
+generalized_poisson_bline_first_rows_py_html = scrollable_table_html(
+    buses_py.head(10)
 )
 ```
 
@@ -3967,11 +3982,11 @@ The simple-model and extended-model stages below will confirm both predictions d
 
 #### Simple Generalized Poisson Regression and Goodness of Fit {#sec-generalized-poisson-bline-simple-model}
 
-The simple model conditions the arrival counts on rain only:
+The simple model conditions the arrival counts on rain only. For rush-hour window $i$, let $r_{i}$ be the binary indicator that it is raining ($r_{i}=1$ if rain, $0$ otherwise):
 
 $$
 Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}(\lambda_i, \theta), \qquad
-\lambda_i = (1 - \theta)\exp(\beta_0 + \beta_1 \texttt{is\_raining}_i),
+\lambda_i = (1 - \theta)\exp(\beta_0 + \beta_1 r_{i}),
 $$
 
 so that $\exp(\hat\beta_1)$ is the expected-count ratio of rainy versus dry rush-hour windows, and $\hat\theta$ summarizes residual departure from equidispersion. Because $\hat\theta$ is expected to be **negative** here — outside what {VGAM}'s dispersion-index parameterization can reach — the fit is obtained by **direct numerical maximization** of the joint log-likelihood derived in @sec-generalized-poisson-estimation.
