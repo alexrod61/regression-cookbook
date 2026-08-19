@@ -1,0 +1,123 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S2 — Introduction (heading through the end of "A Graphical Look"), plus NEW
+"Documented Use Cases" subsection and the Mermaid mind map relocated from front matter.
+
+Scope: replaces everything from
+    ## Introduction
+through the end of the current ::: {#fig-gp-graphical-look} block,
+stopping before
+    ## Case Study 1: Horseshoe Crab Satellites (Overdispersion) {#sec-cs1-crabs}
+
+====================================================================
+FULL REPLACEMENT TEXT
+====================================================================
+
+## Introduction {#sec-generalized-poisson-introduction}
+
+This chapter extends [Classical Poisson regression](#sec-classical-poisson) by introducing a more flexible count-regression model. Classical Poisson regression enforces **equidispersion**: the conditional mean and conditional variance of the count response must be equal. In practice, this assumption is frequently violated. When the variance *exceeds* the mean, the data are **overdispersed**; when the variance falls *below* the mean, they are **underdispersed**. Under overdispersion, Classical Poisson regression underestimates standard errors, inflating the risk of Type I error. Under underdispersion, it overestimates standard errors, making genuine associations harder to detect — and the model has no mechanism to represent underdispersion at all.
+
+The Generalized Poisson (GP) distribution, introduced by @consul1973, relaxes this restriction by adding a single dispersion parameter $\theta$. When $\theta = 0$, the GP distribution reduces exactly to the Poisson distribution; when $\theta > 0$ it accommodates overdispersion; and when $\theta < 0$ it accommodates underdispersion. [Negative Binomial regression](#sec-negative-binomial) also addresses overdispersion, but only the GP model covers underdispersion as well, and because the Classical Poisson model is nested inside the GP family, the two models can be compared directly with a likelihood-ratio test.
+
+Throughout this chapter, we revisit the horseshoe crab satellite counts from @sec-classical-poisson. In that chapter, the Classical Poisson goodness-of-fit checks signalled a problem with the crab data: the residual deviance was substantially larger than its degrees of freedom, and the mean–variance check showed clear overdispersion. Generalized Poisson regression is precisely the remedy this situation calls for, so the crab data give us a running case study with a concrete starting point — one fitted model whose adequacy failed, and one more flexible distribution that can absorb the extra variability. The opposite direction of failure, underdispersion, is harder to find in classic teaching datasets; we return to it in the practice exercises, where a second case study applies the complete workflow to hourly arrivals of the 99 B-Line bus at the UBC Bus Loop, counts that vary *less* than a Poisson process would allow.
+
+@fig-generalized-poisson-regression situates Generalized Poisson regression within the regression techniques covered so far in this book: it is the count-regression model intended for count outcomes that are overdispersed **or** underdispersed.
+
+::: {#fig-generalized-poisson-regression}
+```{mermaid}
+mindmap
+  root((Regression
+  Analysis)
+    Continuous <br/>Outcome Y
+      {{Unbounded <br/>Outcome Y}}
+        )Chapter 3: <br/>Ordinary <br/>Least Squares <br/>Regression(
+          (Normal <br/>Outcome Y)
+      {{Nonnegative <br/>Outcome Y}}
+        )Chapter 4: <br/>Gamma Regression(
+          (Gamma <br/>Outcome Y)
+      {{Bounded <br/>Outcome Y <br/> between 0 and 1}}
+        )Chapter 5: <br/>Beta <br/>Regression(
+          (Beta <br/>Outcome Y)
+      {{Nonnegative <br/>Survival <br/>Time Y}}
+        )Chapter 6: <br/>Parametric <br/> Survival <br/>Regression(
+          (Exponential <br/>Outcome Y)
+          (Weibull <br/>Outcome Y)
+          (Lognormal <br/>Outcome Y)
+        )Chapter 7: <br/>Semiparametric <br/>Survival <br/>Regression(
+          (Cox Proportional <br/>Hazards Model)
+            (Hazard Function <br/>Outcome Y)
+    Discrete <br/>Outcome Y
+      {{Binary <br/>Outcome Y}}
+        {{Ungrouped <br/>Data}}
+          )Chapter 8: <br/>Binary Logistic <br/>Regression(
+            (Bernoulli <br/>Outcome Y)
+        {{Grouped <br/>Data}}
+          )Chapter 9: <br/>Binomial Logistic <br/>Regression(
+            (Binomial <br/>Outcome Y)
+      {{Count <br/>Outcome Y}}
+        {{Equidispersed <br/>Data}}
+          )Chapter 10: <br/>Classical Poisson <br/>Regression(
+            (Poisson <br/>Outcome Y)
+        {{Overdispersed <br/>Data}}
+          )Chapter 11: <br/>Negative Binomial <br/>Regression(
+            (Negative Binomial <br/>Outcome Y)
+        {{Zero Inflated <br/>Data}}
+          )Chapter 12: <br/>Zero Inflated <br/>Poisson <br/>Regression(
+            (Zero Inflated <br/>Poisson <br/>Outcome Y)
+        {{Overdispersed or <br/>Underdispersed <br/>Data}}
+          )Chapter 13: <br/>Generalized <br/>Poisson <br/>Regression(
+            (Generalized <br/>Poisson <br/>Outcome Y)
+```
+
+Regression analysis mind map depicting all modelling techniques explored so far in this book. Depending on the type of outcome $Y$, these techniques are split into two large zones: *discrete* and *continuous*.
+:::
+
+Some research questions you might explore using Generalized Poisson regression:
+
+- How is the **expected number of satellite male crabs** around a female horseshoe crab nest associated with her shell width and colour, once the overdispersion in the counts is accounted for?
+- How are **hourly bus arrival counts** associated with the day of the week and weather conditions when an actively managed schedule makes the counts more regular than a Poisson process would predict (developed in the practice exercises)?
+- How is the **expected number of workplace injury claims per employee** associated with industry sector and firm size, when claim counts are far more variable than their mean?
+
+### Generalized Poisson Regression Assumptions {#sec-generalized-poisson-assumptions}
+
+The assumptions of Generalized Poisson regression parallel those of Classical Poisson regression, with one key modification:
+
+- **Independence**: each count response $Y_i$ is independent of all the others, with its own positive expected count $\mu_i > 0$.
+- **Log-linearity**: the log of the expected count is modelled as a linear combination of the regressors, $\log(\mu_i) = \beta_0 + \beta_1 x_{i,1} + \cdots + \beta_k x_{i,k}$.
+- **Dispersion flexibility**: unlike the Classical Poisson model, the conditional variance need not equal the conditional mean. The GP model allows $\operatorname{Var}(Y_i) \neq \mathbb{E}(Y_i)$ through the relationship $\operatorname{Var}(Y_i) = \mu_i / (1 - \theta)^2$, where the dispersion parameter $\theta \in (-1, 1)$ controls the direction and magnitude of the departure from equidispersion.
+
+### A Graphical Look {#sec-generalized-poisson-graphical-look}
+
+Before developing the model formally, @fig-gp-graphical-look gives a visual preview of what the dispersion parameter $\theta$ does. Inspect the spread of each panel relative to the dashed Classical Poisson reference: the middle panel spreads probability mass further from the mean, while the right panel concentrates it more tightly.
+
+::: {#fig-gp-graphical-look}
+![](img/gp_dispersion_figure.png)
+
+The effect of the dispersion parameter $\theta$ on the shape of the Generalized Poisson distribution (all panels: mean = 5). Left: Classical Poisson ($\theta = 0$, variance-to-mean ratio 1.00). Middle: overdispersed GP ($\theta = 0.4$, ratio 2.78), wider spread and heavier tails than the Poisson reference. Right: underdispersed GP ($\theta = -0.4$, ratio 0.51), counts cluster tightly around the mean with far less spread than the Poisson reference. The dashed line in the middle and right panels shows the Classical Poisson shape for comparison.
+:::
+
+### Documented Use Cases {#sec-generalized-poisson-use-cases}
+
+Generalized Poisson regression and its close relatives are established tools for count data whose variability does not match the Poisson model. @tbl-generalized-poisson-use-cases summarizes several documented uses, from the distribution's methodological foundations to applied analyses. The side by side appearance of overdispersed and underdispersed applications is the point: a single model family covers both directions.
+
+| Paper | Authors | Application area | Outcome variable | Substantive question | General method | Main modelling lesson |
+|---|---|---|---|---|---|---|
+| A Generalization of the Poisson Distribution [@consul1973] | P. C. Consul and G. C. Jain | Statistical theory | General integer counts | Can one two-parameter count distribution allow variance greater than, equal to, or smaller than the mean? | Derives the Generalized Poisson distribution as a generalization of the Poisson distribution | Introduces the dispersion parameter $\theta$, the source of the flexibility used throughout this chapter. |
+| Generalized Poisson Distributions: Properties and Applications [@consul1989gp] | P. C. Consul | Statistical methodology | Count phenomena, including queueing and branching processes | What are the properties and applications of the GP family? | Systematic treatment of GP properties | Establishes the GP family as a defensible probability model, including the support truncation needed when $\theta < 0$. |
+| Generalized Poisson Regression Model [@consul1992gpreg] | P. C. Consul and F. Famoye | Statistical methodology | Overdispersed and underdispersed count responses | How can regressors enter a GP mean while the dispersion parameter is estimated alongside them? | GP regression by maximum likelihood | The direct methodological basis of the model fitted in this chapter. |
+| On the Generalized Poisson Regression Model with an Application to Accident Data [@famoye2004accidents] | F. Famoye, J. T. Wulu Jr., and K. P. Singh | Traffic and occupational safety | Number of accidents per subject | How are accident counts associated with demographic factors and driving habits? | GP regression compared with Classical Poisson regression | An applied overdispersion study in which the GP model fit accident counts better than the Poisson model. |
+| A Flexible Regression Model for Count Data [@sellers2010flexible] | K. F. Sellers and G. Shmueli | Statistics and management science | Applied count responses, including underdispersed business counts | How should count regression handle data that are over- **or** underdispersed? | Conway–Maxwell–Poisson regression | Confirms that underdispersion arises in real data and motivates flexible count models such as the Generalized Poisson model used here. |
+
+: Documented applied and methodological uses of Generalized Poisson regression and closely related flexible count models. {#tbl-generalized-poisson-use-cases .striped .hover}
+
+As in @sec-classical-poisson, the remainder of the chapter follows the data science workflow: study design, data collection and wrangling, exploratory data analysis, data modelling, estimation, goodness of fit, results, and storytelling. We begin by returning to the horseshoe crab data and stating precisely what the analysis is meant to learn.
+
+====================================================================
+FILE: END OF S2 PROPOSAL
+====================================================================
+COMPANION BIBLIOGRAPHY ADDITIONS (appended to book/references.bib in this stage):
+
+@bolker2009           (copied verbatim from main:book/references.bib; cited by the S1 Warning box)
+@consul1989gp         (new; Consul 1989 monograph, Marcel Dekker)
+@consul1992gpreg      (new; Consul & Famoye 1992, Comm. Statist. Theory Methods 21(1):89-109, doi:10.1080/03610929208830766)
+@famoye2004accidents  (new; Famoye, Wulu & Singh 2004, J. Data Sci. 2(3):287-295)
+@sellers2010flexible  (new; Sellers & Shmueli 2010, Ann. Appl. Stat. 4(2):943-961, doi:10.1214/09-AOAS306)
