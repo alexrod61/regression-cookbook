@@ -1,0 +1,41 @@
+# Revision rationale for the Exploratory Data Analysis section
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): NEW `## Exploratory Data Analysis {#sec-generalized-poisson-eda}` with subsections on the response distribution, continuous regressors, categorical regressors, and an EDA summary; the section contains the canonical training/testing split. Companion edit: the front-matter R setup chunk gains `library(gridExtra)` (first used in this section's categorical figure).
+- Reference chapters/files reviewed: finished Chapter 10 on main (EDA stage L606-2475: split placement at EDA start, rsample convention, Tip on 50/50, binned-averages device, jitter policy, response-summary content); skill.md sections 9, 10, 12, 15-17; Chapter 1 anchors @fig-ds-workflow-eda.
+
+## What was preserved
+- The draft's intent to demonstrate overdispersion numerically before modelling — relocated here from the old wrangling section, now computed on the canonical training split by executed code.
+- Finished Chapter 10's EDA devices, carried over where they genuinely apply to a GP chapter: canonical 50/50 seed-123 rsample split + reticulate transfer listing (verbatim convention), category-type restoration, Tip on the 50/50 split, binned interval averages (8 intervals), horizontal-only jitter with a Heads-up, EDA summary table.
+- The draft's placeholder goal of comparing group means across colour/spine (realized here with executed tables).
+
+## What changed
+- Everything is executed at build time; the draft contained no executable EDA at all (only stale 70/30 numbers).
+- Response-distribution summary: training mean 2.849, variance 9.612, ratio 3.374, 34/86 zeros, range 0-12 (training). These replace the draft's full-70/30-sample numbers; prose values are inline `r` computations, not hardcoded text.
+- Added the marginal-vs-conditional Heads-up: a raw variance-to-mean ratio is descriptive; equidispersion is conditional. Required by skill.md section 10 and central to honest GP motivation.
+- Added the continuous-regressor EDA for BOTH width_cm and weight_kg (the draft referenced width only) and categorical EDA with group mean AND group variance columns, enabling the key teaching observation: overdispersion persists within regressor groups (group variance > group mean everywhere).
+- Python categorical plot uses explicit matplotlib code (positions, fixed seed jitter U(-0.15, 0.15)) to match the R boxplot+jitter figure element for element.
+- Colour-name fixes for true parity: mizani (plotnine) does not know R colour names; Python chunks use hex #36648B (steelblue4) and #808080 (gray50). The same hexes are used in the R chunks for exact parity (base R accepts them identically).
+- Added EDA-summary table row cautions per skill.md section 10 (descriptive devices are not model forms; sparse intervals; small categories).
+- Setup chunk: added gridExtra (used exactly once, for the side-by-side categorical figure).
+
+## Why the changes help
+- Statistical honesty: all dispersion evidence is now training-set, executed, and correctly hedged as descriptive; the chapter cannot be accused of double dipping (testing set untouched until Results).
+- Workflow consistency: split logic, seed, rsample usage, and reticulate transfer match finished Chapters 1 and 10 verbatim, so Ch13's samples coincide with Ch10's.
+- R/Python parity: verified numerically identical summaries (mean 2.849/2.849, var 9.612/9.612, ratio 3.374/3.374, zeros 34/34) and matched figure construction.
+
+## Execution and validation
+- R smoke test /tmp/regref/s4_full.R: complete chapter EDA code as written in the QMD ran without error; tables printed above; four figures rendered (s4_resp_r.png, s4_width_r.png, s4_weight_r.png, s4_cat_r.png).
+- Python smoke test /tmp/regref/s4_full.py (venv: pandas 2.x, plotnine 0.15.8, matplotlib): all chunks ran; identical summary statistics on the R-generated split CSV; figures rendered (s4_resp_py.png, s4_width_py.png, s4_cat_py.png). plotnine inline display convention follows finished Chapters (object as last expression; no .show()).
+- A training-range correction was made after noticing the training max count is 12 (full data is 15): the EDA summary table says 0 to 12.
+
+## What should be avoided
+- Pre-split EDA; testing-set glances; seaborn/matplotlib style mismatches vs plotnine usage; hardcoding any summary number in prose (all are inline `r`); interpolating per-bin patterns as if they were fitted model curves.
+
+## References to add or verify
+- Appended this stage (verbatim from main:book/references.bib): @hastie2009, @kuhn2013, @harrell2015 (used in the split Tip).
+
+## Placement and dependencies
+- Inserted between the S3 wrangling content and `## Data Modelling`.
+- Objects for later stages: `training_data`, `testing_data` (R); `training_data`, `testing_data` with restored ordered categoricals + `color_levels`/`spine_levels` (Python); `n_total`, `n_train`, `n_test`; binned-summary objects; the anchors {#sec-generalized-poisson-eda*}. Sections S7+ fit on training_data only; Results (S11) touches testing_data.

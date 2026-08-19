@@ -64,7 +64,8 @@ library(tidyr)
 library(dplyr)
 library(magrittr)
 library(ggplot2)
-library(ggExtra) # draw marginal histograms
+library(ggExtra)   # draw marginal histograms
+library(gridExtra) # combine ggplot2 figures
 library(broom)
 library(knitr)
 library(rsample) # canonical training/testing split
@@ -569,6 +570,621 @@ print("Zero counts:", int((crabs["satellites"] == 0).sum()))
 ```
 
 :::
+
+## Exploratory Data Analysis {#sec-generalized-poisson-eda}
+
+With the data wrangled, we move to **exploratory data analysis** (as shown in @fig-ds-workflow-eda). The goal is to describe the data before modelling them: How are the satellite counts distributed? Is there descriptive evidence of overdispersion? Which regressors appear to be related to the response? Per the data science workflow, all EDA uses the **training data only**, so we first create the training/testing split.
+
+We use the same canonical split as @sec-classical-poisson — a 50/50 simple random split with seed 123 — so that the training observations analysed in this chapter are exactly those analysed in the Classical Poisson chapter:
+
+- @lst-generalized-poisson-data-splitting-r uses the [{rsample}](https://rsample.tidymodels.org/) package to split the wrangled `crabs` dataset into training and testing sets. The argument `prop = 0.5` requests that approximately half of the observations be assigned to the training set, with the rest assigned to the testing set. The sanity check prints the dimensions of both subsets and their observed proportion.
+- In `Python`, we do not re-split the data. Per the book's cross-language convention, the `R`-generated split is the canonical one, and the next listing shows how the `Python` analysis imports it.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-data-splitting-r
+#| lst-cap: "Code to randomly split the horseshoe crab data into training and testing sets."
+#| message: false
+#| warning: false
+# Setting the seed for reproducible splitting
+set.seed(123)
+
+# Performing the 50/50 training/testing split
+split <- initial_split(crabs, prop = 0.5)
+training_data <- training(split)
+testing_data <- testing(split)
+
+# Sanity checks: dimensions and proportions
+n_total <- nrow(crabs)
+n_train <- nrow(training_data)
+n_test  <- nrow(testing_data)
+
+cat("Total observations:", n_total, "\n")
+cat("Training observations:", n_train,
+    "(", round(100 * n_train / n_total, 1), "%)\n")
+cat("Testing observations:", n_test,
+    "(", round(100 * n_test / n_total, 1), "%)\n")
+```
+
+:::
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on the 50/50 split and more careful alternatives!
+::::
+:::: {.Tip-container}
+This dataset contains only `r n_total` observations. A standard predictive modelling workflow often uses a larger training set, such as an 80/20 training/testing split. However, in this chapter we need to support two goals at the same time: an **inferential** inquiry and a **predictive** inquiry.
+
+Using a 50/50 split is a compromise. It gives the training set enough observations for EDA, model fitting, and goodness-of-fit checking, while also leaving a testing set large enough to support both the final **predictive accuracy assessment** and the final **inferential refit**. This choice is not perfect. A larger training set would usually help estimation and diagnostics, while a larger testing set gives a more informative final assessment. With small datasets, we often have to choose between these inconveniences.
+
+The 50/50 split used here is also a **simple random split**, which means it does not explicitly protect against imbalance across important variables. For example, if one female crab colour category or spine condition is rare, a simple random split could place too many of those crabs in one subset and too few in the other. That imbalance can affect both the inferential and predictive parts of the workflow.
+
+A more careful split could stratify the data by an important categorical regressor, such as female crab colour, or by a coarser grouping of the response variable. Other strategies include repeated random splits, cross-validation, or bootstrap-based assessment. These approaches can reduce dependence on a single split and are widely used in predictive modelling and model validation; see @hastie2009, @kuhn2013, and @harrell2015 for broader discussions. The main chapter keeps a single 50/50 split so that the Generalized Poisson regression workflow remains transparent, and so that the results remain directly comparable with @sec-classical-poisson.
+::::
+:::
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on keeping R and Python aligned after the split!
+::::
+:::: {.Heads-up-container}
+Setting the same seed in `R` and `Python` does **not** guarantee the same observations in each subset: the two languages use different random-number generators and different splitting implementations. To keep genuine `R`/`Python` parity, we use the `R`-generated training and testing sets as a common reference. The listing below imports them into `Python` through the [{reticulate}](https://rstudio.github.io/reticulate/) package and restores the categorical data types and level ordering that the transfer would otherwise lose.
+::::
+:::
+
+::: {.panel-tabset}
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-import-r-split-py
+#| lst-cap: "Code to import the R-generated training and testing sets into Python."
+#| message: false
+# Importing R-generated training and testing sets via reticulate
+training_data = r.training_data
+testing_data = r.testing_data
+
+# Ensuring categorical regressors are treated as categorical in Python
+color_levels = ["Light", "Medium light", "Medium dark", "Dark"]
+spine_levels = ["Both good", "One worn or broken", "Both worn or broken"]
+
+training_data["color"] = pd.Categorical(
+    training_data["color"], categories=color_levels, ordered=True
+)
+training_data["spine"] = pd.Categorical(
+    training_data["spine"], categories=spine_levels, ordered=True
+)
+testing_data["color"] = pd.Categorical(
+    testing_data["color"], categories=color_levels, ordered=True
+)
+testing_data["spine"] = pd.Categorical(
+    testing_data["spine"], categories=spine_levels, ordered=True
+)
+
+# Sanity checks: sample sizes, and disjointness of the two splits
+n_total_py = len(r.crabs)
+print("Total observations:", n_total_py)
+print("Training observations:", len(training_data))
+print("Testing observations:", len(testing_data))
+print(
+    "Training + testing equals total:",
+    len(training_data) + len(testing_data) == n_total_py,
+)
+```
+
+:::
+
+From this point until the **Results** section, everything — EDA plots, candidate model fitting, and all goodness-of-fit checks — uses `training_data` only. The testing set stays untouched until the final inferential refit and the final held-out predictive evaluation.
+
+### Distribution of the Count Response {#sec-generalized-poisson-eda-response}
+
+The first question is descriptive: how are the satellite counts distributed in the training data? @fig-generalized-poisson-eda-response-r and @fig-generalized-poisson-eda-response-py show the empirical distribution, and the accompanying tables report the training-set mean, variance, variance-to-mean ratio, and zero proportion.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-eda-response-r
+#| fig-cap: "Empirical distribution of satellite counts in the training data."
+#| message: false
+#| fig-width: 8
+#| fig-height: 5
+p_response <- ggplot(
+  training_data,
+  aes(x = factor(satellites))
+) +
+  geom_bar(fill = "steelblue4", color = "white") +
+  labs(
+    x = "Number of satellite males",
+    y = "Number of female crabs"
+  ) +
+  theme_bw()
+p_response
+```
+
+## **`Python`**
+
+```{python}
+#| echo: false
+#| label: fig-generalized-poisson-eda-response-py
+#| fig-cap: "Empirical distribution of satellite counts in the training data (Python)."
+#| message: false
+#| fig-width: 8
+#| fig-height: 5
+p_response_py = (
+    ggplot(
+        training_data.assign(
+            satellites_factor=training_data["satellites"].astype("category")
+        ),
+        aes(x="satellites_factor"),
+    )
+    + geom_bar(fill="#36648B", color="white")
+    + labs(x="Number of satellite males", y="Number of female crabs")
+    + theme_bw()
+)
+p_response_py
+```
+
+:::
+
+```{r}
+#| echo: false
+#| message: false
+# Training-set response summaries used in prose and tables
+resp_summ <- tibble(
+  Quantity = c(
+    "Number of female crabs",
+    "Mean satellite count",
+    "Variance of satellite counts",
+    "Variance-to-mean ratio",
+    "Zero counts",
+    "Minimum",
+    "Maximum"
+  ),
+  Value = c(
+    nrow(training_data),
+    round(mean(training_data$satellites), 3),
+    round(var(training_data$satellites), 3),
+    round(var(training_data$satellites) / mean(training_data$satellites), 3),
+    sum(training_data$satellites == 0),
+    min(training_data$satellites),
+    max(training_data$satellites)
+  )
+)
+resp_summ_py_html <- NULL
+```
+
+```{python}
+#| echo: false
+#| message: false
+y_train = training_data["satellites"]
+resp_summ_py = pd.DataFrame(
+    {
+        "Quantity": [
+            "Number of female crabs",
+            "Mean satellite count",
+            "Variance of satellite counts",
+            "Variance-to-mean ratio",
+            "Zero counts",
+            "Minimum",
+            "Maximum",
+        ],
+        "Value": [
+            len(y_train),
+            round(y_train.mean(), 3),
+            round(y_train.var(), 3),
+            round(y_train.var() / y_train.mean(), 3),
+            int((y_train == 0).sum()),
+            int(y_train.min()),
+            int(y_train.max()),
+        ],
+    }
+)
+resp_summ_py_html = scrollable_table_html(resp_summ_py)
+```
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-eda-response-r
+#| tbl-cap: "Descriptive summaries of the satellite counts in the training data."
+#| message: false
+kable(resp_summ)
+```
+
+## **`Python` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-eda-response-py
+#| tbl-cap: "Descriptive summaries of the satellite counts in the training data (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$resp_summ_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+Three features stand out in the training data. First, the distribution is **right-skewed**, with many small counts and a few nests with many satellites. Second, `r sum(training_data$satellites == 0)` of the `r n_train` training crabs (about `r round(100 * sum(training_data$satellites == 0) / n_train)`%) have **zero satellites**, so the zero category is prominent. Third — and most important for this chapter — the sample variance (`r round(var(training_data$satellites), 2)`) is more than three times the sample mean (`r round(mean(training_data$satellites), 2)`), giving a variance-to-mean ratio of about `r round(var(training_data$satellites) / mean(training_data$satellites), 2)`.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on reading dispersion from raw summaries!
+::::
+:::: {.Heads-up-container}
+The variance-to-mean ratio computed here is a **marginal** summary: it ignores the regressors completely. A ratio far from one is an early warning, not a verdict. Equidispersion is a **conditional** assumption about the distribution of $Y_i$ given the regressors included in the model. The training-stage dispersion diagnostics in @sec-generalized-poisson-gof are what actually check that assumption.
+
+At the same time, a marginal ratio of `r round(var(training_data$satellites) / mean(training_data$satellites), 2)` is large enough that the Generalized Poisson model — explicitly designed for such departures — is the natural model to develop.
+::::
+:::
+
+### Satellite Counts and Continuous Regressors {#sec-generalized-poisson-eda-continuous}
+
+Next, is the response related to the two continuous regressors? Because counts are noisy, we follow the same device as @sec-classical-poisson: split each continuous regressor into intervals, compute the average satellite count per interval, and overlay those averages on the scatterplot. These binned averages are a **descriptive visual guide**, not the fitted regression model.
+
+@fig-generalized-poisson-eda-width-r and @fig-generalized-poisson-eda-width-py show the relationship with `width_cm`; the pattern is an approximately monotone increase in the average satellite count as shell width grows.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-eda-width-r
+#| fig-cap: "Satellite counts versus female crab width (training data), with interval averages."
+#| message: false
+#| fig-width: 9
+#| fig-height: 6
+n_intervals <- 8
+crabs_binned_width <- training_data |>
+  mutate(width_bin = cut(width_cm, breaks = n_intervals)) |>
+  group_by(width_bin) |>
+  summarise(
+    bin_centre = mean(width_cm),
+    mean_sat = mean(satellites),
+    n_obs = dplyr::n(),
+    .groups = "drop"
+  )
+breaks_width <- seq(
+  min(training_data$width_cm),
+  max(training_data$width_cm),
+  length.out = n_intervals + 1
+)
+p_width <- ggplot(training_data, aes(x = width_cm, y = satellites)) +
+  geom_point(alpha = 0.6) +
+  geom_vline(xintercept = breaks_width, linetype = "dashed", color = "gray50") +
+  geom_point(
+    data = crabs_binned_width,
+    aes(x = bin_centre, y = mean_sat),
+    color = "red", size = 2.5
+  ) +
+  geom_line(
+    data = crabs_binned_width,
+    aes(x = bin_centre, y = mean_sat),
+    color = "red"
+  ) +
+  labs(
+    x = "Carapace width (cm)",
+    y = "Number of satellite males"
+  ) +
+  theme_bw()
+p_width
+```
+
+## **`Python`**
+
+```{python}
+#| echo: false
+#| label: fig-generalized-poisson-eda-width-py
+#| fig-cap: "Satellite counts versus female crab width (training data), with interval averages (Python)."
+#| message: false
+#| fig-width: 9
+#| fig-height: 6
+n_intervals = 8
+training_data["width_bin"] = pd.cut(training_data["width_cm"], bins=n_intervals)
+binned_width_py = (
+    training_data.groupby("width_bin", observed=False)
+    .agg(
+        bin_centre=("width_cm", "mean"),
+        mean_sat=("satellites", "mean"),
+        n_obs=("satellites", "size"),
+    )
+    .reset_index()
+)
+breaks_width_py = np.linspace(
+    training_data["width_cm"].min(), training_data["width_cm"].max(), n_intervals + 1
+)
+p_width_py = (
+    ggplot(training_data, aes(x="width_cm", y="satellites"))
+    + geom_point(alpha=0.6)
+    + geom_vline(xintercept=breaks_width_py, linetype="dashed", color="#808080")
+    + geom_point(
+        data=binned_width_py, mapping=aes(x="bin_centre", y="mean_sat"),
+        color="red", size=2.5,
+    )
+    + geom_line(
+        data=binned_width_py, mapping=aes(x="bin_centre", y="mean_sat"), color="red"
+    )
+    + labs(x="Carapace width (cm)", y="Number of satellite males")
+    + theme_bw()
+)
+p_width_py
+```
+
+:::
+
+@fig-generalized-poisson-eda-weight-r and @fig-generalized-poisson-eda-weight-py repeat the exercise for `weight_kg`. The binned averages again suggest an increasing relationship, although the heaviest bins contain very few crabs and should not be over-read.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-eda-weight-r
+#| fig-cap: "Satellite counts versus female crab weight (training data), with interval averages."
+#| message: false
+#| fig-width: 9
+#| fig-height: 6
+crabs_binned_weight <- training_data |>
+  mutate(weight_bin = cut(weight_kg, breaks = n_intervals)) |>
+  group_by(weight_bin) |>
+  summarise(
+    bin_centre = mean(weight_kg),
+    mean_sat = mean(satellites),
+    n_obs = dplyr::n(),
+    .groups = "drop"
+  )
+breaks_weight <- seq(
+  min(training_data$weight_kg),
+  max(training_data$weight_kg),
+  length.out = n_intervals + 1
+)
+p_weight <- ggplot(training_data, aes(x = weight_kg, y = satellites)) +
+  geom_point(alpha = 0.6) +
+  geom_vline(xintercept = breaks_weight, linetype = "dashed", color = "gray50") +
+  geom_point(
+    data = crabs_binned_weight,
+    aes(x = bin_centre, y = mean_sat),
+    color = "red", size = 2.5
+  ) +
+  geom_line(
+    data = crabs_binned_weight,
+    aes(x = bin_centre, y = mean_sat),
+    color = "red"
+  ) +
+  labs(
+    x = "Weight (kg)",
+    y = "Number of satellite males"
+  ) +
+  theme_bw()
+p_weight
+```
+
+## **`Python`**
+
+```{python}
+#| echo: false
+#| label: fig-generalized-poisson-eda-weight-py
+#| fig-cap: "Satellite counts versus female crab weight (training data), with interval averages (Python)."
+#| message: false
+#| fig-width: 9
+#| fig-height: 6
+training_data["weight_bin"] = pd.cut(training_data["weight_kg"], bins=n_intervals)
+binned_weight_py = (
+    training_data.groupby("weight_bin", observed=False)
+    .agg(
+        bin_centre=("weight_kg", "mean"),
+        mean_sat=("satellites", "mean"),
+        n_obs=("satellites", "size"),
+    )
+    .reset_index()
+)
+breaks_weight_py = np.linspace(
+    training_data["weight_kg"].min(), training_data["weight_kg"].max(), n_intervals + 1
+)
+p_weight_py = (
+    ggplot(training_data, aes(x="weight_kg", y="satellites"))
+    + geom_point(alpha=0.6)
+    + geom_vline(xintercept=breaks_weight_py, linetype="dashed", color="#808080")
+    + geom_point(
+        data=binned_weight_py, mapping=aes(x="bin_centre", y="mean_sat"),
+        color="red", size=2.5,
+    )
+    + geom_line(
+        data=binned_weight_py, mapping=aes(x="bin_centre", y="mean_sat"), color="red"
+    )
+    + labs(x="Weight (kg)", y="Number of satellite males")
+    + theme_bw()
+)
+p_weight_py
+```
+
+:::
+
+### Satellite Counts and Categorical Regressors {#sec-generalized-poisson-eda-categorical}
+
+For the categorical regressors, @tbl-generalized-poisson-eda-categorical-r and @tbl-generalized-poisson-eda-categorical-py report group sizes, group means, and group variances of the satellite counts for each colour category and each spine condition in the training data. Two observations will matter later: the group means vary across colour categories in the expected direction (darker females attract fewer satellites), and within **every** group the sample variance remains well above the sample mean — descriptive evidence that the overdispersion is not explained away by any single regressor.
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-eda-categorical-r
+#| tbl-cap: "Training-set satellite counts by colour category and spine condition."
+#| message: false
+cat_summ_color <- training_data |>
+  group_by(color) |>
+  summarise(
+    `Number of crabs` = dplyr::n(),
+    `Mean` = round(mean(satellites), 2),
+    `Variance` = round(var(satellites), 2),
+    .groups = "drop"
+  ) |>
+  rename(Category = color)
+cat_summ_spine <- training_data |>
+  group_by(spine) |>
+  summarise(
+    `Number of crabs` = dplyr::n(),
+    `Mean` = round(mean(satellites), 2),
+    `Variance` = round(var(satellites), 2),
+    .groups = "drop"
+  ) |>
+  rename(Category = spine)
+kable(
+  bind_rows(`Colour category` = cat_summ_color, `Spine condition` = cat_summ_spine, .id = "Regressor")
+)
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+cat_summ_py = pd.concat(
+    [
+        training_data.groupby("color", observed=True)
+        .agg(n=("satellites", "size"), mean=("satellites", "mean"), var=("satellites", "var"))
+        .round(2)
+        .assign(regressor="Colour category"),
+        training_data.groupby("spine", observed=True)
+        .agg(n=("satellites", "size"), mean=("satellites", "mean"), var=("satellites", "var"))
+        .round(2)
+        .assign(regressor="Spine condition"),
+    ]
+).reset_index(names="Category")
+cat_summ_py = cat_summ_py.rename(
+    columns={"n": "Number of crabs", "mean": "Mean", "var": "Variance", "regressor": "Regressor"}
+)[["Regressor", "Category", "Number of crabs", "Mean", "Variance"]]
+cat_summ_py_html = scrollable_table_html(cat_summ_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-eda-categorical-py
+#| tbl-cap: "Training-set satellite counts by colour category and spine condition (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$cat_summ_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+@fig-generalized-poisson-eda-categorical-r and @fig-generalized-poisson-eda-categorical-py show the same groups visually, with the individual counts overlaid.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on jittered points in categorical plots!
+::::
+:::: {.Heads-up-container}
+In these plots, individual training observations are drawn on top of the boxplots. Many crabs share the same satellite count, so identical points would otherwise overlap. We add a small **horizontal-only** jitter (`width = 0.15`, `height = 0`) so points fan out sideways within each category; the vertical coordinate — the actual satellite count — is never altered.
+::::
+:::
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-eda-categorical-r
+#| fig-cap: "Satellite counts by colour category (left) and spine condition (right) in the training data; points are jittered horizontally only."
+#| message: false
+#| fig-width: 13
+#| fig-height: 5.5
+p_color <- ggplot(training_data, aes(x = color, y = satellites)) +
+  geom_boxplot(outlier.shape = NA, fill = "steelblue3", alpha = 0.4) +
+  geom_jitter(width = 0.15, height = 0, alpha = 0.6) +
+  labs(x = "Female crab colour", y = "Number of satellite males") +
+  theme_bw()
+p_spine <- ggplot(training_data, aes(x = spine, y = satellites)) +
+  geom_boxplot(outlier.shape = NA, fill = "steelblue3", alpha = 0.4) +
+  geom_jitter(width = 0.15, height = 0, alpha = 0.6) +
+  labs(x = "Female crab spine condition", y = "Number of satellite males") +
+  theme_bw()
+gridExtra::grid.arrange(p_color, p_spine, ncol = 2)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: false
+#| label: fig-generalized-poisson-eda-categorical-py
+#| fig-cap: "Satellite counts by colour category (left) and spine condition (right) in the training data; points are jittered horizontally only (Python)."
+#| message: false
+#| fig-width: 13
+#| fig-height: 5.5
+np.random.seed(42)
+jitter = np.random.uniform(-0.15, 0.15, len(training_data))
+cat_plot_data = training_data.assign(
+    color_cat=pd.Categorical(training_data["color"]).codes + 1,
+    spine_cat=pd.Categorical(training_data["spine"]).codes + 1,
+)
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+for ax, code_col, levels, xlabel in [
+    (axes[0], "color_cat", color_levels, "Female crab colour"),
+    (axes[1], "spine_cat", spine_levels, "Female crab spine condition"),
+]:
+    groups = [
+        training_data.loc[cat_plot_data[code_col] == i, "satellites"]
+        for i in range(1, len(levels) + 1)
+    ]
+    ax.boxplot(groups, positions=range(1, len(levels) + 1))
+    ax.scatter(
+        cat_plot_data[code_col] + jitter,
+        training_data["satellites"],
+        alpha=0.6,
+    )
+    ax.set_xticks(range(1, len(levels) + 1), levels, rotation=20)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Number of satellite males")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+### Summary {#sec-generalized-poisson-eda-summary}
+
+@tbl-generalized-poisson-eda-summary summarizes the exploratory findings and what they imply for the modelling stage.
+
+| **Feature investigated** | **Descriptive evidence (training data)** | **Implication for modelling** | **Caution** |
+|:---|:---|:---|:---|
+| Response distribution | Right-skewed counts; 34 of 86 crabs have zero satellites; range 0 to 12. | A count model with a positive expected count is required; the log link is appropriate. | Marginal summaries ignore the regressors. |
+| Mean–variance relationship | Variance-to-mean ratio of about 3.37; group variances exceed group means within every colour and spine group. | Equidispersion is implausible; a model with an explicit dispersion parameter, such as the Generalized Poisson, is motivated. | The formal checks happen in goodness of fit, on the fitted conditional model. |
+| `width_cm` | Interval-average satellite counts increase with shell width. | Width is the natural first regressor for the simple model. | Binned averages are descriptive, not the fitted mean function. |
+| `weight_kg` | Interval averages also increase, but the heaviest intervals contain very few crabs. | Weight is a candidate for the extended model. | Sparse high-weight intervals make the right-hand pattern imprecise. |
+| `color`, `spine` | Group means differ modestly; `Light` has only 8 training crabs and `One worn or broken` only 7. | Colour and spine remain candidate regressors with explicit reference categories. | Small groups produce imprecise contrasts; no rebalancing is done. |
+
+: EDA summary for the horseshoe crab training data. {#tbl-generalized-poisson-eda-summary .striped .hover}
+
+The exploratory evidence points in one consistent direction: the training counts are strongly overdispersed, even within regressor-defined groups, while the expected count clearly varies with female crab size. The next section turns these descriptive observations into a formal probability model: the Generalized Poisson regression model.
 
 ## Data Modelling
 
