@@ -1,0 +1,45 @@
+# Revision rationale for the 99 B-Line Coding Case (S15)
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): appended the complete `::: {.CodingCase}` block at the end of the chapter (after the S14 practice-exercise bank), replacing nothing — the draft's stale Case Study 2 TODO block had been deleted in S14. Companion one-line setup change: added `py_require("pyreadr")` to the chapter setup chunk (needed by the Python data-import listing).
+- Reference chapters/files reviewed: finished Ch10 CodingCase (L8880-17116): container/header structure, workflow-step list, variables table with caption label, Tip on libraries, per-stage `####` headings matching the chapter's workflow, Question/Answer reveal patterns with hints, `## **`R`** / `## **`Python`**` sub-panes inside answers, `kable`/`DT` and `scrollable_table_html` output conventions.
+
+## What was preserved
+- The draft's declared intent of a second, underdispersion case study on the 99 B-Line: kept as the repository-approved Coding Case (`andytai7/cookbook::generalized_poisson_regression`, per the data constraint from the planning phase).
+- The chapter-wide workflow skeleton (study design → wrangling → EDA → simple model → GOF → extended model → prediction → results → storytelling) and every structural convention: canonical 50/50 seed-123 split, six-metric prediction suite, testing-set inferential refit, heads-up/tip boxes, question numbering continuity (13.13–13.23 continue 13.1–13.12).
+- Chapter helpers reused rather than redefined: `gp_prediction_metrics_r` / `gp_prediction_metrics`, `gp_logpmf_r` / `gp_logpmf`, the `GeneralizedPoisson(GenericLikelihoodModel)` machinery class, `scrollable_table_html`.
+
+## What changed
+- NEW section, 11 guided questions with fully executed answers:
+  - CodingCase header, scenario prose, traffic-lights image (repo asset, credit line reused from finished Ch10 where already credited), workflow list, variables table {#tbl-generalized-poisson-bline-variables}, namespace heads-up ({cookbook} exports a data object `poisson` that shadows `stats::poisson()`; all coding-case GLM calls qualify `stats::poisson(link = "log")`).
+  - Q13.13/Q13.14: inferential inquiry ($\theta<0$ + adjusted rain association) and predictive inquiry (six metrics vs training-mean baseline).
+  - Q13.15: no-zeros-is-fine-under-GP support discussion (e^{-λ} ~ 1e-11 at μ≈20).
+  - Wrangling: R `library(cookbook)` + `data()` + plain-vector sanitize + Monday baseline; Python urllib+pyreadr from the package's raw GitHub .rda (established ch10 CodingCase convention).
+  - Q13.16: baseline-category choice and exclusion of `scheduled_frequency` (near-constant design setting, 17–21) and `time_window` (row index identifier) from the regressor set.
+  - EDA: canonical split (n=100/100), training mean 19.92 / var 14.96 / ratio 0.751; group ratios 0.543 (Fri) – 0.838 (rain); histograms both languages.
+  - Q13.17: EDA-based θ̂ sign/magnitude prediction (baseline ≈ −0.15, extended more negative after conditioning).
+  - Q13.18 (Simple model): custom R `optim()` BFGS fitter `bline_gp_fit_r()` (logistic map θ = 2·logit⁻¹(z)−1, support guard, delta-method SE) — required because VGAM provably cannot reach θ<0; Python reuses the chapter's class; extended both-language parity verified (R `optim` vs Python `fit_dispersion` give identical estimates to 4 dp on the spike).
+  - Q13.19 (GOF): Pearson 99.7/97 p≈0.405; deviance 100.1/97 p≈0.393; zero-count check degenerates (expected zeros ~1e-8).
+  - Q13.20 (Extended): θ̂ −0.2836 (SE 0.0902), ratio 0.607; dispersion LRT χ²₁=10.67 p=0.0011; nested day-block χ²₄=16.62 p=0.0023; GP SEs ≈78% of Poisson's.
+  - Q13.21 (prediction): simple GP wins all six held-out metrics (MAE 2.907 vs 2.987 extended vs 2.990 baseline) — deliberately honest counterpoint to the nested LRT; prose explicitly reconciles inferential vs predictive roles.
+  - Q13.22 (results): testing refit θ̂ −0.2859 (SE 0.0882, CI entirely below 0), LRT χ²₁=11.21 p=8.1e-4; rain ratio 0.943 (0.880, 1.011), p=0.101; Tuesday vs Monday p=0.043 flagged as single marginal signal; GP SEs 78% of Poisson's.
+  - Q13.23 (storytelling): three-part briefing (robust regularity finding, calibrated confidence, recommendations + observational limits).
+- All numeric claims in prose are executed inline (`r` expressions), never hardcoded.
+
+## Execution and validation
+- Every computed value verified twice before writing: /tmp/regref/bline_spike.R (custom R `optim` fitter) and /tmp/regref/bline_py.py (chapter's `GeneralizedPoisson` class) agree to ≥4 decimal places on log-likelihoods (−266.2256 extended, −274.5331 simple, baselines), θ̂ (±0.2836/±0.2859), all coefficients, SEs, LRTs (10.67/4.91/16.62/11.21), Pearson/deviance (100.05/100.74 extended; 99.72/100.13 simple), and all six held-out metrics for all three models.
+- Split parity: buses split exported from R (`initial_split(prop=0.5)`, seed 123) and consumed by both languages (Python reads `r.buses_train`), preserving the chapter's single-source-of-truth split discipline.
+- Namespace hazard discovered and documented: `library(cookbook)` attaches a data object named `poisson` which masks the family function; `glm()` calls in the coding case use `stats::poisson(link = "log")`, and the heads-up box explains the pattern to readers.
+- Structural QC after integration: 11 Question/11 Answer headers numbered 13.13–13.23 continuously; `{.CodingCase}` appears exactly once; `py_require("pyreadr")` added; chapter line count 4788.
+
+## What should be avoided
+- VGAM-based fitting for this section (dispersion index (1−θ)² cannot underflow 1 — stated in the scenario prose).
+- Hardcoded numbers in prose; redefinition of chapter helpers; touching other chapters or `_quarto.yml`; the retired `{#sec-cs2-bline}` anchor.
+
+## References cited here
+- Internal anchors only (`@sec-generalized-poisson-estimation`, `@sec-generalized-poisson-fitting-machinery`, `@sec-generalized-poisson-gof`, `@sec-generalized-poisson-prediction`, `@sec-generalized-poisson-eda`, `@tbl-generalized-poisson-bline-*`) — all verified to exist earlier in the chapter. No new bibliography entries.
+
+## Placement and dependencies
+- Appended after the S14 exercise bank; the Coding Case is the final content element of the chapter, matching finished Ch10's ordering (CodingCase closes the chapter).
+- Depends on: chapter setup chunk (libraries, `print_as_dt`, `scrollable_table_html`, `GeneralizedPoisson`, `gp_logpmf*`, `gp_prediction_metrics*`), all present before first use in document order.
