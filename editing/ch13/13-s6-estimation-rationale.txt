@@ -1,0 +1,31 @@
+# Revision rationale for the Estimation section (S6)
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): NEW `## Estimation {#sec-generalized-poisson-estimation}` replacing the draft's estimation stub, with subsection `### Fitting Machinery in R and Python {#sec-generalized-poisson-fitting-machinery}`.
+- Reference chapters/files reviewed: finished Ch10's estimation/likelihood workflow (GLM setup, log-likelihood derivation style, IRLS discussion).
+
+## What was preserved
+- The draft's intent to present maximum-likelihood estimation jointly over regression coefficients and dispersion parameter.
+- The Consul–Jain parameterization established in S5 (`lambda_i` rate-like, `theta` dispersion, interior Poisson nesting at theta=0).
+
+## What changed
+- Joint log-likelihood over (beta, theta) written out from @eq-generalized-poisson-pmf with lambda_i = (1-theta)exp(x_i'beta) substituted; the nested-Poisson role of theta=0 as an interior parameter value stated explicitly (motivating the plain chi^2_1 LRT used later).
+- Explicit heads-up that GP is NOT a classical GLM: the two-parameter random component sits outside the one-parameter exponential family, so there is no IRLS; estimation is a (k+2)-dimensional joint maximum likelihood problem.
+- Executed machinery with verified cross-language parity:
+  - R: VGAM `vglm(..., genpoisson1(zero = "dispind"))`, whose dispersion index is (1-theta)^2 on a log-log link; decoding theta = 1 - exp(-exp(eta2)/2) with a delta-method standard error.
+  - Python: custom `GeneralizedPoisson(GenericLikelihoodModel)` class ({#lst-generalized-poisson-gp-class-py}) with logistic map theta = 2*invlogit(z) - 1, BFGS optimization, observed-information standard errors.
+- Parity verification (performed in spikes before writing): width-only training fit logLik = -177.7141 in BOTH languages; beta_width = 0.2290 (SE 0.0439), theta_hat = 0.516 (variance ratio ~4.27). Small SE differences explained in-text: VGAM uses expected information, the Python class uses observed information.
+
+## Execution and validation
+- Spikes: /tmp/regref/spike_vgam.R and gp class prototypes in /tmp/regref/gp_fit.py; canonical split n_train=86/n_test=87; both languages converged to identical log-likelihoods and point estimates.
+- VGAM provably cannot reach theta < 0 (dispersion index (1-theta)^2 > 1 on its loglog link) — this limitation is stated in-text and drives the S15 Coding Case's custom-MLE design in both languages.
+
+## What should be avoided
+- Presenting GP estimation as IRLS; hiding the (1-theta)^2/theta parameterization mismatch between VGAM and the text; fitting VGAM to underdispersed data.
+
+## References cited here
+- @consul1989gp, @consul1992gpreg (already appended in S2).
+
+## Placement and dependencies
+- Depends on S5 model section (pmf/lambda-mean/log-link equations); consumed by S7 (simple fit), S9 (extended fit), and S15 (Coding Case reuses the Python class and re-derives the R optim fitter).

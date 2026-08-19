@@ -1,0 +1,29 @@
+# Revision rationale for whole-chapter QC and Quarto render (S16)
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Purpose: full integrity pass after S1–S15 — static QC greps plus a complete Quarto render of the chapter with all chunks executed.
+
+## Render environment note
+- Rendering the whole book project fails on this workstation: the repo's `renv/` auto-activation hijacks `.libPaths()`, and the renv library lacks knitr/rmarkdown (no sudo; Homebrew blocked). The QC vehicle is therefore a staged standalone render: chapter file + references.bib + img symlink copied into /tmp/regref/render13 with a minimal `_quarto.yml` (HTML, bibliography), rendered with the Quarto tarball at /tmp/regref/quarto/bin/quarto (v1.10.18). System R lives at /Library/Frameworks/R.framework (4.6.1) with all chapter packages installed (VGAM, rsample, cookbook, etc.); Python execution goes through reticulate with the `py_require` declarations.
+
+## Static QC results
+- Banned terminology: ZERO hits for "IRR", "predictor(s)" as regressor synonyms, "outcome variable", asbio references, "TODO", or retired anchors (`sec-cs1-`, `sec-cs2-`). The 10 `predictor` hits are all the legitimate technical phrase "linear predictor" (also used 7x in finished Ch10).
+- Question/Answer numbering: 13.1–13.12 (exercise bank) + 13.13–13.23 (Coding Case) continuous and paired.
+
+## Render-found defects fixed in this stage (all committed as 7340ab7)
+1. S8 Python GOF chunk called `.to_numpy()` on a statsmodels `fittedvalues` result that is already an ndarray under numpy inputs: `np.asarray(poisson_fit_py.fittedvalues)`.
+2. S9 narrative referenced `gp_poisson_ext_r`, `lr_theta_ext`, `p_theta_ext`, `lr_nested_gp`, `p_nested_gp`, `lr_nested_poisson`, `p_nested_poisson` before any chunk defined them (the SE-comparison listing defining `gp_poisson_ext_r` comes ~200 lines later): added a hidden echo:false precompute chunk right after the extended-fit outputs that fits the extended Poisson contrast and precomputes all six values.
+3. Backticked column name inside an inline `r` expression broke knitr's inline parse: `se_compare_r$`SE ratio`` -> `se_compare_r[["SE ratio"]]`.
+4. Six Python plotnine figure chunks produced no image under knitr (bare object name does not trigger plot output): converted to the verified `p_*.show()` call (spiked in /tmp/regref/figtest — bare object emits nothing, `.show()` and `.draw(show=TRUE)` both emit; the chunk-identical sibling `fig-generalized-poisson-eda-categorical-py` worked because it uses matplotlib `plt.show()`).
+5. `lst-generalized-poisson-simple-model-fit-py` sat on an EMPTY label-only `{r}` wrapper chunk and never registered a listing: caption/label moved onto the real Python chunk (same pattern as the working `lst-generalized-poisson-gp-class-py`).
+6. `@Definition-generalized-poisson-distribution` was parsed by citeproc as a citation (finished chapters never crossref `Definition-*` ids): replaced with a plain section crossref to @sec-generalized-poisson-random-component.
+
+## Post-fix render result
+- `Output created: 13-generalized-poisson.html`, 20 figure PNGs emitted (all R+Python figure pairs present, including the new B-Line histograms).
+- Remaining warnings are exclusively cross-CHAPTER references (@sec-classical-poisson, @sec-zero-inflated-poisson, @sec-negative-binomial, @sec-intro, ch10 table labels, the Appendix-C anchor) that resolve at full-book build time; none are ch13-internal.
+- Rendered-number audit (grep of the HTML against verified spike values): theta_hat extended -0.2836 / -0.2859, log-likelihoods -274.5331 / -266.2256 / -271.5607, dispersion LRTs 10.67 / 11.211, nested 16.615, B-Line metric triples (2.907/3.480/2.666), rain ratio 0.943, six-metric tables, Question 13.23/Answer 13.23, namespace heads-up — all present and matching.
+
+## Notes/limitations
+- The standalone render cannot execute the book's site chrome; cross-page link validation of other chapters' anchors is deferred to a full-book build on a machine with a functioning project renv (or renv::install()).
+- No reticulate Python figure convention change was needed beyond `.show()`; ch10's matplotlib-direct idiom remains the book's alternative.
