@@ -1405,6 +1405,171 @@ class GeneralizedPoisson(GenericLikelihoodModel):
 
 With the log-likelihood specified (@eq-generalized-poisson-loglik), the estimation problem is identical in spirit to every maximum likelihood fit in this book: supply the data, maximize, and read off estimates with their standard errors. The next section fits the simple model to the crab training data in both languages and checks that the two implementations agree.
 
+## Simple Model: Satellite Counts and Female Crab Width {#sec-generalized-poisson-simple-model}
+
+We begin with the same simple specification as @sec-classical-poisson-simple-model: the number of satellite males regressed on the female crab's shell width alone,
+
+$$
+Y_i \mid x_i \sim \operatorname{GPO}(\lambda_i, \theta),
+\qquad
+\log(\mu_i) = \beta_0 + \beta_1 \,\texttt{width\_cm}_i,
+\qquad
+\lambda_i = (1 - \theta)\,\mu_i.
+$${#eq-generalized-poisson-simple-model}
+
+The only visible difference from Chapter 10's simple model is the random component — and that is the point of this chapter.
+
+### Fitting the Simple Model
+
+@lst-generalized-poisson-simple-model-fit-r fits the model with `VGAM::vglm()` on the training data. Recall from @sec-generalized-poisson-fitting-machinery that `VGAM` parameterizes the dispersion index as $(1 - \theta)^2$ on a log-log link, so the second intercept row of the raw summary is decoded into $\hat{\theta}$ (with a delta-method standard error) before printing.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-simple-model-fit-r
+#| lst-cap: "Code to fit the simple Generalized Poisson model to the crab training data with VGAM, and to decode the dispersion row into theta."
+#| message: false
+#| warning: false
+# Fitting the simple Generalized Poisson model on the training data
+gp_fit_r <- vglm(
+  satellites ~ width_cm,
+  family = genpoisson1(zero = "dispind"),
+  data = training_data
+)
+
+# Decoding the raw VGAM summary table
+cs <- coef(summary(gp_fit_r))
+beta0_hat <- cs["(Intercept):1", "Estimate"]
+se_beta0  <- cs["(Intercept):1", "Std. Error"]
+beta1_hat <- cs["width_cm", "Estimate"]
+se_beta1  <- cs["width_cm", "Std. Error"]
+eta2_hat  <- cs["(Intercept):2", "Estimate"]
+se_eta2   <- cs["(Intercept):2", "Std. Error"]
+
+# Converting the dispersion row to theta with a delta-method standard error
+theta_hat <- 1 - exp(-exp(eta2_hat) / 2)
+se_theta  <- (exp(-exp(eta2_hat) / 2) * exp(eta2_hat) / 2) * se_eta2
+
+# Tidied coefficient table
+gp_simple_summary_r <- tibble(
+  Term          = c("(Intercept)", "width_cm", "Dispersion (theta)"),
+  Estimate      = c(beta0_hat, beta1_hat, theta_hat),
+  `Std. Error`  = c(se_beta0, se_beta1, se_theta),
+  `z value`     = Estimate / `Std. Error`,
+  `Pr(>|z|)`    = 2 * pnorm(-abs(`z value`))
+)
+```
+
+:::
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-simple-model-fit-py
+#| lst-cap: "Code to fit the same model in Python with the GenericLikelihoodModel class of the estimation section; theta and its standard error are recovered from the logistic-map working parameter."
+#| message: false
+#| warning: false
+```
+The `Python` fit reuses the `GeneralizedPoisson` class defined in @lst-generalized-poisson-gp-class-py:
+
+```{python}
+#| echo: true
+#| message: false
+# Assembling the design matrix and response for the simple model
+from scipy.stats import norm
+
+X_train = np.column_stack(
+    [np.ones(len(training_data)), training_data["width_cm"].to_numpy(dtype=float)]
+)
+y_train = training_data["satellites"].to_numpy(dtype=float)
+
+# Fitting the simple Generalized Poisson model
+gp_fit_py = GeneralizedPoisson(y_train, X_train).fit_dispersion()
+
+# Recovering theta and its delta-method standard error from the logistic map
+beta_hat = gp_fit_py.params[:-1]
+beta_se = gp_fit_py.bse[:-1]
+z_hat = gp_fit_py.params[-1]
+theta_hat_py = 2.0 / (1.0 + np.exp(-z_hat)) - 1.0
+se_theta_py = (
+    2.0
+    * (1.0 / (1.0 + np.exp(-z_hat)))
+    * (1.0 - 1.0 / (1.0 + np.exp(-z_hat)))
+    * gp_fit_py.bse[-1]
+)
+
+# Tidied coefficient table
+gp_simple_summary_py = pd.DataFrame(
+    {
+        "Term": ["(Intercept)", "width_cm", "Dispersion (theta)"],
+        "Estimate": [beta_hat[0], beta_hat[1], theta_hat_py],
+        "Std. Error": [beta_se[0], beta_se[1], se_theta_py],
+    }
+)
+gp_simple_summary_py["z value"] = (
+    gp_simple_summary_py["Estimate"] / gp_simple_summary_py["Std. Error"]
+)
+gp_simple_summary_py["Pr(>|z|)"] = (
+    2 * (1 - norm.cdf(gp_simple_summary_py["z value"].abs()))
+)
+gp_simple_summary_py_html = scrollable_table_html(gp_simple_summary_py)
+```
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-simple-model-r
+#| tbl-cap: "Coefficient estimates, standard errors, and Wald statistics for the simple Generalized Poisson model (R; expected-information standard errors)."
+#| message: false
+print_as_dt(gp_simple_summary_r)
+```
+
+## **`Python` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-simple-model-py
+#| tbl-cap: "Coefficient estimates, standard errors, and Wald statistics for the simple Generalized Poisson model (Python; observed-information standard errors)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gp_simple_summary_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+### Reading the Estimates
+
+The two implementations agree where it matters: both report a maximized log-likelihood of `r round(logLik(gp_fit_r), 4)` in `R` and `r round(reticulate::py$gp_fit_py$llf, 4)` in `Python`, and the coefficient estimates match to at least three decimals. The small differences in the standard errors are the expected-versus-observed-information difference flagged in @sec-generalized-poisson-estimation.
+
+Three readings from the training fit:
+
+- **The dispersion parameter.** $\hat{\theta} = `r round(theta_hat, 3)`$ corresponds to a variance-to-mean ratio of $1 / (1 - \hat{\theta})^2 = `r round(1 / (1 - theta_hat)^2, 2)`$: the fitted variance is about four times the fitted mean. Its 95% Wald interval (`r round(theta_hat - 1.96 * se_theta, 3)`, `r round(theta_hat + 1.96 * se_theta, 3)`) lies entirely above zero, so the training data already indicate that the conditional variance is much larger than a Poisson model would allow. The next chapter section tests $\theta = 0$ formally with a likelihood-ratio test.
+- **The width coefficient.** $\hat{\beta}_1 = `r round(beta1_hat, 3)`$ on the log-link scale means that, in the training data, a one-centimetre larger shell width is associated with an expected satellite count multiplied by $\exp(`r round(beta1_hat, 3)`) = `r round(exp(beta1_hat), 3)`$ — that is, about a `r round(100 * (exp(beta1_hat) - 1))`% larger expected count. The 95% confidence interval for this **expected-count ratio** is (`r round(exp(beta1_hat - 1.96 * se_beta1), 3)`, `r round(exp(beta1_hat + 1.96 * se_beta1), 3)`), entirely above one.
+- **The intercept.** $\hat{\beta}_0 = `r round(beta0_hat, 2)`$ is the log expected count for a hypothetical crab of width 0 cm, far outside the observed range of `r round(min(training_data$width_cm), 1)`–`r round(max(training_data$width_cm), 1)` cm; its role is calibration, not science.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on reading training-set significance!
+::::
+:::: {.Heads-up-container}
+Everything on this page comes from the training data. The Wald interval for $\beta_1$ excluding zero here is a model-checking signal, not the final word on the inferential inquiry: per the data science workflow, the inferential claim itself is made in the **Results** section, after refitting the selected model on the untouched testing set. Small intervals at this stage tell us the model class is behaving as designed — nothing more.
+::::
+:::
+
+Before trusting any interpretation, however, the model must pass the same adequacy checks demanded of any regression in this book. The next section runs the full goodness-of-fit suite for the Generalized Poisson model — the checks that the classical Poisson model failed in @sec-classical-poisson, plus the zero-count check that the GP zero probability $\exp(-\lambda_i)$ makes possible.
+
 ## Goodness of Fit
 
 Goodness of fit uses two components. First, residual deviance follows the same formula as in @goodness:
