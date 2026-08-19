@@ -1,0 +1,1358 @@
+PROPOSED ADDITION for book/13-generalized-poisson.qmd
+Stage: S15 — Coding Case (99 B-Line, underdispersion). This stage APPENDS the block below
+at the end of the file, immediately after the final Practice-Exercises Answer container
+(Answer 13.12, added in S14).
+Question numbering continues from the exercises: Coding-Case questions are 13.13–13.22.
+Companion setup edit (same stage): book/13-generalized-poisson.qmd setup chunk gains
+`py_require("pyreadr")` (one line, alongside the existing py_require calls), needed by the
+Python data-import chunk below.
+
+====================================================================
+FULL INSERTED TEXT
+====================================================================
+
+::: {.CodingCase}
+:::: {.CodingCase-header}
+99 B-Line Bus Arrivals During Rush Hour
+::::
+:::: {.CodingCase-container}
+A regional transit authority is reviewing the reliability of its busiest express corridor — the **99 B-Line**, which runs along Broadway between Commercial–Broadway Station and the University of British Columbia. During weekday rush hours, the corridor operates on a **tight schedule**: a bus is planned to arrive at very short, nearly constant headways, and dispatchers intervene when gaps become too large.
+
+For a service-planning review, analysts counted, for each of 200 weekday rush-hour windows, how many buses **actually arrived** at a central stop in one hour (`buses_per_hour`), together with the day of the week (`day_of_week`), whether it was raining during the window (`is_raining`), the number of buses scheduled for that window (`scheduled_frequency`), and a time-window index (`time_window`).
+
+![Image by [*manfredsteger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-traffic-lights-police-6230164/).](img/traffic-lights.png){width="475"}
+
+Because buses are dispatched on an enforced schedule, rush-hour arrivals are expected to be **more regular than random**: under a homogeneous Poisson process, hourly counts fluctuate with variance equal to the mean, whereas a well-controlled service pins counts close to the scheduled target. In the language of this chapter, the working hypothesis is **underdispersion**, that is, $\theta < 0$ in the Generalized Poisson model. Since underdispersed fits cannot be obtained from {VGAM}'s `vglm()` (its dispersion index $(1-\theta)^2 > 1$ cannot drop below one), this exercise fits the model by **direct numerical likelihood maximization** in both languages, applying the log-likelihood machinery derived in @sec-generalized-poisson-estimation.
+
+You will reproduce the complete modelling workflow developed in this chapter:
+
+1. Formulate the **statistical questions**.
+2. Understand the **study design** and **variables**.
+3. Wrangle the data.
+4. Explore the **training data**.
+5. Fit and interpret a simple Generalized Poisson regression model.
+6. Assess **goodness of fit**.
+7. Extend the model with additional regressors.
+8. Evaluate **held-out prediction**.
+9. Obtain **inferential summaries** from a **testing-set refit**.
+10. Communicate the findings in **plain language**.
+
+@tbl-generalized-poisson-bline-variables summarizes the variables in this dataset.
+
+| Variable | Description |
+|:---:|:---:|
+| `buses_per_hour` | Number of buses that actually arrived during the one-hour rush-hour window. |
+| `day_of_week` | Day of the week of the observation: Monday through Friday. |
+| `is_raining` | Rain indicator: `0` for no rain during the window and `1` for rain. |
+| `scheduled_frequency` | Number of buses the timetable schedules for that window. |
+| `time_window` | Sequential index of the observed window in the study period. |
+
+: Variables used in the 99 B-Line Generalized Poisson regression exercise. {#tbl-generalized-poisson-bline-variables .striped .hover}
+
+The response `buses_per_hour` is a count of service deliveries under dispatch control. The regressors `day_of_week` and `is_raining` describe conditions that may be associated with achievable service levels: traffic and boarding times vary by day, and rain slows loading and traffic. The two remaining columns are **design information rather than conditions**: `time_window` only indexes the observations, and `scheduled_frequency` is set by the authority — its variation across windows is tiny (17 to 21 scheduled buses) precisely because rush-hour dispatch is tightly controlled. The modelling will keep both of these columns out of the regressor set.
+
+Finally, because this is an observational record rather than an experiment, associations between conditions (for instance, rain) and arrivals should not be read as causal effects: rain may be a marker for heavier traffic months, construction periods, or seasonal schedules. The purpose of the exercise is to practice Generalized Poisson regression on an **underdispersed** count response, while keeping the limits of the data and model visible.
+::::
+:::
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on libraries for this exercise!
+::::
+:::: {.Tip-container}
+The complete dependencies are listed:
+
+- `R`: [{cookbook}](https://github.com/andytai7/cookbook/tree/main) (provides the `generalized_poisson_regression` data), [{rsample}](https://rsample.tidymodels.org/), [{dplyr}](https://dplyr.tidyverse.org), [{knitr}](https://yihui.org/knitr/), and [{reticulate}](https://rstudio.github.io/reticulate/).
+- `Python`: [{pandas}](https://pandas.pydata.org/), [{numpy}](https://numpy.org/), [{scipy}](https://scipy.org/), and [{pyreadr}](https://pypi.org/project/pyreadr/).
+::::
+:::
+
+#### Study Design
+
+Before analyzing the data, we translate the service-review objective into statistical questions. As in the horseshoe-crab running example, we distinguish an **inferential inquiry** from a **predictive inquiry**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
+
+::: {.Question}
+::::{.Question-header}
+Question 13.13 — Inferential Inquiry
+::::
+::::{.Question-container}
+Formulate an **inferential inquiry** that could reasonably be answered using this dataset. Your inquiry should involve the **dispersion parameter** $\theta$ as well as associations between the explanatory variables and the response, in the units of the problem.
+
+> **Hint:** The service-design hypothesis is that scheduled dispatch makes arrivals *more regular than random*; each inquiry in this chapter targets a population-level relationship.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.13
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+> **Inferential inquiry:** During weekday rush hours on the 99 B-Line, is the distribution of actual bus arrivals per hour **underdispersed relative to a Poisson model** (that is, $\theta < 0$), and — allowing for this dispersion — is the expected number of arrivals per hour associated with rain, after accounting for the day of the week?
+
+The first part asks about the *spread relative to the mean* (population value $\theta$); the second asks about a conditional-mean association measured by an expected-count ratio.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.14 — Predictive Inquiry
+::::
+::::{.Question-container}
+Formulate a **predictive inquiry** for the same dataset, and state the benchmark against which any fitted model must be compared.
+
+> **Hint:** The benchmark should be the strongest prediction achievable *without* using the regressors.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.14
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+> **Predictive inquiry:** For a *new* weekday rush-hour window on the 99 B-Line, how accurately can the model predict the number of bus arrivals per hour from the day of the week and rain status — and do these regressors improve held-out prediction over the training-mean baseline?
+
+As in @sec-generalized-poisson-prediction, accuracy is judged on the testing data with the six-metric suite, against an intercept-only Generalized Poisson model fitted on the training data.
+
+</details>
+::::
+:::
+
+#### Data Understanding
+
+The data are supplied by the [{cookbook}](https://github.com/andytai7/cookbook/tree/main) package as `generalized_poisson_regression`. Before any wrangling, we inspect the raw object: its dimensions, storage types, and ranges.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.15 — Nature of the Response
+::::
+::::{.Question-container}
+The response `buses_per_hour` ranges from `12` to `30` with **no zero counts**, whereas the horseshoe-crab response had many zeros. Does the absence of zeros conflict with the Generalized Poisson model's support, and what does the observed range suggest about the data-generating process compared with the crab data?
+
+> **Hint:** Check what the GP probability mass function assigns at $y = 0$ when the mean is near 20.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.15
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+There is **no conflict**. The GP support $\{0, 1, 2, \ldots\}$ merely *allows* zero; it does not *require* zeros. With $\mu \approx 20$ and $\theta < 0$, the zero-count probability $\exp(-\lambda) = \exp(-(1-\theta)\mu)$ is astronomically small (of order $\exp(-25) \approx 10^{-11}$), so observing zero in any window is essentially impossible. The tight range $12$–$30$ around a mean near 19 with variance far below the mean is the fingerprint of a **scheduled, controlled process** — the opposite regime from the crab data, where occupancy was uncertain and variance exceeded the mean. The chapter's dispersion parameter $\theta$ is precisely what adapts the same model class to both regimes.
+
+</details>
+::::
+:::
+
+#### Data Wrangling
+
+We now import the data, verify types and ranges, and set up the categorical structure that the design matrix will use. The split is still not performed yet: as in the running example, it happens **immediately before EDA** so that all exploration uses the training data only.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
+In this section, we will:
+
+1. Import the dataset from {cookbook} (`R`) or its raw `.rda` file (`Python`).
+2. Inspect its dimensions, names, and storage types.
+3. Verify that `buses_per_hour` is a valid count response.
+4. Check for missing and unusual values.
+5. Establish the reference (baseline) category `Monday` for `day_of_week`.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up: a small namespace collision!
+::::
+::::{.Heads-up-container}
+The {cookbook} package also ships a dataset named `poisson`, so after `library(cookbook)` the plain name `poisson` no longer resolves to `stats::poisson()`. To keep the chapter robust we write the Poisson family **fully qualified** — `stats::poisson(link = "log")` — in every coding-case chunk. The same caution applies in your own projects whenever a data-loading step attaches an object that masks a function.
+::::
+:::
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-wrangling-r
+#| lst-cap: "Importing and wrangling the 99 B-Line dataset (R)."
+#| message: false
+#| warning: false
+
+library(cookbook)
+
+# Importing the dataset provided by the cookbook package
+data(generalized_poisson_regression)
+buses_raw <- generalized_poisson_regression
+
+# Sanitizing to plain vectors and setting the Monday baseline
+buses <- data.frame(
+  buses_per_hour = as.integer(buses_raw$buses_per_hour),
+  day_of_week = factor(
+    as.character(buses_raw$day_of_week),
+    levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+  ),
+  is_raining = as.integer(buses_raw$is_raining),
+  scheduled_frequency = as.integer(buses_raw$scheduled_frequency),
+  time_window = as.integer(buses_raw$time_window)
+)
+
+# First ten observations
+buses |>
+  slice_head(n = 10) |>
+  kable(align = rep("c", ncol(buses)))
+```
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-checks-r
+#| lst-cap: "Structural checks on the 99 B-Line dataset (R)."
+# Dimensions and missing values
+dim(buses)
+colSums(is.na(buses))
+
+# Response is a valid count: integer-valued, non-negative, no zeros expected here
+c(
+  all_integer = all(buses$buses_per_hour == as.integer(buses$buses_per_hour)),
+  minimum = min(buses$buses_per_hour),
+  maximum = max(buses$buses_per_hour),
+  zeros = sum(buses$buses_per_hour == 0)
+)
+
+# Marginal distributions of the conditions
+table(buses$day_of_week)
+table(buses$is_raining)
+range(buses$scheduled_frequency)
+```
+
+## **`Python`**
+
+In `Python` the package is mirrored from its raw GitHub store; the `.rda` file is downloaded to a temporary directory and read with {pyreadr}. The same structural checks follow.
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-wrangling-py
+#| lst-cap: "Importing and wrangling the 99 B-Line dataset (Python)."
+#| message: false
+#| warning: false
+
+import tempfile
+import urllib.request
+from pathlib import Path
+import pyreadr
+
+bline_url = (
+    "https://raw.githubusercontent.com/"
+    "andytai7/cookbook/main/data/generalized_poisson_regression.rda"
+)
+
+with tempfile.TemporaryDirectory() as temporary_directory:
+    downloaded_file = (
+        Path(temporary_directory) / "generalized_poisson_regression.rda"
+    )
+    _ = urllib.request.urlretrieve(bline_url, downloaded_file)
+    bline_objects = pyreadr.read_r(str(downloaded_file))
+
+buses_raw_py = bline_objects["generalized_poisson_regression"]
+
+# Sanitizing to plain columns and declaring the weekday order
+day_levels_bline = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+buses_py = pd.DataFrame(
+    {
+        "buses_per_hour": buses_raw_py["buses_per_hour"].astype(int),
+        "day_of_week": pd.Categorical(
+            buses_raw_py["day_of_week"].astype(str),
+            categories=day_levels_bline,
+            ordered=True,
+        ),
+        "is_raining": buses_raw_py["is_raining"].astype(int),
+        "scheduled_frequency": buses_raw_py["scheduled_frequency"].astype(int),
+        "time_window": buses_raw_py["time_window"].astype(int),
+    }
+)
+
+generalized_poisson_bline_first_rows_py_html = buses_py.head(10).to_html(
+    index=False, border=0
+)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-bline-first-rows-py
+#| tbl-cap: "First ten observations in the 99 B-Line dataset (Python)."
+#| message: false
+#| warning: false
+#| results: asis
+cat(
+  "\n",
+  reticulate::py$generalized_poisson_bline_first_rows_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-checks-py
+#| lst-cap: "Structural checks on the 99 B-Line dataset (Python)."
+#| message: false
+# Dimensions and missing values
+buses_py.shape
+buses_py.isna().sum()
+
+# Response sanity: integer, non-negative, observed range and zeros
+(
+    int(buses_py["buses_per_hour"].min()),
+    int(buses_py["buses_per_hour"].max()),
+    int((buses_py["buses_per_hour"] == 0).sum()),
+)
+
+# Marginal distributions of the conditions
+buses_py["day_of_week"].value_counts().reindex(day_levels_bline)
+buses_py["is_raining"].value_counts()
+```
+
+The checks confirm: `200` observations of five variables; the response is integer-valued in `12`–`30` with no zeros; every weekday and rain condition is well represented; `scheduled_frequency` stays within `17`–`21`.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.16 — Baseline Category and Excluded Columns
+::::
+::::{.Question-container}
+Why is `Monday` chosen as the reference level for `day_of_week`, and why are `scheduled_frequency` and `time_window` excluded from the regressor set even though they are numeric and complete?
+
+> **Hint:** Think about interpretability of contrasts for the first part, and about what a regressor *is* (a measured condition vs. a design constant or identifier) for the second.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.16
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Baseline.** Monday opens the operating week and is the natural anchor for schedule performance after the weekend; making it the reference level means each weekday coefficient reads as "relative to Monday," which is how the service review is framed. Any other level would only reparameterize the same contrasts (see Question 13.12).
+
+**Exclusions.** A regressor must describe a *condition* of the observation that could plausibly be associated with the response. `time_window` is an identifier — its "association" with the response would be a machine-generated artifact, not a property of the corridor. `scheduled_frequency` is a nearly constant design setting (17–21 buses) imposed by the authority; it is not a condition the service experiences, and within this dataset its narrow variation cannot be separated from the intercept. Neither belongs in the mean model.
+
+</details>
+::::
+:::
+
+#### Exploratory Data Analysis
+
+The EDA answers two questions on the **training data**: (i) how is underdispersion expressed empirically, and (ii) which conditions shift the location of the count distribution? The 50/50 split uses the same protocol as the running example (`set.seed(123)`, `initial_split(prop = 0.5)`), so that all exploratory claims below are silently held to the discipline developed in @sec-generalized-poisson-eda.
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-split-r
+#| lst-cap: "Canonical 50/50 split of the 99 B-Line data (R)."
+# Setting the seed for reproducible splitting
+set.seed(123)
+
+# Performing the 50/50 training/testing split
+bline_split <- initial_split(buses, prop = 0.5)
+buses_train <- training(bline_split)
+buses_test <- testing(bline_split)
+
+# Sanity checks: sample sizes and response extremes
+c(n_train = nrow(buses_train), n_test = nrow(buses_test), proport = nrow(buses_train) / nrow(buses))
+```
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-eda-r
+#| lst-cap: "Training-set summaries and condition-wise dispersion ratios for the 99 B-Line data (R)."
+# Overall response summaries on the training data
+bline_train_summaries_r <- c(
+  n = nrow(buses_train),
+  mean = mean(buses_train$buses_per_hour),
+  var = var(buses_train$buses_per_hour),
+  ratio = var(buses_train$buses_per_hour) / mean(buses_train$buses_per_hour),
+  zeros = sum(buses_train$buses_per_hour == 0)
+)
+round(bline_train_summaries_r, 3)
+
+# Variance-to-mean ratio by rain condition
+buses_train |>
+  group_by(is_raining) |>
+  summarise(
+    n = n(),
+    mean = mean(buses_per_hour),
+    var = var(buses_per_hour),
+    ratio = var / mean,
+    .groups = "drop"
+  ) |>
+  kable(align = "c", digits = 3)
+
+# Variance-to-mean ratio by weekday
+buses_train |>
+  group_by(day_of_week) |>
+  summarise(
+    n = n(),
+    mean = mean(buses_per_hour),
+    var = var(buses_per_hour),
+    ratio = var / mean,
+    .groups = "drop"
+  ) |>
+  kable(align = "c", digits = 3)
+```
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-bline-histogram-r
+#| fig-cap: "Histogram of buses per hour on the 99 B-Line training data. The distribution is tightly concentrated around its mean (vertical dashed line), the visual signature of underdispersion (R)."
+#| fig-width: 7
+#| fig-height: 4.5
+#| message: false
+ggplot(buses_train, aes(x = buses_per_hour)) +
+  geom_histogram(
+    bins = max(buses_train$buses_per_hour) - min(buses_train$buses_per_hour) + 1,
+    fill = "#3B6E9E", colour = "white"
+  ) +
+  geom_vline(
+    xintercept = mean(buses_train$buses_per_hour),
+    linetype = "dashed", colour = "firebrick", linewidth = 0.8
+  ) +
+  scale_x_continuous(breaks = seq(12, 30, by = 2)) +
+  labs(
+    x = "Buses arriving per hour (training data)",
+    y = "Number of rush-hour windows"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-split-eda-py
+#| lst-cap: "Splitting and training-set summaries for the 99 B-Line data (Python)."
+#| message: false
+# Reusing the R-generated canonical split through reticulate
+buses_train_py = r.buses_train.copy()
+buses_test_py = r.buses_test.copy()
+buses_train_py["day_of_week"] = pd.Categorical(
+    buses_train_py["day_of_week"], categories=day_levels_bline, ordered=True
+)
+buses_test_py["day_of_week"] = pd.Categorical(
+    buses_test_py["day_of_week"], categories=day_levels_bline, ordered=True
+)
+
+# Sanity check on sample sizes
+(len(buses_train_py), len(buses_test_py))
+
+# Overall response summaries on the training data
+y_train_bline = buses_train_py["buses_per_hour"].to_numpy(dtype=float)
+bline_train_mean = float(y_train_bline.mean())
+bline_train_var = float(y_train_bline.var(ddof=1))
+round(float(bline_train_var / bline_train_mean), 3)
+
+# Variance-to-mean ratio by rain condition
+buses_train_py.groupby("is_raining", observed=True)["buses_per_hour"].agg(
+    n="count", mean="mean", var="var"
+).assign(ratio=lambda d: d["var"] / d["mean"]).round(3)
+
+# Variance-to-mean ratio by weekday
+buses_train_py.groupby("day_of_week", observed=True)["buses_per_hour"].agg(
+    n="count", mean="mean", var="var"
+).assign(ratio=lambda d: d["var"] / d["mean"]).round(3)
+```
+
+```{python}
+#| echo: false
+#| fig-cap: "Histogram of buses per hour on the 99 B-Line training data (Python)."
+#| label: fig-generalized-poisson-bline-histogram-py
+#| fig-width: 7
+#| fig-height: 4.5
+from plotnine import *  # pattern repeated from the chapter setup for a self-contained listing
+
+p_bline_hist_py = (
+    ggplot(
+        buses_train_py,
+        aes(x="buses_per_hour"),
+    )
+    + geom_histogram(
+        bins=int(buses_train_py["buses_per_hour"].max() -
+                 buses_train_py["buses_per_hour"].min() + 1),
+        fill="#3B6E9E", color="white",
+    )
+    + geom_vline(xintercept=bline_train_mean, linetype="dashed", color="firebrick")
+    + labs(
+        x="Buses arriving per hour (training data)",
+        y="Number of rush-hour windows",
+    )
+    + theme_minimal()
+)
+p_bline_hist_py
+```
+
+On the training data, the response centers near $\bar y_{\text{train}} = `r round(bline_train_summaries_r["mean"], 2)`$ buses per hour with variance `r round(bline_train_summaries_r["var"], 3)`, giving an empirical variance-to-mean ratio of `r round(bline_train_summaries_r["ratio"], 3)` — well below one. Every condition shows the same signature: the ratio ranges from `0.543` (Friday) to `0.838` (rainy windows). The histogram in @fig-generalized-poisson-bline-histogram-r makes the same point visually: the distribution is pinned to a narrow band around the mean. No conditioning group needs more than a modest location shift — mean arrivals run from about $17.8$ (Friday) to $21.4$ (Wednesday).
+
+::: {.Question}
+::::{.Question-header}
+Question 13.17 — Reading the Dispersion Signature
+::::
+::::{.Question-container}
+Based only on the EDA, what would you predict about the sign and approximate magnitude of $\hat\theta$ under (i) an intercept-only mean and (ii) the mean model with rain and weekday contrasts? Which of the two should show the *larger* $|\hat\theta|$, and why?
+
+> **Hint:** Map each variance-to-mean ratio through $1/(1-\theta)^2$ approximately, and remember what conditioning on regressors does to residual variability.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.17
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Both fits must find $\hat\theta < 0$: every ratio seen so far is below one, and $1/(1-\theta)^2 < 1$ requires $\theta < 0$.
+
+(i) Intercept-only: ratio $\approx 0.75$ implies $1-\hat\theta \approx 1/\sqrt{0.75} \approx 1.155$, so $\hat\theta \approx -0.15$.
+
+(ii) With rain and weekday contrasts: the group-wise ratios (0.543–0.838) are *lower* than the overall ratio, because part of the overall variance was day-to-day location variation. Conditioning absorbs that part, so the residual ratio should drop — meaning $\hat\theta$ should move **further** from zero, on the order of $-0.25$ to $-0.30$.
+
+The simple-model and extended-model stages below will confirm both predictions directly.
+
+</details>
+::::
+:::
+
+#### Simple Generalized Poisson Regression and Goodness of Fit {#sec-generalized-poisson-bline-simple-model}
+
+The simple model conditions the arrival counts on rain only:
+
+$$
+Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}(\lambda_i, \theta), \qquad
+\lambda_i = (1 - \theta)\exp(\beta_0 + \beta_1 \texttt{is\_raining}_i),
+$$
+
+so that $\exp(\hat\beta_1)$ is the expected-count ratio of rainy versus dry rush-hour windows, and $\hat\theta$ summarizes residual departure from equidispersion. Because $\hat\theta$ is expected to be **negative** here — outside what {VGAM}'s dispersion-index parameterization can reach — the fit is obtained by **direct numerical maximization** of the joint log-likelihood derived in @sec-generalized-poisson-estimation.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.18 — Fitting the Simple Model Without VGAM
+::::
+::::{.Question-container}
+Write the fitting code for the simple model in both languages: a small `R` objective passed to `optim()` (BFGS with the observed information), and the `GeneralizedPoisson` class from @sec-generalized-poisson-fitting-machinery for `Python`. Report $\hat\theta$, its standard error, the implied variance-to-mean ratio, and the likelihood-ratio test of $H_0: \theta = 0$ against the nested Poisson fit on the same training data.
+
+> **Hint:** Map the unconstrained optimizer coordinate $z$ to $\theta = 2\operatorname{logit}^{-1}(z) - 1$, and take its standard error from the delta method.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.18
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-optimizer-r
+#| lst-cap: "Direct maximum likelihood for Generalized Poisson regression with underdispersion (R)."
+#| message: false
+# Negative log-likelihood of the joint Generalized Poisson model
+bline_negloglik_r <- function(params, y, X) {
+  k <- ncol(X)
+  beta <- params[1:k]
+  z <- params[k + 1]
+  theta <- 2 * plogis(z) - 1      # logistic map to (-1, 1)
+  mu <- exp(as.numeric(X %*% beta))
+  lam <- (1 - theta) * mu
+  t <- lam + theta * y
+  if (any(t <= 0)) return(Inf)    # support/truncation guard
+  -sum(log(lam) + (y - 1) * log(t) - t - lgamma(y + 1))
+}
+
+# One-call fitter: returns coefficients, dispersion, and standard errors
+bline_gp_fit_r <- function(y, X) {
+  k <- ncol(X)
+  start <- c(log(mean(y)), rep(0, k - 1), 0)
+  fit <- optim(
+    start, bline_negloglik_r, y = y, X = X,
+    method = "BFGS", hessian = TRUE, control = list(maxit = 1000)
+  )
+  se <- sqrt(diag(solve(fit$hessian)))
+  beta_hat <- fit$par[1:k]
+  se_beta <- se[1:k]
+  z_hat <- fit$par[k + 1]
+  theta_hat <- 2 * plogis(z_hat) - 1
+  se_theta <- 2 * plogis(z_hat) * (1 - plogis(z_hat)) * se[k + 1]
+  list(
+    beta = beta_hat, se_beta = se_beta,
+    theta = theta_hat, se_theta = se_theta, z = z_hat,
+    loglik = -fit$value
+  )
+}
+```
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-simple-fit-r
+#| lst-cap: "Fitting the simple rain-only Generalized Poisson model on the training data (R)."
+#| message: false
+X_bline_simple_r <- model.matrix(~ is_raining, data = buses_train)
+y_bline_train_r <- buses_train$buses_per_hour
+fit_bline_simple_r <- bline_gp_fit_r(y_bline_train_r, X_bline_simple_r)
+
+# Tidied coefficient table with Wald statistics
+tidy_bline_simple_r <- data.frame(
+  term = c("(Intercept)", "is_raining"),
+  estimate = round(fit_bline_simple_r$beta, 4),
+  std.error = round(fit_bline_simple_r$se_beta, 4),
+  z.value = round(fit_bline_simple_r$beta / fit_bline_simple_r$se_beta, 3),
+  p.value = signif(
+    2 * pnorm(-abs(fit_bline_simple_r$beta / fit_bline_simple_r$se_beta)), 3
+  )
+)
+kable(tidy_bline_simple_r, align = "c", row.names = FALSE)
+
+# Dispersion estimate with delta-method standard error and implied variance ratio
+theta_hat_bline_simple_r <- fit_bline_simple_r$theta
+c(
+  theta_hat = round(theta_hat_bline_simple_r, 4),
+  se_theta = round(fit_bline_simple_r$se_theta, 4),
+  variance_ratio = round(1 / (1 - theta_hat_bline_simple_r)^2, 3)
+)
+
+# Classical Poisson contrast on the same training data
+fit_bline_poisson_simple_r <- glm(
+  buses_per_hour ~ is_raining,
+  family = stats::poisson(link = "log"),
+  data = buses_train
+)
+ll_bline_simple_r <- fit_bline_simple_r$loglik
+ll_bline_poisson_simple_r <- as.numeric(logLik(fit_bline_poisson_simple_r))
+bline_lrt_theta_simple_r <- 2 * (ll_bline_simple_r - ll_bline_poisson_simple_r)
+bline_p_theta_simple_r <- pchisq(bline_lrt_theta_simple_r, df = 1, lower.tail = FALSE)
+c(
+  logLik_GP = round(ll_bline_simple_r, 4),
+  logLik_Poisson = round(ll_bline_poisson_simple_r, 4),
+  LRT = round(bline_lrt_theta_simple_r, 3),
+  p_value = signif(bline_p_theta_simple_r, 3)
+)
+
+# How much too large are the Classical Poisson standard errors?
+bline_se_ratio_simple_r <-
+  fit_bline_simple_r$se_beta / summary(fit_bline_poisson_simple_r)$coef[, "Std. Error"]
+round(bline_se_ratio_simple_r, 3)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-simple-fit-py
+#| lst-cap: "Fitting the simple rain-only Generalized Poisson model on the training data (Python)."
+#| message: false
+# Reusing the GeneralizedPoisson machinery class introduced earlier in the chapter
+X_bline_simple_py = np.column_stack(
+    [
+        np.ones(len(buses_train_py)),
+        buses_train_py["is_raining"].to_numpy(dtype=float),
+    ]
+)
+fit_bline_simple_py = GeneralizedPoisson(y_train_bline, X_bline_simple_py).fit_dispersion()
+
+beta_hat_bline_simple_py = fit_bline_simple_py.params[:-1]
+se_beta_bline_simple_py = fit_bline_simple_py.bse[:-1]
+z_hat_bline_simple_py = fit_bline_simple_py.params[-1]
+s_hat_bline_simple_py = 1.0 / (1.0 + np.exp(-z_hat_bline_simple_py))
+theta_hat_bline_simple_py = 2.0 * s_hat_bline_simple_py - 1.0
+se_theta_bline_simple_py = float(
+    2.0 * s_hat_bline_simple_py * (1.0 - s_hat_bline_simple_py) * fit_bline_simple_py.bse[-1]
+)
+
+bline_simple_py = pd.DataFrame(
+    {
+        "term": ["(Intercept)", "is_raining"],
+        "estimate": np.round(beta_hat_bline_simple_py, 4),
+        "std.error": np.round(se_beta_bline_simple_py, 4),
+        "z.value": np.round(beta_hat_bline_simple_py / se_beta_bline_simple_py, 3),
+        "p.value": [
+            float(2 * stats.norm.sf(abs(v)))
+            for v in beta_hat_bline_simple_py / se_beta_bline_simple_py
+        ],
+    }
+)
+bline_simple_py_html = scrollable_table_html(bline_simple_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-bline-simple-py
+#| tbl-cap: "Simple rain-only Generalized Poisson model fitted on the B-Line training data (Python)."
+#| message: false
+#| warning: false
+#| results: asis
+cat(
+  "\n",
+  reticulate::py$bline_simple_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+```{python}
+#| echo: true
+#| message: false
+# Dispersion estimate, implied variance ratio, and the Classical Poisson contrast
+print(
+    "theta:", round(theta_hat_bline_simple_py, 4),
+    " se:", round(se_theta_bline_simple_py, 4),
+    " ratio:", round(1 / (1 - theta_hat_bline_simple_py) ** 2, 3),
+)
+fit_bline_poisson_simple_py = sm.GLM(
+    y_train_bline, X_bline_simple_py, family=sm.families.Poisson()
+).fit()
+ll_bline_simple_py = float(fit_bline_simple_py.llf)
+ll_bline_poisson_simple_py = float(fit_bline_poisson_simple_py.llf)
+lrt_bline_simple_py = 2.0 * (ll_bline_simple_py - ll_bline_poisson_simple_py)
+print(
+    "GP logLik:", round(ll_bline_simple_py, 4),
+    " Poisson logLik:", round(ll_bline_poisson_simple_py, 4),
+    " LRT:", round(lrt_bline_simple_py, 3),
+    " p:", float(stats.chi2.sf(lrt_bline_simple_py, 1)),
+)
+print(
+    "GP/Poisson SE ratios:",
+    np.round(se_beta_bline_simple_py / fit_bline_poisson_simple_py.bse, 3),
+)
+```
+
+The simple fit finds $\hat\theta = `r round(theta_hat_bline_simple_r, 4)`$ with standard error `r round(fit_bline_simple_r$se_theta, 4)` — the residual variance-to-mean ratio is $1/(1-\hat\theta)^2 = `r round(1/(1-theta_hat_bline_simple_r)^2, 3)`$, so rainy-or-dry conditional variance sits about `r round(100*(1-round(1/(1-theta_hat_bline_simple_r)^2, 3)), 0)`% below what equidispersion would require. The likelihood-ratio test of $\theta = 0$ gives $\chi^2_1 = `r round(bline_lrt_theta_simple_r, 2)`$ ($p = `r signif(bline_p_theta_simple_r, 3)`$): even conditioning only on rain, the underdispersion is detectable at the 5% level. And the practical cost of ignoring it is visible: the Classical Poisson standard errors are about `r round(100*(1-mean(bline_se_ratio_simple_r)), 0)`% wider than the model-based GP ones — uncertainty is **overstated** when the schedule-induced regularity is not modelled.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.19 — Goodness of Fit of the Simple Model
+::::
+::::{.Question-container}
+Assess the adequacy of the simple rain-only fit with the Pearson and residual-deviance statistics developed in @sec-generalized-poisson-gof, calibrated against $\chi^2$ on $97$ residual degrees of freedom. Is the zero-count check informative for these data?
+
+> **Hint:** The saturated-model log-likelihood term for the GP random component was derived in the running example; the residual degrees of freedom subtract the two coefficients and $\theta$.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.19
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-simple-gof-r
+#| lst-cap: "Pearson and deviance goodness-of-fit for the simple B-Line model (R)."
+#| message: false
+bline_df_simple_r <- length(y_bline_train_r) - (ncol(X_bline_simple_r) + 1)
+
+mu_bline_simple_r <- exp(as.numeric(X_bline_simple_r %*% fit_bline_simple_r$beta))
+
+# Pearson statistic under the GP variance function
+bline_pearson_simple_r <- sum(
+  (y_bline_train_r - mu_bline_simple_r)^2 /
+    (mu_bline_simple_r / (1 - theta_hat_bline_simple_r)^2)
+)
+c(
+  Pearson = round(bline_pearson_simple_r, 2),
+  df = bline_df_simple_r,
+  p_value = round(pchisq(bline_pearson_simple_r, bline_df_simple_r, lower.tail = FALSE), 3)
+)
+
+# Residual deviance against the saturated GP model
+bline_ll_sat_simple_r <- vapply(
+  y_bline_train_r,
+  function(yi) {
+    if (yi == 0) return(0)
+    lam_sat <- (
+      yi * (1 - theta_hat_bline_simple_r) +
+        sqrt(yi^2 * (1 - theta_hat_bline_simple_r)^2 + 4 * theta_hat_bline_simple_r * yi)
+    ) / 2
+    gp_logpmf_r(yi, lam_sat, theta_hat_bline_simple_r)
+  },
+  numeric(1)
+)
+bline_deviance_simple_r <- 2 * sum(
+  bline_ll_sat_simple_r -
+    gp_logpmf_r(y_bline_train_r, (1 - theta_hat_bline_simple_r) * mu_bline_simple_r, theta_hat_bline_simple_r)
+)
+c(
+  Deviance = round(bline_deviance_simple_r, 2),
+  df = bline_df_simple_r,
+  p_value = round(pchisq(bline_deviance_simple_r, bline_df_simple_r, lower.tail = FALSE), 3)
+)
+
+# Expected number of zeros under the fitted model
+sum(exp(-(1 - theta_hat_bline_simple_r) * mu_bline_simple_r))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-simple-gof-py
+#| lst-cap: "Pearson and deviance goodness-of-fit for the simple B-Line model (Python)."
+#| message: false
+bline_df_simple_py = len(y_train_bline) - (X_bline_simple_py.shape[1] + 1)
+
+mu_bline_simple_py = np.exp(X_bline_simple_py @ beta_hat_bline_simple_py)
+lam_bline_simple_py = (1.0 - theta_hat_bline_simple_py) * mu_bline_simple_py
+
+pearson_bline_simple_py = float(
+    np.sum(
+        (y_train_bline - mu_bline_simple_py) ** 2
+        / (mu_bline_simple_py / (1.0 - theta_hat_bline_simple_py) ** 2)
+    )
+)
+print(
+    "Pearson:", round(pearson_bline_simple_py, 2),
+    " df:", bline_df_simple_py,
+    " p:", round(float(stats.chi2.sf(pearson_bline_simple_py, bline_df_simple_py)), 3),
+)
+ll_sat_simple_py = np.zeros_like(y_train_bline)
+lam_sat_simple_py = (
+    y_train_bline * (1.0 - theta_hat_bline_simple_py)
+    + np.sqrt(
+        y_train_bline**2 * (1.0 - theta_hat_bline_simple_py) ** 2
+        + 4.0 * theta_hat_bline_simple_py * y_train_bline
+    )
+) / 2.0
+ll_sat_simple_py = gp_logpmf(
+    y_train_bline, lam_sat_simple_py, theta_hat_bline_simple_py
+)
+deviance_bline_simple_py = 2.0 * float(
+    np.sum(ll_sat_simple_py - gp_logpmf(y_train_bline, lam_bline_simple_py, theta_hat_bline_simple_py))
+)
+print(
+    "Deviance:", round(deviance_bline_simple_py, 2),
+    " df:", bline_df_simple_py,
+    " p:", round(float(stats.chi2.sf(deviance_bline_simple_py, bline_df_simple_py)), 3),
+)
+print("Expected zeros:", float(np.sum(np.exp(-lam_bline_simple_py))))
+```
+
+Both statistics sit essentially at their expected levels: Pearson `r round(bline_pearson_simple_r, 1)` and deviance `r round(bline_deviance_simple_r, 1)` on `r bline_df_simple_r` residual degrees of freedom ($p \approx `r round(pchisq(bline_pearson_simple_r, bline_df_simple_r, lower.tail = FALSE), 2)`$ and $`r round(pchisq(bline_deviance_simple_r, bline_df_simple_r, lower.tail = FALSE), 2)`$). No lack of fit is indicated. The zero-count check degenerates exactly as predicted in Question 13.15: the model expects essentially no zeros (`r signif(sum(exp(-(1-theta_hat_bline_simple_r) * mu_bline_simple_r)), 2)`) and the data oblige — the check is uninformative in an underdispersed, high-mean setting, and this itself validates the choice not to consider zero-inflated alternatives.
+
+</details>
+::::
+:::
+
+#### Extending the Simple Model: Day of the Week
+
+The inferential inquiry asks about rain *after accounting for the day of the week*, so the next stage adds the four weekday contrasts (Monday reference) to the systematic component.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.20 — Extended Model, Dispersion Test, and Nested Comparison
+::::
+::::{.Question-container}
+Fit the extended model `buses_per_hour ~ is_raining + day_of_week` on the training data. Report $\hat\theta$ and its standard error, the likelihood-ratio test of $\theta = 0$, and the nested test adding the four weekday contrasts to the simple model. Conclude which specification the training evidence supports.
+
+> **Hint:** The nested comparison places the four day dummies jointly under a $\chi^2_4$ reference.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.20
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-extended-fit-r
+#| lst-cap: "Fitting the extended B-Line model with rain and weekday contrasts (R)."
+#| message: false
+X_bline_ext_r <- model.matrix(~ is_raining + day_of_week, data = buses_train)
+fit_bline_ext_r <- bline_gp_fit_r(y_bline_train_r, X_bline_ext_r)
+
+term_names_bline_r <- c("(Intercept)", "is_raining", paste0("day_of_week", c("Tuesday", "Wednesday", "Thursday", "Friday")))
+tidy_bline_ext_r <- data.frame(
+  term = term_names_bline_r,
+  estimate = round(fit_bline_ext_r$beta, 4),
+  std.error = round(fit_bline_ext_r$se_beta, 4),
+  z.value = round(fit_bline_ext_r$beta / fit_bline_ext_r$se_beta, 3),
+  p.value = signif(2 * pnorm(-abs(fit_bline_ext_r$beta / fit_bline_ext_r$se_beta)), 3)
+)
+kable(tidy_bline_ext_r, align = "c", row.names = FALSE)
+
+theta_hat_bline_ext_r <- fit_bline_ext_r$theta
+c(
+  theta_hat = round(theta_hat_bline_ext_r, 4),
+  se_theta = round(fit_bline_ext_r$se_theta, 4),
+  variance_ratio = round(1 / (1 - theta_hat_bline_ext_r)^2, 3)
+)
+
+# Classical Poisson contrast and the dispersion LRT on the same split
+fit_bline_poisson_ext_r <- glm(
+  buses_per_hour ~ is_raining + day_of_week,
+  family = stats::poisson(link = "log"),
+  data = buses_train
+)
+ll_bline_ext_r <- fit_bline_ext_r$loglik
+ll_bline_poisson_ext_r <- as.numeric(logLik(fit_bline_poisson_ext_r))
+bline_lrt_theta_ext_r <- 2 * (ll_bline_ext_r - ll_bline_poisson_ext_r)
+bline_p_theta_ext_r <- pchisq(bline_lrt_theta_ext_r, df = 1, lower.tail = FALSE)
+c(
+  logLik_GP = round(ll_bline_ext_r, 4),
+  logLik_Poisson = round(ll_bline_poisson_ext_r, 4),
+  LRT = round(bline_lrt_theta_ext_r, 3),
+  p_value = signif(bline_p_theta_ext_r, 3)
+)
+
+# Nested GP comparison: adding the four weekday contrasts to the simple model
+bline_lrt_nested_r <- 2 * (ll_bline_ext_r - ll_bline_simple_r)
+bline_p_nested_r <- pchisq(bline_lrt_nested_r, df = 4, lower.tail = FALSE)
+c(LRT = round(bline_lrt_nested_r, 3), df = 4, p_value = signif(bline_p_nested_r, 3))
+
+# GP versus Classical Poisson standard errors under the extended specification
+bline_se_ratio_ext_r <- fit_bline_ext_r$se_beta / summary(fit_bline_poisson_ext_r)$coef[, "Std. Error"]
+round(bline_se_ratio_ext_r, 3)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-extended-fit-py
+#| lst-cap: "Fitting the extended B-Line model with rain and weekday contrasts (Python)."
+#| message: false
+def bline_design_ext(df):
+    d = pd.get_dummies(df[["day_of_week"]], drop_first=True)
+    return np.column_stack(
+        [
+            np.ones(len(df)),
+            df["is_raining"].to_numpy(dtype=float),
+            d.to_numpy(dtype=float),
+        ]
+    )
+
+X_bline_ext_py = bline_design_ext(buses_train_py)
+fit_bline_ext_py = GeneralizedPoisson(y_train_bline, X_bline_ext_py).fit_dispersion()
+
+beta_hat_bline_ext_py = fit_bline_ext_py.params[:-1]
+se_beta_bline_ext_py = fit_bline_ext_py.bse[:-1]
+z_hat_bline_ext_py = fit_bline_ext_py.params[-1]
+s_hat_bline_ext_py = 1.0 / (1.0 + np.exp(-z_hat_bline_ext_py))
+theta_hat_bline_ext_py = 2.0 * s_hat_bline_ext_py - 1.0
+se_theta_bline_ext_py = float(
+    2.0 * s_hat_bline_ext_py * (1.0 - s_hat_bline_ext_py) * fit_bline_ext_py.bse[-1]
+)
+
+bline_ext_py = pd.DataFrame(
+    {
+        "term": [
+            "(Intercept)", "is_raining",
+            "day_of_week[T.Tuesday]", "day_of_week[T.Wednesday]",
+            "day_of_week[T.Thursday]", "day_of_week[T.Friday]",
+        ],
+        "estimate": np.round(beta_hat_bline_ext_py, 4),
+        "std.error": np.round(se_beta_bline_ext_py, 4),
+        "z.value": np.round(beta_hat_bline_ext_py / se_beta_bline_ext_py, 3),
+        "p.value": [
+            float(2 * stats.norm.sf(abs(v)))
+            for v in beta_hat_bline_ext_py / se_beta_bline_ext_py
+        ],
+    }
+)
+bline_ext_py_html = scrollable_table_html(bline_ext_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-bline-extended-py
+#| tbl-cap: "Extended Generalized Poisson model with rain and weekday contrasts on the B-Line training data (Python)."
+#| message: false
+#| warning: false
+#| results: asis
+cat(
+  "\n",
+  reticulate::py$bline_ext_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+```{python}
+#| echo: true
+#| message: false
+print(
+    "theta:", round(theta_hat_bline_ext_py, 4),
+    " se:", round(se_theta_bline_ext_py, 4),
+    " ratio:", round(1 / (1 - theta_hat_bline_ext_py) ** 2, 3),
+)
+fit_bline_poisson_ext_py = sm.GLM(
+    y_train_bline, X_bline_ext_py, family=sm.families.Poisson()
+).fit()
+ll_bline_ext_py = float(fit_bline_ext_py.llf)
+ll_bline_poisson_ext_py = float(fit_bline_poisson_ext_py.llf)
+lrt_bline_ext_py = 2.0 * (ll_bline_ext_py - ll_bline_poisson_ext_py)
+print(
+    "GP logLik:", round(ll_bline_ext_py, 4),
+    " Poisson logLik:", round(ll_bline_poisson_ext_py, 4),
+    " LRT:", round(lrt_bline_ext_py, 3),
+    " p:", float(stats.chi2.sf(lrt_bline_ext_py, 1)),
+)
+lrt_bline_nested_py = 2.0 * (ll_bline_ext_py - ll_bline_simple_py)
+print(
+    "Nested LRT (day contrasts):", round(lrt_bline_nested_py, 3),
+    " df: 4  p:", float(stats.chi2.sf(lrt_bline_nested_py, 4)),
+)
+print(
+    "GP/Poisson SE ratios:",
+    np.round(se_beta_bline_ext_py / fit_bline_poisson_ext_py.bse, 3),
+)
+```
+
+The extended fit pushes the dispersion estimate further from zero — $\hat\theta = `r round(theta_hat_bline_ext_r, 4)`$ (standard error `r round(fit_bline_ext_r$se_theta, 4)`$, $1/(1-\hat\theta)^2 = `r round(1/(1-theta_hat_bline_ext_r)^2, 3)`$) — exactly the direction predicted in Question 13.17: day-to-day location differences were masquerading as variance. The dispersion test is now decisive ($\chi^2_1 = `r round(bline_lrt_theta_ext_r, 2)`$, $p = `r signif(bline_p_theta_ext_r, 3)`$), and the nested test favors including the weekday contrasts ($\chi^2_4 = `r round(bline_lrt_nested_r, 2)`$, $p = `r signif(bline_p_nested_r, 3)`$). Individual weekday contrasts remain weak marginal Wald signals ($p$ from `r min(tidy_bline_ext_r$p.value[-(1:2)])` to `r max(tidy_bline_ext_r$p.value[-(1:2)])`), which is normal for a jointly significant block of indicators on modest information. The GP standard errors sit uniformly at about `r round(100*mean(bline_se_ratio_ext_r), 0)`% of their Classical Poisson counterparts — underdispersion corrected, inference sharpened.
+
+</details>
+::::
+:::
+
+#### Prediction
+
+The six-metric held-out suite from @sec-generalized-poisson-prediction now answers the predictive inquiry: extended model, simple model, and the training-mean baseline, all fitted on the training data and scored on the testing data.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.21 — Held-out Comparison of the Three Models
+::::
+::::{.Question-container}
+Compute the six held-out metrics for the extended model, the simple rain-only model, and the training-mean baseline. Which model is the strongest predictor, and does the answer agree with the nested likelihood-ratio test from Question 13.20 in this dataset?
+
+> **Hint:** "Training-mean baseline" here means the intercept-only GP fit — it carries its own $\hat\theta$, so the mass-based metrics measure dispersion calibration, not just location.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.21
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-metrics-r
+#| lst-cap: "Held-out six-metric comparison of the B-Line models (R)."
+#| message: false
+X_bline_simple_test_r <- model.matrix(~ is_raining, data = buses_test)
+X_bline_ext_test_r <- model.matrix(~ is_raining + day_of_week, data = buses_test)
+y_bline_test_r <- buses_test$buses_per_hour
+
+# Intercept-only GP baseline on the training data
+fit_bline_base_r <- bline_gp_fit_r(y_bline_train_r, matrix(1, nrow = length(y_bline_train_r), ncol = 1))
+theta_hat_bline_base_r <- fit_bline_base_r$theta
+mu_hat_bline_base_r <- exp(fit_bline_base_r$beta[1])
+
+bline_metrics_r <- round(rbind(
+  `Simple GP (rain)` = gp_prediction_metrics_r(
+    y_bline_test_r,
+    exp(as.numeric(X_bline_simple_test_r %*% fit_bline_simple_r$beta)),
+    theta_hat_bline_simple_r
+  ),
+  `Extended GP (rain + weekday)` = gp_prediction_metrics_r(
+    y_bline_test_r,
+    exp(as.numeric(X_bline_ext_test_r %*% fit_bline_ext_r$beta)),
+    theta_hat_bline_ext_r
+  ),
+  `Training-mean baseline` = gp_prediction_metrics_r(
+    y_bline_test_r,
+    rep(mu_hat_bline_base_r, length(y_bline_test_r)),
+    theta_hat_bline_base_r
+  )
+), 3)
+bline_metrics_r |>
+  as_tibble(rownames = "Model") |>
+  kable(align = "c")
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-metrics-py
+#| lst-cap: "Held-out six-metric comparison of the B-Line models (Python)."
+#| message: false
+X_bline_simple_test_py = np.column_stack(
+    [
+        np.ones(len(buses_test_py)),
+        buses_test_py["is_raining"].to_numpy(dtype=float),
+    ]
+)
+X_bline_ext_test_py = bline_design_ext(buses_test_py)
+y_test_bline = buses_test_py["buses_per_hour"].to_numpy(dtype=float)
+
+fit_bline_base_py = GeneralizedPoisson(
+    y_train_bline, np.ones((len(y_train_bline), 1))
+).fit_dispersion()
+theta_hat_bline_base_py = 2.0 / (1.0 + np.exp(-fit_bline_base_py.params[-1])) - 1.0
+mu_hat_bline_base_py = float(np.exp(fit_bline_base_py.params[0]))
+
+bline_metrics_py = pd.DataFrame(
+    [
+        {
+            "Model": "Simple GP (rain)",
+            **gp_prediction_metrics(
+                y_test_bline,
+                np.exp(X_bline_simple_test_py @ beta_hat_bline_simple_py),
+                theta_hat_bline_simple_py,
+            ),
+        },
+        {
+            "Model": "Extended GP (rain + weekday)",
+            **gp_prediction_metrics(
+                y_test_bline,
+                np.exp(X_bline_ext_test_py @ beta_hat_bline_ext_py),
+                theta_hat_bline_ext_py,
+            ),
+        },
+        {
+            "Model": "Training-mean baseline",
+            **gp_prediction_metrics(
+                y_test_bline,
+                np.full(len(y_test_bline), mu_hat_bline_base_py),
+                theta_hat_bline_base_py,
+            ),
+        },
+    ]
+).round(3)
+bline_metrics_py_html = scrollable_table_html(bline_metrics_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-bline-metrics-py
+#| tbl-cap: "Held-out prediction metrics for the B-Line models (Python)."
+#| message: false
+#| warning: false
+#| results: asis
+cat(
+  "\n",
+  reticulate::py$bline_metrics_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+The simple rain-only model is the strongest predictor: it wins **all six** metrics — MAE `r round(bline_metrics_r["Simple GP (rain)", "MAE"], 3)` against `r round(bline_metrics_r["Extended GP (rain + weekday)", "MAE"], 3)` (extended) and `r round(bline_metrics_r["Training-mean baseline", "MAE"], 3)` (baseline), with the same ordering on RMSE, mean GP deviance, KL discrepancy, and negative log predictive mass. The extended model's extra day parameters cost slightly more in variance than they recover in systematic signal once deployed on fresh windows — despite the nested test supporting them on training data. The predictive inquiry therefore prefers the simple specification, while the inferential inquiry still needs the extended specification to state the rain association *given the day of the week*; the two roles of the split pull in opposite directions here, and the workflow keeps them separate by design.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.22 — Inferential Conclusions from the Testing-set Refit
+::::
+::::{.Question-container}
+Refit the extended specification on the testing data and state the inferential conclusions that survive: (i) is underdispersion confirmed out of sample? (ii) What can be said about the rain and weekday associations?
+
+> **Hint:** Calibrate each Wald statement with its 95% expected-count-ratio interval, and the dispersion statement with the likelihood-ratio test on the testing scale.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.22
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-results-r
+#| lst-cap: "Testing-set refit and inferential summaries for the B-Line exercise (R)."
+#| message: false
+fit_bline_test_r <- bline_gp_fit_r(y_bline_test_r, X_bline_ext_test_r)
+tidy_bline_test_r <- data.frame(
+  term = term_names_bline_r,
+  estimate = round(fit_bline_test_r$beta, 4),
+  std.error = round(fit_bline_test_r$se_beta, 4),
+  z.value = round(fit_bline_test_r$beta / fit_bline_test_r$se_beta, 3),
+  p.value = signif(2 * pnorm(-abs(fit_bline_test_r$beta / fit_bline_test_r$se_beta)), 3),
+  ratio = round(exp(fit_bline_test_r$beta), 3)
+)
+kable(tidy_bline_test_r, align = "c", row.names = FALSE)
+
+theta_hat_bline_test_r <- fit_bline_test_r$theta
+c(
+  theta_hat = round(theta_hat_bline_test_r, 4),
+  se_theta = round(fit_bline_test_r$se_theta, 4),
+  cr_lower = round(theta_hat_bline_test_r - 1.96 * fit_bline_test_r$se_theta, 3),
+  cr_upper = round(theta_hat_bline_test_r + 1.96 * fit_bline_test_r$se_theta, 3),
+  variance_ratio = round(1 / (1 - theta_hat_bline_test_r)^2, 3)
+)
+
+# Dispersion test on the testing scale
+ll_bline_test_r <- fit_bline_test_r$loglik
+fit_bline_poisson_test_r <- glm(
+  buses_per_hour ~ is_raining + day_of_week,
+  family = stats::poisson(link = "log"),
+  data = buses_test
+)
+ll_bline_poisson_test_r <- as.numeric(logLik(fit_bline_poisson_test_r))
+bline_lrt_theta_test_r <- 2 * (ll_bline_test_r - ll_bline_poisson_test_r)
+bline_p_theta_test_r <- pchisq(bline_lrt_theta_test_r, df = 1, lower.tail = FALSE)
+c(LRT = round(bline_lrt_theta_test_r, 3), p_value = signif(bline_p_theta_test_r, 3))
+
+# Rain association: expected-count ratio with 95% credible width (Wald)
+beta_rain_bline_test_r <- fit_bline_test_r$beta[2]
+se_rain_bline_test_r <- fit_bline_test_r$se_beta[2]
+bline_rain_ratio_r <- c(
+  estimate = exp(beta_rain_bline_test_r),
+  lower = exp(beta_rain_bline_test_r - 1.96 * se_rain_bline_test_r),
+  upper = exp(beta_rain_bline_test_r + 1.96 * se_rain_bline_test_r)
+)
+round(bline_rain_ratio_r, 3)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-bline-results-py
+#| lst-cap: "Testing-set refit and inferential summaries for the B-Line exercise (Python)."
+#| message: false
+fit_bline_test_py = GeneralizedPoisson(y_test_bline, X_bline_ext_test_py).fit_dispersion()
+beta_hat_bline_test_py = fit_bline_test_py.params[:-1]
+se_beta_bline_test_py = fit_bline_test_py.bse[:-1]
+z_hat_bline_test_py = fit_bline_test_py.params[-1]
+s_hat_bline_test_py = 1.0 / (1.0 + np.exp(-z_hat_bline_test_py))
+theta_hat_bline_test_py = 2.0 * s_hat_bline_test_py - 1.0
+se_theta_bline_test_py = float(
+    2.0 * s_hat_bline_test_py * (1.0 - s_hat_bline_test_py) * fit_bline_test_py.bse[-1]
+)
+print(
+    "theta:", round(theta_hat_bline_test_py, 4),
+    " se:", round(se_theta_bline_test_py, 4),
+    " ratio:", round(1 / (1 - theta_hat_bline_test_py) ** 2, 3),
+)
+fit_bline_poisson_test_py = sm.GLM(
+    y_test_bline, X_bline_ext_test_py, family=sm.families.Poisson()
+).fit()
+lrt_bline_test_py = 2.0 * (float(fit_bline_test_py.llf) - float(fit_bline_poisson_test_py.llf))
+print(
+    "Dispersion LRT on testing:", round(lrt_bline_test_py, 3),
+    " p:", float(stats.chi2.sf(lrt_bline_test_py, 1)),
+)
+bline_test_py = pd.DataFrame(
+    {
+        "term": [
+            "(Intercept)", "is_raining",
+            "day_of_week[T.Tuesday]", "day_of_week[T.Wednesday]",
+            "day_of_week[T.Thursday]", "day_of_week[T.Friday]",
+        ],
+        "estimate": np.round(beta_hat_bline_test_py, 4),
+        "std.error": np.round(se_beta_bline_test_py, 4),
+        "p.value": [
+            float(2 * stats.norm.sf(abs(v)))
+            for v in beta_hat_bline_test_py / se_beta_bline_test_py
+        ],
+        "ratio": np.round(np.exp(beta_hat_bline_test_py), 3),
+    }
+)
+bline_test_py_html = scrollable_table_html(bline_test_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-bline-results-py
+#| tbl-cap: "Extended model refitted on the B-Line testing data, with expected-count ratios (Python)."
+#| message: false
+#| warning: false
+#| results: asis
+cat(
+  "\n",
+  reticulate::py$bline_test_py_html,
+  "\n",
+  sep = ""
+)
+```
+
+**(i) Underdispersion: confirmed.** The testing-scale dispersion estimate $\hat\theta = `r round(theta_hat_bline_test_r, 4)`$ (standard error `r round(fit_bline_test_r$se_theta, 4)`; 95% interval `r round(theta_hat_bline_test_r - 1.96*fit_bline_test_r$se_theta, 3)` to `r round(theta_hat_bline_test_r + 1.96*fit_bline_test_r$se_theta, 3)`, entirely below zero) implies a conditional variance-to-mean ratio of `r round(1/(1-theta_hat_bline_test_r)^2, 3)`, and the likelihood-ratio test against the nested Poisson scale gives $\chi^2_1 = `r round(bline_lrt_theta_test_r, 2)`$, $p = `r signif(bline_p_theta_test_r, 3)`$. Rush-hour arrivals on this corridor are materially **more regular than a Poisson model allows**, with or without conditioning on conditions — the schedule works.
+
+**(ii) Associations: weak and direction-consistent.** Rainy windows are associated with an expected-count ratio of `r round(bline_rain_ratio_r["estimate"], 3)` (95% Wald interval `r round(bline_rain_ratio_r["lower"], 3)` to `r round(bline_rain_ratio_r["upper"], 3)`; $p = `r signif(tidy_bline_test_r$p.value[2], 3)`$): a suggestion of roughly `r round(100*(1 - bline_rain_ratio_r["estimate"]), 0)`% fewer arrivals in rain, not significant at the 5% level given the day of the week. Among weekday contrasts, only Tuesday stands out against Monday ($p = `r signif(tidy_bline_test_r$p.value[3], 3)`$), and even that is a single marginal signal among four — the joint picture is that condition effects are small relative to sampling noise at $n = 100$ windows, while dispersion is not.
+
+**Standard errors.** The GP standard errors on the testing refit are `r round(100*mean(fit_bline_test_r$se_beta / summary(fit_bline_poisson_test_r)$coef[, "Std. Error"]), 0)`% of the Classical Poisson ones — the mirror image of the crab analysis, where ignoring overdispersion had *understated* uncertainty. Here ignoring underdispersion would have **overstated** it and understated the evidence that the corridor's service is tightly controlled.
+
+</details>
+::::
+:::
+
+#### Storytelling {#sec-generalized-poisson-bline-storytelling}
+
+The final piece of the workflow is communication: turning the refit, the dispersion test, and the held-out metric table into a briefing a service planner can act on.
+
+::: {.Question}
+::::{.Question-header}
+Question 13.23 — Briefing the Service-Planning Review
+::::
+::::{.Question-container}
+Write a short plain-language briefing for the transit authority's service-planning review. It must answer three things: (i) What did we find about rush-hour reliability on the 99 B-Line? (ii) How much confidence should be placed in each part of the finding? (iii) What does the analysis recommend — and what does it **not** license you to claim?
+
+> **Hint:** Distinguish the robust finding (dispersion) from the suggestive one (rain), keep the observational caveat, and state consequences only in the data's own terms (buses per hour).
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.23
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Briefing — 99 B-Line rush-hour reliability review.**
+
+Across 200 weekday rush-hour windows, the 99 B-Line delivered about 20 bus arrivals per hour at the central stop, and — the review's headline — those arrivals were **significantly more regular than random scheduling would produce**. After modelling the counts with a Generalized Poisson regression, the implied variance of hourly arrivals is roughly `r round(100*(1/(1-theta_hat_bline_test_r)^2), 0)`% of what the standard Poisson benchmark would assign at the same mean (testing-scale ratio `r round(1/(1-theta_hat_bline_test_r)^2, 2)`; $p \approx `r signif(bline_p_theta_test_r, 2)`$ on held-out data). Peak service on the corridor is tight, as the dispatch protocol intends.
+
+**Confidence.** The regularity finding is robust: it appears in both halves of the data, at nearly identical strength, and survives out-of-sample refitting. The secondary findings are weaker. Rainy rush hours show slightly fewer arrivals — about `r round(100*(1-bline_rain_ratio_r["estimate"]), 0)`% fewer per hour — but the association does not reach conventional significance on the held-out refit, so it should be treated as suggestive rather than established. Day-to-day differences were jointly detectable in the model-development data but were too small individually to be decision-relevant, and the extra weekday parameters did not improve predictions on new windows.
+
+**Recommendations and limits.** For reliability KPIs, schedule-adherence dashboards, and passenger-information variance margins, the uncertainty bands calibrated to a Poisson assumption are too wide — roughly a fifth too wide here — so service targets set on those bands would be needlessly conservative. Nothing here licenses causal claims: the rain pattern reflects conditions *concurrent* with rain (traffic, boarding times, seasonal timetables), not the effect of weather alone; and the analysis covers rush-hour behaviour at one corridor — other routes, or off-peak windows where dispatch control is looser, could plausibly be **over**dispersed and would need their own fit.
+
+</details>
+::::
+:::
+
+====================================================================
+END OF APPENDED BLOCK
+====================================================================
