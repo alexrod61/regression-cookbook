@@ -3050,6 +3050,62 @@ The predictive answer is therefore sobering: **the crab regressors do not buy re
 
 : Structure of the predictive and inferential results summary on the held-out testing data. {#tbl-generalized-poisson-results-summary .striped .hover}
 
+## Storytelling {#sec-generalized-poisson-storytelling}
+
+The **storytelling stage** translates the full Generalized Poisson workflow into a message for an applied audience. Imagine presenting to marine biologists studying horseshoe crab reproduction. They care about two distinct things, and the story keeps them separate:
+
+- **Inferential**: which female characteristics are associated with the expected number of satellite males, and how certain are we?
+- **Predictive**: do those characteristics help predict satellite counts for crabs we have not measured?
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-thread-needle-diy-sew-6230155/).](img/thread.png){width="350"}
+
+The journey to the answer matters as much as the answer. Chapter 10's Classical Poisson model failed these data: the conditional variance was roughly three times the mean, expected zeros were less than a third of what was observed, and its residual deviance was far above its degrees of freedom. This chapter's candidate — Generalized Poisson regression — adds exactly one parameter aimed at exactly those failures. The training-stage audit showed the repair working: the Pearson statistic with the GP variance function is in line with its degrees of freedom, the expected zero count moved from `r round(expected_zeros_poisson, 1)` to `r round(expected_zeros_gp, 1)` (against `r observed_zeros` observed), and the likelihood-ratio test formalized the need for the dispersion parameter.
+
+From the inferential point of view, the motivating question was:
+
+> **How is the expected number of satellite males associated with female crab width, weight, colour, and spine condition?**
+
+Two findings carry the answer. First, the **dispersion itself is a finding**: on the testing-set refit, $\hat\theta = `r round(theta_hat_test, 2)`$ per @tbl-generalized-poisson-test-refit-r, the counts vary about $`r round(1 / (1 - theta_hat_test)^2, 1)`$ times as much as a Poisson model with the same mean would allow, and the test of $H_0: \theta = 0$ is decisive ($p \approx `r formatC(p_theta_test, format = "e", digits = 1)`$). Any scientific statement about these crabs that ignores this dispersion is built on an unsound uncertainty floor.
+
+Second, within the proper uncertainty the evidence concentrates on **colour**. Relative to `Light` females, `Dark` females are estimated to have `r round(100 * (1 - exp(cs_test["colorDark", "Estimate"])))`% fewer expected satellite males (95% interval for the ratio from `r round(exp(cs_test["colorDark", "Estimate"] - 1.96 * cs_test["colorDark", "Std. Error"]), 2)` to `r round(exp(cs_test["colorDark", "Estimate"] + 1.96 * cs_test["colorDark", "Std. Error"]), 2)`), and `Medium dark` points the same way with a wider interval. The body-size variables that dominate the raw plots do not carry a statistically decisive adjusted effect at this sample size — an honest disappointment that the GP model states plainly precisely *because* its standard errors are calibrated. Stakeholders should hear that sentence whole: *the association story is about colour; the size-gradient visible in exploratory plots is not, at these sample sizes, distinguishable from chance under a model whose uncertainty we trust.* Chapter 10's Poisson-based refit read slightly more generously [@sec-classical-poisson-storytelling]; the difference is not new data but correctly sized intervals.
+
+From the predictive point of view, the motivating question was:
+
+> **How well can the available regressors be used to predict the expected number of satellite males for a female crab?**
+
+Plainly: the regressors are not reliable point predictors on held-out crabs. The extended GP model's held-out MAE is `r round(gp_prediction_metrics_table_r["Extended GP model", "MAE"], 2)` satellites against `r round(gp_prediction_metrics_table_r["Training-mean baseline", "MAE"], 2)` for a rule that always predicts the training average of `r round(mu_baseline_r, 2)`; RMSE tells the same story (`r round(gp_prediction_metrics_table_r["Extended GP model", "RMSE"], 2)` against `r round(gp_prediction_metrics_table_r["Training-mean baseline", "RMSE"], 3)`). Only the distribution-aware negative log predictive mass tilts marginally toward the extended model (`r round(gp_prediction_metrics_table_r["Extended GP model", "Mean negative log predictive mass"], 3)` against `r round(gp_prediction_metrics_table_r["Training-mean baseline", "Mean negative log predictive mass"], 3)`), reflecting the better-calibrated spread rather than better locations.
+
+The responsible story, then, is not "*the model explains satellite counts*". It is:
+
+> *Satellite counts are strongly overdispersed — a stable, tested property of these data, present on data the model never saw. After adjusting honestly for this dispersion, the clearest association is darker colour with fewer satellites; the observed body-size gradient is compatible with a wide range of adjusted effects, including none. Used predictively, the crab characteristics give an honest picture of how uncertain any single crab's count remains, rather than an accurate point forecast.*
+
+That is a usable scientific message, and it is only available because the model was allowed to say how variable the world is. The [Negative Binomial](#sec-negative-binomial) and [Zero-Inflated Poisson](#sec-zero-inflated-poisson) chapters show two alternative routes to overdispersion and zero surplus (variance *quadratic* in the mean; a two-component zero process); the exercises compare them directly against what was done here.
+
+## Chapter Summary {#sec-chapter-13-summary}
+
+This chapter presented **Generalized Poisson (GP) regression** as the book's answer to count data that violate equidispersion **in either direction**. The running horseshoe crab case study framed the two guiding inquiries summarized in @tbl-generalized-poisson-chapter-summary-inquiries.
+
+| Inquiry type | Guiding question | Main takeaway |
+|:---:|:---:|:---|
+| **Inferential inquiry** | How is the expected number of satellite males associated with female crab width, weight, colour, and spine condition? | Dispersion is decisively present ($\hat\theta \approx 0.51$ on the testing refit, variance about $4.2\times$ the mean, $H_0: \theta = 0$ rejected overwhelmingly); the `Dark` vs `Light` colour contrast is the clearest adjusted association; body-size effects do not clear GP-calibrated uncertainty at this sample size. |
+| **Predictive inquiry** | How well can the available regressors be used to predict the expected number of satellite males for a female crab? | Held-out point prediction does not beat a training-mean baseline (MAE 2.53 vs 2.50); the GP model's contribution is calibrated predictive spread, not lower error. |
+
+: Summary of the two guiding inquiries in the Generalized Poisson regression case study. {#tbl-generalized-poisson-chapter-summary-inquiries .striped .hover}
+
+The model itself has three parts (@sec-generalized-poisson-data-modelling): a **random component** $Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}(\lambda_i, \theta)$ with mean $\mu_i = \lambda_i/(1-\theta)$ and variance $\mu_i / (1-\theta)^2$; the **systematic component** $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$; and the **log link** $\log \mu_i = \eta_i$, which ties the rate-like parameter to the regressors through $\lambda_i = (1-\theta)\exp(\eta_i)$. The dispersion parameter $\theta \in (-1, 1)$ carries the meaning: $\theta = 0$ nests the Classical Poisson model as an *interior* point, $\theta > 0$ inflates the variance above the mean, and $\theta < 0$ compresses it below the mean. The Chapter 13 distributional summary in @sec-generalized-poisson-distribution collects the distribution's properties independently of any regression.
+
+Estimation is **joint maximum likelihood** in $(\boldsymbol{\beta}, \theta)$ — there is no iteratively reweighted least squares shortcut as in a classical GLM — and uncertainty comes from the inverse information matrix, with the expected-versus-observed information difference explaining small `R`/`Python` discrepancies (@sec-generalized-poisson-estimation). In `R`, {VGAM}'s `vglm()` with `genpoisson1(zero = "dispind")` fits the model and we decoded its dispersion row back into $\theta$; in `Python`, the chapter's own `GenericLikelihoodModel` subclass maximizes the log-likelihood directly, with the logistic map keeping $\theta$ in $(-1, 1)$.
+
+Goodness of fit ran as a full training-stage audit (@sec-generalized-poisson-gof): the likelihood-ratio test of $\theta = 0$ (classical $\chi^2_1$ applies because $0$ is interior), the Pearson statistic standardized by the GP variance function, the observed-versus-fitted comparison, the residual deviance with its small-counts approximation caveat, and the GP zero-count check $\sum_i \exp(-\hat\lambda_i)$ — the check that flagged the remaining zero surplus as the feature a dispersion parameter cannot repair on its own.
+
+Interpretation kept Chapter 10's grammar (@sec-generalized-poisson-interpretation): coefficients are additive on the log expected-count scale and multiplicative as **expected-count ratios**, categorical coefficients compare against reference categories, and $\theta$ was given its own reporting convention (parameter plus its implied variance multiplier).
+
+The results stage delivered the conclusions on held-out data (@sec-generalized-poisson-results): inference from a testing-set refit, prediction from the training-fitted model, six executed metrics against an intercept-only GP baseline, and an honest answer to both inquiries.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-confused-6230199/).](img/aha.png){width="300"}
+
+Where does this model sit among the book's count-model tools? **Negative Binomial** regression (@sec-negative-binomial) models overdispersion with a variance quadratic in the mean, and **Zero-Inflated Poisson** regression (@sec-zero-inflated-poisson) models a structural zero surplus with a mixture; both are one-direction tools. The Generalized Poisson model's distinguishing feature is the sign of one scalar: it treats overdispersion and underdispersion symmetrically, which is why this book places it as the capstone of the mean-variance-flexible count models. The 99 B-Line coding case at the end of the chapter exercises the underdispersed side of the same machinery — where the Classical Poisson model errs in the *opposite* direction — and the practice exercises develop the conceptual material (the dispersion parameter's geometry, comparison with the sibling models, and the dispersion ratio as decision quantity).
+
 ## Case Study 2: 99 B-Line Bus Arrivals (Underdispersion) {#sec-cs2-bline}
 
 We now turn to a setting where the count data exhibits the opposite problem. The 99 B-Line is the busiest bus route in Canada, running along Broadway from Commercial-Broadway SkyTrain station to the UBC Bus Loop. During weekday morning peak hours (7-9 AM), TransLink actively manages the headway between buses, targeting roughly 20 arrivals per hour at the UBC Bus Loop. Unlike the horseshoe crab dataset, where biological heterogeneity drove variance above the mean, the 99 B-Line's regulated schedule suppresses variance *below* what a Poisson process would predict, a natural underdispersion story.
