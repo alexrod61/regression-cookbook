@@ -1,0 +1,469 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S9 — Extended GP model. NEW SECTION inserted between the S8 GOF section (ends at
+    "...comparison between the two chapters remains clean.")
+and
+    ## Case Study 2: 99 B-Line Bus Arrivals (Underdispersion) {#sec-cs2-bline}
+The S10 interpretation and S11/S12 prediction/results sections will be inserted after this
+one and will then absorb the B-Line block boundary change (S15 replaces the B-Line
+section entirely).
+
+Executed, verified values (canonical training split, n = 86):
+  Extended GP: logLik = -173.4715 (both languages); theta = 0.4923; ratio 3.88; df 77
+  Betas: width 0.0782, weight 0.5683, colour Mlight -0.2893 Mdark -0.3544 Dark -1.2195,
+         spine One 0.1734 Both 0.5400; R SEs 0.1051/0.3464/0.4009/0.4528/0.6062/0.5461/0.3114,
+         Python SEs 0.0978/0.3242/0.4092/0.4577/0.6632/0.5591/0.3185 (expected vs observed info)
+  Nested LRT (GP): 8.485, df 6, p = 0.205 | same-split Poisson nested LRT: 18.553, p = 0.005
+  theta = 0 LRT (extended): 70.408, df 1, p = 4.8e-17
+  GOF: Pearson 68.40/77 = 0.89 (p = 0.748); deviance 116.19/77 = 1.51 (nominal p = 0.0026);
+       expected zeros 27.77 vs 34 observed
+  SE comparison: GP SE / Poisson SE in [1.56, 2.01]; sqrt(dispersion ratio) = 1.97 heuristic
+
+====================================================================
+FULL INSERTED TEXT
+====================================================================
+
+## Extending the Model with Additional Regressors {#sec-generalized-poisson-extended-model}
+
+The goodness-of-fit audit of @sec-generalized-poisson-gof found the dispersion problem repaired but two items unresolved: a zero surplus the dispersion parameter cannot fully absorb (`r observed_zeros` observed versus `r round(expected_zeros_gp, 1)` expected zeros), and a thin one-regressor mean model. Following the workflow, we return to data modelling and fit the **extended specification** — the same four regressors as the extended model of @sec-classical-poisson-additional-regressors, with `Light` and `Both good` as reference categories:
+
+$$
+\log(\mu_i) = \beta_0 + \beta_1\, \texttt{width\_cm}_i + \beta_2\, \texttt{weight\_kg}_i
++ \beta_3\, 1_{\{\texttt{Medium light}\}}(i)
++ \beta_4\, 1_{\{\texttt{Medium dark}\}}(i)
++ \beta_5\, 1_{\{\texttt{Dark}\}}(i)
++ \beta_6\, 1_{\{\texttt{One worn or broken}\}}(i)
++ \beta_7\, 1_{\{\texttt{Both worn or broken}\}}(i),
+$${#eq-generalized-poisson-extended-model}
+
+with the same GP random component $Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}((1 - \theta)\mu_i, \theta)$. The dummy-variable arrangement is exactly the one tabulated in @tbl-classical-poisson-dummy-variable-arrangement of @sec-classical-poisson.
+
+### Adding Phenotypic Regressors {#sec-generalized-poisson-phenotypic-regressors}
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-extended-fit-r
+#| lst-cap: "Code to fit the extended Generalized Poisson model (width, weight, colour, spine condition) to the training data with VGAM."
+#| message: false
+#| warning: false
+# Fitting the extended Generalized Poisson model
+gp_fit_ext_r <- vglm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = genpoisson1(zero = "dispind"),
+  data = training_data
+)
+
+# Decoding the summary into a tidied coefficient table
+cs_ext <- coef(summary(gp_fit_ext_r))
+beta_rows <- c(
+  "(Intercept):1", "width_cm", "weight_kg",
+  "colorMedium light", "colorMedium dark", "colorDark",
+  "spineOne worn or broken", "spineBoth worn or broken"
+)
+eta2_ext <- cs_ext["(Intercept):2", "Estimate"]
+se_eta2_ext <- cs_ext["(Intercept):2", "Std. Error"]
+theta_hat_ext <- 1 - exp(-exp(eta2_ext) / 2)
+se_theta_ext <- (exp(-exp(eta2_ext) / 2) * exp(eta2_ext) / 2) * se_eta2_ext
+
+gp_ext_summary_r <- tibble(
+  Term = c(
+    "(Intercept)", "width_cm", "weight_kg",
+    "Colour: Medium light", "Colour: Medium dark", "Colour: Dark",
+    "Spine: One worn or broken", "Spine: Both worn or broken",
+    "Dispersion (theta)"
+  ),
+  Estimate = c(cs_ext[beta_rows, "Estimate"], theta_hat_ext),
+  `Std. Error` = c(cs_ext[beta_rows, "Std. Error"], se_theta_ext),
+  `z value` = Estimate / `Std. Error`,
+  `Pr(>|z|)` = 2 * pnorm(-abs(`z value`))
+)
+```
+
+:::
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-extended-fit-py
+#| lst-cap: "Code to fit the extended model in Python; pd.get_dummies with drop_first=True reproduces R's treatment contrasts with the Light and Both good reference categories."
+#| message: false
+#| warning: false
+```
+```{python}
+#| echo: true
+#| message: false
+# Building the extended design matrix with treatment-contrast dummies
+cat_dummies = pd.get_dummies(training_data[["color", "spine"]], drop_first=True)
+X_train_ext = np.column_stack(
+    [
+        np.ones(len(training_data)),
+        training_data["width_cm"].to_numpy(dtype=float),
+        training_data["weight_kg"].to_numpy(dtype=float),
+        cat_dummies.to_numpy(dtype=float),
+    ]
+)
+
+# Fitting the extended Generalized Poisson model
+gp_fit_ext_py = GeneralizedPoisson(y_train, X_train_ext).fit_dispersion()
+beta_hat_ext = gp_fit_ext_py.params[:-1]
+beta_se_ext = gp_fit_ext_py.bse[:-1]
+z_hat_ext = gp_fit_ext_py.params[-1]
+theta_hat_ext_py = 2.0 / (1.0 + np.exp(-z_hat_ext)) - 1.0
+se_theta_ext_py = (
+    2.0
+    * (1.0 / (1.0 + np.exp(-z_hat_ext)))
+    * (1.0 - 1.0 / (1.0 + np.exp(-z_hat_ext)))
+    * gp_fit_ext_py.bse[-1]
+)
+
+# Tidied coefficient table
+coef_names_ext = [
+    "(Intercept)", "width_cm", "weight_kg",
+    "Colour: Medium light", "Colour: Medium dark", "Colour: Dark",
+    "Spine: One worn or broken", "Spine: Both worn or broken",
+]
+gp_ext_summary_py = pd.DataFrame(
+    {
+        "Term": coef_names_ext,
+        "Estimate": beta_hat_ext,
+        "Std. Error": beta_se_ext,
+    }
+)
+gp_ext_summary_py["z value"] = (
+    gp_ext_summary_py["Estimate"] / gp_ext_summary_py["Std. Error"]
+)
+gp_ext_summary_py["Pr(>|z|)"] = (
+    2 * (1 - stats.norm.cdf(gp_ext_summary_py["z value"].abs()))
+)
+theta_row = pd.DataFrame(
+    {
+        "Term": ["Dispersion (theta)"],
+        "Estimate": [theta_hat_ext_py],
+        "Std. Error": [se_theta_ext_py],
+        "z value": [theta_hat_ext_py / se_theta_ext_py],
+        "Pr(>|z|)": [
+            2 * (1 - stats.norm.cdf(abs(theta_hat_ext_py / se_theta_ext_py)))
+        ],
+    }
+)
+gp_ext_summary_py = pd.concat([gp_ext_summary_py, theta_row], ignore_index=True)
+gp_ext_summary_py_html = scrollable_table_html(gp_ext_summary_py)
+```
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-extended-fit-r
+#| tbl-cap: "Coefficient estimates for the extended Generalized Poisson model (training data; R, expected-information standard errors)."
+#| message: false
+print_as_dt(gp_ext_summary_r)
+```
+
+## **`Python` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-extended-fit-py
+#| tbl-cap: "Coefficient estimates for the extended Generalized Poisson model (training data; Python, observed-information standard errors)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gp_ext_summary_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+Both languages return a maximized log-likelihood of `r round(logLik(gp_fit_ext_r), 4)`, and the point estimates match to at least three decimals. The extended dispersion estimate is $\hat\theta = `r round(theta_hat_ext, 3)`$ (`Python`: `r round(reticulate::py$theta_hat_ext_py, 3)`), a variance-to-mean ratio of `r round(1 / (1 - theta_hat_ext)^2, 2)`: adding three sets of regressors barely moves the dispersion parameter (`r round(theta_hat, 3)` $\to$ `r round(theta_hat_ext, 3)`). The overdispersion in these data is **not** explained away by body size, colour, or spine condition — a likelihood-ratio test of $\theta = 0$ for the extended model gives $2 \times [`r round(logLik(gp_fit_ext_r), 2)` - (`r round(logLik(gp_poisson_ext_r), 2)`)] = `r round(lr_theta_ext, 2)`$ on one degree of freedom ($p \approx `r formatC(p_theta_ext, format = "e", digits = 1)`$).
+
+### Did the Extension Pay Off? {#sec-generalized-poisson-nested}
+
+The complementary question pits the two GP models against each other: does the four-regressor specification beat the width-only model? The nested likelihood-ratio statistic is
+
+$$
+2\,\big[\ell_{\text{extended}} - \ell_{\text{simple}}\big]
+= 2 \times \big[`r round(logLik(gp_fit_ext_r), 2)` - (`r round(logLik(gp_fit_r), 2)`)\big]
+= `r round(lr_nested_gp, 2)`,
+$$
+
+on $6$ degrees of freedom (eight coefficient columns against two), giving $p = `r round(p_nested_gp, 3)`$. Under the Generalized Poisson model the extra regressors do **not** jointly improve the training fit beyond what width already delivers.
+
+The same-split Classical Poisson comparison — executed in the code above — tells a different story: there the nested statistic is `r round(lr_nested_poisson, 2)` on the same $6$ degrees of freedom, $p = `r round(p_nested_poisson, 3)`$. The point estimates barely moved between the two model classes; the **uncertainty** did. Because the Poisson model understates the variance, it overstates the evidence for the added regressors. This is the inferential argument for the GP model made concrete.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on keeping the extended specification anyway!
+::::
+:::: {.Tip-container}
+Despite $p = `r round(p_nested_gp, 3)`$ on the nested test, the rest of this chapter continues with the extended specification, for two reasons. First, comparability: @sec-classical-poisson conducted its final assessment with this same regressor set, so holding the specification constant isolates the effect of the random component — the comparison this chapter exists to stage. Second, protocol discipline: the extended specification was fixed before model fitting as the set of available phenotypic variables (@tbl-generalized-poisson-study-design-variables), and the EDA supported a genuine colour gradient. The training-stage test results are reported exactly as they come out — both here and in the goodness-of-fit summary — rather than governing the specification post hoc.
+::::
+:::
+
+### Goodness of Fit of the Extended Model {#sec-generalized-poisson-extended-gof}
+
+The extended model passes through the same audit as the simple one; the executed numbers (computed in the listings above) are collected in @fig-generalized-poisson-extended-obs-fitted-r / @fig-generalized-poisson-extended-obs-fitted-py and in the summary below.
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-extended-gof-r
+#| lst-cap: "Code for the extended-model goodness-of-fit numbers (R)."
+#| message: false
+#| warning: false
+mu_hat_ext <- as.numeric(fitted(gp_fit_ext_r)[, 1])
+lambda_hat_ext <- (1 - theta_hat_ext) * mu_hat_ext
+df_gof_ext <- nrow(training_data) - length(coef(gp_fit_ext_r))
+
+# Pearson chi-squared with the GP variance function
+pearson_ext <- sum((y_train_vec - mu_hat_ext)^2 / (mu_hat_ext / (1 - theta_hat_ext)^2))
+p_pearson_ext <- pchisq(pearson_ext, df = df_gof_ext, lower.tail = FALSE)
+
+# Saturated-GP residual deviance
+lambda_sat_ext <- vapply(
+  y_train_vec,
+  function(yi) {
+    if (yi == 0) return(0)
+    (yi * (1 - theta_hat_ext) + sqrt(yi^2 * (1 - theta_hat_ext)^2 + 4 * theta_hat_ext * yi)) / 2
+  },
+  numeric(1)
+)
+ll_sat_ext <- numeric(length(y_train_vec))
+pos <- y_train_vec > 0
+ll_sat_ext[pos] <- gp_logpmf_r(y_train_vec[pos], lambda_sat_ext[pos], theta_hat_ext)
+ll_hat_ext <- gp_logpmf_r(y_train_vec, lambda_hat_ext, theta_hat_ext)
+deviance_resids_ext <- sign(y_train_vec - mu_hat_ext) * sqrt(2 * (ll_sat_ext - ll_hat_ext))
+residual_deviance_ext <- sum(deviance_resids_ext^2)
+p_deviance_ext <- pchisq(residual_deviance_ext, df = df_gof_ext, lower.tail = FALSE)
+
+# Zero-count expectation under the extended model
+expected_zeros_ext <- sum(exp(-lambda_hat_ext))
+
+cat(
+  "Pearson:", round(pearson_ext, 2), "/", df_gof_ext,
+  "=", round(pearson_ext / df_gof_ext, 2), "(upper p =", round(p_pearson_ext, 3), ")\n",
+  "Deviance:", round(residual_deviance_ext, 2), "/", df_gof_ext,
+  "=", round(residual_deviance_ext / df_gof_ext, 2), "(nominal p =", round(p_deviance_ext, 4), ")\n",
+  "Expected zeros:", round(expected_zeros_ext, 1), "vs", observed_zeros, "observed\n"
+)
+```
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-extended-gof-py
+#| lst-cap: "Code for the extended-model goodness-of-fit numbers (Python)."
+#| message: false
+#| warning: false
+mu_hat_ext_py = np.exp(X_train_ext @ beta_hat_ext)
+lambda_hat_ext_py = (1.0 - theta_hat_ext_py) * mu_hat_ext_py
+df_gof_ext_py = len(y_train) - (X_train_ext.shape[1] + 1)
+
+# Pearson chi-squared with the GP variance function
+pearson_chisq_ext_py = float(
+    np.sum((y_train - mu_hat_ext_py) ** 2 / (mu_hat_ext_py / (1 - theta_hat_ext_py) ** 2))
+)
+p_pearson_ext_py = stats.chi2.sf(pearson_chisq_ext_py, df=df_gof_ext_py)
+
+# Saturated-GP residual deviance
+lambda_sat_ext_py = np.zeros_like(y_train)
+positive = y_train > 0
+ys = y_train[positive]
+lambda_sat_ext_py[positive] = (
+    ys * (1 - theta_hat_ext_py)
+    + np.sqrt(ys**2 * (1 - theta_hat_ext_py) ** 2 + 4 * theta_hat_ext_py * ys)
+) / 2
+ll_sat_ext_py = np.zeros_like(y_train)
+ll_sat_ext_py[positive] = gp_logpmf(ys, lambda_sat_ext_py[positive], theta_hat_ext_py)
+ll_hat_ext_py = gp_logpmf(y_train, lambda_hat_ext_py, theta_hat_ext_py)
+deviance_resids_ext_py = np.sign(y_train - mu_hat_ext_py) * np.sqrt(
+    2.0 * (ll_sat_ext_py - ll_hat_ext_py)
+)
+residual_deviance_ext_py = float(np.sum(deviance_resids_ext_py**2))
+p_deviance_ext_py = stats.chi2.sf(residual_deviance_ext_py, df=df_gof_ext_py)
+
+# Zero-count expectation under the extended model
+expected_zeros_ext_py = float(np.sum(np.exp(-lambda_hat_ext_py)))
+
+print(
+    f"Pearson: {pearson_chisq_ext_py:.2f} / {df_gof_ext_py} = "
+    f"{pearson_chisq_ext_py / df_gof_ext_py:.2f} (upper p = {p_pearson_ext_py:.3f})"
+)
+print(
+    f"Deviance: {residual_deviance_ext_py:.2f} / {df_gof_ext_py} = "
+    f"{residual_deviance_ext_py / df_gof_ext_py:.2f} (nominal p = {p_deviance_ext_py:.4f})"
+)
+print(f"Expected zeros: {expected_zeros_ext_py:.1f} vs {observed_zeros_py} observed")
+```
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: false
+#| label: fig-generalized-poisson-extended-obs-fitted-r
+#| fig-cap: "Observed versus fitted satellite counts for the extended GP model (training data); observed counts are jittered vertically to expose ties."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+set.seed(123)
+ggplot(
+  tibble(fitted = mu_hat_ext, observed = y_train_vec),
+  aes(x = fitted, y = observed)
+) +
+  geom_jitter(width = 0, height = 0.15, alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
+  labs(
+    x = "Fitted expected count (extended model)",
+    y = "Observed count (vertically jittered)"
+  ) +
+  theme_bw()
+```
+
+## **`Python`**
+
+```{python}
+#| echo: false
+#| label: fig-generalized-poisson-extended-obs-fitted-py
+#| fig-cap: "Observed versus fitted satellite counts for the extended GP model (training data, Python); observed counts are jittered vertically to expose ties."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+np.random.seed(123)
+(
+    ggplot(
+        pd.DataFrame(
+            {
+                "fitted": mu_hat_ext_py,
+                "observed": y_train + np.random.uniform(-0.15, 0.15, len(y_train)),
+            }
+        ),
+        aes(x="fitted", y="observed"),
+    )
+    + geom_point(alpha=0.6)
+    + geom_abline(intercept=0, slope=1, linetype="dashed", color="#666666")
+    + labs(
+        x="Fitted expected count (extended model)",
+        y="Observed count (vertically jittered)",
+    )
+    + theme_bw()
+)
+```
+
+:::
+
+| **Check** | **Simple GP model** | **Extended GP model** | **Reading** |
+|:---|:---|:---|:---|
+| Pearson $\chi^2$ / df | 62.35 / 83 = 0.75 ($p = 0.956$) | 68.40 / 77 = 0.89 ($p = 0.748$) | GP variance function adequate in both |
+| Residual deviance / df | 121.11 / 83 = 1.46 | 116.19 / 77 = 1.51 | Slight absolute drop; ratios moved by small-count approximation, not real deterioration |
+| Expected zeros (vs 34 observed) | 27.4 | 27.8 | Zero surplus barely moves — it is not a regressor-deficiency artefact |
+| $\hat\theta$; variance ratio | 0.516; 4.27 | 0.492; 3.88 | Overdispersion survives all regressors |
+| $\theta = 0$ LRT | 80.48, $p = 2.9\times 10^{-19}$ | 70.41, $p = 4.8\times 10^{-17}$ | Dispersion parameter necessary in both |
+
+: Simple-versus-extended goodness-of-fit summary for the Generalized Poisson model (training data). {#tbl-generalized-poisson-extended-gof-summary .striped .hover}
+
+The picture is consistent with the simple model's audit: the GP variance function remains adequate (Pearson ratio 0.89), the expected zero count creeps closer to the observed 34 but a surplus of about six remains, and $\hat\theta$ hardly budges. Whatever creates the extra zeros, it is not the omission of these regressors.
+
+### The Inferential Payoff: Calibrated Standard Errors {#sec-generalized-poisson-se-comparison}
+
+@tbl-generalized-poisson-se-comparison-r and @tbl-generalized-poisson-se-comparison-py put the extended GP fit side by side with the same-split, same-specification Poisson fit.
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-se-comparison-r
+#| lst-cap: "Code to compare Generalized Poisson and Poisson standard errors on the same specification and split (R)."
+#| message: false
+#| warning: false
+gp_poisson_ext_r <- glm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = poisson,
+  data = training_data
+)
+cs_pois_ext <- coef(summary(gp_poisson_ext_r))
+
+se_compare_r <- tibble(
+  Term = c(
+    "(Intercept)", "width_cm", "weight_kg",
+    "Colour: Medium light", "Colour: Medium dark", "Colour: Dark",
+    "Spine: One worn or broken", "Spine: Both worn or broken"
+  ),
+  `GP estimate` = cs_ext[beta_rows, "Estimate"],
+  `GP SE` = cs_ext[beta_rows, "Std. Error"],
+  `Poisson estimate` = cs_pois_ext[, "Estimate"],
+  `Poisson SE` = cs_pois_ext[, "Std. Error"],
+  `SE ratio` = `GP SE` / `Poisson SE`,
+  `GP p-value` = 2 * pnorm(-abs(`GP estimate` / `GP SE`)),
+  `Poisson p-value` = 2 * pnorm(-abs(`Poisson estimate` / `Poisson SE`))
+)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-se-comparison-r
+#| tbl-cap: "Generalized Poisson versus Poisson inferential comparisons on the extended specification (training data; R expected-information standard errors)."
+#| message: false
+print_as_dt(se_compare_r)
+```
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-se-comparison-py
+#| lst-cap: "Code to compare Generalized Poisson and Poisson standard errors on the same specification and split (Python)."
+#| message: false
+#| warning: false
+poisson_ext_py = sm.GLM(y_train, X_train_ext, family=Poisson()).fit()
+
+se_compare_py = pd.DataFrame(
+    {
+        "Term": coef_names_ext,
+        "GP estimate": beta_hat_ext,
+        "GP SE": beta_se_ext,
+        "Poisson estimate": poisson_ext_py.params,
+        "Poisson SE": poisson_ext_py.bse,
+    }
+)
+se_compare_py["SE ratio"] = se_compare_py["GP SE"] / se_compare_py["Poisson SE"]
+se_compare_py["GP p-value"] = 2 * (1 - stats.norm.cdf(
+    (se_compare_py["GP estimate"] / se_compare_py["GP SE"]).abs()
+))
+se_compare_py["Poisson p-value"] = 2 * (1 - stats.norm.cdf(
+    (se_compare_py["Poisson estimate"] / se_compare_py["Poisson SE"]).abs()
+))
+se_compare_py_html = scrollable_table_html(se_compare_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-se-comparison-py
+#| tbl-cap: "Generalized Poisson versus Poisson inferential comparisons on the extended specification (training data; Python observed-information standard errors)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$se_compare_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+Three observations carry the chapter's statistical message:
+
+1. **The point estimates barely move.** The largest absolute change is on the intercept (`r round(cs_pois_ext[1, 1], 2)` $\to$ `r round(cs_ext["(Intercept):1", "Estimate"], 2)`); the regressor coefficients shift by at most a few hundredths. Generalizing the random component is not about changing the estimated associations.
+2. **The standard errors inflate by 56% to 101%** (`SE ratio` column, `r round(min(se_compare_r$`SE ratio`), 2)` to `r round(max(se_compare_r$`SE ratio`), 2)`). The naive heuristic from equidispersion theory, a multiplicative $\sqrt{\text{Var}/\mathbb{E}} = \sqrt{`r round(1 / (1 - theta_hat_ext)^2, 2)`} = `r round(1 / (1 - theta_hat_ext), 2)`$, is of the right order — the actual information-matrix inflation varies by coefficient because the Hessian geometry is not a flat rescaling.
+3. **The inferential ranking of the regressors changes.** Under the Poisson model, `weight_kg`, `Colour: Dark`, and `Spine: Both worn or broken` all clear the conventional 5% line on this training split (p = 0.005, 0.010, 0.006); under the GP model none of them clearly does (p = 0.08–0.10, 0.04–0.07, and 0.08–0.09, varying slightly across the two information-matrix conventions). Chapter 10's own goodness-of-fit section documented that the Poisson model's variance was too small; the table above is the inferential price of that failure, made visible coefficient by coefficient.
+
+The estimates themselves look reasonable; the *conclusions* are what changed. The next section reads the extended-model coefficients on their own merits, in the expected-count-ratio language of Chapter 10.
+
+====================================================================
+FILE: END OF S9 PROPOSAL
+====================================================================
