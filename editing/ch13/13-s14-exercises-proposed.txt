@@ -1,0 +1,353 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S14 — Practice Exercises. This stage:
+  (a) DELETES the tail of the draft file from "## Case Study 2: 99 B-Line Bus Arrivals
+      (Underdispersion) {#sec-cs2-bline}" through END OF FILE (the stale CS2 TODO block,
+      the draft's old Storytelling block, and the draft's old Practice Problems block);
+  (b) APPENDS the new "## Practice Exercises {#sec-generalized-poisson-exercises}" bank.
+The Coding Case (B-Line) is appended by stage S15 directly after the exercises.
+
+====================================================================
+FULL INSERTED TEXT
+====================================================================
+
+## Practice Exercises {#sec-generalized-poisson-exercises}
+
+The following practice exercises reinforce the main ideas of this chapter. Some questions check the structure of the Generalized Poisson model (the two parameters, their roles, and what the model reduces to); others ask you to reason about the workflow decisions the running case study made (dispersion testing, calibrated standard errors, predictive calibration). Working through them before the coding case will make the 99 B-Line analysis much more direct.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464611/).](img/exercises.png){width="550"}
+
+### Conceptual Questions {#sec-generalized-poisson-exercises-conceptual}
+
+::: {.Question}
+::::{.Question-header}
+Question 13.1
+::::
+::::{.Question-container}
+**True or False**
+
+The Generalized Poisson regression model is a generalization of Classical Poisson regression that is useful only for overdispersed count responses.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.1
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+The dispersion parameter $\theta$ ranges over $(-1, 1)$ and controls the variance-to-mean ratio $\frac{1}{(1-\theta)^2}$ in **both** directions: $\theta > 0$ gives overdispersion (ratio above one) and $\theta < 0$ gives underdispersion (ratio below one). The horseshoe crab analysis used the first direction; the coding case at the end of the chapter uses the second.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.2
+::::
+::::{.Question-container}
+**True or False**
+
+Setting $\theta = 0$ in the Generalized Poisson probability mass function gives back the Poisson probability mass function exactly.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.2
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** True.
+
+**Rationale:**
+
+Substituting $\theta = 0$ into @eq-generalized-poisson-pmf gives
+
+$$
+p_Y(y; \lambda, 0) = \frac{\lambda (\lambda + 0 \cdot y)^{y-1} e^{-(\lambda + 0 \cdot y)}}{y!}
+= \frac{\lambda \cdot \lambda^{y-1} e^{-\lambda}}{y!}
+= \frac{\lambda^y e^{-\lambda}}{y!},
+$$
+
+the Poisson PMF with mean $\lambda$. This exact nesting — at an **interior** point of the parameter space — is what makes the likelihood-ratio test of $H_0: \theta = 0$ a plain $\chi^2_1$ test.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.3
+::::
+::::{.Question-container}
+**Numerical Question**
+
+A fitted GP model reports $\hat\theta = 1/3$ for one dataset and $\hat\theta = -1/3$ for another. For each dataset, by what factor does the model's assumed variance differ from its assumed mean? Express both results in one sentence each, including the standard-deviation factor.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.3
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Use $\operatorname{Var}(Y) = \mu/(1-\theta)^2$ and $\operatorname{SD}(Y) = \sqrt{\mu}/|1-\theta|$:
+
+- $\hat\theta = 1/3$: variance factor $1/(2/3)^2 = 2.25$; SD factor $3/2 = 1.5$. *The assumed variance is 2.25 times the mean; spread is 1.5 times the Poisson spread at the same mean.*
+- $\hat\theta = -1/3$: variance factor $1/(4/3)^2 = 0.5625$; SD factor $3/4 = 0.75$. *The assumed variance is 0.5625 times the mean; spread is three quarters of the Poisson spread.*
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.4
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Why is the estimation of a Generalized Poisson regression not an ordinary iteratively reweighted least squares problem like the Poisson GLM of @sec-classical-poisson?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.4
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+IRLS works because the Poisson GLM's random component belongs to the one-parameter exponential family: the mean function alone determines the variance, so coefficients can be updated with weights derived only from $\mu_i$. The GP random component carries the additional parameter $\theta$, so the variance $\mu_i/(1-\theta)^2$ is what the likelihood says it is only when $\theta$ is optimized **jointly** with $\boldsymbol{\beta}$. Estimation is therefore a $(k+2)$-dimensional maximum likelihood problem — handled in `R` by {VGAM}'s vector GLM machinery with Fisher scoring, and in `Python` by direct numerical maximization of @eq-generalized-poisson-loglik.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.5
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Distinguish the inferential roles of $\exp(\hat\beta_j)$ and $\hat\theta$ in a fitted GP model: which aspects of the response distribution does each one summarize, and does either one depend on the units of the regressors?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.5
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+- $\exp(\hat\beta_j)$ is an **expected-count ratio**: the multiplicative change in the conditional *mean* per unit increase of regressor $j$, holding the other regressors fixed. It depends on the regressor's units (per cm, per kg, category-vs-reference).
+- $\hat\theta$ describes the conditional *spread relative to the mean*, through the ratio $1/(1-\hat\theta)^2$. It is unit-free: it reflects heterogeneity or regularity in the data-generating process, not a per-unit change.
+
+So the coefficient vector locates the distribution, and the dispersion parameter shapes it.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.6
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+The likelihood-ratio test of $H_0: \theta = 0$ against $H_1: \theta \neq 0$ was calibrated against $\chi^2_1$ in this chapter, while the comparison between Poisson and Zero-Inflated Poisson in @sec-zero-inflated-poisson required more care. Where does the difference come from?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.6
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+It comes from **where the null value sits in the parameter space**. For GP, $\theta = 0$ lies strictly inside the legal range $(-1, 1)$, so the usual regularity conditions for the likelihood-ratio test hold and $\chi^2_1$ applies. For ZIP, the null $\pi = 0$ (no zero-inflated component) lies on the **boundary** of $[0, 1)$, which breaks the standard conditions; the asymptotic reference is a mixture of chi-squared distributions rather than a plain $\chi^2$. Same machinery, different geometry.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.7
+::::
+::::{.Question-container}
+**Numerical Question**
+
+Weekly grant submissions in a university department have mean 4 and variance 1.8. (a) Are these data over- or underdispersed? (b) What value of $\theta$ would a GP model with a constant mean imply? (c) What does this imply about standard errors computed under a mis-specified Poisson model?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.7
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+(a) **Underdispersed**: variance-to-mean ratio $1.8/4 = 0.45 < 1$.
+
+(b) Setting $1/(1-\theta)^2 = 0.45$ gives $1 - \theta = \sqrt{1/0.45} = 1.491$, hence $\theta = -0.491$.
+
+(c) The Poisson model would assume variance $4$ where the data show $1.8$, so its information-based standard errors would be **too large by a factor of about $\sqrt{4/1.8} \approx 1.49$** — genuine regressor effects would be understated rather than overstated (the mirror image of the crab analysis; see @tbl-generalized-poisson-se-comparison-r).
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.8
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Both the Generalized Poisson model and the Negative Binomial model of @sec-negative-binomial allow overdispersion. Contrast how each parameterizes the variance, and give one setting where the GP model is the only option of the two.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.8
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+- **Negative Binomial:** $\operatorname{Var}(Y_i) = \mu_i + \mu_i^2/\kappa$ with $\kappa > 0$ — a *quadratic* variance function; the relative overdispersion shrinks as the mean grows.
+- **Generalized Poisson:** $\operatorname{Var}(Y_i) = \mu_i/(1-\theta)^2$ — a *constant proportional multiplier*; the variance-to-mean ratio is the same at every mean level.
+
+The GP model is the only option of the two for **underdispersed** counts: the Negative Binomial variance can never fall below the mean, while $\theta < 0$ gives variance *below* the mean.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.9
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+One of the chapter's goodness-of-fit checks compared the observed number of zero counts (`r observed_zeros` in the training data) against the model expectation $\sum_i \exp(-\hat\lambda_i)$. Why does this check describe something a dispersion parameter cannot repair by itself, and which model family from @sec-zero-inflated-poisson addresses precisely that failure?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.9
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The dispersion parameter rescales the whole distribution proportionally: it decides *how spread out* counts are around the mean at every level of the mean. A structural surplus at the single point $y = 0$ is a *local* distortion (some nests attract no satellites at all for structural reasons). Neither the GP ratio nor the NB variance can bend one point of the PMF independently — that is exactly what a **mixture** does: the zero-inflated (or hurdle) family models zero counts as coming from an extra process with its own probability, which is why those models were the subject of @sec-zero-inflated-poisson.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.10
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+In the held-out metric table of @tbl-generalized-poisson-test-metrics-r, the extended model and the training-mean baseline nearly tied on MAE and RMSE, but disagreed more clearly on the mean negative log predictive mass. Explain mechanistically why the dispersion parameter can change one family of metrics without changing the other.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.10
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+ME, MAE, and RMSE score only the predicted **mean** $\hat\mu_i$ against the observed count $y_i$; neither $\theta$ nor the rest of the predictive distribution enters. The mean GP deviance and the mean negative log predictive mass evaluate $\log p_Y(y_i; \hat\lambda_i, \hat\theta)$, which depends explicitly on $\theta$. A larger fitted spread raises the predictive probability of counts far from the mean and lowers it near the centre, so a model whose dispersion is well calibrated can look identical on mean-only metrics yet better (or worse) on mass-based metrics.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.11
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+The inferential conclusions of this chapter were drawn from the extended GP model **refitted on the testing data**, not from the training fit that drove model development. Why would reporting the training fit's $p$-values have been methodologically wrong, even if the model had been specified in advance?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.11
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The training data informed many decisions that precede inference: the split diagnostics, the choice to fit a GP model, the extended specification being retained despite a non-significant nested test, and the repeated goodness-of-fit inspections. Each such step consumes some of the data's information; formal $p$-values computed on the same data that selected the model and passed its audits are anti-conservative by an amount that is difficult to quantify. Refitting the settled specification on data never seen by the workflow restores the nominal calibration of the Wald intervals and tests — this is the inferential/predictive two-role structure of @tbl-generalized-poisson-results-inquiries.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 13.12
+::::
+::::
+::::{.Question-container}
+**Short-answer Question**
+
+Suppose the extended crab model were refit with `Medium light` (instead of `Light`) as the reference colour category. Which fitted quantities change, and which do not?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 13.12
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Changing the reference category is a **reparameterization**, not a model change. The coefficient vector changes (all colour contrasts are now relative to `Medium light`, e.g., the old $\hat\beta_5$ for `Dark` becomes $\hat\beta_5 - \hat\beta_3$), as do the corresponding standard errors and $p$-values for the *new* contrasts. Everything on the observation scale is unchanged: fitted expected counts $\hat\mu_i$, the dispersion estimate $\hat\theta$, the maximized log-likelihood, all goodness-of-fit statistics, and all predictions. The scientific conclusions must be written about *specific category comparisons*, which is why the study-design stage fixes reference categories in advance (@tbl-generalized-poisson-study-design-variables).
+
+</details>
+::::
+:::
+
+====================================================================
+FILE: END OF S14 PROPOSAL
+====================================================================
