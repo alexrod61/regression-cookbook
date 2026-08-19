@@ -1,0 +1,38 @@
+# Revision rationale for the Simple Model section
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): NEW `## Simple Model: Satellite Counts and Female Crab Width {#sec-generalized-poisson-simple-model}` inserted between `## Estimation` and the draft-stale `## Goodness of Fit` (the latter is replaced in stage S8).
+- Reference chapters/files reviewed: finished Ch10 simple-model section (fit-then-read order, tidied coefficient tables, terminology "expected-count ratio"); skill.md sections 2 (case-first), 12 (transitions), 14-16 (code/output conventions).
+
+## What was preserved
+- The draft's decision to fit the model with VGAM in R and with a custom statsmodels GenericLikelihoodModel in Python (the draft showed static previews; the fit is now executed on the canonical training split).
+
+## What changed
+- The section did not exist in the draft as executable content. Everything is executed at build time on `training_data` (86 crabs): VGAM `vglm(satellites ~ width_cm, genpoisson1(zero = "dispind"))` in R; the S6 `GeneralizedPoisson` class in Python.
+- VGAM's raw dispersion row is decoded in chapter-visible code to theta_hat = 1 - exp(-exp(eta2)/2) with a delta-method standard error, because VGAM writes (1 - theta)^2 on a log-log link (empirically confirmed: eta2 = 0.372419 decodes to theta = 0.515976, matching Python's direct MLE).
+- Tidied three-row coefficient tables per language (Intercept, width_cm, Dispersion theta) with Wald z and p columns; R table printed with print_as_dt, Python via scrollable_table_html + hidden R chunk (the pattern established in S3).
+- Reading-the-estimates prose uses terminology "expected-count ratio" (never "IRR"), gives the 25.7% figure with its exponentiated 95% CI (1.154, 1.370), decodes theta_hat into a variance multiplier (4.27x), and flags the intercept as calibration-only.
+- Added the training-set-significance Heads-up: p-values here are model-checking signals; the inferential claim waits for the Results refit (consistent with the book's workflow).
+- Parity sentence is itself executed inline (`r` reading both logLik values, including the Python object through reticulate), so the claim cannot drift from the code.
+
+## Why the changes help
+- Estimation moves from a static promise to executed, verified output; the draft only previewed code and never knitted numbers.
+- The decoding of VGAM's two-intercept output is a real comprehension barrier for students; making it explicit code with comments removes a recurring source of confusion AND documents the genpoisson1 parameterization choice, which differs from the appendix's notation.
+- Cross-language parity (logLik -177.7141 vs -177.71414, identical betas, sum of fitted means 245 = sum of y in both) is now a demonstrated property, not an assertion.
+
+## Execution and validation
+- R verbatim smoke: /tmp/regref/s7_chapter_r.R on the canonical split — table and all inline values printed as expected (beta1 = 0.229, exp = 1.257, CI 1.154-1.370, theta = 0.516, SE 0.061, z = 8.44, p = 3.1e-17, theta CI 0.396-0.636?? Note: delta-method theta CI (0.396, 0.636) used in prose, from this run).
+- Python verbatim smoke: /tmp/regref/s7_chapter_py.py — identical table (beta SEs 1.1036/0.0396 observed-information; theta 0.5160 +/- 0.0638), logLik -177.71414.
+- logLik parity |diff| = 3.5e-05.
+
+## What should be avoided
+- Loading broom for vglm (unsupported -> informal tables would clash with book conventions); printing VGAM's raw two-intercept summary without decoding; calling either fit "the GLM estimate" (it is joint ML).
+
+## References cited here
+- None new; the Consul and Jain citation phrase lives in the S6 class docstring and listing caption.
+
+## Placement and dependencies
+- Objects created here and consumed downstream: R side `gp_fit_r`, `beta0_hat`, `beta1_hat`, `se_beta1`, `theta_hat`, `se_theta`, `gp_simple_summary_r`; Python side `X_train`, `y_train`, `gp_fit_py`, `theta_hat_py`, `se_theta_py`, `gp_simple_summary_py(_html)`.
+- S8 (GOF) uses gp_fit_r/gp_fit_py for the full adequacy suite including the GP zero-count check with sum_i exp(-lambda_hat_i).
+- Caution: prose inline value for the theta Wald CI uses the DELTA-method endpoints 0.396/0.636; the transformed VGAM-Wald endpoints 0.403/0.640 computed earlier are equivalent and both within rounding of reported values.
