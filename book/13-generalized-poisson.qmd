@@ -730,7 +730,7 @@ p_response_py = (
     + labs(x="Number of satellite males", y="Number of female crabs")
     + theme_bw()
 )
-p_response_py
+p_response_py.show()
 ```
 
 :::
@@ -926,7 +926,7 @@ p_width_py = (
     + labs(x="Carapace width (cm)", y="Number of satellite males")
     + theme_bw()
 )
-p_width_py
+p_width_py.show()
 ```
 
 :::
@@ -1015,7 +1015,7 @@ p_weight_py = (
     + labs(x="Weight (kg)", y="Number of satellite males")
     + theme_bw()
 )
-p_weight_py
+p_weight_py.show()
 ```
 
 :::
@@ -1466,18 +1466,14 @@ gp_simple_summary_r <- tibble(
 
 :::
 
-```{r}
+The `Python` fit reuses the `GeneralizedPoisson` class defined in @lst-generalized-poisson-gp-class-py:
+
+```{python}
 #| echo: true
 #| lst-label: lst-generalized-poisson-simple-model-fit-py
 #| lst-cap: "Code to fit the same model in Python with the GenericLikelihoodModel class of the estimation section; theta and its standard error are recovered from the logistic-map working parameter."
 #| message: false
 #| warning: false
-```
-The `Python` fit reuses the `GeneralizedPoisson` class defined in @lst-generalized-poisson-gp-class-py:
-
-```{python}
-#| echo: true
-#| message: false
 # Assembling the design matrix and response for the simple model
 from scipy.stats import norm
 
@@ -1683,7 +1679,7 @@ lambda_hat_py = (1.0 - theta_hat_py) * mu_hat_py
 
 # Classical Poisson fit on the same split, for the contrast
 poisson_fit_py = sm.GLM(y_train, X_train, family=Poisson()).fit()
-mu_hat_poisson_py = poisson_fit_py.fittedvalues.to_numpy()
+mu_hat_poisson_py = np.asarray(poisson_fit_py.fittedvalues)
 
 # 1. Likelihood-ratio test of theta = 0
 lr_theta_py = 2.0 * (gp_fit_py.llf - poisson_fit_py.llf)
@@ -1855,7 +1851,7 @@ gof_plot_data_py = pd.DataFrame(
         "observed": y_train + np.random.uniform(-0.15, 0.15, len(y_train)),
     }
 )
-(
+p_gof_obs_fitted_py = (
     ggplot(gof_plot_data_py, aes(x="fitted", y="observed"))
     + geom_point(alpha=0.6)
     + geom_abline(intercept=0, slope=1, linetype="dashed", color="#666666")
@@ -1865,6 +1861,7 @@ gof_plot_data_py = pd.DataFrame(
     )
     + theme_bw()
 )
+p_gof_obs_fitted_py.show()
 ```
 
 :::
@@ -1896,7 +1893,7 @@ Interpreting $D$ as $\chi^2_{83}$ is an *approximation* that is trustworthy when
 
 ### The Zero-Count Check {#sec-generalized-poisson-gof-zeros}
 
-The EDA recorded `r observed_zeros` zero counts among the 86 training crabs. Under the fitted GP model the probability of a zero for observation $i$ is $p_Y(0; \hat\lambda_i, \hat\theta) = \exp(-\hat\lambda_i)$ (see @Definition-generalized-poisson-distribution), so the model expects
+The EDA recorded `r observed_zeros` zero counts among the 86 training crabs. Under the fitted GP model the probability of a zero for observation $i$ is $p_Y(0; \hat\lambda_i, \hat\theta) = \exp(-\hat\lambda_i)$ (see the definition in @sec-generalized-poisson-random-component), so the model expects
 
 $$
 \sum_{i=1}^{n} \exp(-\hat\lambda_i) = `r round(expected_zeros_gp, 1)`
@@ -2137,6 +2134,30 @@ cat(
 
 :::
 
+```{r}
+#| echo: false
+#| message: false
+# Precomputing the extended-model likelihood comparisons used in the prose below:
+# the Classical Poisson contrast on the same split and specification...
+gp_poisson_ext_r <- glm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = poisson,
+  data = training_data
+)
+
+# ...the dispersion test on the extended scale,
+lr_theta_ext <- 2 * (logLik(gp_fit_ext_r) - logLik(gp_poisson_ext_r))
+p_theta_ext <- pchisq(lr_theta_ext, df = 1, lower.tail = FALSE)
+
+# ...the nested GP comparison (extended vs width-only)...
+lr_nested_gp <- 2 * (logLik(gp_fit_ext_r) - logLik(gp_fit_r))
+p_nested_gp <- pchisq(lr_nested_gp, df = 6, lower.tail = FALSE)
+
+# ...and the same nested comparison under the Poisson random component.
+lr_nested_poisson <- 2 * (logLik(gp_poisson_ext_r) - logLik(gp_poisson_r))
+p_nested_poisson <- pchisq(lr_nested_poisson, df = 6, lower.tail = FALSE)
+```
+
 Both languages return a maximized log-likelihood of `r round(logLik(gp_fit_ext_r), 4)`, and the point estimates match to at least three decimals. The extended dispersion estimate is $\hat\theta = `r round(theta_hat_ext, 3)`$ (`Python`: `r round(reticulate::py$theta_hat_ext_py, 3)`), a variance-to-mean ratio of `r round(1 / (1 - theta_hat_ext)^2, 2)`: adding three sets of regressors barely moves the dispersion parameter (`r round(theta_hat, 3)` $\to$ `r round(theta_hat_ext, 3)`). The overdispersion in these data is **not** explained away by body size, colour, or spine condition — a likelihood-ratio test of $\theta = 0$ for the extended model gives $2 \times [`r round(logLik(gp_fit_ext_r), 2)` - (`r round(logLik(gp_poisson_ext_r), 2)`)] = `r round(lr_theta_ext, 2)`$ on one degree of freedom ($p \approx `r formatC(p_theta_ext, format = "e", digits = 1)`$).
 
 ### Did the Extension Pay Off? {#sec-generalized-poisson-nested}
@@ -2291,7 +2312,7 @@ ggplot(
 #| fig-width: 8
 #| fig-height: 6
 np.random.seed(123)
-(
+p_ext_obs_fitted_py = (
     ggplot(
         pd.DataFrame(
             {
@@ -2309,6 +2330,7 @@ np.random.seed(123)
     )
     + theme_bw()
 )
+p_ext_obs_fitted_py.show()
 ```
 
 :::
@@ -2412,7 +2434,7 @@ cat(
 Three observations carry the chapter's statistical message:
 
 1. **The point estimates barely move.** The largest absolute change is on the intercept (`r round(cs_pois_ext[1, 1], 2)` $\to$ `r round(cs_ext["(Intercept):1", "Estimate"], 2)`); the regressor coefficients shift by at most a few hundredths. Generalizing the random component is not about changing the estimated associations.
-2. **The standard errors inflate by 56% to 101%** (`SE ratio` column, `r round(min(se_compare_r$`SE ratio`), 2)` to `r round(max(se_compare_r$`SE ratio`), 2)`). The naive heuristic from equidispersion theory, a multiplicative $\sqrt{\text{Var}/\mathbb{E}} = \sqrt{`r round(1 / (1 - theta_hat_ext)^2, 2)`} = `r round(1 / (1 - theta_hat_ext), 2)`$, is of the right order — the actual information-matrix inflation varies by coefficient because the Hessian geometry is not a flat rescaling.
+2. **The standard errors inflate by 56% to 101%** (`SE ratio` column, `r round(min(se_compare_r[["SE ratio"]]), 2)` to `r round(max(se_compare_r[["SE ratio"]]), 2)`). The naive heuristic from equidispersion theory, a multiplicative $\sqrt{\text{Var}/\mathbb{E}} = \sqrt{`r round(1 / (1 - theta_hat_ext)^2, 2)`} = `r round(1 / (1 - theta_hat_ext), 2)`$, is of the right order — the actual information-matrix inflation varies by coefficient because the Hessian geometry is not a flat rescaling.
 3. **The inferential ranking of the regressors changes.** Under the Poisson model, `weight_kg`, `Colour: Dark`, and `Spine: Both worn or broken` all clear the conventional 5% line on this training split (p = 0.005, 0.010, 0.006); under the GP model none of them clearly does (p = 0.08–0.10, 0.04–0.07, and 0.08–0.09, varying slightly across the two information-matrix conventions). Chapter 10's own goodness-of-fit section documented that the Poisson model's variance was too small; the table above is the inferential price of that failure, made visible coefficient by coefficient.
 
 The estimates themselves look reasonable; the *conclusions* are what changed. The next section reads the extended-model coefficients on their own merits, in the expected-count-ratio language of Chapter 10.
@@ -3017,7 +3039,7 @@ ggplot(
 #| fig-width: 8
 #| fig-height: 6
 np.random.seed(123)
-(
+p_test_obs_fitted_py = (
     ggplot(
         pd.DataFrame(
             {
@@ -3035,6 +3057,7 @@ np.random.seed(123)
     )
     + theme_bw()
 )
+p_test_obs_fitted_py.show()
 ```
 
 :::
@@ -3931,7 +3954,7 @@ p_bline_hist_py = (
     )
     + theme_minimal()
 )
-p_bline_hist_py
+p_bline_hist_py.show()
 ```
 
 On the training data, the response centers near $\bar y_{\text{train}} = `r round(bline_train_summaries_r["mean"], 2)`$ buses per hour with variance `r round(bline_train_summaries_r["var"], 3)`, giving an empirical variance-to-mean ratio of `r round(bline_train_summaries_r["ratio"], 3)` — well below one. Every condition shows the same signature: the ratio ranges from `0.543` (Friday) to `0.838` (rainy windows). The histogram in @fig-generalized-poisson-bline-histogram-r makes the same point visually: the distribution is pinned to a narrow band around the mean. No conditioning group needs more than a modest location shift — mean arrivals run from about $17.8$ (Friday) to $21.4$ (Wednesday).
