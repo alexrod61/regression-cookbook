@@ -1,0 +1,108 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S5 — Formal model presentation. Replaces the current
+    ## Data Modelling
+section (ending right before the current "## Estimation" heading) with
+    ## The Generalized Poisson Regression Model {#sec-generalized-poisson-data-modelling}
+plus three subsections. Notation: dispersion parameter theta, rate-like parameter lambda_i
+(Appendix C alignment); PMF per Ch2 conventions; every definition self-contained.
+
+====================================================================
+FULL REPLACEMENT TEXT
+====================================================================
+
+## The Generalized Poisson Regression Model {#sec-generalized-poisson-data-modelling}
+
+The EDA pointed to a specific problem: the training counts appear strongly overdispersed, while the expected count clearly varies with female crab size. We now build the formal probability model that can represent both features at once. Like every regression model in this book, the specification has three parts: a **random component** (the conditional distribution of the response), a **systematic component** (how the regressors enter), and a **link function** (how the two are connected). The first is the genuinely new piece; the second and third coincide with those of @sec-classical-poisson-glm.
+
+### The Random Component {#sec-generalized-poisson-random-component}
+
+For the $i$th observation ($i = 1, \ldots, n$), let $Y_i$ be the count response (for our case study, the number of satellite males) and let $x_{i,1}, \ldots, x_{i,k}$ be its regressors. Conditional on those regressors, we model
+
+$$
+Y_i \mid x_{i,1}, \ldots, x_{i,k} \sim \operatorname{GPO}(\lambda_i, \theta),
+$${#eq-generalized-poisson-random-component}
+
+where $\operatorname{GPO}(\lambda_i, \theta)$ denotes the **Generalized Poisson distribution** with parameters $\lambda_i > 0$ and $\theta \in (-1, 1)$.
+
+::: {#Definition-generalized-poisson-distribution .definition}
+:::: {.definition-header}
+Definition of the Generalized Poisson distribution
+::::
+
+:::: {.definition-container}
+A discrete random variable $Y$ follows a **Generalized Poisson distribution** with parameters $\lambda > 0$ and $\theta \in (-1, 1)$, written $Y \sim \operatorname{GPO}(\lambda, \theta)$, if its probability mass function (PMF) is
+
+$$
+p_Y(y; \lambda, \theta) \;=\; \frac{\lambda \, (\lambda + \theta y)^{y - 1} \, \exp\!\big(-(\lambda + \theta y)\big)}{y!},
+\qquad y = 0, 1, 2, \ldots
+$${#eq-generalized-poisson-pmf}
+
+[@consul1973]. Here $\lambda$ is a rate-like parameter and $\theta$ is the **dispersion parameter**. When $\theta < 0$, the support is truncated so that $\lambda + \theta y$ stays positive; the truncation only bites at counts far in the upper tail for the parameter values we will encounter [@consul1989gp].
+
+The mean and variance of $Y$ are
+
+$$
+\mathbb{E}(Y) = \frac{\lambda}{1 - \theta},
+\qquad
+\operatorname{Var}(Y) = \frac{\lambda}{(1 - \theta)^3}.
+$$
+
+So the ratio of variance to mean is
+
+$$
+\frac{\operatorname{Var}(Y)}{\mathbb{E}(Y)} = \frac{1}{(1 - \theta)^2}:
+$$
+
+equal to $1$ when $\theta = 0$ (which recovers the Poisson distribution), greater than $1$ when $\theta > 0$ (**overdispersion**), and smaller than $1$ when $\theta < 0$ (**underdispersion**). One useful special value for later diagnostics is the probability of a zero count, $p_Y(0; \lambda, \theta) = \exp(-\lambda)$.
+
+The same parameterization appears in @sec-generalized-poisson-distribution in the distributional appendix.
+::::
+:::
+
+Two properties of this random component drive everything that follows. First, the Poisson distribution is **nested** inside the GP family at $\theta = 0$, which will let us formally compare the two models. Second, $\theta$ converts directly into a variance multiplier: for example, $\theta = 0.5$ implies a variance $1 / (1 - 0.5)^2 = 4$ times the mean, while $\theta = -0.5$ implies a variance $0.44$ times the mean. We assume a single dispersion parameter $\theta$ shared by all observations, while each observation keeps its own $\lambda_i$.
+
+### The Systematic Component {#sec-generalized-poisson-systematic-component}
+
+As in @sec-classical-poisson-glm, the regressors enter through a **linear predictor**
+
+$$
+\eta_i = \beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \cdots + \beta_k x_{i,k}
+       = \mathbf{x}_i^\top \boldsymbol{\beta},
+$${#eq-generalized-poisson-systematic-component}
+
+where $\mathbf{x}_i = (1, x_{i,1}, \ldots, x_{i,k})^\top$ collects the intercept and the $k$ regressors of observation $i$, and $\boldsymbol{\beta} = (\beta_0, \beta_1, \ldots, \beta_k)^\top$ is the coefficient vector. Linearity here means linearity **in the coefficients**; the expected count itself will not be a straight-line function of the regressors.
+
+For the running case study we start with the same simple specification as @sec-classical-poisson: the female crab's shell width only. The extended specification — width, weight, colour, and spine condition — is deliberately the same as the extended model in @sec-classical-poisson-additional-regressors, so that any change in conclusions can be attributed to the random component rather than to a different set of regressors.
+
+### The Log Link Function {#sec-generalized-poisson-log-link}
+
+Writing $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ for the conditional expected count, we connect the mean to the linear predictor with the same **log link** as Chapter 10:
+
+$$
+\log(\mu_i) = \eta_i
+\qquad\Longleftrightarrow\qquad
+\mu_i = \exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$${#eq-generalized-poisson-log-link}
+
+The log link keeps the expected count positive for any value of the linear predictor and places the coefficients on the **log expected-count scale**; exponentiating a coefficient therefore gives a multiplicative change in the expected count, exactly as in Chapter 10.
+
+Combining the link with the GP mean, $\mu_i = \lambda_i / (1 - \theta)$, gives the rate-like parameter that enters the PMF:
+
+$$
+\lambda_i = (1 - \theta)\,\mu_i = (1 - \theta)\exp(\mathbf{x}_i^\top \boldsymbol{\beta}).
+$${#eq-generalized-poisson-lambda-mean}
+
+The regression thus carries two sets of unknowns: the coefficient vector $\boldsymbol{\beta}$, which moves the expected count, and the scalar dispersion parameter $\theta \in (-1, 1)$, which governs how far the variance is from the mean.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up: a GLM-like model that is not a Poisson GLM!
+::::
+:::: {.Heads-up-container}
+Chapter 10's Poisson regression is a classical generalized linear model: its Poisson random component belongs to the one-parameter exponential family, and its coefficients can be estimated by Iteratively Reweighted Least Squares (IRLS). The Generalized Poisson model looks similar — same linear predictor, same log link — but its random component carries the second parameter $\theta$, which places it outside that special case. It is best understood as a **joint maximum likelihood** problem in $(\boldsymbol{\beta}, \theta)$: in `R` we will fit it with [{VGAM}](https://cran.r-project.org/package=VGAM)'s vector generalized linear model machinery (`vglm()` with a GP family), and in `Python` we will maximize the GP log-likelihood directly. The estimation section makes the likelihood — and where the standard errors come from — precise.
+::::
+:::
+
+====================================================================
+FILE: END OF S5 PROPOSAL
+====================================================================
