@@ -1,0 +1,34 @@
+# Revision rationale for the Prediction section
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): NEW `## Prediction with Generalized Poisson Regression {#sec-generalized-poisson-prediction}` after the interpretation section, before the B-Line case-study block.
+- Reference chapters/files reviewed: finished Ch10 prediction section (L6943-7158: matrix/scalar prediction equation, expected-vs-exact-count Heads-up, first-10 testing predictions table, deferral of metrics to Results); skill.md sections 13, 20.
+
+## What was preserved
+- The finished-Ch10 prediction architecture verbatim: prediction equation, manual calculation before software, the expected-count (not rounded count) warning, training-fitted model used for held-out predictions, metrics deferred to Results.
+
+## What changed
+- The prediction display ATTACHES theta: three-part display (mean equation, lambda conversion, full predictive GPO distribution) instead of the Poisson single-parameter statement.
+- New executed manual calculation for the first testing observation (profile: Medium light, Both worn or broken, 28.3 cm, 3.05 kg): eta = 1.607 printed with each term's underbrace annotation, mu_1 = 4.988, lambda_1 = 2.532, P(Y=0) = 0.079 versus Poisson 0.007, predictive SD 4.40 versus Poisson 2.23 — all inline-executed values.
+- The R code contains an explicit equivalence check (manual design-matrix multiplication equals VGAM predict(), printed boolean) so the manual-software correspondence is demonstrated, not claimed.
+- First-ten held-out predictions table gains the column GP predictive P(Y = 0) per row (exp(-lambda_i)), which no Poisson chapter can show (there it would be exp(-mu_i)).
+- Heads-up on predicting with a dispersion parameter: which metric families react to honest spread (negative log predictive mass, predictive deviance) versus which do not (ME/MAE/RMSE) — forward motivation for the Results metrics table.
+
+## Why the changes help
+- GP-specific addition keeps continuity with Chapter 10 while demonstrating the real gain of the chapter: predictive distributions whose spread matches the data.
+- The all.equal check teaches that predict() is not magic and anchors the manual arithmetic to software output.
+
+## Execution and validation
+- R verbatim smoke: /tmp/regref/s11_chapter_r.R — manual eta/mu/P0/SD printed (1.607 / 4.988 / 0.079 / 4.40), equality with predict() confirmed in the upstream spike (4.987698 both).
+- Python parity verified in /tmp/regref/s11_s12_spike.py (mu_1 4.98768, identical table columns).
+- VGAM predict(type="response") shape quirk handled with the is.null(dim()) guard, documented in a code comment.
+
+## What should be avoided
+- Rounding predictions to integers; using the training-fitted theta only for GOF but forgetting it in prediction; promising predictive improvement before the metrics are computed.
+
+## References cited here
+- None new this stage.
+
+## Placement and dependencies
+- Objects: mm_test, beta_vec, mu_test_r, gp_test_predictions_r; Python: cat_dummies_test, X_test, mu_test_py, lambda_test_py, gp_test_predictions_py(_html). S12 (Results) consumes mu_test_r/mu_test_py (and theta_hat_ext) for the metric tables, and refits gp on testing_data for the inferential branch.

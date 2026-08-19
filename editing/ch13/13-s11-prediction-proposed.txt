@@ -1,0 +1,185 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S11 — Prediction with GP regression. NEW SECTION inserted after the S10
+interpretation section (ends "...after refitting on the untouched testing set.") and
+before "## Case Study 2: 99 B-Line Bus Arrivals (Underdispersion) {#sec-cs2-bline}".
+
+Executed (R/Python parity verified):
+  testing row 1: Medium light, Both worn or broken, width 28.3 cm, weight 3.05 kg, observed 8
+  eta_1 = 1.6070, mu_1 = 4.988 = predict() output both languages
+  lambda_1 = (1 - 0.4923) * 4.988 = 2.532; P(Y = 0) = exp(-2.532) = 0.0796 GP vs exp(-4.988) = 0.0068 Poisson
+  predictive SD at mu=4.988: sqrt(4.988 * 3.88) = 4.40 (Poisson: sqrt(4.988) = 2.23)
+
+====================================================================
+FULL INSERTED TEXT
+====================================================================
+
+## Prediction with Generalized Poisson Regression {#sec-generalized-poisson-prediction}
+
+Prediction proceeds exactly as in @sec-classical-poisson-prediction: form the linear predictor for a new profile, exponentiate to the expected-count scale, and — the GP addition — attach the fitted dispersion parameter. For a new female crab with regressor row vector $\mathbf{x}_{\operatorname{new}}^\top$ (intercept plus the seven extended-model regressors),
+
+$$
+\hat\mu_{\operatorname{new}} = \exp\big(\mathbf{x}_{\operatorname{new}}^\top \hat{\boldsymbol{\beta}}\big),
+\qquad
+\hat\lambda_{\operatorname{new}} = (1 - \hat\theta)\,\hat\mu_{\operatorname{new}},
+\qquad
+Y_{\operatorname{new}} \mid \mathbf{x}_{\operatorname{new}} \sim \operatorname{GPO}\big(\hat\lambda_{\operatorname{new}}, \hat\theta\big).
+$${#eq-generalized-poisson-prediction}
+
+The predicted value $\hat\mu_{\operatorname{new}}$ is an **expected count**, not a rounded count: it can be fractional but must be positive. What the GP layer adds relative to Chapter 10 is an honest *predictive spread* — predictive SD $\sqrt{\hat\mu_{\operatorname{new}}/(1-\hat\theta)^2}$ — and it makes the whole satellite-count distribution available for the profile: its zero probability is $\exp(-\hat\lambda_{\operatorname{new}})$, its tail probabilities follow from the PMF, and so on.
+
+### A Manual Prediction, First
+
+Before delegating to software, walk through one prediction by hand. The first testing observation is a `Medium light`, `Both worn or broken` female of width `r testing_data$width_cm[1]` cm and weight `r testing_data$weight_kg[1]` kg (observed count: `r testing_data$satellites[1]`). Its linear predictor is
+
+$$
+\hat\eta = \underbrace{`r round(cs_ext["(Intercept):1", "Estimate"], 3)`}_{\hat\beta_0}
++ \underbrace{`r round(cs_ext["width_cm", "Estimate"], 4)`}_{\hat\beta_1}(`r testing_data$width_cm[1]`)
++ \underbrace{`r round(cs_ext["weight_kg", "Estimate"], 4)`}_{\hat\beta_2}(`r testing_data$weight_kg[1]`)
++ \underbrace{(`r round(cs_ext["colorMedium light", "Estimate"], 4)`)}_{\hat\beta_3}(1)
++ \underbrace{`r round(cs_ext["spineBoth worn or broken", "Estimate"], 4)`}_{\hat\beta_7}(1)
+= `r round(sum(beta_hat_r1 <- c(cs_ext["(Intercept):1","Estimate"]) + cs_ext["width_cm","Estimate"] * testing_data$width_cm[1] + cs_ext["weight_kg","Estimate"] * testing_data$weight_kg[1] + cs_ext["colorMedium light","Estimate"] + cs_ext["spineBoth worn or broken","Estimate"]), 3)`,
+$$
+
+so $\hat\mu_1 = \exp(`r round(beta_hat_r1, 3)`) = `r round(exp(beta_hat_r1), 3)`$ and $\hat\lambda_1 = (1 - `r round(theta_hat_ext, 4)`) \times `r round(exp(beta_hat_r1), 3)` = `r round((1 - theta_hat_ext) * exp(beta_hat_r1), 3)`$. Under the fitted GP, $P(Y_1 = 0) = \exp(-\hat\lambda_1) = `r round(exp(-(1 - theta_hat_ext) * exp(beta_hat_r1)), 3)`$ — where a Poisson model with the same mean would say `r round(exp(-exp(beta_hat_r1)), 3)` — and the predictive standard deviation is $\sqrt{`r round(exp(beta_hat_r1), 2)` \times `r round(1/(1-theta_hat_ext)^2, 2)`} \approx `r round(sqrt(exp(beta_hat_r1) / (1 - theta_hat_ext)^2), 2)`$ rather than the Poisson $\sqrt{`r round(exp(beta_hat_r1), 2)`} \approx `r round(sqrt(exp(beta_hat_r1)), 2)`$. The software calls below reproduce exactly this arithmetic.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on predicting with a dispersion parameter!
+::::
+:::: {.Heads-up-container}
+A Poisson prediction collapses to its mean: once $\hat\mu_{\operatorname{new}}$ is computed, the whole predictive distribution is fixed. A GP prediction is a genuine two-parameter distribution: $\hat\mu_{\operatorname{new}}$ describes the *location* and $\hat\theta$ describes the *spread*. When $\hat\theta \approx 0.5$, the predictive SD is roughly $1/(1-\hat\theta) \approx `r round(1 / (1 - theta_hat_ext), 2)`$ times the Poisson one at the same mean — so GP prediction intervals for individual counts are roughly twice as wide as the Poisson equivalents. Metrics that score the whole predictive distribution (the negative log predictive mass, the predictive deviance) will react to this honest widening; mean-only metrics (ME, MAE, RMSE) will not. Both families of metrics appear in @sec-generalized-poisson-results.
+::::
+:::
+
+### Held-Out Predictions from the Training-Fitted Model
+
+For the predictive inquiry, the rules of the workflow matter: **the extended model fitted on the training data is used to predict the testing observations**; no refitting happens before prediction. The tables below show the first ten held-out predictions and check explicitly that the manual linear-predictor arithmetic equals the software's fitted prediction.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-predictions-r
+#| lst-cap: "Code to generate held-out expected-count predictions from the training-fitted extended GP model (R), including the manual-product check."
+#| message: false
+#| warning: false
+# Design matrix for the testing data and the eight regression coefficients
+mm_test <- model.matrix(~ width_cm + weight_kg + color + spine, data = testing_data)
+beta_vec <- c(cs_ext["(Intercept):1", "Estimate"], cs_ext[beta_rows[-1], "Estimate"])
+names(beta_vec) <- colnames(mm_test)  # renaming (Intercept):1 to (Intercept)
+mu_test_r <- exp(drop(mm_test %*% beta_vec))
+
+# The same predictions via VGAM's predict() method
+mu_test_vglm <- predict(gp_fit_ext_r, newdata = testing_data, type = "response")
+if (!is.null(dim(mu_test_vglm))) mu_test_vglm <- mu_test_vglm[, 1]
+cat("Manual equals predict():", isTRUE(all.equal(mu_test_r, as.numeric(mu_test_vglm))), "\n")
+
+# First ten testing predictions with predictive zero probabilities
+gp_test_predictions_r <- testing_data |>
+  mutate(
+    predicted_expected_count = round(mu_test_r, 2),
+    predictive_prob_zero = round(exp(-(1 - theta_hat_ext) * mu_test_r), 3)
+  ) |>
+  select(
+    satellites, width_cm, weight_kg, color, spine,
+    predicted_expected_count, predictive_prob_zero
+  ) |>
+  slice_head(n = 10)
+```
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-predictions-r
+#| tbl-cap: "First ten held-out predictions from the training-fitted extended Generalized Poisson model, with the GP predictive probability of a zero count."
+#| message: false
+gp_test_predictions_r |>
+  rename(
+    `Observed satellite count` = satellites,
+    `Width (cm)` = width_cm,
+    `Weight (kg)` = weight_kg,
+    `Colour` = color,
+    `Spine condition` = spine,
+    `Predicted expected count` = predicted_expected_count,
+    `GP predictive P(Y = 0)` = predictive_prob_zero
+  ) |>
+  print_as_dt()
+```
+
+:::
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-predictions-py
+#| lst-cap: "Code to generate held-out expected-count predictions from the training-fitted extended GP model (Python)."
+#| message: false
+#| warning: false
+```
+```{python}
+#| echo: true
+#| message: false
+# Design matrix for the testing data, with the same dummy layout as the training fit
+cat_dummies_test = pd.get_dummies(testing_data[["color", "spine"]], drop_first=True)
+X_test = np.column_stack(
+    [
+        np.ones(len(testing_data)),
+        testing_data["width_cm"].to_numpy(dtype=float),
+        testing_data["weight_kg"].to_numpy(dtype=float),
+        cat_dummies_test.to_numpy(dtype=float),
+    ]
+)
+mu_test_py = np.exp(X_test @ beta_hat_ext)
+lambda_test_py = (1.0 - theta_hat_ext_py) * mu_test_py
+
+# First ten testing predictions with predictive zero probabilities
+gp_test_predictions_py = testing_data.assign(
+    predicted_expected_count=mu_test_py.round(2),
+    predictive_prob_zero=np.exp(-lambda_test_py).round(3),
+).loc[
+    :,
+    [
+        "satellites", "width_cm", "weight_kg", "color", "spine",
+        "predicted_expected_count", "predictive_prob_zero",
+    ],
+].head(10)
+gp_test_predictions_py_html = scrollable_table_html(
+    gp_test_predictions_py.rename(
+        columns={
+            "satellites": "Observed satellite count",
+            "width_cm": "Width (cm)",
+            "weight_kg": "Weight (kg)",
+            "color": "Colour",
+            "spine": "Spine condition",
+            "predicted_expected_count": "Predicted expected count",
+            "predictive_prob_zero": "GP predictive P(Y = 0)",
+        }
+    )
+)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-predictions-py
+#| tbl-cap: "First ten held-out predictions from the training-fitted extended Generalized Poisson model, with the GP predictive probability of a zero count (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gp_test_predictions_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+The first held-out prediction reproduces the manual calculation above: $\hat\mu_1 = `r round(mu_test_r[1], 3)`$ expected satellite males with a GP zero probability of `r round(exp(-(1 - theta_hat_ext) * mu_test_r[1]), 3)`$. The full predictive assessment — six held-out metrics and the comparison against a training-mean baseline — belongs to the results stage, up next.
+
+====================================================================
+FILE: END OF S11 PROPOSAL
+====================================================================
