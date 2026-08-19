@@ -1,0 +1,439 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S12 — Results and Statistical Interpretation. NEW SECTION inserted after the S11
+prediction section (ends "...belongs to the results stage, up next.") and before
+    "## Case Study 2: 99 B-Line Bus Arrivals (Underdispersion) {#sec-cs2-bline}".
+
+Executed (R/Python parity verified; testing data n = 87, first touched here):
+  Testing refit: theta = 0.514 (SE 0.059 R / 0.061 Python), variance ratio 4.23,
+    logLik = -190.4396, LRT theta=0 vs testing-Poisson: 86.96, p = 1.1e-20
+    betas: width -0.0147 (p 0.92), weight 0.4911 (p 0.38), Medium light -0.504 (p 0.25),
+    Medium dark -0.925 (p 0.07), Dark -1.204 (p 0.049), spineOne -0.282 (p 0.54),
+    spineBoth -0.068 (p 0.81); Dark ratio 0.30, CI (0.09, 1.00)
+  Held-out metrics: extended GP ME 0.281, MAE 2.530, RMSE 3.289, dev 1.583, KL 0.791, NLPM 2.256;
+    intercept-only baseline (mu 2.849, theta 0.583): ME 0.140, MAE 2.496, RMSE 3.196,
+    dev 1.444, KL 0.722, NLPM 2.275
+
+====================================================================
+FULL INSERTED TEXT
+====================================================================
+
+## Results and Statistical Interpretation {#sec-generalized-poisson-results}
+
+We now move from model building to results. Everything so far — EDA, both candidate GP fits, the dispersion tests, and all goodness-of-fit checks — ran on the training data. The testing set of `r nrow(testing_data)` crabs has not been touched since it was sealed in @sec-generalized-poisson-eda. The two guiding inquiries set out in @tbl-generalized-poisson-study-design-inquiries get separate answers:
+
+| Inquiry type | Research question | What this results stage delivers |
+|:---:|:---:|:---|
+| **Inferential inquiry** | How is the expected number of satellite males associated with female crab width, weight, colour, and spine condition? | Coefficient-level inferential summaries from the extended Generalized Poisson model **refitted on the testing data**, including $\hat\theta$ with its uncertainty and the test of $H_0: \theta = 0$. |
+| **Predictive inquiry** | How well can the available regressors be used to predict the expected number of satellite males for a female crab? | Held-out predictive metrics computed from the **training-fitted** extended model's predictions on the testing data, compared against a training-mean baseline. |
+
+: The two guiding inquiries revisited for the Results section. {#tbl-generalized-poisson-results-inquiries .striped .hover}
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on why the testing data appear in two roles here!
+::::
+:::: {.Heads-up-container}
+The two inquiries use the testing data differently, and the distinction matters:
+
+- **Inferential**: the selected extended model is **refitted on the testing data**, giving a final coefficient-level analysis on observations never used for EDA, fitting, or goodness-of-fit decisions.
+- **Predictive**: the model is **not** refitted; predictions for the testing responses come from the model fitted on the training data.
+
+Mixing these roles would corrupt one branch or the other: the inferential refit is the workflow's guard against data-driven model selection, while held-out prediction is only meaningful before the model sees the testing responses.
+::::
+:::
+
+### Inferential Results: Refitting on the Testing Data {#sec-generalized-poisson-inferential-results}
+
+The extended specification of @eq-generalized-poisson-extended-model — same regressors, same reference categories, same GP random component — is refitted on the testing data with identical machinery:
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-refit-r
+#| lst-cap: "Code to refit the extended Generalized Poisson model on the testing data and assemble the inferential summary (R)."
+#| message: false
+#| warning: false
+# Refitting the extended model on the testing data
+gp_fit_test_r <- vglm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = genpoisson1(zero = "dispind"),
+  data = testing_data
+)
+poisson_test_r <- glm(
+  satellites ~ width_cm + weight_kg + color + spine,
+  family = poisson,
+  data = testing_data
+)
+
+# Decoding the testing-refit summary
+cs_test <- coef(summary(gp_fit_test_r))
+eta2_test <- cs_test["(Intercept):2", "Estimate"]
+se_eta2_test <- cs_test["(Intercept):2", "Std. Error"]
+theta_hat_test <- 1 - exp(-exp(eta2_test) / 2)
+se_theta_test <- (exp(-exp(eta2_test) / 2) * exp(eta2_test) / 2) * se_eta2_test
+
+# Testing-set test of theta = 0
+lr_theta_test <- 2 * (logLik(gp_fit_test_r) - logLik(poisson_test_r))
+p_theta_test <- pchisq(lr_theta_test, df = 1, lower.tail = FALSE)
+
+# Coefficient table on the log expected-count scale
+gp_test_summary_r <- tibble(
+  Term = c(
+    "(Intercept)", "width_cm", "weight_kg",
+    "Colour: Medium light", "Colour: Medium dark", "Colour: Dark",
+    "Spine: One worn or broken", "Spine: Both worn or broken",
+    "Dispersion (theta)"
+  ),
+  Estimate = c(cs_test[beta_rows, "Estimate"], theta_hat_test),
+  `Std. Error` = c(cs_test[beta_rows, "Std. Error"], se_theta_test),
+  `z value` = Estimate / `Std. Error`,
+  `Pr(>|z|)` = 2 * pnorm(-abs(`z value`)),
+  `Ratio: exp(estimate)` = exp(Estimate),
+  `Ratio 95% CI lower` = exp(Estimate - 1.96 * `Std. Error`),
+  `Ratio 95% CI upper` = exp(Estimate + 1.96 * `Std. Error`)
+)
+
+# Exponentiated ratios are not meaningful for the dispersion parameter
+gp_test_summary_r[
+  gp_test_summary_r$Term == "Dispersion (theta)",
+  c("Ratio: exp(estimate)", "Ratio 95% CI lower", "Ratio 95% CI upper")
+] <- NA_real_
+```
+
+:::
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-refit-py
+#| lst-cap: "Code to refit the extended Generalized Poisson model on the testing data and assemble the inferential summary (Python)."
+#| message: false
+#| warning: false
+```
+```{python}
+#| echo: true
+#| message: false
+y_test = testing_data["satellites"].to_numpy(dtype=float)
+
+# Refitting the extended model on the testing data
+gp_fit_test_py = GeneralizedPoisson(y_test, X_test).fit_dispersion()
+poisson_test_py = sm.GLM(y_test, X_test, family=Poisson()).fit()
+beta_hat_test = gp_fit_test_py.params[:-1]
+beta_se_test = gp_fit_test_py.bse[:-1]
+z_hat_test = gp_fit_test_py.params[-1]
+theta_hat_test_py = 2.0 / (1.0 + np.exp(-z_hat_test)) - 1.0
+s_z = 1.0 / (1.0 + np.exp(-z_hat_test))
+se_theta_test_py = 2.0 * s_z * (1.0 - s_z) * gp_fit_test_py.bse[-1]
+
+# Testing-set test of theta = 0
+lr_theta_test_py = 2.0 * (gp_fit_test_py.llf - poisson_test_py.llf)
+p_theta_test_py = stats.chi2.sf(lr_theta_test_py, df=1)
+
+# Coefficient table on the log expected-count scale
+gp_test_summary_py = pd.DataFrame(
+    {
+        "Term": coef_names_ext,
+        "Estimate": beta_hat_test,
+        "Std. Error": beta_se_test,
+    }
+)
+gp_test_summary_py["z value"] = (
+    gp_test_summary_py["Estimate"] / gp_test_summary_py["Std. Error"]
+)
+gp_test_summary_py["Pr(>|z|)"] = (
+    2 * (1 - stats.norm.cdf(gp_test_summary_py["z value"].abs()))
+)
+gp_test_summary_py["Ratio: exp(estimate)"] = np.exp(gp_test_summary_py["Estimate"])
+gp_test_summary_py["Ratio 95% CI lower"] = np.exp(
+    gp_test_summary_py["Estimate"] - 1.96 * gp_test_summary_py["Std. Error"]
+)
+gp_test_summary_py["Ratio 95% CI upper"] = np.exp(
+    gp_test_summary_py["Estimate"] + 1.96 * gp_test_summary_py["Std. Error"]
+)
+theta_row_test = pd.DataFrame(
+    {
+        "Term": ["Dispersion (theta)"],
+        "Estimate": [theta_hat_test_py],
+        "Std. Error": [se_theta_test_py],
+        "z value": [theta_hat_test_py / se_theta_test_py],
+        "Pr(>|z|)": [
+            2 * (1 - stats.norm.cdf(abs(theta_hat_test_py / se_theta_test_py)))
+        ],
+        "Ratio: exp(estimate)": [np.nan],
+        "Ratio 95% CI lower": [np.nan],
+        "Ratio 95% CI upper": [np.nan],
+    }
+)
+gp_test_summary_py = pd.concat([gp_test_summary_py, theta_row_test], ignore_index=True)
+gp_test_summary_py_html = scrollable_table_html(gp_test_summary_py)
+```
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-refit-r
+#| tbl-cap: "Testing-set refit of the extended Generalized Poisson model: log-scale estimates with Wald statistics and expected-count ratios with 95% confidence intervals (R)."
+#| message: false
+print_as_dt(gp_test_summary_r)
+```
+
+## **`Python` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-refit-py
+#| tbl-cap: "Testing-set refit of the extended Generalized Poisson model: log-scale estimates with Wald statistics and expected-count ratios with 95% confidence intervals (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gp_test_summary_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+Reading the testing-set refit:
+
+- **The dispersion parameter is a finding of the study, not a tuning detail.** The testing refit gives $\hat\theta = `r round(theta_hat_test, 3)`$ (95% Wald interval `r round(theta_hat_test - 1.96 * se_theta_test, 2)` to `r round(theta_hat_test + 1.96 * se_theta_test, 2)`), a variance `r round(1 / (1 - theta_hat_test)^2, 1)` times the mean. The held-out likelihood-ratio test of $H_0: \theta = 0$ gives $\chi^2_1 = `r round(lr_theta_test, 2)`$, $p \approx `r formatC(p_theta_test, format = "e", digits = 1)`$: the equidispersion assumption fails on data the model never saw. Training and testing agree (compare $\hat\theta = `r round(theta_hat_ext, 3)`$ from @sec-generalized-poisson-extended-model), so the overdispersion is a stable feature of these crabs, not an artefact of one split.
+- **One comparison keeps an interval below one: `Dark` vs `Light`.** Its testing estimate of `r round(exp(cs_test["colorDark", "Estimate"]), 2)` on the expected-count ratio scale has the 95% interval (`r round(exp(cs_test["colorDark", "Estimate"] - 1.96 * cs_test["colorDark", "Std. Error"]), 2)`, `r round(exp(cs_test["colorDark", "Estimate"] + 1.96 * cs_test["colorDark", "Std. Error"]), 2)`): an estimated `r round(100 * (1 - exp(cs_test["colorDark", "Estimate"])))`% lower expected satellite count for `Dark` females than for `Light` females of the same width, weight, and spine condition, with the interval just touching one. `Medium dark` points the same way (ratio `r round(exp(cs_test["colorMedium dark", "Estimate"]), 2)`, interval upper endpoint `r round(exp(cs_test["colorMedium dark", "Estimate"] + 1.96 * cs_test["colorMedium dark", "Std. Error"]), 2)`).
+- **Every other regressor interval comfortably contains one** on the testing refit — including both body-size measures, whose training-stage EDA gradient was the clearest signal in the chapter. Under the GP model's honest uncertainty, and with `r nrow(testing_data)` testing observations, the body-size association is not statistically distinguishable from zero in either half of the data once the remaining regressors are adjusted for (training width p = `r round(2 * pnorm(-abs(cs_ext["width_cm", "Estimate"] / cs_ext["width_cm", "Std. Error"])), 2)`; testing width p = `r round(2 * pnorm(-abs(cs_test["width_cm", "Estimate"] / cs_test["width_cm", "Std. Error"])), 2)`).
+
+Overall inferential answer: *on the testing-set refit, female crab colour contrasts against `Light` — with `Dark` in particular — provide the clearest evidence of association with the expected number of satellite males, while the body-size effects do not clear the GP model's honest uncertainty bands; simultaneously, the dispersion parameter is decisively positive, so any final interpretation must use the GP model's standard errors rather than Poisson ones.*
+
+### Predictive Results: Held-Out Metrics for the Training-Fitted Model {#sec-generalized-poisson-predictive-results}
+
+For the predictive branch, we evaluate the predictions produced in @sec-generalized-poisson-prediction. @tbl-generalized-poisson-prediction-metric-guide lists the six metrics; they are the GP analogues of the six metrics of @tbl-classical-poisson-prediction-metric-guide in @sec-classical-poisson.
+
+| Metric | Definition | Reading |
+|:---:|:---:|:---|
+| Mean error (ME) | $\frac{1}{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}} (y_i - \hat\mu_i)$ | Average signed error; near zero means little average bias, but signs can cancel. |
+| Mean absolute error (MAE) | $\frac{1}{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}} |y_i - \hat\mu_i|$ | Typical absolute error in counts. Smaller is better. |
+| Root mean squared error (RMSE) | $\sqrt{\frac{1}{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}} (y_i - \hat\mu_i)^2}$ | Penalizes large errors more than MAE. Smaller is better. |
+| Mean GP deviance | $\frac{2}{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}}\big[\ell_i^{\text{sat}} - \ell_i\big]$ with $\ell_i = \log p_Y(y_i;\hat\lambda_i,\hat\theta)$ and $\ell_i^{\text{sat}}$ from @eq-generalized-poisson-saturated | Likelihood-based discrepancy of the fitted GP distribution with the saturated GP fit for each testing observation. Smaller is better. |
+| Average KL discrepancy | Half of the mean GP deviance | The same evidence as the mean GP deviance on the KL scale (the two rows always move together). Smaller is better. |
+| Mean negative log predictive mass | $-\frac{1}{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}} \log p_Y(y_i;\hat\lambda_i,\hat\theta)$ | Average predictive surprise under the fitted GP distribution; this metric reacts to the *honest spread* that $\hat\theta$ provides. Smaller is better. |
+
+: Prediction metrics used to evaluate held-out testing performance for the fitted Generalized Poisson model. {#tbl-generalized-poisson-prediction-metric-guide .striped .hover}
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-metrics-r
+#| lst-cap: "Code to compute the six held-out prediction metrics for the extended GP model and the intercept-only baseline (R)."
+#| message: false
+#| warning: false
+# Intercept-only GP baseline fitted on the training data
+gp_baseline_r <- vglm(
+  satellites ~ 1, genpoisson1(zero = "dispind"), data = training_data
+)
+mu_baseline_r <- exp(coef(gp_baseline_r)["(Intercept):1"])
+theta_hat_baseline <- 1 - exp(-exp(coef(gp_baseline_r)["(Intercept):2"]) / 2)
+
+# Metric helper: all six metrics need only observed counts, fitted means, and theta
+gp_prediction_metrics_r <- function(observed, mu_pred, theta_pred) {
+  lam <- (1 - theta_pred) * mu_pred
+  ll <- gp_logpmf_r(observed, lam, theta_pred)
+  ll_sat <- vapply(
+    observed,
+    function(yi) {
+      if (yi == 0) return(0)
+      lam_sat <- (yi * (1 - theta_pred) + sqrt(yi^2 * (1 - theta_pred)^2 + 4 * theta_pred * yi)) / 2
+      gp_logpmf_r(yi, lam_sat, theta_pred)
+    },
+    numeric(1)
+  )
+  dev <- 2 * (ll_sat - ll)
+  c(
+    `Mean error` = mean(observed - mu_pred),
+    MAE = mean(abs(observed - mu_pred)),
+    RMSE = sqrt(mean((observed - mu_pred)^2)),
+    `Mean GP deviance` = mean(dev),
+    `Average KL discrepancy` = mean(dev) / 2,
+    `Mean negative log predictive mass` = mean(-ll)
+  )
+}
+
+y_test_vec <- testing_data$satellites
+gp_prediction_metrics_table_r <- round(rbind(
+  `Extended GP model` = gp_prediction_metrics_r(y_test_vec, mu_test_r, theta_hat_ext),
+  `Training-mean baseline` = gp_prediction_metrics_r(
+    y_test_vec, rep(mu_baseline_r, length(y_test_vec)), theta_hat_baseline
+  )
+), 3)
+```
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-metrics-r
+#| tbl-cap: "Held-out prediction metrics on the testing data for the training-fitted extended GP model and the intercept-only baseline (R)."
+#| message: false
+gp_prediction_metrics_table_r |>
+  as_tibble(rownames = "Model") |>
+  print_as_dt()
+```
+
+:::
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-test-metrics-py
+#| lst-cap: "Code to compute the six held-out prediction metrics for the extended GP model and the intercept-only baseline (Python)."
+#| message: false
+#| warning: false
+```
+```{python}
+#| echo: true
+#| message: false
+# Metric helper: all six metrics need only observed counts, fitted means, and theta
+def gp_prediction_metrics(observed, mu_pred, theta_pred):
+    lam = (1.0 - theta_pred) * mu_pred
+    ll = gp_logpmf(observed, lam, theta_pred)
+    ll_sat = np.zeros_like(observed)
+    positive = observed > 0
+    ys = observed[positive]
+    lam_sat = (
+        ys * (1 - theta_pred)
+        + np.sqrt(ys**2 * (1 - theta_pred) ** 2 + 4 * theta_pred * ys)
+    ) / 2
+    ll_sat[positive] = gp_logpmf(ys, lam_sat, theta_pred)
+    dev = 2.0 * (ll_sat - ll)
+    return {
+        "Mean error": float(np.mean(observed - mu_pred)),
+        "MAE": float(np.mean(np.abs(observed - mu_pred))),
+        "RMSE": float(np.sqrt(np.mean((observed - mu_pred) ** 2))),
+        "Mean GP deviance": float(np.mean(dev)),
+        "Average KL discrepancy": float(np.mean(dev) / 2),
+        "Mean negative log predictive mass": float(np.mean(-ll)),
+    }
+
+# Intercept-only GP baseline fitted on the training data
+gp_baseline_py = GeneralizedPoisson(y_train, np.ones((len(y_train), 1))).fit_dispersion()
+mu_baseline_py = float(np.exp(gp_baseline_py.params[0]))
+theta_hat_baseline_py = (
+    2.0 / (1.0 + np.exp(-gp_baseline_py.params[-1])) - 1.0
+)
+
+gp_prediction_metrics_table_py = pd.DataFrame(
+    [
+        {"Model": "Extended GP model", **gp_prediction_metrics(y_test, mu_test_py, theta_hat_ext_py)},
+        {
+            "Model": "Training-mean baseline",
+            **gp_prediction_metrics(
+                y_test, np.full(len(y_test), mu_baseline_py), theta_hat_baseline_py
+            ),
+        },
+    ]
+).round(3)
+gp_prediction_metrics_table_py_html = scrollable_table_html(gp_prediction_metrics_table_py)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-test-metrics-py
+#| tbl-cap: "Held-out prediction metrics on the testing data for the training-fitted extended GP model and the intercept-only baseline (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gp_prediction_metrics_table_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+The comparator shown in the second row is a **training-mean baseline**: an intercept-only GP fit on the training data, which predicts $\hat\mu = \bar y_{\text{train}} = `r round(mu_baseline_r, 3)`$ for every testing crab with its own dispersion $\hat\theta_{\text{baseline}} = `r round(theta_hat_baseline, 3)`$. If the regressors add out-of-sample predictive value, the extended model should beat this deliberately naive benchmark; if it does not, adding regressors has not bought prediction.
+
+@fig-generalized-poisson-test-obs-fitted-r and @fig-generalized-poisson-test-obs-fitted-py show the held-out scatter.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: fig-generalized-poisson-test-obs-fitted-r
+#| fig-cap: "Observed versus predicted satellite counts on the held-out testing data (extended GP model, training-fitted); observed counts are jittered vertically to expose ties."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+set.seed(123)
+ggplot(
+  tibble(predicted = mu_test_r, observed = y_test_vec),
+  aes(x = predicted, y = observed)
+) +
+  geom_jitter(width = 0, height = 0.15, alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
+  labs(
+    x = "Predicted expected count (extended GP model)",
+    y = "Observed count (vertically jittered)"
+  ) +
+  theme_bw()
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| label: fig-generalized-poisson-test-obs-fitted-py
+#| fig-cap: "Observed versus predicted satellite counts on the held-out testing data (extended GP model, training-fitted, Python); observed counts are jittered vertically to expose ties."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+np.random.seed(123)
+(
+    ggplot(
+        pd.DataFrame(
+            {
+                "predicted": mu_test_py,
+                "observed": y_test + np.random.uniform(-0.15, 0.15, len(y_test)),
+            }
+        ),
+        aes(x="predicted", y="observed"),
+    )
+    + geom_point(alpha=0.6)
+    + geom_abline(intercept=0, slope=1, linetype="dashed", color="#666666")
+    + labs(
+        x="Predicted expected count (extended GP model)",
+        y="Observed count (vertically jittered)",
+    )
+    + theme_bw()
+)
+```
+
+:::
+
+Reading the metric table honestly: the extended model and the baseline are close on every metric, and the ranking splits. On the absolute-error family the baseline is slightly better (MAE `r round(gp_prediction_metrics_table_r["Extended GP model", "MAE"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "MAE"], 3)`; RMSE `r round(gp_prediction_metrics_table_r["Extended GP model", "RMSE"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "RMSE"], 3)`); on the distribution-sensitive side the extended model wins the negative log predictive mass (`r round(gp_prediction_metrics_table_r["Extended GP model", "Mean negative log predictive mass"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "Mean negative log predictive mass"], 3)`) while losing the mean GP deviance (`r round(gp_prediction_metrics_table_r["Extended GP model", "Mean GP deviance"], 3)` vs `r round(gp_prediction_metrics_table_r["Training-mean baseline", "Mean GP deviance"], 3)`). The held-out correlation between observed and predicted counts is only `r round(cor(y_test_vec, mu_test_r), 2)`.
+
+The predictive answer is therefore sobering: **the crab regressors do not buy reliable held-out point predictions beyond the training-mean benchmark on this split** — the same conclusion Chapter 10 reached for the Classical Poisson model, reproduced here under a better-calibrated distribution. What the GP model buys is not a lower MAE; it is *correctly sized uncertainty*: predictive distributions whose spread matches the data (so a predictive $\hat P(Y = 0)$ of `r round(exp(-(1 - theta_hat_ext) * mu_test_r[1]), 2)` is defensible where the Poisson `r round(exp(-mu_test_r[1]), 3)` was not) and inferential standard errors that survive refits.
+
+| **Perspective** | **Deliverable** | **Conclusion for this case study** |
+|:---|:---|:---|
+| Point-prediction error | ME, MAE, RMSE | Extended model roughly ties or slightly trails the training-mean baseline; no regressor-driven predictive edge out of sample. |
+| Distributional prediction error | Mean GP deviance, average KL discrepancy, mean negative log predictive mass | Mixed: NLPM favours the extended model, deviance favours the baseline; differences small either way. |
+| Inferential calibration | Testing-refit Wald intervals; LRT of $\theta = 0$ | Dispersion decisively present ($\hat\theta \approx 0.51$, ratio $\approx 4.2$); `Dark`-vs-`Light` the clearest association; Poisson-standard-error conclusions would overstate the evidence. |
+
+: Structure of the predictive and inferential results summary on the held-out testing data. {#tbl-generalized-poisson-results-summary .striped .hover}
+
+====================================================================
+FILE: END OF S12 PROPOSAL
+====================================================================
