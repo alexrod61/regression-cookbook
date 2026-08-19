@@ -2416,6 +2416,56 @@ Three observations carry the chapter's statistical message:
 
 The estimates themselves look reasonable; the *conclusions* are what changed. The next section reads the extended-model coefficients on their own merits, in the expected-count-ratio language of Chapter 10.
 
+## Interpreting the Parameter Estimates {#sec-generalized-poisson-interpretation}
+
+The extended fit of @sec-generalized-poisson-extended-model gives eight regression coefficients and one dispersion parameter. The coefficient interpretation follows Chapter 10's log-link logic exactly: on the log scale a coefficient changes the log expected count additively, so its exponential is a multiplicative **expected-count ratio**. What the Generalized Poisson layer changes is how much uncertainty we attach to those ratios — and, through $\theta$, how we describe the variability a given profile should expect.
+
+### Interpreting the Continuous Regressors {#sec-generalized-poisson-continuous-regressors}
+
+- **Shell width** ($\hat\beta_1 = `r round(cs_ext["width_cm", "Estimate"], 3)`$). Holding the other regressors fixed, a one-centimetre larger carapace is associated with an expected satellite count multiplied by $e^{\hat\beta_1} = `r round(exp(cs_ext["width_cm", "Estimate"]), 3)`$, a Wald 95% interval of (`r round(exp(cs_ext["width_cm", "Estimate"] - 1.96 * cs_ext["width_cm", "Std. Error"]), 2)`, `r round(exp(cs_ext["width_cm", "Estimate"] + 1.96 * cs_ext["width_cm", "Std. Error"]), 2)`) for that ratio. The point estimate is positive — larger crabs attract more satellites — but the interval includes $1$, so the training fit alone does not separate the width effect from zero once the other regressors share the credit.
+- **Weight** ($\hat\beta_2 = `r round(cs_ext["weight_kg", "Estimate"], 3)`$). Holding the other regressors fixed, one additional kilogram is associated with an expected count multiplied by $e^{\hat\beta_2} = `r round(exp(cs_ext["weight_kg", "Estimate"]), 2)`$, with interval (`r round(exp(cs_ext["weight_kg", "Estimate"] - 1.96 * cs_ext["weight_kg", "Std. Error"]), 2)`, `r round(exp(cs_ext["weight_kg", "Estimate"] + 1.96 * cs_ext["weight_kg", "Std. Error"]), 2)`). One kilogram is a large step relative to the observed range (`r round(min(training_data$weight_kg), 1)`–`r round(max(training_data$weight_kg), 1)` kg), so it is also instructive to rescale: per 0.1 kg, the ratio is $e^{\hat\beta_2/10} = `r round(exp(cs_ext["weight_kg", "Estimate"] / 10), 3)`$.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on interpreting width and weight together!
+::::
+:::: {.Heads-up-container}
+In the training data the correlation between `width_cm` and `weight_kg` is `r round(cor(training_data$width_cm, training_data$weight_kg), 2)` — the two body-size measures largely carry the same information. "Holding the other fixed" is then a mathematical operation, not a description of a crab one is likely to see: a crab cannot easily gain a kilogram at fixed width. The individual width and weight intervals overlap substantially because the two regressors share their explanatory power; joint interpretation of the *size signal* (both coefficients positive, their linear combination tightly positive) is safer than strong claims about either coefficient on its own.
+::::
+:::
+
+### Interpreting the Categorical Regressors {#sec-generalized-poisson-categorical-regressors}
+
+For the categorical regressors, every coefficient is a contrast with the reference category (`Light` for colour, `Both good` for spine condition), so an exponentiated coefficient reads as the expected-count ratio *of the named category relative to its reference, other regressors held fixed*.
+
+- **Colour.** Relative to a `Light` female of the same size and spine condition: `Medium light` $e^{\hat\beta_3} = `r round(exp(cs_ext["colorMedium light", "Estimate"]), 2)`$ (95% interval (`r round(exp(cs_ext["colorMedium light", "Estimate"] - 1.96 * cs_ext["colorMedium light", "Std. Error"]), 2)`, `r round(exp(cs_ext["colorMedium light", "Estimate"] + 1.96 * cs_ext["colorMedium light", "Std. Error"]), 2)`)), `Medium dark` $e^{\hat\beta_4} = `r round(exp(cs_ext["colorMedium dark", "Estimate"]), 2)`$ ((`r round(exp(cs_ext["colorMedium dark", "Estimate"] - 1.96 * cs_ext["colorMedium dark", "Std. Error"]), 2)`, `r round(exp(cs_ext["colorMedium dark", "Estimate"] + 1.96 * cs_ext["colorMedium dark", "Std. Error"]), 2)`)), and `Dark` $e^{\hat\beta_5} = `r round(exp(cs_ext["colorDark", "Estimate"]), 2)`$ ((`r round(exp(cs_ext["colorDark", "Estimate"] - 1.96 * cs_ext["colorDark", "Std. Error"]), 2)`, `r round(exp(cs_ext["colorDark", "Estimate"] + 1.96 * cs_ext["colorDark", "Std. Error"]), 2)`)). The estimates decrease monotonically: the point estimate for a `Dark` crab is about `r round(100 * (1 - exp(cs_ext["colorDark", "Estimate"])))`% **fewer** expected satellites than an otherwise identical `Light` crab, and its interval sits almost entirely below one. This direction matches the EDA gradient (@tbl-generalized-poisson-eda-categorical-r).
+- **Spine condition.** Relative to `Both good`: `One worn or broken` $e^{\hat\beta_6} = `r round(exp(cs_ext["spineOne worn or broken", "Estimate"]), 2)`$ ((`r round(exp(cs_ext["spineOne worn or broken", "Estimate"] - 1.96 * cs_ext["spineOne worn or broken", "Std. Error"]), 2)`, `r round(exp(cs_ext["spineOne worn or broken", "Estimate"] + 1.96 * cs_ext["spineOne worn or broken", "Std. Error"]), 2)`)) and `Both worn or broken` $e^{\hat\beta_7} = `r round(exp(cs_ext["spineBoth worn or broken", "Estimate"]), 2)`$ ((`r round(exp(cs_ext["spineBoth worn or broken", "Estimate"] - 1.96 * cs_ext["spineBoth worn or broken", "Std. Error"]), 2)`, `r round(exp(cs_ext["spineBoth worn or broken", "Estimate"] + 1.96 * cs_ext["spineBoth worn or broken", "Std. Error"]), 2)`)). Both point estimates are above one, but both intervals comfortably include one; the small `One worn or broken` group (7 training crabs) has a particularly wide interval, as flagged in the EDA.
+
+A results-sentence template for these fits, with placeholders filled from the training model: *"Among female crabs in the training data, and holding the other listed regressors fixed, [category] females had an estimated [ratio]-fold expected number of satellite males relative to [reference] females (95% Wald interval for the ratio: [lo]–[hi])."*
+
+### Interpreting the Dispersion Parameter {#sec-generalized-poisson-theta-interpretation}
+
+The dispersion parameter deserves interpretation of its own, because it is the reason this chapter exists. With $\hat\theta = `r round(theta_hat_ext, 3)`$, any crab profile with fitted expected count $\hat\mu_i$ carries
+
+$$
+\widehat{\operatorname{Var}}(Y_i) = \frac{\hat\mu_i}{(1 - \hat\theta)^2} = `r round(1 / (1 - theta_hat_ext)^2, 2)`\,\hat\mu_i,
+\qquad
+\widehat{\operatorname{SD}}(Y_i) = \frac{\sqrt{\hat\mu_i}}{1 - \hat\theta} = `r round(1 / (1 - theta_hat_ext), 2)`\,\sqrt{\hat\mu_i}.
+$${#eq-generalized-poisson-theta-reading}
+
+A concrete calibration makes the meaning tangible. For a profile with $\hat\mu_i = 3$: the GP model says counts fluctuate with variance `r round(3 / (1 - theta_hat_ext)^2, 1)` (SD $`r round(sqrt(3 / (1 - theta_hat_ext)^2), 1)`$), whereas a Poisson model with the same mean says variance $3$ (SD $`r round(sqrt(3), 2)`$). The GP model also implies $P(Y_i = 0) = \exp(-(1 - \hat\theta)\hat\mu_i) = `r round(exp(-(1 - theta_hat_ext) * 3), 3)`$ — versus `r round(exp(-3), 3)` under the Poisson model at the same mean. The dispersion parameter thus changes not only the widths of confidence intervals but the *shape* of every prediction this model makes: it more than quadruples the implied chance of an empty nest at this mean.
+
+:::{.Tip}
+::::{.Tip-header}
+Tip: reporting theta alongside the coefficients!
+::::
+::::{.Tip-container}
+A one-line convention that travels well into reports and papers: **"fitted GP dispersion $\hat\theta = `r round(theta_hat_ext, 2)`$ (95% Wald interval `r round(theta_hat_ext - 1.96 * se_theta_ext, 2)` to `r round(theta_hat_ext + 1.96 * se_theta_ext, 2)`, implying a variance `r round(1 / (1 - theta_hat_ext)^2, 1)` times the mean."** Readers then see both the parameter and its consequence on a familiar scale. Reporting $\hat\theta$ alone is opaque; reporting only the ratio hides which side of the Poisson model the data landed on.
+::::
+:::
+
+What changed relative to Chapter 10 is almost entirely *how sure we are*, not *which way the associations point*. Every statement above is still a training-stage statement: @sec-generalized-poisson-prediction turns to the predictive inquiry (held-out accuracy), and @sec-generalized-poisson-results will restate the inferential claims after refitting on the untouched testing set.
+
 ## Case Study 2: 99 B-Line Bus Arrivals (Underdispersion) {#sec-cs2-bline}
 
 We now turn to a setting where the count data exhibits the opposite problem. The 99 B-Line is the busiest bus route in Canada, running along Broadway from Commercial-Broadway SkyTrain station to the UBC Bus Loop. During weekday morning peak hours (7-9 AM), TransLink actively manages the headway between buses, targeting roughly 20 arrivals per hour at the UBC Bus Loop. Unlike the horseshoe crab dataset, where biological heterogeneity drove variance above the mean, the 99 B-Line's regulated schedule suppresses variance *below* what a Poisson process would predict, a natural underdispersion story.
