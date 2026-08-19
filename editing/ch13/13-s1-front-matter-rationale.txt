@@ -1,0 +1,43 @@
+# Revision rationale for front matter (Warning box, setup chunks, Learning Objectives)
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): everything from the chapter title through the end of the Learning Objectives box — the {.Warning} block, the Mermaid figure {#fig-generalied-poisson-regression}, the setup chunks {r setup-r}/{python setup-py}, and the {.LO} block.
+- Reference chapters/files reviewed: skill.md (master editing prompt, sections 5.1–5.4, 15–16, 27, 30, 31.7); finished Chapter 10 on main (Warning markup lines 26–56, LO markup lines 57–84, setup chunks lines 73–157); finished Chapters 1 and 2 conventions inventory (callout templates, py_require/import pattern, print_as_dt helpers); finished Chapter 12 on main; book/custom.css; book/references.bib.
+
+## What was preserved
+- The Google-tag and MathJax <script> blocks, the chapter title with anchor {#sec-generalized-poisson}, and the `colourize` helper R chunk: identical to the book's canonical headmatter.
+- The draft's .Warning/.LO callout scaffolding (classes match custom.css and finished Chapter 10's markup exactly).
+- The draft's correct conceptual identifications kept and sharpened in the Warning: GP handles over- AND underdispersion; GP nests Classical Poisson at zero dispersion; NB is the overdispersion-only alternative; ZIP for excess zeros; equidispersed data belongs to Chapter 10.
+- print_as_dt / print_as_dt_all Python-table helpers copied verbatim from finished Chapter 10's setup chunk.
+
+## What changed
+- Warning box rewritten around the master prompt section 5.1 checklist: response support, independence, positive expected count via log link, the over- OR under-dispersion decision rule, and chapter redirects. Removed the equation-level content ($\delta = 0$ bullet) — the Warning must stay conceptual.
+- Fixed figure-ID typo: @fig-generalied-poisson-regression -> @fig-generalized-poisson-regression.
+- Terminology per skill.md section 30: "outcome variable" -> "response variable"; removed all "IRR" phrasing; dispersion parameter symbol changed from draft's $\delta$ to $\theta$ to align with finished Appendix C {#sec-generalized-poisson-distribution} (PMF with rate-like $\lambda$ and dispersion $\theta \in (-1,1)$, mean $\lambda/(1-\theta)$, variance $\lambda/(1-\theta)^2$). Decision confirmed by lead author.
+- Setup chunks converted from TODO stubs to executable code modelled on finished Chapter 10: tidyverse components + broom + knitr; ADDED rsample (canonical 50/50 split, seed 123, matching finished Chapter 10 — not the draft's stale 70/30) and VGAM (GP fitting for the overdispersed running case). Dropped the draft's planned asbio (finished Chapter 10 reads Crabs.dat from Agresti's GitHub, not asbio) and devtools (unused). Python: numpy, pandas, scipy (stats/gammaln), statsmodels (formula glm + Poisson family), plotnine, matplotlib.
+- ADDED the scrollable_table_html helper in the Python setup chunk per skill.md section 16.3 (declared book-wide standard; absent from the exported finished chapters, which predate the standard).
+- Learning Objectives rewritten: observable verbs covering the full chapter arc (both dispersion directions, two inquiries, random/systematic/link components, PMF + mean-variance with $\theta$, joint MLE and variance->SE connection, multi-layer GOF plus the dispersion LRT, expected-count-ratio interpretation, held-out metrics + baseline, responsible communication). The draft's "Interpret the regression coefficients (IRR)" objective replaced; the draft promised no diagnostics beyond a dispersion test and no prediction evaluation, both of which the revised chapter delivers.
+- Mermaid mind-map figure REMOVED from front matter; relocated into the Introduction (Stage S2), matching finished Chapter 10's placement (mind map inside Introduction, Warning referencing it forward). The intermediate S1 commit therefore has a dangling @fig-generalized-poisson-regression reference until S2 lands immediately after in the same work block.
+
+## Why the changes help
+- Statistical correctness: the Warning now states the actual GP domain (both dispersion directions, unified) and no longer claims counts must occur "over fixed and known exposures" (an exposure framing GP regression does not require and the chapter never uses).
+- Pedagogical sequence: Warning/LO/setup now mirror the finished Chapter 10 pattern readers meet in Chapter 10.
+- Convention alignment: $\theta$ dispersion notation matches Appendix C, eliminating a two-symbol confusion for students; "response"/"regressor"/"expected-count ratio" per the book's terminology audit.
+- Reproducibility: setup chunks are executable and audit-clean (every loaded package used later in the chapter; skill.md sections 5.3, 31.4).
+
+## Execution and validation
+- R packages installed and verified on this machine: VGAM 1.1-x, rsample, broom, reticulate (R 4.6.1).
+- VGAM capability spike (scripts /tmp/regref/spike_vgam.R, spike_vgam2.R): genpoisson0/1/2 all fit the overdispersed Consul-Jain GP but CANNOT fit underdispersed data (dispersion estimates slam to parameter boundaries on simulated data with true delta = -0.5, var/mean = 0.43). Consequence: the running case (overdispersed crabs) uses VGAM in R and a custom likelihood in Python; the underdispersed coding case (99 B-Line) will use a custom maximum-likelihood fit in BOTH languages (R optim / Python GenericLikelihoodModel subclass). This is documented here so the setup chunk's VGAM comment "(overdispersed case)" is accurate.
+- Python venv (/tmp/regref/.venv): numpy, pandas, scipy 1.18, statsmodels 0.14.6, pyreadr operational.
+- No rendering attempted at this stage (Quarto 1.10.18 available at /tmp/regref/quarto/bin; full render QC in the final stage).
+
+## What should be avoided
+- "IRR" / "incidence rate ratio" phrasing (no exposure/rate interpretation exists here); "predictor" for "regressor"; referencing the 70/30 seed-1046 split from the stale pre-revision Chapter 10; asbio-based data loading; equation-level content inside the Warning box; the misspelled figure ID.
+
+## References to add or verify
+- @bolker2009 (cited in the Warning): entry copied from main's book/references.bib; appended to the branch bibliography in Stage S2 together with the use-cases table entries.
+
+## Placement and dependencies
+- Replaces bytes from "::: {.Warning}" through the end of the LO box, exclusive of the GTM/MathJax blocks, title, and colourize chunk.
+- The figure anchor @fig-generalized-poisson-regression is created in Stage S2 (Introduction). Later sections depend on: training_data/testing_data (Stage S3), the scrollable_table_html helper (every Python table from Stage S3 on), and the $\theta$-dispersion convention (Sections "Data Modelling" onward, Stage S5).

@@ -35,77 +35,113 @@ colourize <- function(x, color) {
 When to Use and Not Use Generalized Poisson Regression
 ::::
 ::::{.Warning-container}
-Generalized Poisson regression is a type of generalized linear model that is appropriately used under the following conditions:
+Generalized Poisson regression is a count-regression model for modelling **non-negative integer count outcomes** when the variability of the counts departs from what the Classical Poisson model allows. It is most appropriate when the response records how many times an event occurs for each observational unit and the counts are visibly **more or less variable** than their mean. Examples include the number of satellite males around a horseshoe crab nest, the number of workplace injury claims per employee, or the number of actively managed bus arrivals per hour at a transit stop.
 
-- The outcome variable is **discrete** and **count-type** as shown in @fig-generalied-poisson-regression. Examples include number of doctor visits, number of web clicks, number of accidents, etc.
-- Outcomes are statistically independent from one to the next.
-- The data shows **overdispersion** (variance exceeds mean) **or underdispersion** (variance is less than mean). See @sec-classical-poisson for the equidispersion case.
-- Counts occur over fixed and known exposures (such as time intervals or geographic areas).
-- We intend to use the **logarithm of the mean** of the outcome as a **link function**, which ensures that our predictions are always positive.
+Use Generalized Poisson regression when the following conditions are reasonable for the data and the modelling inquiry:
 
-However, Generalized Poisson regression should not be used in the following scenarios:
+- The response variable is a **non-negative integer count**, as illustrated in @fig-generalized-poisson-regression.
+- The scientific or data-science inquiry focuses on how the **expected count** changes with a set of regressors.
+- The observations can be treated as **statistically independent**, or at least independent enough for the modelling purpose.
+- The **expected count** is **positive** and can be connected to the regressors through the log link.
+- The counts display **overdispersion** (variance exceeding the mean) **or underdispersion** (variance falling below the mean), making the equal mean–variance restriction of [Classical Poisson regression](#sec-classical-poisson) untenable.
 
-- The outcome is not a count (e.g., binary outcomes, proportions, or continuous variables).
-- The dispersion parameter $\delta = 0$ is strongly supported - use [Classical Poisson](10-classical-poisson.qmd) (Chapter 10) instead.
-- The outcome variable includes a large number of zeros - use [Zero-Inflated Poisson](12-zero-inflated-poisson.qmd) (Chapter 12) instead.
+Generalized Poisson regression should not be the default choice in the following situations:
+
+- The response is **not a count**. Binary outcomes are usually better handled with [Binary Logistic regression](#sec-binary-logistic), proportions require their own modelling choices such as [Beta regression](#sec-beta), and continuous responses belong to other chapters of the cookbook (such as [Ordinary Least-squares](#sec-ols) or [Gamma](#sec-gamma) regressions).
+- The counts are consistent with **equidispersion**, meaning their conditional variance is approximately equal to their conditional mean. In that case, the simpler [Classical Poisson regression](#sec-classical-poisson) is preferable, since the additional dispersion parameter is unnecessary.
+- The overdispersion is driven by an **excess of zero counts** that a single count distribution cannot explain. In that case, [Zero-Inflated Poisson regression](#sec-zero-inflated-poisson) may be more appropriate.
+- The observations exhibit **strong dependence or clustering** — for instance, repeated measurements on the same subjects or spatially correlated counts. In such cases, a generalized linear mixed model may be more appropriate because it can extend the generalized linear model framework with random effects for grouped or dependent observations; see, for example, @bolker2009 for a practical introduction to generalized linear mixed models in ecological and evolutionary applications.
+
+In this chapter, we use Generalized Poisson regression as the cookbook's flexible count-regression model for data that are overdispersed **or** underdispersed. For counts that are only overdispersed, [Negative Binomial regression](#sec-negative-binomial) is another standard alternative; only the Generalized Poisson model handles both dispersion directions within a single distribution that nests Classical Poisson as a special case.
 ::::
 :::
 
-::: {#fig-generalied-poisson-regression}
-```{mermaid}
-mindmap
-  root((Regression 
-  Analysis)
-    Continuous <br/>Outcome Y
-      {{Unbounded <br/>Outcome Y}}
-        )Chapter 3: <br/>Ordinary <br/>Least Squares <br/>Regression(
-          (Normal <br/>Outcome Y)
-      {{Nonnegative <br/>Outcome Y}}
-        )Chapter 4: <br/>Gamma Regression(
-          (Gamma <br/>Outcome Y)
-      {{Bounded <br/>Outcome Y <br/> between 0 and 1}}
-        )Chapter 5: <br/>Beta <br/>Regression(
-          (Beta <br/>Outcome Y)
-      {{Nonnegative <br/>Survival <br/>Time Y}}
-        )Chapter 6: <br/>Parametric <br/> Survival <br/>Regression(
-          (Exponential <br/>Outcome Y)
-          (Weibull <br/>Outcome Y)
-          (Lognormal <br/>Outcome Y)
-        )Chapter 7: <br/>Semiparametric <br/>Survival <br/>Regression(
-          (Cox Proportional <br/>Hazards Model)
-            (Hazard Function <br/>Outcome Y)
-    Discrete <br/>Outcome Y
-      {{Binary <br/>Outcome Y}}
-        {{Ungrouped <br/>Data}}
-          )Chapter 8: <br/>Binary Logistic <br/>Regression(
-            (Bernoulli <br/>Outcome Y)
-        {{Grouped <br/>Data}}
-          )Chapter 9: <br/>Binomial Logistic <br/>Regression(
-            (Binomial <br/>Outcome Y)
-      {{Count <br/>Outcome Y}}
-        {{Equidispersed <br/>Data}}
-          )Chapter 10: <br/>Classical Poisson <br/>Regression(
-            (Poisson <br/>Outcome Y)
-        {{Overdispersed <br/>Data}}
-          )Chapter 11: <br/>Negative Binomial <br/>Regression(
-            (Negative Binomial <br/>Outcome Y)
-        {{Zero Inflated <br/>Data}}
-          )Chapter 12: <br/>Zero Inflated <br/>Poisson <br/>Regression(
-            (Zero Inflated <br/>Poisson <br/>Outcome Y)
-        {{Overdispersed or <br/>Underdispersed <br/>Data}}
-          )Chapter 13: <br/>Generalized <br/>Poisson <br/>Regression(
-            (Generalized <br/>Poisson <br/>Outcome Y)
-```
-
-Regression analysis mind map depicting all modelling techniques explored in this book. Depending on the type of outcome $Y$, these techniques are split into two large zones: *discrete* and *continuous*.
-:::
-
 ```{r setup-r, include=FALSE}
-# TODO: Add required libraries (VGAM, tidyverse, broom, asbio)
+# Load required libraries
+library(readr)
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(ggExtra) # draw marginal histograms
+library(broom)
+library(knitr)
+library(rsample) # canonical training/testing split
+library(VGAM)    # Generalized Poisson fitting (overdispersed case)
+
+library(reticulate)
+py_config()
+
+py_require("pandas")
+py_require("numpy")
+py_require("matplotlib")
+py_require("statsmodels")
+py_require("scipy")
+py_require("plotnine")
+
+pandas <- import("pandas")
+numpy <- import("numpy")
+matplotlib <- import("matplotlib")
+statsmodels <- import("statsmodels")
+scipy <- import("scipy")
+plotnine <- import("plotnine")
+
+options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
+
+print_as_dt <- function(x){
+  DT::datatable(x,
+                rownames = FALSE,
+                options = list(
+                  dom = 'ltipr',
+                  autoWidth = TRUE,
+                  columnDefs = list(
+                    list(className = 'dt-left', targets = "_all"),
+                    list(width = '200px', targets = "_all")
+                    )
+                  )
+                )
+}
+
+print_as_dt_all <- function(x){
+  DT::datatable(
+    x,
+    rownames = FALSE,
+    options = list(
+      dom = 't',
+      paging = FALSE,
+      scrollX = TRUE,
+      autoWidth = TRUE,
+      columnDefs = list(
+        list(className = 'dt-left', targets = "_all")
+      )
+    )
+  )
+}
 ```
 
 ```{python setup-py, include=FALSE}
-# TODO: Add required Python imports and custom GP likelihood class
+import numpy as np
+import pandas as pd
+from plotnine import *
+import statsmodels.api as sm
+from statsmodels.formula.api import glm
+from statsmodels.genmod.families import Poisson
+from matplotlib import pyplot as plt
+import scipy.stats as stats
+from scipy.special import gammaln
+
+def scrollable_table_html(data, **kwargs):
+    kwargs.setdefault("index", False)
+    kwargs.setdefault("border", 0)
+
+    return (
+        '<div class="table-responsive">'
+        + data.to_html(
+            **kwargs
+        )
+        + '</div>'
+    )
 ```
 
 ::: {.LO}
@@ -115,14 +151,16 @@ Learning Objectives
 ::::{.LO-container}
 By the end of this chapter, you will be able to:
 
-- Explain why Classical Poisson regression underperforms when the equidispersion assumption is violated.
-- Determine when Generalized Poisson regression is preferred over Classical Poisson and Negative Binomial regression.
-- Write down the Generalized Poisson PMF and its mean-variance relationship.
-- Describe the role of the dispersion parameter $\delta$ and interpret its sign and magnitude.
-- Perform and interpret a dispersion test to detect over- or underdispersion.
-- Fit a Generalized Poisson regression model in R and Python.
-- Interpret the regression coefficients (IRR) and the dispersion parameter $\delta$.
-- Evaluate model performance and compare results against Classical Poisson regression.
+- Explain why Classical Poisson regression can fail when the **equidispersion** assumption is violated, in either direction.
+- Determine when Generalized Poisson regression is an **appropriate modelling choice** relative to Classical Poisson, Negative Binomial, and Zero-Inflated Poisson alternatives.
+- Frame **inferential** and **predictive inquiries** for a count-regression problem with overdispersed or underdispersed data using the **data science workflow**.
+- Specify a Generalized Poisson regression model through its **random component**, its **systematic component**, and its **log link function**.
+- Write and interpret the **Generalized Poisson probability mass function** and its **mean–variance relationship**, including the role of the dispersion parameter $\theta$.
+- Explain how **maximum likelihood estimation** jointly estimates the regression coefficients and the dispersion parameter, and how the assumed variance structure drives model-based standard errors.
+- Assess model adequacy with **observed-versus-fitted checks**, a **dispersion test**, a **zero-count check**, **residual deviance**, and **residual plots**, and formally test whether the dispersion parameter departs from zero.
+- Interpret regression coefficients as **multiplicative changes in the expected count**, holding other regressors fixed, and interpret the estimated dispersion parameter through the implied variance-to-mean ratio.
+- Evaluate **predictive performance** using held-out prediction metrics and a baseline comparison.
+- Communicate Generalized Poisson regression results responsibly for both inferential and predictive inquiries.
 ::::
 :::
 
