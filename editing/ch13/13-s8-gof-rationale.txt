@@ -1,0 +1,37 @@
+# Revision rationale for the Goodness of Fit section
+
+## Scope
+- Target chapter/file: book/13-generalized-poisson.qmd (branch Writing-for-Section-13).
+- Exact section(s): replaced the draft-stale `## Goodness of Fit` region (delta notation, unexecuted code, the old CS1 `## Results` riding inside the same region through `## Case Study 2`) with `## Checking Goodness of Fit {#sec-generalized-poisson-gof}` plus six executed subsections.
+- Reference chapters/files reviewed: finished Ch10 GOF suite (L3575-5040: observed-vs-fitted, Pearson dispersion, excess-zero check, residual deviance, residual plots, adequacy summary table tbl-simple-classical-poisson-gof-summary, workflow-gate framing at L608); skill.md sections 10, 13.
+
+## What was preserved
+- The draft's instinct to place a Poisson-vs-GP LRT inside goodness of fit (kept, made interior-point-regular, executed: 80.48, df 1, p = 2.9e-19).
+- The draft's two-component instinct (global fit + feature checks) — realized with the full finished-Ch10 suite.
+
+## What changed
+- All five diagnostics are executed on the canonical training split with objects inherited from S7 (gp_fit_r / gp_fit_py, theta_hat): LRT of theta = 0; GP-variance Pearson chi-squared (62.35/83 = 0.75, upper p = 0.956); observed-vs-fitted figure executed in both languages; saturated-GP residual deviance (121.11/83 = 1.46) via a NEW closed form for the saturated lambda (positive root of the quadratic from score = 0, displayed as eq-generalized-poisson-saturated; zeros get the limiting value 0); GP zero-count check using exp(-lambda_i) (27.4 expected vs 34 observed).
+- Every GP number is contrasted, in executed code, with the same-split simple Poisson fit (Pearson 252.70/84 = 3.01; deviance 266.58; expected zeros 8.97), so the chapter's repair claim is quantified rather than asserted; the contrast matches what Chapter 10 reported in tbl-simple-classical-poisson-gof-summary.
+- Added the deviance chi-squared-approximation Heads-up with the executed fact that 34% of fitted expected counts are below 2 (an earlier draft of the file said "half"; corrected after executing, another demonstration that prose numbers must come from code).
+- Adequacy summary table tbl-generalized-poisson-gof-summary mirrors finished Ch10's five-row format with an explicit Decision paragraph: dispersion repaired, zero surplus of about 7 remains, mean model thin -> motivates the extended model.
+- Jitter policy in the observed-vs-fitted figure: vertical-only bounded jitter (height 0.15, width 0), disclosed in the caption (y coordinate of count observations is never displaced on the FITTED axis because that axis is continuous).
+
+## Why the changes help
+- Replaces the draft's unexecuted two-liner with the same audit Chapter 10 demands, adapted to GP: this is the section where the chapter's raison d'etre (repairing Poisson's failures) is actually proven.
+- The GP-specific diagnostics (variance-function Pearson; saturated deviance; zero check with exp(-lambda)) are what reviewers will ask for; deriving the saturated root in text keeps the section self-contained.
+- Honest residual messaging: the deviance ratio 1.46 with nominal p = 0.004 is reported WITH the approximation caveat instead of being hidden or spun.
+
+## Execution and validation
+- R verbatim: /tmp/regref/s8_chapter_r.R — all printed values match the proposal header (80.48 / 62.35 / 0.956 / 252.70 -> 3.01 / 121.11 / 0.0041 / 34 obs zeros / 27.4 GP / 8.97 Poisson / deviance residuals in (-2.02, 2.31), no NaN).
+- Python verbatim: /tmp/regref/s8_gof.py — identical numbers (LRT 80.476 p 2.94e-19; Pearson 62.357 p 0.956; deviance 121.11 p 0.0041; zeros 27.39/8.97; corr 0.3785).
+- Inline prose values are `r`-executed (logLik gap, ratio comparisons, zero gap of about 7, pp() with formatC).
+
+## What should be avoided
+- Reducing GOF to a formal test only; using the Poisson sqrt(mu) Pearson standardization for a GP fit; reading the nominal deviance p-value as decisive evidence at small fitted counts; hiding the remaining zero surplus.
+
+## References cited here
+- Cross-reference to @sec-zero-inflated-poisson for the structural-zero remedy; no new bib entries this stage.
+
+## Placement and dependencies
+- Replaced region spans old GOF + old CS1 Results; the new Prediction/Results sections will be inserted by S11/S12 between the extended-model section (S9) and the B-Line case study (replaced by S15).
+- Objects created: df_gof, mu_hat, lambda_hat, var_hat, deviance_resids, residual_deviance, pearson_chisq, expected_zeros_gp (+ _py mirrors), gp_poisson_r / poisson_fit_py, gof_numbers_r/_py(_html).

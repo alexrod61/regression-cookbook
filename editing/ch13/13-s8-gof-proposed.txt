@@ -1,0 +1,426 @@
+PROPOSED REPLACEMENT for book/13-generalized-poisson.qmd
+Stage: S8 — Goodness of Fit suite on the simple GP model. Replaces the draft-stale
+    ## Goodness of Fit
+section (which referenced delta notation and never executed on the canonical split) up to
+but NOT including the next "## Case Study 1: Model Fitting" style heading.
+
+Executed, verified values (canonical training split, n = 86, df_GOF = 83):
+  LRT GP vs Poisson: 80.476, df 1, p = 2.9e-19
+  GP Pearson chi^2: 62.35 (Python 62.357), ratio/df 0.751, upper p 0.956
+  Poisson Pearson ratio: 3.008 (same split)
+  GP deviance (saturated-GP): 121.11, ratio 1.459, nominal p 0.0041
+  Poisson deviance: 266.58 (same split)
+  Zeros: observed 34; GP expected 27.39; Poisson expected 8.97
+  Deviance residuals range [-2.021, 2.305]; corr(y, mu_hat) = 0.378
+
+====================================================================
+FULL REPLACEMENT TEXT
+====================================================================
+
+## Checking Goodness of Fit {#sec-generalized-poisson-gof}
+
+Before interpreting anything from the simple model, we put it through the same **workflow gate** as every model in this book: does the fitted Generalized Poisson model actually behave like the data? For the GP story of @sec-generalized-poisson-data-modelling, adequacy means three things: the fitted expected counts should track the observed counts (the mean structure), the fitted variance $`r round(1 / (1 - theta_hat)^2, 2)` \times \mu_i$ should describe the observed spread around the means (the overdispersion that motivated this chapter), and the fitted model should reproduce features of the count distribution such as the number of zero counts. All checks use the training fit computed in @sec-generalized-poisson-simple-model.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-gof-r
+#| lst-cap: "Code to compute goodness-of-fit diagnostics for the simple Generalized Poisson model on the training data; a Poisson fit on the same split provides the head-to-head contrast."
+#| message: false
+#| warning: false
+# Sample size and residual degrees of freedom (p = 3 = two betas + theta)
+df_gof <- nrow(training_data) - length(coef(gp_fit_r))
+
+# Fitted means and rate-like parameters
+mu_hat <- as.numeric(fitted(gp_fit_r)[, 1])
+lambda_hat <- (1 - theta_hat) * mu_hat
+y_train_vec <- training_data$satellites
+
+# Classical Poisson fit on the same split, for the contrast
+gp_poisson_r <- glm(satellites ~ width_cm, family = poisson, data = training_data)
+mu_hat_poisson <- fitted(gp_poisson_r)
+
+# 1. Likelihood-ratio test of theta = 0 (Poisson is nested in GP at theta = 0)
+lr_theta <- 2 * (logLik(gp_fit_r) - logLik(gp_poisson_r))
+p_lr_theta <- pchisq(lr_theta, df = 1, lower.tail = FALSE)
+
+# 2. Pearson chi-squared statistic with the GP variance function
+var_hat <- mu_hat / (1 - theta_hat)^2
+pearson_chisq <- sum((y_train_vec - mu_hat)^2 / var_hat)
+p_pearson <- pchisq(pearson_chisq, df = df_gof, lower.tail = FALSE)
+pearson_poisson <- sum((y_train_vec - mu_hat_poisson)^2 / mu_hat_poisson)
+
+# 3. Residual deviance against the saturated GP model
+gp_logpmf_r <- function(y, lam, th) {
+  t <- lam + th * y
+  log(lam) + (y - 1) * log(t) - t - lgamma(y + 1)
+}
+lambda_sat <- vapply(
+  y_train_vec,
+  function(yi) {
+    if (yi == 0) return(0)  # saturated log-likelihood limit is 0 at lambda -> 0
+    (yi * (1 - theta_hat) + sqrt(yi^2 * (1 - theta_hat)^2 + 4 * theta_hat * yi)) / 2
+  },
+  numeric(1)
+)
+ll_sat <- numeric(length(y_train_vec))
+pos <- y_train_vec > 0
+ll_sat[pos] <- gp_logpmf_r(y_train_vec[pos], lambda_sat[pos], theta_hat)
+ll_hat <- gp_logpmf_r(y_train_vec, lambda_hat, theta_hat)
+deviance_resids <- sign(y_train_vec - mu_hat) * sqrt(2 * (ll_sat - ll_hat))
+residual_deviance <- sum(deviance_resids^2)
+p_deviance <- pchisq(residual_deviance, df = df_gof, lower.tail = FALSE)
+
+# 4. Zero-count check via the GP zero probability exp(-lambda_i)
+observed_zeros <- sum(y_train_vec == 0)
+expected_zeros_gp <- sum(exp(-lambda_hat))
+expected_zeros_poisson <- sum(exp(-mu_hat_poisson))
+
+# Collecting the headline numbers
+gof_numbers_r <- tibble(
+  Quantity = c(
+    "LRT of theta = 0 (GP vs Poisson), df = 1",
+    "Pearson chi-squared (GP variance), df = 83",
+    "Residual deviance (saturated GP), df = 83",
+    "Observed zero counts",
+    "Expected zeros under simple GP",
+    "Expected zeros under simple Poisson",
+    "Poisson Pearson chi-squared, df = 84",
+    "Poisson residual deviance"
+  ),
+  Value = round(c(
+    lr_theta, pearson_chisq, residual_deviance,
+    observed_zeros, expected_zeros_gp, expected_zeros_poisson,
+    pearson_poisson, deviance(gp_poisson_r)
+  ), 2),
+  `p-value` = c(
+    "< 0.0001",
+    as.character(round(p_pearson, 3)),
+    as.character(round(p_deviance, 4)),
+    "-", "-", "-", "-", "-"
+  )
+)
+gof_numbers_r
+```
+
+:::
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-gof-py
+#| lst-cap: "Code to compute the same goodness-of-fit diagnostics in Python from the fitted GeneralizedPoisson object."
+#| message: false
+#| warning: false
+```
+The same computations in `Python`, from the fit of @lst-generalized-poisson-simple-model-fit-py:
+
+```{python}
+#| echo: true
+#| message: false
+# Degrees of freedom: n minus (two betas + one theta)
+df_gof_py = len(y_train) - (X_train.shape[1] + 1)
+
+# Fitted means and rate-like parameters
+mu_hat_py = np.exp(X_train @ beta_hat)
+lambda_hat_py = (1.0 - theta_hat_py) * mu_hat_py
+
+# Classical Poisson fit on the same split, for the contrast
+poisson_fit_py = sm.GLM(y_train, X_train, family=Poisson()).fit()
+mu_hat_poisson_py = poisson_fit_py.fittedvalues.to_numpy()
+
+# 1. Likelihood-ratio test of theta = 0
+lr_theta_py = 2.0 * (gp_fit_py.llf - poisson_fit_py.llf)
+p_lr_theta_py = stats.chi2.sf(lr_theta_py, df=1)
+
+# 2. Pearson chi-squared with the GP variance function
+pearson_chisq_py = float(
+    np.sum((y_train - mu_hat_py) ** 2 / (mu_hat_py / (1 - theta_hat_py) ** 2))
+)
+p_pearson_py = stats.chi2.sf(pearson_chisq_py, df=df_gof_py)
+pearson_poisson_py = float(
+    np.sum((y_train - mu_hat_poisson_py) ** 2 / mu_hat_poisson_py)
+)
+
+# 3. Residual deviance against the saturated GP model
+def gp_logpmf(y, lam, theta):
+    t = lam + theta * y
+    return np.log(lam) + (y - 1.0) * np.log(t) - t - gammaln(y + 1.0)
+
+lambda_sat_py = np.zeros_like(y_train)
+positive = y_train > 0
+ys = y_train[positive]
+lambda_sat_py[positive] = (
+    ys * (1 - theta_hat_py)
+    + np.sqrt(ys**2 * (1 - theta_hat_py) ** 2 + 4 * theta_hat_py * ys)
+) / 2
+ll_sat_py = np.zeros_like(y_train)
+ll_sat_py[positive] = gp_logpmf(ys, lambda_sat_py[positive], theta_hat_py)
+ll_hat_py = gp_logpmf(y_train, lambda_hat_py, theta_hat_py)
+deviance_resids_py = np.sign(y_train - mu_hat_py) * np.sqrt(
+    2.0 * (ll_sat_py - ll_hat_py)
+)
+residual_deviance_py = float(np.sum(deviance_resids_py**2))
+p_deviance_py = stats.chi2.sf(residual_deviance_py, df=df_gof_py)
+
+# 4. Zero-count check via the GP zero probability exp(-lambda_i)
+observed_zeros_py = int((y_train == 0).sum())
+expected_zeros_gp_py = float(np.sum(np.exp(-lambda_hat_py)))
+expected_zeros_poisson_py = float(np.sum(np.exp(-mu_hat_poisson_py)))
+
+# Collecting the headline numbers
+gof_numbers_py = pd.DataFrame(
+    {
+        "Quantity": [
+            "LRT of theta = 0 (GP vs Poisson), df = 1",
+            "Pearson chi-squared (GP variance), df = 83",
+            "Residual deviance (saturated GP), df = 83",
+            "Observed zero counts",
+            "Expected zeros under simple GP",
+            "Expected zeros under simple Poisson",
+            "Poisson Pearson chi-squared, df = 84",
+            "Poisson residual deviance",
+        ],
+        "Value": [
+            round(lr_theta_py, 2),
+            round(pearson_chisq_py, 2),
+            round(residual_deviance_py, 2),
+            observed_zeros_py,
+            round(expected_zeros_gp_py, 2),
+            round(expected_zeros_poisson_py, 2),
+            round(pearson_poisson_py, 2),
+            round(float(poisson_fit_py.deviance), 2),
+        ],
+        "p-value": [
+            "< 0.0001",
+            round(p_pearson_py, 3),
+            round(p_deviance_py, 4),
+            "-", "-", "-", "-", "-",
+        ],
+    }
+)
+gof_numbers_py_html = scrollable_table_html(gof_numbers_py)
+```
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-gof-numbers-r
+#| tbl-cap: "Goodness-of-fit headline numbers for the simple Generalized Poisson model (training data), with the same-split Poisson contrasts."
+#| message: false
+print_as_dt(gof_numbers_r)
+```
+
+## **`Python` Output**
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-gof-numbers-py
+#| tbl-cap: "Goodness-of-fit headline numbers for the simple Generalized Poisson model (training data, Python), with the same-split Poisson contrasts."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$gof_numbers_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+### Testing the Need for the Dispersion Parameter {#sec-generalized-poisson-gof-dispersion-lrt}
+
+The first check is targeted: is $\theta$ doing real work? Because the Poisson model is exactly the $\theta = 0$ member of the GP family, we can test $H_0: \theta = 0$ with a likelihood-ratio test. As flagged in @sec-generalized-poisson-estimation, $\theta = 0$ is an interior point of $(-1, 1)$, so the classical $\chi^2_1$ reference applies. The statistic is
+
+$$
+lr = 2\,\big[\ell_{\text{GP}}(\hat{\boldsymbol{\beta}}, \hat{\theta}) - \ell_{\text{Poisson}}(\hat{\boldsymbol{\beta}}_{\text{P}})\big]
+= 2 \times \big[ -`r round(logLik(gp_fit_r), 2)` - \big(-`r round(-logLik(gp_poisson_r), 2)`\big) \big]
+= `r round(lr_theta, 2)` ,
+$$
+
+which is overwhelmingly significant ($p \approx `r formatC(p_lr_theta, format = "e", digits = 1)`$). The dispersion parameter is not a technical nicety here; the data reject the Poisson restriction decisively.
+
+### The Variance Structure: Pearson Statistic {#sec-generalized-poisson-gof-pearson}
+
+The Pearson statistic uses the residuals standardized by the **GP variance function**, $(y_i - \hat\mu_i)/\sqrt{\hat\mu_i/(1-\hat\theta)^2}$, not by the Poisson $\sqrt{\hat\mu_i}$:
+
+$$
+X^2_P = \sum_{i=1}^{n} \frac{(y_i - \hat\mu_i)^2}{\hat\mu_i/(1-\hat\theta)^2} = `r round(pearson_chisq, 2)`. 
+$${#eq-generalized-poisson-pearson}
+
+Against a $\chi^2_{83}$ reference (86 training observations minus three fitted parameters), $X^2_P / 83 = `r round(pearson_chisq / df_gof, 2)`$ with an upper-tail $p$-value of `r round(p_pearson, 3)` — there is no evidence of residual over- or under-dispersion left in the mean-standardized residuals. The contrast is stark: the same-split Classical Poisson fit — for which the Pearson variance function is $\mu_i$ — produces $X^2_P/84 = `r round(pearson_poisson / 84, 2)`$, about three times too large (the failure documented in @tbl-simple-classical-poisson-gof-summary of @sec-classical-poisson). The GP variance function is doing exactly what it was designed to do.
+
+### The Mean Structure: Observed versus Fitted Counts {#sec-generalized-poisson-gof-obs-fitted}
+
+@fig-generalized-poisson-gof-obs-fitted-r and @fig-generalized-poisson-gof-obs-fitted-py plot observed satellite counts against the fitted expected counts, with the 45-degree reference line. The training correlation between observed and fitted counts is `r round(cor(y_train_vec, mu_hat), 2)`; the scatter fans out around the line in roughly the proportionate way the GP variance function $\mu_i/(1-\theta)^2$ predicts — the spread grows with the fitted mean rather than staying constant.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: fig-generalized-poisson-gof-obs-fitted-r
+#| fig-cap: "Observed versus fitted satellite counts for the simple GP model (training data); observed counts are jittered vertically by bounded noise to expose ties. The dashed line is the ideal 45-degree line."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+set.seed(123)
+gof_plot_data_r <- tibble(fitted = mu_hat, observed = y_train_vec)
+ggplot(gof_plot_data_r, aes(x = fitted, y = observed)) +
+  geom_jitter(width = 0, height = 0.15, alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey40") +
+  labs(
+    x = "Fitted expected count (mu-hat)",
+    y = "Observed count (vertically jittered)"
+  ) +
+  theme_bw()
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| label: fig-generalized-poisson-gof-obs-fitted-py
+#| fig-cap: "Observed versus fitted satellite counts for the simple GP model (training data, Python); observed counts are jittered vertically by bounded noise to expose ties. The dashed line is the ideal 45-degree line."
+#| message: false
+#| fig-width: 8
+#| fig-height: 6
+np.random.seed(123)
+gof_plot_data_py = pd.DataFrame(
+    {
+        "fitted": mu_hat_py,
+        "observed": y_train + np.random.uniform(-0.15, 0.15, len(y_train)),
+    }
+)
+(
+    ggplot(gof_plot_data_py, aes(x="fitted", y="observed"))
+    + geom_point(alpha=0.6)
+    + geom_abline(intercept=0, slope=1, linetype="dashed", color="#666666")
+    + labs(
+        x="Fitted expected count (mu-hat)",
+        y="Observed count (vertically jittered)",
+    )
+    + theme_bw()
+)
+```
+
+:::
+
+### Residual Deviance against the Saturated GP Model {#sec-generalized-poisson-gof-deviance}
+
+Goodness of fit is often summarized by the **residual deviance**: twice the log-likelihood gap between the fitted model and a saturated model that reproduces every observation. For the GP distribution the saturated fit of observation $i$ (when $y_i > 0$) attains $\max_\lambda \log p_Y(y_i; \lambda, \hat\theta)$ at
+
+$$
+\hat\lambda_i^{(sat)} = \frac{y_i(1-\hat\theta) + \sqrt{\,y_i^2(1-\hat\theta)^2 + 4\hat\theta\, y_i\,}}{2},
+$${#eq-generalized-poisson-saturated}
+
+obtained by solving $\partial \log p_Y / \partial \lambda = 0$; for $y_i = 0$ the log-likelihood supremum is $0$. The resulting deviance is
+
+$$
+D = 2 \sum_{i=1}^{n} \big[\ell_i^{\text{sat}} - \hat\ell_i\big] = `r round(residual_deviance, 2)`
+$$
+
+on $86 - 3 = 83$ degrees of freedom, a ratio of `r round(residual_deviance / df_gof, 2)`; the same-split Poisson value was `r round(deviance(gp_poisson_r), 2)`. The deviance falls by more than half once the dispersion parameter enters.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on the deviance chi-squared approximation!
+::::
+:::: {.Heads-up-container}
+Interpreting $D$ as $\chi^2_{83}$ is an *approximation* that is trustworthy when expected counts are at least moderately large. Here many fitted expected counts are small (`r round(100 * mean(mu_hat < 2))`% of the training crabs have $\hat\mu_i < 2$), so the nominal $p$-value of `r round(p_deviance, 3)` overstates the evidence of misfit. That is why this chapter weights the **Pearson** check (which standardizes each observation directly) and the **zero-count** check (which probes a specific, interpretable feature) more heavily than the deviance — and why the residual deviance remains useful mainly as a *relative* number, on which the GP model improves the Poisson model by a factor of `r round(deviance(gp_poisson_r) / residual_deviance, 1)`.
+::::
+:::
+
+### The Zero-Count Check {#sec-generalized-poisson-gof-zeros}
+
+The EDA recorded `r observed_zeros` zero counts among the 86 training crabs. Under the fitted GP model the probability of a zero for observation $i$ is $p_Y(0; \hat\lambda_i, \hat\theta) = \exp(-\hat\lambda_i)$ (see @Definition-generalized-poisson-distribution), so the model expects
+
+$$
+\sum_{i=1}^{n} \exp(-\hat\lambda_i) = `r round(expected_zeros_gp, 1)`
+$$
+
+zero nests — versus `r round(expected_zeros_poisson, 1)` under the same-split Poisson fit. The GP model recovers most of the Poisson model's shortfall, but still under-predicts zeros by about `r observed_zeros - round(expected_zeros_gp)` crabs. This is the diagnostic fingerprint worth remembering: a dispersion parameter widens the whole distribution symmetrically around its mean shape, whereas a **structural zero surplus** is targeted directly by the mixture models of @sec-zero-inflated-poisson (ZIP) and hurdle models. Both remedies are legitimate; which one fits a given dataset is an empirical question.
+
+### Residual Plots {#sec-generalized-poisson-gof-residual-plots}
+
+@fig-generalized-poisson-gof-residuals-r and @fig-generalized-poisson-gof-residuals-py plot the deviance residuals against the fitted expected counts and against width. The residuals are centred near zero with values bounded in $[`r round(min(deviance_resids), 2)`, `r round(max(deviance_resids), 2)`]$ — no observation is catastrophically misfit, and no systematic bend remains against width. The visible banding is unavoidable: the response takes only integer values, so residuals line up along curved bands, one per count value.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| label: fig-generalized-poisson-gof-residuals-r
+#| fig-cap: "Deviance residuals of the simple GP model against fitted expected counts (left) and against female crab shell width (right); training data. Banding is a consequence of integer counts."
+#| message: false
+#| fig-width: 13
+#| fig-height: 5.5
+resid_data_r <- tibble(
+  fitted = mu_hat,
+  width_cm = training_data$width_cm,
+  dev_resid = deviance_resids
+)
+p_res_fit <- ggplot(resid_data_r, aes(x = fitted, y = dev_resid)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  labs(x = "Fitted expected count", y = "Deviance residual") +
+  theme_bw()
+p_res_width <- ggplot(resid_data_r, aes(x = width_cm, y = dev_resid)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey40") +
+  labs(x = "Carapace width (cm)", y = "Deviance residual") +
+  theme_bw()
+gridExtra::grid.arrange(p_res_fit, p_res_width, ncol = 2)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| label: fig-generalized-poisson-gof-residuals-py
+#| fig-cap: "Deviance residuals of the simple GP model against fitted expected counts (left) and against female crab shell width (right); training data (Python). Banding is a consequence of integer counts."
+#| message: false
+#| fig-width: 13
+#| fig-height: 5.5
+fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+axes[0].scatter(mu_hat_py, deviance_resids_py, alpha=0.6)
+axes[0].axhline(0, linestyle="dashed", color="#666666")
+axes[0].set_xlabel("Fitted expected count")
+axes[0].set_ylabel("Deviance residual")
+axes[1].scatter(training_data["width_cm"], deviance_resids_py, alpha=0.6)
+axes[1].axhline(0, linestyle="dashed", color="#666666")
+axes[1].set_xlabel("Carapace width (cm)")
+axes[1].set_ylabel("Deviance residual")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+### Model Adequacy Summary {#sec-generalized-poisson-gof-summary}
+
+| **Check** | **GP model result** | **Same-split Poisson result** | **Verdict** |
+|:---|:---|:---|:---|
+| Mean structure (observed vs fitted) | Correlation 0.38; scatter fans out with the fitted mean | Same mean trend available | Adequate as a width-only mean function; more regressors are assessable next |
+| Dispersion test, $H_0: \theta = 0$ | LRT $= 80.48$, df $1$, $p = 2.9\times 10^{-19}$ | — | Strongly reject: the dispersion parameter is necessary |
+| Pearson $\chi^2$ / df | 62.35 / 83 $= 0.75$; upper $p = 0.956$ | 252.70 / 84 $= 3.01$ | GP variance function adequate; Poisson's was three times too small |
+| Residual deviance / df | 121.11 / 83 $= 1.46$ (nominal $p = 0.004$; approximation caveated) | 266.58 / 84 $= 3.17$ | GP halves the deviance; residual elevation partly artefactual at small counts |
+| Zero-count check | 34 observed vs 27.4 expected | 34 observed vs 9.0 expected | GP recovers most of the zero shortfall; a surplus of about 7 zeros remains |
+
+: Training-stage adequacy summary for the simple width-only Generalized Poisson model, contrasted with the same-split Classical Poisson fit. {#tbl-generalized-poisson-gof-summary .striped .hover}
+
+**Decision.** The simple Generalized Poisson model repairs the two headline failures of the classical Poisson fit: the conditional variance is no longer three times too small, and the expected zero count is now at least of the right order of magnitude. Two cautions survive: a modest zero surplus (34 observed vs 27.4 expected) and the fingerprint that width alone is a thin mean model. Both motivate the next step of the workflow — adding the remaining phenotypic regressors, with the extended specification chosen to match @sec-classical-poisson-additional-regressors so that the comparison between the two chapters remains clean.
+
+====================================================================
+FILE: END OF S8 PROPOSAL
+====================================================================
