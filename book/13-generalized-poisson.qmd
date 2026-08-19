@@ -1279,92 +1279,131 @@ Chapter 10's Poisson regression is a classical generalized linear model: its Poi
 ::::
 :::
 
-## Estimation
+## Estimation {#sec-generalized-poisson-estimation}
 
-Parameters are estimated via joint maximum likelihood for $(\boldsymbol{\beta}, \delta)$. The log-likelihood is:
+The model of @sec-generalized-poisson-data-modelling has two sets of unknowns: the coefficient vector $\boldsymbol{\beta} = (\beta_0, \beta_1, \ldots, \beta_k)^\top$ and the dispersion parameter $\theta \in (-1, 1)$. We estimate them together by **maximum likelihood**, conditioning on the observed values of the regressors, and using the **training data** only.
+
+Under conditional independence of the responses given the regressors, the log-likelihood follows directly from the GP probability mass function (@eq-generalized-poisson-pmf) with $\lambda_i = (1 - \theta)\exp(\mathbf{x}_i^\top \boldsymbol{\beta})$ (see @eq-generalized-poisson-lambda-mean):
 
 $$
-\ell(\boldsymbol{\beta}, \delta) = \sum_{i=1}^n \left[ \log\theta_i + (y_i - 1)\log(\theta_i + \delta y_i) - (\theta_i + \delta y_i) - \log(y_i!) \right]
+\ell(\boldsymbol{\beta}, \theta)
+= \sum_{i=1}^{n} \Big[
+\log \lambda_i
++ (y_i - 1)\log\big(\lambda_i + \theta\, y_i\big)
+- \big(\lambda_i + \theta\, y_i\big)
+- \log(y_i!)
+\Big],
+\qquad \lambda_i = (1 - \theta)\exp\big(\mathbf{x}_i^\top \boldsymbol{\beta}\big).
+$${#eq-generalized-poisson-loglik}
+
+Unlike ordinary least squares, and unlike the Poisson GLM of @sec-classical-poisson-glm whose coefficients admit an efficient iteratively reweighted least squares algorithm, this log-likelihood has no closed-form maximizer: the estimators $(\hat{\boldsymbol{\beta}}, \hat{\theta})$ are the numerical solution of the $(k + 2)$-dimensional score system. In practice, both of our toolchains maximize $\ell$ by iterative numerical optimization over $(\boldsymbol{\beta}, \theta)$ jointly.
+
+Uncertainty quantification is standard likelihood machinery. The variance–covariance matrix of the estimates is approximated by the inverse of the information matrix evaluated at the maximum,
+
 $$
+\operatorname{Var}\big((\hat{\boldsymbol{\beta}}, \hat{\theta})\big)
+\;\approx\;
+\big[\mathcal{I}(\hat{\boldsymbol{\beta}}, \hat{\theta})\big]^{-1},
+\qquad
+\operatorname{SE}(\hat{\beta}_j) = \sqrt{\big[\mathcal{I}^{-1}\big]_{jj}},
+$${#eq-generalized-poisson-se}
 
-where $\theta_i = (1-\delta)\exp(X_i^\top \boldsymbol{\beta})$. Unlike Classical Poisson where only $\boldsymbol{\beta}$ is estimated via IRLS, here both parameters are estimated jointly via Newton-Raphson / BFGS, initialized from a Classical Poisson fit with $\delta^{(0)} = 0$.
+and a large-sample Wald 95% confidence interval for a coefficient is $\hat{\beta}_j \pm 1.96\,\operatorname{SE}(\hat{\beta}_j)$, with the same construction applying to $\theta$.
 
-In R, the `VGAM` package handles this via `vglm()` with the `genpoisson1()` family. In Python, we implement a custom `GenericLikelihoodModel` that encodes the GP log-likelihood directly.
+Two estimation subtleties are worth naming before the code.
 
-::: {.panel-tabset}
-## R Code
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on expected versus observed information!
+::::
+:::: {.Heads-up-container}
+There are two ways to compute the information matrix in @eq-generalized-poisson-se: the **expected** (Fisher) information and the **observed** information (the negative Hessian of the log-likelihood at the maximum). Both are valid large-sample approximations, but they are not numerically identical in finite samples. `VGAM::vglm()` reports standard errors from the **expected** information, while the `Python` class below obtains them from the **observed** information returned by the numerical optimizer. Expect small differences between the two columns of output — both this chapter and the data agree that the substantive conclusions are unchanged.
+::::
+:::
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on the Poisson-vs-GP comparison being regular!
+::::
+:::: {.Heads-up-container}
+Because $\theta = 0$ lies **inside** the parameter space $(-1, 1)$ — not on its boundary — the Poisson model is nested in the GP model under ordinary regularity conditions. The classical $\chi^2_1$ asymptotics therefore apply to the likelihood-ratio test of $H_0: \theta = 0$ performed later in this chapter; no mixture-of-chi-squared correction is needed (contrast this with the zero-inflation probability boundary problem of @sec-zero-inflated-poisson).
+::::
+:::
+
+### Fitting Machinery in R and Python {#sec-generalized-poisson-fitting-machinery}
+
+- **`R`**: [{VGAM}](https://cran.r-project.org/package=VGAM) fits the model as a *vector generalized linear model* via `vglm()`. The call below (executed in the next section) uses the `genpoisson1()` family, which parameterizes the model through the mean $\mu_i$ with a log link and a **dispersion index** equal to $(1 - \theta)^2$ with a log-log link; the argument `zero = "dispind"` constrains the dispersion index to be a single scalar shared by all observations — exactly the constant-$\theta$ assumption of @sec-generalized-poisson-random-component. VGAM's summary table will show two intercept-labelled rows: `(Intercept):1` is $\hat{\beta}_0$ on the log-link scale, and `(Intercept):2` is the dispersion row on the log-log scale, which we convert back to $\hat{\theta} = 1 - \sqrt{\exp(-\exp(\hat{\eta}_2))}$.
+
 ```{.r}
 library(VGAM)
 
-# Fit Classical Poisson first (used for comparison in GoF)
-fit_poisson <- glm(satell ~ width + color,
-                   family = poisson(link = "log"),
-                   data = train_set)
-
-# Fit Generalized Poisson
-fit_gp <- vglm(satell ~ width + color,
-               family = genpoisson1(),
-               data = train_set)
-
-summary(fit_gp)
+gp_fit <- vglm(
+  satellites ~ width_cm,
+  family = genpoisson1(zero = "dispind"),
+  data = training_data
+)
+coef(summary(gp_fit))
 ```
 
-## Python Code
-```{.python}
-from statsmodels.base.model import GenericLikelihoodModel
+- **`Python`**: no mainstream `Python` package ships a Generalized Poisson regression, so we fit the log-likelihood directly with a [{statsmodels}](https://www.statsmodels.org/) `GenericLikelihoodModel`. One implementation detail deserves attention: the optimizer is unconstrained, while $\theta$ must stay in $(-1, 1)$ and $\lambda_i = (1 - \theta)\mu_i$ must stay positive. We therefore optimize over a real-valued working parameter $z \in \mathbb{R}$ and recover the dispersion parameter through the logistic map
+
+$$
+\theta = \frac{2}{1 + \exp(-z)} - 1 \in (-1, 1),
+$${#eq-generalized-poisson-logistic-map}
+
+which guarantees $\lambda_i > 0$ for any $(\boldsymbol{\beta}, z)$ the optimizer visits, and which — unlike the `VGAM` parameterization — allows $\theta < 0$. This is the form we will need for the underdispersed practice case in the exercises.
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-gp-class-py
+#| lst-cap: "A GenericLikelihoodModel class for the Generalized Poisson regression with log link (consul1973). The logistic map on the last parameter keeps the dispersion parameter inside (-1, 1) and lambda_i positive."
+#| message: false
+#| warning: false
+import warnings
+
 from scipy.special import gammaln
-import statsmodels.api as sm
+from statsmodels.base.model import GenericLikelihoodModel
+
 
 class GeneralizedPoisson(GenericLikelihoodModel):
+    """Generalized Poisson regression with log link, per Consul and Jain (1973).
+
+    Parameters are (beta, z), where the logistic map
+    theta = 2 / (1 + exp(-z)) - 1 keeps theta in (-1, 1) so that
+    lambda_i = (1 - theta) * exp(x_i' beta) stays positive.
     """
-    Generalized Poisson Regression (Consul & Jain, 1973).
-    Parameter vector: [beta_0, ..., beta_k, delta]
-    """
-    def loglikeobs(self, params):
-        delta = params[-1]
-        beta  = params[:-1]
-        mu    = np.exp(self.exog @ beta)
-        theta = mu * (1 - delta)
-        y     = self.endog
-        ll    = np.where(
-            y == 0,
-            -theta,
-            np.log(theta) + (y - 1) * np.log(
-                np.maximum(theta + delta * y, 1e-300)
-            ) - (theta + delta * y) - gammaln(y + 1)
-        )
-        return ll
 
-    def fit(self, start_params=None, **kwargs):
-        if start_params is None:
-            # Initialize beta from Classical Poisson; delta starts at 0
-            poisson_fit = sm.GLM(
-                self.endog, self.exog,
-                family=sm.families.Poisson()
-            ).fit()
-            start_params = np.append(poisson_fit.params, 0.0)
-        return super().fit(start_params=start_params, **kwargs)
+    def nloglikeobs(self, params):
+        beta = params[:-1]
+        z = params[-1]
+        theta = 2.0 / (1.0 + np.exp(-z)) - 1.0
+        eta = self.exog @ beta
+        mu = np.exp(eta)
+        lam = (1.0 - theta) * mu
+        y = self.endog
+        t = lam + theta * y
+        if np.any(t <= 0):
+            return np.inf
+        ll = np.log(lam) + (y - 1.0) * np.log(t) - t - gammaln(y + 1.0)
+        return -ll
 
-# Prepare design matrix
-X_train = sm.add_constant(
-    pd.get_dummies(train_set[["width", "color"]],
-                   drop_first=True, dtype=float)
-)
-
-# Fit Classical Poisson (for GoF comparison)
-fit_poisson = sm.GLM(
-    train_set["satell"].values, X_train.values,
-    family=sm.families.Poisson()
-).fit()
-
-# Fit Generalized Poisson
-gp_model = GeneralizedPoisson(
-    train_set["satell"].values, X_train.values
-)
-fit_gp = gp_model.fit(method="bfgs", disp=False)
-print(fit_gp.summary())
+    def fit_dispersion(self, **kwargs):
+        """Fit by BFGS from a data-driven start (log-mean intercept, theta = 0)."""
+        start_beta = np.zeros(self.exog.shape[1])
+        start_beta[0] = np.log(self.endog.mean())
+        start_params = np.concatenate([start_beta, [0.0]])
+        # Suppress statsmodels bookkeeping warnings: the extra dispersion
+        # parameter is intentional and accounted for by the class.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = self.fit(
+                start_params=start_params, method="bfgs",
+                disp=False, maxiter=1000, **kwargs,
+            )
+        return res
 ```
-:::
+
+With the log-likelihood specified (@eq-generalized-poisson-loglik), the estimation problem is identical in spirit to every maximum likelihood fit in this book: supply the data, maximize, and read off estimates with their standard errors. The next section fits the simple model to the crab training data in both languages and checks that the two implementations agree.
 
 ## Goodness of Fit
 
