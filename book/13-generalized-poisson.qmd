@@ -263,72 +263,311 @@ Generalized Poisson regression and its close relatives are established tools for
 
 As in @sec-classical-poisson, the remainder of the chapter follows the data science workflow: study design, data collection and wrangling, exploratory data analysis, data modelling, estimation, goodness of fit, results, and storytelling. We begin by returning to the horseshoe crab data and stating precisely what the analysis is meant to learn.
 
-## Case Study 1: Horseshoe Crab Satellites (Overdispersion) {#sec-cs1-crabs}
+## Case Study: Horseshoe Crab Satellites {#sec-generalized-poisson-case-study}
 
-We return to the horseshoe crab dataset from Chapter 10. In that chapter, we fit a Classical Poisson regression to model the number of male satellite crabs (`satell`) around each female nest as a function of shell width (`width`) and color (`color`). The model produced a residual deviance substantially larger than its degrees of freedom, a warning sign that the equidispersion assumption may be violated.
+The running case study in this chapter revisits the **horseshoe crab satellites** dataset introduced in @sec-classical-poisson. Each observational unit is one female horseshoe crab nest, and the response is the number of male **satellite** crabs residing around the nest. As before, the candidate regressors are observable characteristics of the female crab: her carapace width and weight, her colour category, and her spine condition.
 
-Before refitting, we confirm the problem directly: the sample mean of `satell` is approximately 2.92 and the sample variance is approximately 9.91, giving a variance-to-mean ratio of roughly 3.4. A dataset drawn from a true Poisson distribution would have a ratio near 1.0. The horseshoe crab data shows clear overdispersion, the variance is more than three times the mean, and the GP model is the appropriate remedy.
+Reusing the same dataset is deliberate. In @sec-classical-poisson, the extended Classical Poisson model for these data failed important goodness-of-fit checks: the residual deviance was substantially larger than its degrees of freedom, the Pearson dispersion estimate was well above one, and the observed zero counts exceeded what the fitted model expected. In other words, the crab counts are **overdispersed**, and the Chapter 10 conclusion pointed explicitly to more flexible count models — including the Generalized Poisson model of this chapter. Returning to the same data lets us ask a sharper question than "how does GP regression work?" It lets us ask: **does the extra dispersion parameter actually repair the adequacy failures of the Classical Poisson fit, and what changes in the inferential and predictive conclusions when it does?**
 
-## Data Collection and Wrangling {#sec-cs1-wrangling}
+Because we already know the dataset well from @sec-classical-poisson, the case-study-specific introduction can be brief. The data remain secondary, observational data: no experiment was designed, no treatments were assigned, and no causal claims will be made. Associations between female crab characteristics and the expected number of satellite males will be described as associations, not effects.
 
-The `crabs` dataset is described in full in Chapter 10. We reload it here and reproduce the same 70/30 train/test split for direct comparability with the Classical Poisson results from that chapter. We then confirm the overdispersion signal before modelling.
+## Study Design: Framing the Inferential and Predictive Inquiries {#sec-generalized-poisson-study-design}
 
-::: {.panel-tabset}
-## R Code
-```{.r}
-library(asbio)
-data(crabs)
-crabs <- as_tibble(crabs) |>
-  select(satell, width, everything())
+Before fitting a Generalized Poisson regression model, we clarify what the model is supposed to help us learn. This is the **study design** stage of the data science workflow introduced in @sec-ds-workflow-study-design. At this stage, we are not yet choosing software functions or interpreting coefficients. Instead, we are defining the modelling purpose, the observational unit, the response variable, and the role of the regressors.
 
-# Reproduce 70/30 split from Chapter 10 (seed = 1046)
-set.seed(1046)
-n <- nrow(crabs)
-test_indices <- sample(seq_len(n), size = floor(0.3 * n))
-train_set <- crabs[-test_indices, ]
-test_set  <- crabs[test_indices, ]
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
 
-# Confirm overdispersion
-cat("Mean of satell:       ", round(mean(train_set$satell), 3), "\n")
-cat("Variance of satell:   ", round(var(train_set$satell),  3), "\n")
-cat("Variance/Mean ratio:  ", round(var(train_set$satell) /
-                                    mean(train_set$satell), 3), "\n")
-```
+For the horseshoe crab case study, the study-design elements are summarized in @tbl-generalized-poisson-study-design-variables. This table fixes the basic modelling ingredients before we decide how the Generalized Poisson regression model will be used.
 
-## R Output
-```
-Mean of satell:        2.923
-Variance of satell:    9.912
-Variance/Mean ratio:   3.392
-```
+| **Role in the study design** | **Variable(s)** | **Description** |
+|:---:|:---:|:---:|
+| **Observational unit** | Female horseshoe crab | Each row corresponds to one female crab observed in the study. |
+| **Response variable** | Number of satellite males | The count outcome: how many satellite males were observed near the female crab. |
+| **Main regressors** | Body width, weight, colour category, spine condition | Observable characteristics of the female crab that may be associated with the expected number of satellite males. |
 
-## Python Code
-```{.python}
-# crabs dataframe defined in the setup chunk above
-# Reproduce 70/30 split from Chapter 10 (seed = 1046)
-np.random.seed(1046)
-n = len(crabs)
-train_indices = np.random.choice(n, size=int(0.7 * n), replace=False)
-train_set = crabs.iloc[train_indices].reset_index(drop=True)
-test_set  = crabs.drop(index=train_indices).reset_index(drop=True)
+: Key elements of the horseshoe crab study design for the Generalized Poisson regression chapter. {#tbl-generalized-poisson-study-design-variables .striped .hover}
 
-# Confirm overdispersion
-mean_sat = train_set["satell"].mean()
-var_sat  = train_set["satell"].var()
-print(f"Mean of satell:       {mean_sat:.3f}")
-print(f"Variance of satell:   {var_sat:.3f}")
-print(f"Variance/Mean ratio:  {var_sat / mean_sat:.3f}")
-```
+Note that a single dataset can support different kinds of modelling inquiries. Therefore, we will use the same count response to illustrate two related but distinct modelling purposes: an **inferential inquiry** and a **predictive inquiry**, as shown in @tbl-generalized-poisson-study-design-inquiries. This distinction is critical since the modelling workflow is not judged in exactly the same way for both purposes.
 
-## Python Output
-```
-Mean of satell:        2.923
-Variance of satell:    9.912
-Variance/Mean ratio:   3.392
-```
+| **Inquiry type** | **Main question** | **Main modelling emphasis** | **What we will look for later in the chapter** |
+|:---:|:---:|:---:|:---:|
+| **Inferential inquiry** | How is the expected number of satellite males associated with female crab characteristics? | Coefficients, the dispersion parameter, uncertainty, hypothesis tests, confidence intervals, and interpretation. | Whether the estimated associations are meaningful, whether accounting for overdispersion changes the conclusions relative to Classical Poisson regression, and whether the model is adequate enough for its standard errors to be trustworthy. |
+| **Predictive inquiry** | How well can the available regressors predict the expected number of satellite males for a female crab? | Predicted expected counts, test-set accuracy, and comparison against a simple baseline. | Whether the fitted Generalized Poisson model improves held-out predictive performance beyond a simple benchmark and beyond the Classical Poisson model. |
+
+: Two modelling inquiries supported by the horseshoe crab satellites case study. {#tbl-generalized-poisson-study-design-inquiries .striped .hover}
+
+The above inferential and predictive inquiries are connected but not interchangeable. Keeping them separate helps us decide which results belong in the inferential interpretation and which results belong in the prediction-accuracy discussion.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on inference versus prediction!
+::::
+:::: {.Heads-up-container}
+For the inferential inquiry, the main object of interest is the relationship between the expected count and the regressors. We will pay attention to coefficient estimates, the estimated dispersion parameter, standard errors, confidence intervals, and hypothesis tests, together with the assumptions needed for the interpretation to be reasonable. Here, the model's variance assumption matters twice: it describes the data **and** it drives the model-based standard errors.
+
+On the other hand, for the predictive inquiry, the main object of interest is how well the model predicts expected counts for observations not used to fit the model. We will therefore use a training/testing split, compute predicted expected counts on the testing set, compare prediction errors against a baseline model, and summarize prediction accuracy with metrics such as **mean absolute error (MAE)**, **root mean squared error (RMSE)**, and likelihood-based predictive scores.
+
+Both inquiries require model checking. If the Generalized Poisson model fits the data poorly, then both the inferential interpretation and the predictive results become less useful.
+::::
 :::
 
-A variance-to-mean ratio of 3.39 is clear evidence of overdispersion. A dataset drawn from a true Poisson distribution would produce a ratio near 1.0. This confirms that Classical Poisson regression, which enforces that ratio to be exactly 1, is a poor fit, and motivates the GP model we introduce in the Data Modelling section.
+### Inferential Inquiry {#sec-generalized-poisson-inferential-inquiry}
+
+Specifically, the inferential inquiry asks — exactly as it did in @sec-classical-poisson:
+
+> **How is the expected number of satellite males associated with female crab characteristics, holding other regressors fixed?**
+
+The question is identical to Chapter 10 on purpose: we want to compare the two **model classes** on the same scientific footing. The question is about **association and interpretation**, not causation. The data are **observational**, and the case study does not establish a causal design. The inferential goal is to describe how the expected count of satellite males changes across observed female crab characteristics within a Generalized Poisson regression framework.
+
+For this inquiry, the **results stage** will focus on coefficient estimates, the estimated dispersion parameter, uncertainty, and statistical interpretation. A central question is whether the conclusions from Chapter 10 — which relied on Poisson-based standard errors despite failed dispersion checks — survive once the variance assumption is relaxed.
+
+### Predictive Inquiry {#sec-generalized-poisson-predictive-inquiry}
+
+Now, the predictive inquiry asks:
+
+> **How well can the available regressors be used to predict the expected number of satellite males for a female crab?**
+
+This question is about **prediction accuracy**. The target of prediction in Generalized Poisson regression is the expected count, **not necessarily the exact observed count**. For a given female crab, the observed number of satellite males may differ from the model-predicted expected count because count outcomes are variable even when the model is well specified — and the Generalized Poisson model gives that variability an explicit, estimable size through its dispersion parameter.
+
+For this inquiry, the **results stage** will focus on out-of-sample prediction. We will fit the model using a training set and evaluate prediction accuracy on a testing set. The testing-set predictions will be compared against a simple baseline that predicts the training-set mean count for every testing observation, and against the Classical Poisson fit using the same regressors. These comparisons are necessary because an accuracy metric is easier to interpret when we can ask whether the regression model does better than simple benchmarks.
+
+## Data Collection and Wrangling {#sec-generalized-poisson-data-wrangling}
+
+The data used in this chapter are **secondary observational data**. They were originally collected in the study by @brockmann1996 on satellite male groups in horseshoe crabs and later made available in a form commonly used in a textbook on categorical data and count regression [@agresti2013]. The version used here comes from [Agresti's public GitHub repository](https://github.com/alanagresti/categorical-data/blob/master/Crabs.dat) for categorical-data examples, exactly as in @sec-classical-poisson-data-wrangling, so that the two chapters analyse identical observations.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
+According to the documentation for the teaching version of the dataset, each row corresponds to one female horseshoe crab [@agresti2013]. The variables record the female crab's colour, spine condition, carapace width, number of satellite males, and weight. The original data also include a binary indicator for whether at least one satellite male was present; our response variable is the **count** of satellite males, so the binary indicator is not the primary outcome.
+
+Before doing EDA, we will complete a small amount of data wrangling (as shown in @fig-ds-workflow-data-collection-wrangling). The goal is not to create the training/testing split yet. As in the data science workflow from @sec-intro (more specifically in @sec-ds-workflow-eda), the data split belongs to the EDA stage because we first need to inspect the data structure and then decide how to separate observations for modelling and evaluation. In this section, we only load the data, rename variables, and prepare the categorical regressors so that they are easier to interpret later. The main variables used in the chapter are summarized in @tbl-generalized-poisson-wrangled-variables.
+
+| **Variable after wrangling** | **Role** | **Description** |
+|:---:|:---:|:---:|
+| `satellites` | Response | Number of satellite males observed near the female crab. |
+| `width_cm` | Regressor | Female crab carapace width, measured in centimetres. |
+| `weight_kg` | Regressor | Female crab weight, measured in kilograms. |
+| `color` | Regressor | Female crab colour category, treated as categorical. |
+| `spine` | Regressor | Female crab spine condition, treated as categorical. |
+
+: Main variables used after wrangling the horseshoe crab dataset. {#tbl-generalized-poisson-wrangled-variables .striped .hover}
+
+The `R` and `Python` code below follow the same wrangling logic. First, the data are read from the public teaching data file associated with the categorical-data examples in @agresti2013. Second, the columns are assigned readable names. Third, the colour and spine variables are converted to categorical variables with descriptive labels. Finally, the dataset is restricted to the variables needed for this chapter. More specifically, we have the following:
+
+- In `R`, via the packages part of [{tidyverse}](https://www.tidyverse.org), we read the raw data directly from Agresti's GitHub repository. The file already includes column names, so we let `read_table()` read the header. Then, we rename the columns needed for this chapter: `sat` becomes `satellites`, `width` becomes `width_cm`, and `weight` becomes `weight_kg`. The variables `color` and `spine` are stored as numeric codes in the raw file, so we convert them into categorical variables with descriptive labels.
+- In `Python`, via [{pandas}](https://pypi.org/project/pandas/), we repeat the same wrangling steps. The file already includes column names, so `read_csv()` reads the header directly. Then, `rename()` gives the response and continuous regressors more explicit names. The `map()` calls replace the numeric colour and spine codes with descriptive labels, and the final selection keeps the working variables used in this chapter.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+crabs_url <- paste0(
+  "https://raw.githubusercontent.com/",
+  "alanagresti/categorical-data/master/Crabs.dat"
+)
+
+crabs_raw <- read_table(crabs_url)
+
+crabs <- crabs_raw |>
+  transmute(
+    satellites = sat,
+    width_cm = width,
+    weight_kg = weight,
+    color = factor(
+      color,
+      levels = c(1, 2, 3, 4),
+      labels = c(
+        "Light",
+        "Medium light",
+        "Medium dark",
+        "Dark"
+      )
+    ),
+    spine = factor(
+      spine,
+      levels = c(1, 2, 3),
+      labels = c(
+        "Both good",
+        "One worn or broken",
+        "Both worn or broken"
+      )
+    )
+  )
+```
+
+## **`Python` Code**
+
+``` {.python}
+crabs_url = (
+    "https://raw.githubusercontent.com/"
+    "alanagresti/categorical-data/master/Crabs.dat"
+)
+
+crabs_raw = pd.read_csv(
+    crabs_url,
+    sep=r"\s+"
+)
+
+color_labels = {
+    1: "Light",
+    2: "Medium light",
+    3: "Medium dark",
+    4: "Dark",
+}
+
+spine_labels = {
+    1: "Both good",
+    2: "One worn or broken",
+    3: "Both worn or broken",
+}
+
+crabs = (
+    crabs_raw
+    .rename(
+        columns={
+            "sat": "satellites",
+            "width": "width_cm",
+            "weight": "weight_kg",
+        }
+    )
+    .assign(
+        color=lambda data_frame: data_frame["color"].map(color_labels),
+        spine=lambda data_frame: data_frame["spine"].map(spine_labels),
+    )
+    [
+        [
+            "satellites",
+            "width_cm",
+            "weight_kg",
+            "color",
+            "spine",
+        ]
+    ]
+)
+```
+
+:::
+
+Both languages read the same raw file and apply the same recoding, so the two analyses start from identical observations. @tbl-generalized-poisson-crabs-data-r and @tbl-generalized-poisson-crabs-data-py display the wrangled dataset: the `R` tab shows the full dataset in a scrollable interactive table, while the `Python` tab shows the first ten rows.
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: tbl-generalized-poisson-crabs-data-r
+#| tbl-cap: "Wrangled horseshoe crab data used in the Generalized Poisson regression analysis."
+#| echo: false
+#| message: false
+crabs_url <- paste0(
+  "https://raw.githubusercontent.com/",
+  "alanagresti/categorical-data/master/Crabs.dat"
+)
+crabs_raw <- read_table(crabs_url, show_col_types = FALSE)
+crabs <- crabs_raw |>
+  transmute(
+    satellites = sat,
+    width_cm = width,
+    weight_kg = weight,
+    color = factor(color, levels = c(1, 2, 3, 4),
+                   labels = c("Light", "Medium light", "Medium dark", "Dark")),
+    spine = factor(spine, levels = c(1, 2, 3),
+                   labels = c("Both good", "One worn or broken", "Both worn or broken"))
+  )
+crabs |>
+  print_as_dt()
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+crabs_url = (
+    "https://raw.githubusercontent.com/"
+    "alanagresti/categorical-data/master/Crabs.dat"
+)
+crabs_raw = pd.read_csv(crabs_url, sep=r"\s+")
+color_labels = {1: "Light", 2: "Medium light", 3: "Medium dark", 4: "Dark"}
+spine_labels = {1: "Both good", 2: "One worn or broken", 3: "Both worn or broken"}
+crabs = (
+    crabs_raw
+    .rename(columns={"sat": "satellites", "width": "width_cm", "weight": "weight_kg"})
+    .assign(color=lambda data_frame: data_frame["color"].map(color_labels),
+            spine=lambda data_frame: data_frame["spine"].map(spine_labels))
+    [["satellites", "width_cm", "weight_kg", "color", "spine"]]
+)
+crabs_head_py_html = scrollable_table_html(crabs.head(10))
+```
+
+```{r}
+#| echo: false
+#| label: tbl-generalized-poisson-crabs-data-py
+#| tbl-cap: "First ten rows of the wrangled horseshoe crab data (Python)."
+#| message: false
+#| results: asis
+cat(
+  "
+",
+  reticulate::py$crabs_head_py_html,
+  "
+",
+  sep = ""
+)
+```
+
+:::
+
+Finally, @lst-generalized-poisson-data-checks-r and @lst-generalized-poisson-data-checks-py run the structural checks reported below: the dataset has 173 rows and 5 columns, there are no missing values, the response takes non-negative integer values from 0 to 15 with 62 zero counts, and the category counts show that `Light` (12 crabs) and `One worn or broken` (15 crabs) are small groups. The small `Light` category matters later: it is the reference category for `color`, so colour contrasts estimated against it will be comparatively imprecise. That is a reason for caution in interpretation, not a reason to delete observations.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| lst-label: lst-generalized-poisson-data-checks-r
+#| lst-cap: "Code to check the structure of the wrangled horseshoe crab data."
+#| message: false
+# Dimensions and storage types
+dim(crabs)
+sapply(crabs, class)
+
+# Missing values
+sum(is.na(crabs))
+
+# Category counts
+table(crabs$color)
+table(crabs$spine)
+
+# Response range and zero counts
+range(crabs$satellites)
+sum(crabs$satellites == 0)
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| lst-label: lst-generalized-poisson-data-checks-py
+#| lst-cap: "Code to check the structure of the wrangled horseshoe crab data."
+#| message: false
+# Dimensions and storage types
+print(crabs.shape)
+print(crabs.dtypes)
+
+# Missing values
+print("Missing values:", int(crabs.isna().sum().sum()))
+
+# Category counts
+print(crabs["color"].value_counts())
+print(crabs["spine"].value_counts())
+
+# Response range and zero counts
+print("Range:", int(crabs["satellites"].min()), "to", int(crabs["satellites"].max()))
+print("Zero counts:", int((crabs["satellites"] == 0).sum()))
+```
+
 :::
 
 ## Data Modelling
