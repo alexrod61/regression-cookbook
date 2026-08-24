@@ -844,25 +844,29 @@ You can also visualize the relationship across other regressors in various types
 
 ## Data Modelling
 
-A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is categorical and nominal (our response of interest) subject to the numerical regressors `commute_distance` and `age`, and binary regressors `has_car_available` and `weekend_commuter`. 
+A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is a categorical and nominal outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
 
-This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities that will belong to categories $1,2,\dots,m$ respectively; i.e., 
-$$P(Y_i=1)=p_{i,1}, P(Y_i=2)=p_{i,2}, \dots, P(Y_i=m)=p_{i,m}$$ {#eq-multinomial-dist}
+This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
+$$P(Y_i=1)=p_{i,1},\newline
+P(Y_i=2)=p_{i,2}, \newline
+\dots\newline
+\dots\newline
+P(Y_i=m)=p_{i,m}$$ {#eq-multinomial-dist}
 where
 $$
 \sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
 $$
 
-*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with $m=2$.*
+*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$.*
 
-The Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
+Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
 
 Here is what we can do:
 
 1. Pick one of the categories to be the **baseline**.
 2. For each of the other categories, we model the logarithm of the odds to the baseline category.
 
-Now, **what is the math for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ **logit link** functions:
+Now, **what is the mathematics for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ **logit link** functions:
 
 $$
 \begin{gathered}
@@ -899,15 +903,15 @@ $$ {#eq-prob-multinomial}
 
 ***If we add all $m$ probabilities in @eq-prob-multinomial, the sum is equal to $1$ for the $i$th observation. This is particularly important when we want to use this model for making predictions in classification matters.***
 
-Let's set up a multinomial logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public Transit`, `Bicycle`, and `Walking`, subject to the continuous regressors `commute_distance` and `age`, denoted as $x_{i,\texttt{distance}}$ and $x_{i,\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{i,\texttt{car}}$ and $Z_{i,\texttt{weekend}}$ respectively. We will use `Car` as the baseline level for `transport_mode`. The equation of each link function for this multinomial model is given below, such that each link function has its own intercept and a set of regression coefficients.
+Let's set up a Multinomial Logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public Transit`, `Bicycle`, and `Walking`, subject to the continuous regressors `commute_distance` and `age`, denoted as $x_{i,\texttt{distance}}$ and $x_{i,\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{i,\texttt{car}}$ and $Z_{i,\texttt{weekend}}$ respectively. We will use `Car` as the baseline level for `transport_mode`. The equation of each link function for this multinomial model is given below, such that each link function has its own intercept and a set of regression coefficients.
 
 $$
 \begin{align*}
-\eta_i^{(\texttt{Public},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
-&= \beta_0^{(\texttt{Public},\texttt{Car})} + \beta_1^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}, \\
-\eta_i^{(\texttt{Bike},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
-&= \beta_0^{(\texttt{Bike},\texttt{Car})} + \beta_1^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}, \\
-\eta_i^{(\texttt{Walk},\texttt{Car})} &= \log\left[\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&\eta_i^{(\texttt{Public},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&= \beta_0^{(\texttt{Public},\texttt{Car})} + \beta_1^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}, \\[0.6em]
+&\eta_i^{(\texttt{Bike},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
+&= \beta_0^{(\texttt{Bike},\texttt{Car})} + \beta_1^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}, \\[0.6em]
+&\eta_i^{(\texttt{Walk},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
 &= \beta_0^{(\texttt{Walk},\texttt{Car})} + \beta_1^{(\texttt{Walk},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Walk},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}} .
 \end{align*}
 $$
@@ -916,12 +920,12 @@ Taking exponential on both sides of the model equations gives the ratio of the p
 
 $$
 \begin{align*}
-&\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = \exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]\\
-&= \exp\left[\beta_0^{(\texttt{Public},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}\right]\\[12pt]
-&\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = \exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})} \right]\\
-&= \exp\left[\beta_0^{(\texttt{Bike},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}\right]\\[12pt]
-&\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = \exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]\\
-&= \exp\left[\beta_0^{(\texttt{Walk},\texttt{Car})}\right] \exp\left[\beta_1^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{distance}}\right] \exp\left[\beta_2^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{age}}\right] \exp\left[ \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}}\right] \exp\left[ \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}}\right]
+&\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Public},\texttt{Car})}}\\
+&= e^{\beta_0^{(\texttt{Public},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}}\\[12pt]
+&\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Bike},\texttt{Car})}}\\
+&= e^{\beta_0^{(\texttt{Bike},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}}\\[12pt]
+&\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}\\
+&= e^{\beta_0^{(\texttt{Walk},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}}}
 \end{align*}
 $$
 
@@ -929,17 +933,16 @@ Finally, the probabilities of $Y_i$ belonging to categories `Car`, `Public Trans
 
 $$
 \begin{align*}
-P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{1}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]} \\
-P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]} \\
-P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}\\
-P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}{1+\exp\left[\eta_i^{(\texttt{Public},\texttt{Car})} \right]+\exp\left[\eta_i^{(\texttt{Bike},\texttt{Car})}\right]+\exp\left[\eta_i^{(\texttt{Walk},\texttt{Car})} \right]}
+P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{1}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
+P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Public},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
+P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Bike},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
+P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}}
 \end{align*}
 $$ {#eq-probabilities}
 
-
 ### The Log-Likelihood Function
 
-A multinomial logistic regression model treats the categories in the response variable as nominal, which means that there is no inherent ranking or ordering among them; therefore, each category is compared directly against a single baseline category. Recall from @eq-prob-multinomial that this comparison gives us the category-specific probabilities in closed form,
+A Multinomial Logistic regression model treats the categories in the response variable as nominal, which means that there is no inherent ranking or ordering among them; therefore, each category is compared directly against a single baseline category. Recall from @eq-prob-multinomial that this comparison gives us the category-specific probabilities in closed form,
 
 $$
 p_{i,j} = P(Y_i = j \mid x_{i,1}, \ldots, x_{i,K}), \qquad j = 1, \ldots, m,
@@ -1039,7 +1042,7 @@ where $\beta_{0}^{(2,1)}$, ..., $\beta_{0}^{(m,1)}$ are category-specific interc
 
 The model therefore comprises $(m-1)\times (K+1)$ parameters: $m-1$ intercepts and $(m-1)\times K$ regression coefficients. 
 
-We now fit the multinomial logistic regression model using the `nnet` package in `R` or the `statsmodel` package in `Python`. 
+We now fit the multinomial logistic regression model on `train_set` using the `nnet` package in `R` and the `statsmodel` package in `Python`. 
 
 ::: {.panel-tabset}
 
@@ -1294,7 +1297,7 @@ print(multinom_fit_balanced.summary())
 
 ## Goodness of Fit
 
-Let us assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
+Now let's assess how well the fitted multinomial logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
 
 ### Likelihood-Based Measures
 
@@ -1453,7 +1456,7 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the intercept-only model. McFadden's `r round(mcfadden_r2,4)` is below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of the variation in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the imbalanced training model, and they are useful later for comparing this fit against the upsampled model or other model specifications.
+The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the null (intercept-only) model. McFadden's $R^2$ (`r round(mcfadden_r2,4)`) is below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of variability in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the imbalanced training model, and they are useful later for comparing this fit against the upsampled model or other model specifications.
 
 ### Classification-Based Measures
 
@@ -1654,11 +1657,11 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the train set, the model achieves an overall accuracy of about `r 100.0*round(overall_accuracy, 3)`%. On average, the model correctly identifies `r 100.0*round(macro_recall, 3)`% of instances for each transport mode, which means that the macro recall is `r 100.0*round(macro_recall, 3)`%. Macro recall is relatively low, which suggests that the model is biased towards the majority classes, even though the overall accuracy is decent. Macro F1 score is `r 100.0*round(macro_f1, 3)`%, which means the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall, and this can happen if precision is high for the majority class, but recall for the minority classes is low.
+On the train set, the model achieves an overall accuracy of about **`r 100.0*round(overall_accuracy, 3)`%**. On average, the model correctly identifies **`r 100.0*round(macro_recall, 3)`%** of instances for each transport mode, which means that the macro recall is **`r 100.0*round(macro_recall, 3)`%**. Macro recall is relatively low, which suggests that the model is biased towards the majority classes, even though the overall accuracy is decent. Macro F1 score is **`r 100.0*round(macro_f1, 3)`%**, which means the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall, and this can happen if precision is high for the majority class, but recall for the minority classes is low.
 
-In summary, the model performs okay overall but is biased toward the dominant classes. It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes. You are encouraged to explore the performance of the fitted model on the balanced sets. 
+In summary, the model performs okay overall but is biased towards the dominant classes. It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes. For comparison, you are encouraged to explore the performance of the fitted model on the balanced sets. 
 
-## Inference
+## Inference {#sec-inference}
 
 After we finish estimating the coefficients, we look at how uncertain they are and whether they differ from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the solution). Taking square roots of those variances gives standard errors. 
 Similar as in [Classical Poisson regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), each coefficient divided by its standard error gives a (asymptotically normal) **Wald Z statistic** to test if the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio—how the odds of choosing a category change for a one‑unit increase in the regressor, holding other variables fixed.
@@ -1702,16 +1705,22 @@ test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
 # Print the fitted model
-print(summary(multinom_test))
+broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::rename(outcome_class = y.level) |>
+  dplyr::mutate_if(is.numeric, round, 3) |>
+  print(n = Inf, width = Inf)
 
 # Significant coefficients only
 cat("\nSignificant coefficients (5% threshold):\n")
 
-broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
+results_df <- broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
   dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
   rename(outcome_class = y.level) |>
   print(n = Inf, width = Inf)               # show full term names without truncation
+
+# Display the results
+results_df
 ```
 
 ## Python Code
@@ -1766,11 +1775,14 @@ print(summary(multinom_test))
 # Significant coefficients only
 cat("\nSignificant coefficients (5% threshold):\n")
 
-broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
+results_df <-broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
   dplyr::mutate_if(is.numeric, round, 3) |>
   dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
   rename(outcome_class = y.level) |>
   print(n = Inf, width = Inf)               # show full term names without truncation
+
+# Display the results
+results_df
 ```
 
 ## Python Output
@@ -1808,7 +1820,7 @@ print(multinom_fit.summary())
 
 :::
 
-On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. As shown in the outputs below, the test set contains only two `Walking` observations and seven `Bicycle` observations, and none of these nine observations are weekend commuters; therefore, the `Walking` and `Bicycle` equations suffer from quasi-complete separation. 
+On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. The remaining rows in the table of significant coefficients in the `R` output should be read with caution. As shown in the outputs below, the test set contains only two `Walking` observations and seven `Bicycle` observations. None of these nine observations are weekend commuters and both the `Walking` observations do not have car available; therefore, the `Walking` and `Bicycle` equations suffer from quasi-complete separation. 
 
 ::: {.panel-tabset}
 
@@ -1950,65 +1962,132 @@ print(multinom_fit.summary())
 
 ### Regressors Associated with Transport Mode
 
-The multinomial logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so that each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category $k$ relative to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `Public Transit` equation, and we will interpret them below. 
+```{r}
+#| label: multinom-test-inline
+#| echo: false
+#| message: false
+#| warning: false
 
-**Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = 1.19$, $z = 5.84$, $p < 0.001$, 95% CI: $1.12, 1.26$). It has the following interpretation.
+# Coefficient table on the log-odds scale: estimates, standard errors, z, p
+coef_log <- broom::tidy(multinom_test, conf.int = FALSE) |>
+  dplyr::rename(outcome_class = y.level)
 
-> *Holding age, car availability, and weekend commuting status constant, each additional kilometre of one-way commute distance is associated with 1.19 times higher odds of choosing public transit over car.*
+# Coefficient table on the odds-ratio scale, with Wald 95% confidence intervals
+coef_or <- broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
+  dplyr::rename(outcome_class = y.level)
 
-Although the per-kilometre effect appears modest, it compounds over larger differences in commute length. For example, a commute that is $10$ kilometres longer multiplies the odds of choosing public transit over the car by approximately $1.19^{10} \approx 2.6$, assuming that age, car availability, and weekend commuting status are held constant. 
+# Non-baseline outcome classes, taken from the data rather than hard coded
+non_baseline <- setdiff(levels(test_set$transport_mode), "Car")
+class_bike <- grep("Bicycle", non_baseline, value = TRUE)
+class_pt   <- grep("Transit", non_baseline, value = TRUE)
+class_walk <- grep("Walk",    non_baseline, value = TRUE)
 
-**Car availability:** Car availability is a significant predictor of choosing public transit over the car ($\text{OR} = 0.193$, $z = -4.79$, $p < 0.001$, 95% CI: $0.098, 0.378$). It has the following interpretation.
+# Pull a single quantity for a given outcome class and term.
+# Fails loudly at render time if the class or term name does not match.
+get_stat <- function(class, term_name, column, tbl = coef_or) {
+  value <- tbl[[column]][tbl$outcome_class == class & tbl$term == term_name]
+  if (length(value) != 1) {
+    stop("No unique match for outcome class '", class, "' and term '", term_name, "'.")
+  }
+  value
+}
 
-> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have 0.128 times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately 87.2% in the odds of choosing public transit over car.*
+# Numeric formatting that degrades gracefully under quasi-complete separation.
+# Returns bare LaTeX, so inline calls are wrapped in $ ... $ in the prose.
+fmt_num <- Vectorize(function(x, digits = 3) {
+  if (is.na(x)) return("\\text{NA}")
+  if (!is.finite(x)) return(paste0(if (x < 0) "-" else "", "\\approx \\infty"))
+  if (x != 0 && abs(x) < 10^(-digits)) return("\\approx 0")
+  if (abs(x) >= 1e4) {
+    e <- floor(log10(abs(x)))
+    return(sprintf("%.2f \\times 10^{%d}", x / 10^e, e))
+  }
+  formatC(x, format = "f", digits = digits)
+})
+
+# p-values: bare form for tables, prefixed form for prose
+fmt_pval <- function(p) {
+  if (p < 0.001) "< 0.001" else formatC(p, format = "f", digits = 3)
+}
+fmt_p <- function(p) {
+  if (p < 0.001) "< 0.001" else paste0("= ", fmt_pval(p))
+}
+
+# 95% confidence interval on the odds-ratio scale, as a comma-separated pair
+fmt_ci <- function(class, term_name, digits = 3) {
+  paste0(
+    fmt_num(get_stat(class, term_name, "conf.low"), digits), ", ",
+    fmt_num(get_stat(class, term_name, "conf.high"), digits)
+  )
+}
+```
+
+The multinomial logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so that each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category $k$ relative to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `` `r class_pt` `` equation, and we will interpret them below.
+
+**Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = `r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)`$, $z = `r fmt_num(get_stat(class_pt, "commute_distance", "statistic", coef_log), 2)`$, $p `r fmt_p(get_stat(class_pt, "commute_distance", "p.value"))`$, 95% CI: $`r fmt_ci(class_pt, "commute_distance", 2)`$). It has the following interpretation.
+
+> *Holding age, car availability, and weekend commuting status constant, each additional kilometre of one-way commute distance is associated with `r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)` times higher odds of choosing public transit over car.*
+
+Although the per-kilometre effect appears modest, it compounds over larger differences in commute length. For example, a commute that is $10$ kilometres longer multiplies the odds of choosing public transit over the car by approximately $`r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)`^{10} \approx `r fmt_num(get_stat(class_pt, "commute_distance", "estimate")^10, 1)`$, assuming that age, car availability, and weekend commuting status are held constant.
+
+**Car availability:** Car availability is a significant predictor of choosing public transit over the car ($\text{OR} = `r fmt_num(get_stat(class_pt, "has_car_availableYes", "estimate"))`$, $z = `r fmt_num(get_stat(class_pt, "has_car_availableYes", "statistic", coef_log), 2)`$, $p `r fmt_p(get_stat(class_pt, "has_car_availableYes", "p.value"))`$, 95% CI: $`r fmt_ci(class_pt, "has_car_availableYes")`$). It has the following interpretation.
+
+> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have `r fmt_num(get_stat(class_pt, "has_car_availableYes", "estimate"))` times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately `r fmt_num(100 * (1 - get_stat(class_pt, "has_car_availableYes", "estimate")), 1)`% in the odds of choosing public transit over car.*
 
 The remaining rows of the significant coefficients table in the `R` output are artifacts of the quasi-complete separation discussed above and are therefore not interpreted.
 
 ## Results
 
-The fitted model can be written as 
+The fitted model can be written as
 $$
 \log \left( \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}} + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}} + \hat{\beta}_{3}^{(k,\text{Car})}Z_{i,\texttt{car}} + \hat{\beta}_{4}^{(k,\text{Car})} Z_{i,\texttt{weekend}},
 $$ {#eq-fitted-model}
-where $k$ is one of the non-baseline levels: `Bicycle`, `Public Transit`, or `Walking`, and the regressors are denoted as $x_{i,\texttt{distance}}, x_{i,\texttt{age}}, Z_{i,\texttt{car}},$ and $Z_{i,\texttt{weekend}}$.
+where $k$ is one of the non-baseline levels: `` `r class_bike` ``, `` `r class_pt` ``, or `` `r class_walk` ``, and the regressors are denoted as $x_{i,\texttt{distance}}, x_{i,\texttt{age}}, Z_{i,\texttt{car}},$ and $Z_{i,\texttt{weekend}}$.
 
-The estimated intercepts and slope coefficients of the multinomial logistic regression model fitted on the test set in the Inference section are summarized in the three tables below. Every estimate is interpreted relative to the baseline category `Car`, and the $z$ statistics, $p$-values, odds ratios, and $95\%$ confidence intervals are computed from the estimates and standard errors reported in the `R` output:
+The estimated intercepts and slope coefficients of the multinomial logistic regression model fitted on the test set in @sec-inference are summarized in the three tables below. Every estimate is interpreted relative to the baseline category `Car`, and the $z$ statistics, $p$-values, odds ratios, and $95\%$ Wald confidence intervals are taken directly from the `R` output:
 
-**`Bicycle` versus `Car`:**
+```{r}
+#| label: multinom-coef-tables
+#| echo: false
+#| results: asis
 
-| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
-|-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Bicycle},\,\text{Car})}$ (intercept) | $-0.502$ | $1.576$ | $-0.32$ | $0.750$ | $0.606$ | $(0.028, 13.290)$ |
-| $\hat{\beta}_{1}^{(\text{Bicycle},\,\text{Car})}$ (`commute_distance`) | $-0.152$ | $0.088$ | $-1.73$ | $0.084$ | $0.859$ | $(0.723, 1.020)$ |
-| $\hat{\beta}_{2}^{(\text{Bicycle},\,\text{Car})}$ (`age`) | $-0.049$ | $0.033$ | $-1.50$ | $0.132$ | $0.952$ | $(0.892, 1.015)$ |
-| $\hat{\beta}_{3}^{(\text{Bicycle},\,\text{Car})}$ (`has_car_availableYes`) | $1.096$ | $1.160$ | $0.94$ | $0.345$ | $2.992$ | $(0.308, 29.049)$ |
-| $\hat{\beta}_{4}^{(\text{Bicycle},\,\text{Car})}$ (`weekend_commuterYes`) | $-22.109$ | $4.54 \times 10^{4}$ | $\approx 0$ | $1.000$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
+term_order <- c("(Intercept)", "commute_distance", "age",
+                "has_car_availableYes", "weekend_commuterYes")
+param_labels <- c("(intercept)", "`commute_distance`", "`age`",
+                  "`has_car_availableYes`", "`weekend_commuterYes`")
 
-**`Public Transit` versus `Car`:**
+for (k in c(class_bike, class_pt, class_walk)) {
 
-| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
-|-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Public\_Transit},\,\text{Car})}$ (intercept) | $-1.666$ | $0.695$ | $-2.40$ | $0.016$ | $0.189$ | $(0.048, 0.737)$ |
-| $\hat{\beta}_{1}^{(\text{Public\_Transit},\,\text{Car})}$ (`commute_distance`) | $0.175$ | $0.030$ | $5.83$ | $< 0.001$ | $1.191$ | $(1.123, 1.264)$ |
-| $\hat{\beta}_{2}^{(\text{Public\_Transit},\,\text{Car})}$ (`age`) | $0.002$ | $0.013$ | $0.12$ | $0.903$ | $1.002$ | $(0.975, 1.028)$ |
-| $\hat{\beta}_{3}^{(\text{Public\_Transit},\,\text{Car})}$ (`has_car_availableYes`) | $-2.056$ | $0.411$ | $-5.00$ | $< 0.001$ | $0.128$ | $(0.057, 0.287)$ |
-| $\hat{\beta}_{4}^{(\text{Public\_Transit},\,\text{Car})}$ (`weekend_commuterYes`) | $-0.573$ | $0.508$ | $-1.13$ | $0.259$ | $0.564$ | $(0.208, 1.525)$ |
+  # Escape underscores and spaces for use inside \text{ } in the parameter symbols
+  k_math <- gsub("[ _]", "\\\\_", k)
 
-**`Walking` versus `Car`:**
+  cat("**`", k, "` versus `Car`:**\n\n", sep = "")
+  cat("| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |\n")
+  cat("|-----------|----------|------------|-----|-----------|-----|--------|\n")
 
-| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |
-|-----------|----------|------------|-----|-----------|-----|--------|
-| $\hat{\beta}_{0}^{(\text{Walking},\,\text{Car})}$ (intercept) | $-3.378$ | $2.643$ | $-1.28$ | $0.201$ | $0.034$ | $(0.000, 6.068)$ |
-| $\hat{\beta}_{1}^{(\text{Walking},\,\text{Car})}$ (`commute_distance`) | $-0.085$ | $0.171$ | $-0.50$ | $0.621$ | $0.919$ | $(0.656, 1.285)$ |
-| $\hat{\beta}_{2}^{(\text{Walking},\,\text{Car})}$ (`age`) | $0.037$ | $0.059$ | $0.63$ | $0.528$ | $1.038$ | $(0.925, 1.165)$ |
-| $\hat{\beta}_{3}^{(\text{Walking},\,\text{Car})}$ (`has_car_availableYes`) | $-42.504$ | $6.37 \times 10^{8}$ | $-6.67 \times 10^{-8}$ | $1.000$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
-| $\hat{\beta}_{4}^{(\text{Walking},\,\text{Car})}$ (`weekend_commuterYes`) | $-14.941$ | $2840.984$ | $-0.005$ | $0.996$ | $\approx 0$ | $(\approx 0, \approx \infty)$ |
+  for (i in seq_along(term_order)) {
+    tm <- term_order[i]
+    cat(sprintf(
+      "| $\\hat{\\beta}_{%d}^{(\\text{%s},\\,\\text{Car})}$ %s | $%s$ | $%s$ | $%s$ | $%s$ | $%s$ | $(%s)$ |\n",
+      i - 1L, k_math, param_labels[i],
+      fmt_num(get_stat(k, tm, "estimate",   coef_log)),
+      fmt_num(get_stat(k, tm, "std.error",  coef_log)),
+      fmt_num(get_stat(k, tm, "statistic",  coef_log), 2),
+      fmt_pval(get_stat(k, tm, "p.value",   coef_log)),
+      fmt_num(get_stat(k, tm, "estimate")),
+      fmt_ci(k, tm)
+    ))
+  }
 
-The `Bicycle` and `Public Transit` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `Public Transit` equation are significant at the $5\%$ level. As discussed in the Inference section, the `Walking` equation and the `weekend_commuterYes` term in the `Bicycle` equation suffer from quasi-complete separation; the resulting extreme coefficient magnitudes paired with astronomical standard errors drive the associated $z$-statistics toward zero and the $p$-values toward one, which is a symptom of a maximum likelihood estimate that does not exist rather than genuine null effects.
+  cat("\n")
+}
+```
+
+The `` `r class_bike` `` and `` `r class_pt` `` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `` `r class_pt` `` equation are significant at the $5\%$ level. As discussed in @sec-inference, the `` `r class_walk` `` equation and the `weekend_commuterYes` term in the `` `r class_bike` `` equation suffer from quasi-complete separation; the resulting extreme coefficient magnitudes paired with astronomical standard errors drive the associated $z$-statistics toward zero and the $p$-values toward one, which is a symptom of a maximum likelihood estimate that does not exist rather than genuine null effects.
 
 ### Prediction 
 
-We will fit the model on the train set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+Now we will fit the Multinomial Logistic regression model on the train set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
 ::: {.panel-tabset}
 
@@ -2259,15 +2338,24 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the test set, the model achieves an overall accuracy of **73.0\%**, a macro recall of **36.9\%**, and a macro F1 of **72.4\%**. 
+On the test set, the model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. 
 
-The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $64.7\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. All $7$ `Bicycle` observations in the test set are misclassified as `Car` or `Public Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation
+The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $64.7\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. Among the seven `Bicycle` observations in the test set, six are misclassified as `Car` and one is misclassified as `Public_Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. 
+
+::: {.Tip}
+::::{.Tip-header}
+Class Imbalance and Prediction
+::::
+::::{.Tip-container}
+The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood function in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation:
 
 $$
 \sum_{i=1}^n \hat{p}_{i,j} = \sum_{i=1}^n y_{i,j} = n_j,
 $$
 
 where $n_j$ is the number of observations in category $j$ in the train set. Consequently, the fitted probabilities of each category average exactly its sample proportion in the train set, which is roughly $2.4\%$ for `Bicycle` and less than $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, due to which these minority classes are not predicted at all in the test set.
+::::
+:::
 
 Now let's use the upsampled model (`multinom_fit_balanced`) from @sec-estimation to predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
@@ -2450,7 +2538,7 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the test set, the `multinom_fit_balanced` model achieves an overall accuracy of **45.5\%**, a macro recall of **52.2\%**, and a macro F1 of **33.4\%**. Overall this upsampled model has a lower accuracy on the test set than the original `multinom_fit` model; however, it correctly classifies some of the `Bicycle` and `Walking` observations in the test set with recalls of roughly $66.7\%$ and $50\%$ respectively.
+On the test set, the upsampled model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**,, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. Overall this upsampled model has a lower accuracy on the test set than the original `multinom_fit` model; however, it correctly classifies some of the `Bicycle` and `Walking` observations in the test set with recalls of roughly $66.7\%$ and $50\%$ respectively. As discussed in @sec-estimation, there is evidence that the upsampled model improves recall of minority classes but the trade-off is that the overall accuracy is lower, meaning that it is an overfit model. 
 
 ## Storytelling
 
