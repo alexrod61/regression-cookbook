@@ -997,7 +997,7 @@ Each regressor is chosen based on its theoretical and statistical relevance in e
 
 ### The Random Component
 
-The Multinomial Logistic regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
+The random component of Multinomial Logistic regression approach assumes a [Multinoulli distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
 $$
 \begin{align*}
 P(Y_i=1)=p_{i,1},\newline
@@ -1012,13 +1012,13 @@ $$
 \sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
 $$
 
-*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$.*
+*A particular highlight is that the Bernoulli distribution is a special case of the Multinoulli distribution with two possible outcomes, i.e. $m=2$.*
 
 Let $Y_i$ denote the transport mode of the $i$th commuter in the training data, for $i=1,2,...,n$, such that $Y_i$ can be one of `Public_Transit`, `Car`, `Bicycle`, or `Walking`. 
 
 Let
 $$
-\mathbf{x}_i = (x_{i,1},...,x_{i,K}),
+\mathbf{x}_i = (x_{i,1},...,x_{i,k}),
 $$ 
 denote the vector of observed regressor values for commuter $i$. For the largest candidate specification in this chapter, $k=4$, corresponding to commute distance, age, car availability, and weekend commuter status. 
 
@@ -1027,7 +1027,7 @@ The random component of Multinomial Logistic regression assumes
 $$
 Y_i \mid \mathbf{x}_i
 \sim
-\operatorname{Multinoulli}(p_{i,1}, p_{i,2},...,p_{i,m-1}),
+\operatorname{Multinoulli}(p_{i,1}, ...,p_{i,m-1}),
 $$
 
 where
@@ -1039,7 +1039,100 @@ p_{i,k}
 $$
 is the **conditional probability** that $Y_i$ belongs to category $k$, given the regressor values $\mathbf{x}_i$. Consequently,
 $$\Pr(Y_i=m\mid\mathbf{x}_i)=1-\Sigma_{j=1}^{m-1}p_{i,j}$$
-As $0\leqp_{i,k}\leq1$ and $\Sigma_{j=1}^mp_{i,j}=1$, it follows that the sum of parameters, $\Sigma_{j=1}^{m-1}p_{i,j}$ is a real number between $0$ and $1$. Note that the Bernoulli distribution is a special case of the Multinoulli distribution with two possible outcomes, i.e. $m=2$.
+As $0\leq p_{i,k}\leq1$ and $\Sigma_{j=1}^mp_{i,j}=1$, it follows that the sum of parameters, $\Sigma_{j=1}^{m-1}p_{i,j}$ is a real number between $0$ and $1$. 
+
+The random component tells us what kind of response is being modelled, but it does not yet explain why two commuters with different characteristics may have different values of $p_{i,1}, ...,p_{i,m-1}$.That role belongs to the systematic component.
+
+### The Systematic Component
+
+Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the systematic component combines the regressors through a **linear predictor**. With $k$ regressors,
+
+$$
+\eta_i^{(j,1)}
+=
+\beta_0
++
+\beta_1x_{i,1}
++
+\beta_2x_{i,2}
++
+\cdots
++
+\beta_kx_{i,k}.
+$${#eq-systematic-component}
+
+Equivalently,
+
+$$
+\eta_i
+=
+\beta_0
++
+\mathbf{x}_i^\top
+\boldsymbol{\beta},
+$$
+
+where
+
+$$
+\boldsymbol{\beta}
+=
+\left(
+\beta_1,
+\beta_2,
+\ldots,
+\beta_k
+\right)^\top.
+$$
+
+Thus:
+
+- $\eta_i$ is the **linear predictor** for commuter $i$;
+- $\beta_0$ is the intercept;
+- $\beta_1,\ldots,\beta_k$ are fixed but unknown regression coefficients;
+- $x_{i,1},\ldots,x_{i,k}$ are the observed regressor values for commuter $i$;
+- $\mathbf{x}_i$ collects those $k$ regressor values; and
+- $\boldsymbol{\beta}$ collects the corresponding $k$ regression coefficients.
+
+Some texts absorb the intercept into the vector notation by adding a leading $1$ to the regressor vector. We keep $\beta_0$ visible here so that $\mathbf{x}_i$ remains consistent with the regressor-vector notation introduced earlier in the chapter. 
+
+The word **linear** in *linear predictor* refers to the way the regression coefficients enter $\eta_i$. It does **not** mean that the default probability itself is a straight-line function of the regressors.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on what is linear in Multinomial Logistic regression!
+::::
+:::: {.Heads-up-container}
+The systematic component for each non-baseline category $j$ is $\eta_i^{(j,1)}$. In other words,
+
+$$
+\eta_i
+=
+\beta_0
++
+\mathbf{x}_i^\top\boldsymbol{\beta}
+$$
+
+is linear in the regression coefficients, while
+
+$$
+\pi_i
+=
+\Pr(Y_i=1\mid\mathbf{x}_i)
+$$
+
+lives on the probability scale.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
+
+Therefore, we still need a link function that connects the unrestricted real-valued linear predictor $\eta_i$ to a valid probability between $0$ and $1$.
+::::
+:::
+
+This separation between the linear predictor and the response-scale probability is what allows a GLM to retain a regression structure without forcing the conditional probability itself to be linear.
+
+
+### The Logit Link Functions
 
 Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
 
@@ -1157,7 +1250,7 @@ $$ {#eq-likelihood-multinomial}
 
 where $n$ is the number of individuals in the sample, $m$ is the number of categories, and $p_{i,j}$ is the model-implied softmax probability that individual $i$ (with regressor values $x_{i,1}, \ldots, x_{i,K}$) falls in category $j$. The unknown parameters are collected in $\boldsymbol{\beta}$, the stack of all reference-category coefficients $\beta_k^{(j,1)}$ for $j = 2, \ldots, m$ and $k = 0, 1, \ldots, K$, such that it consists of an intercept and $K$ slopes for each of the $m-1$ non-baseline categories.
 
-The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual: because of the indicator $y_{i,j}$ in the exponent, every term equals $1$ except the one matching the individual's true category, so the inner product collapses to just $p_{i,j}$ for that observed category. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
+The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual; because of the indicator $y_{i,j}$ in the exponent, $\prod_{j=1}^m p_{i,j}^{y_{i,j}}$ collapses to just $p_{i,j}$ for the actual observed category of $i$th observation. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
 
 Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the **log-likelihood function**:
 
@@ -1169,11 +1262,11 @@ Substituting the softmax probabilities from @eq-prob-multinomial and using the r
 
 $$
 \ell(\boldsymbol{\beta}) = \sum_{i=1}^n \left[ \sum_{j=2}^m y_{i,j} \sum_{k=0}^K x_{i,k} \beta_k^{(j,1)} - \log\left( 1 + \sum_{j=2}^m e^{\sum_{k=0}^K x_{i,k} \beta_k^{(j,1)}} \right) \right],
-$$
+$$ {#eq-log-likelihoood}
 
 where $x_{i,0} = 1$ corresponds to the intercept in the linear model.
 
-Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\beta}}$, the coefficient values under which the observed data are most probable. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
+Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\beta}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as is known as the **maximum-likelihood estimation**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -1223,19 +1316,29 @@ The full Newton–Raphson/IRLS procedure is:
 
 ## Estimation {#sec-estimation}
 
+With the data modelling stage completed, we now move to estimation, where we fit the Multinomial Logistic regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each regressor contributes to the response variable, allowing us to measure their individual effects on primary mode of transport.
+
+The goal of estimation is to determine the coefficient estimates through **maximum likelihood estimation**, which gives the coefficients estimates for which the observed training data is the most probable under a **conditioned Multinomial distribution** for `transport_mode`. This provides a mathematical framework for analyzing the commuting behaviors and primary modes of transport. 
+
 ### Fitting the Model
 
 We now turn to the question of how the parameters of the Multinomial Logistic regression model are estimated from data. We summarize the key estimation steps in mathematical terms below, working with one observation at a time before generalizing to the full sample.
 
-Recall that the model for a response $Y$ with $m$ categories and $K$ regressors is given by
+Recall that the model for a response $Y_i$ with $m$ categories and $K$ regressors is given by
 
 $$
-\log \left( \frac{P(Y_i = k \mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)} \right) = \beta_{0}^{(k,1)} + \beta_{1}^{(k,1)} x_{i,1} + \beta_{2}^{(k,1)} x_{i,2} + ... + \beta_{K}^{(k,1)} x_{i,k},\,\,\,\,k=2,...,m
+\begin{aligned}
+\log \left( \frac{P(Y_i = j \mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)} \right) &= \beta_{0}^{(j,1)}\\
+&\quad+\beta_{1}^{(j,1)}x_{i,1}\\
+&\quad+\beta_{2}^{(j,1)} x_{i,2}\\
+&\quad+ ... \\
+&\quad+ \beta_{k}^{(j,1)} x_{i,k},\,\,\,\,j=2,...,m
+\end{aligned}
 $$ {#eq-multinomial-model}
 
-where $\beta_{0}^{(2,1)}$, ..., $\beta_{0}^{(m,1)}$ are category-specific intercepts, and $\beta_{1}^{(k,1)}$, $\beta_{2}^{(k,1)}$, ..., $\beta_{K}^{(k,1)}$ are the slope coefficients corresponding to the $k$-th category of $Y$.
+where $\beta_{0}^{(2,1)}$, ..., $\beta_{0}^{(m,1)}$ are category-specific intercepts, and $\beta_{1}^{(k,1)}$, $\beta_{2}^{(j,1)}$, ..., $\beta_{k}^{(j,1)}$ are the slope coefficients corresponding to the $j$-th category of $Y$.
 
-The model therefore comprises $(m-1)\times (K+1)$ parameters: $m-1$ intercepts and $(m-1)\times K$ regression coefficients. 
+The model therefore comprises $(m-1)\times (k+1)$ parameters: $m-1$ intercepts and $(m-1)\times k$ regression coefficients. 
 
 We now fit the Multinomial Logistic regression model on `train_set` using the `nnet` package in `R` and the `statsmodel` package in `Python`. 
 
@@ -1330,11 +1433,11 @@ In the case study model with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt
 
 $$
 \begin{aligned}
-\log \left( \frac{P(Y_i = k \mid \mathbf{x}_i)}{P(Y_i = \text{Car} \mid \mathbf{x}_i)} \right) &= \hat{\beta}_{0}^{(k,\text{Car})}\\
-&\quad + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}}\\
-&\quad + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}}\\
-&\quad + \hat{\beta}_{3}^{(k,\text{Car})} Z_{i,\texttt{car}}\\
-&\quad + \hat{\beta}_{4}^{(k,\text{Car})} Z_{i,\texttt{weekend}},
+\log \left( \frac{P(Y_i = j \mid \mathbf{x}_i)}{P(Y_i = \text{Car} \mid \mathbf{x}_i)} \right) &= \hat{\beta}_{0}^{(k,\text{Car})}\\
+&\quad + \hat{\beta}_{1}^{(j,\text{Car})} x_{i,\texttt{distance}}\\
+&\quad + \hat{\beta}_{2}^{(j,\text{Car})} x_{i,\texttt{age}}\\
+&\quad + \hat{\beta}_{3}^{(j,\text{Car})} Z_{i,\texttt{car}}\\
+&\quad + \hat{\beta}_{4}^{(j,\text{Car})} Z_{i,\texttt{weekend}},
 \end{aligned}
 $$
 
@@ -1348,7 +1451,7 @@ If one category is much more frequent than the others (i.e., unbalanced outcomes
 3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
 4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates (complete separation).
 
-For example, if 95\% of the observations are `Car`, then the model has little incentive to adjust parameters for `Walking` and `Bus`, so estimates for those categories can be unstable. There are two common approaches: 
+For example, in our training data, only $5\%$ of the observations are `Car`, so the model has little incentive to adjust parameters for `Car`. There are two common approaches: 
 
 1. Downsampling: Reduce the majority class size so that each class is roughly balanced. This risks throwing away data, but helps balance influence.
 2. Upsampling: Duplicate (or synthetically generate) minority class cases until classes are balanced. This risks overfitting, but improves minority estimation.
