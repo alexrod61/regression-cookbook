@@ -480,9 +480,6 @@ test_set  <- data[-train_idx, ]
 
 cat("train set size:", nrow(train_set))
 cat("Test set size:", nrow(test_set))
-
-print(filter(test_set, transport_mode=="Bicycle"))
-print(filter(test_set, transport_mode=="Walking"))
 ```
 
 ## Python Output
@@ -509,7 +506,7 @@ Before diving into data modelling, it is crucial to develop a deep understanding
 
 ### Continuous Variables
 
-We will begin by examining continuous variables. Let's visualize the relationship between `transport_mode` and continuous regressors - `age` and `commute_distance`. This is best visualized using box plots and violin plots. 
+We begin by examining continuous variables. There are two continuous regressors: `age` and `commute_distance`, and we will examine their relationship with the response variable `transport_mode` through visualizations, such as box plots and violin plots. 
 
 ::: {.panel-tabset}
 
@@ -518,8 +515,9 @@ We will begin by examining continuous variables. Let's visualize the relationshi
 ```{.r}
 # Custom color palette `cbPalette` 
 cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-# visualize boxplots and violin plots of commute_distance v.s. transport_mode
-p3 <- train_set %>%
+
+# Visualize boxplots and violin plots of commute_distance v.s. transport_mode
+p1 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
     geom_violin(alpha = 0.6, trim = FALSE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
@@ -531,7 +529,7 @@ p3 <- train_set %>%
     theme(legend.position = "none") +
     guides(fill = guide_legend(title = "Transport Mode"))
 
-p4 <- train_set %>%
+p2 <- train_set %>%
     ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
     geom_violin(alpha = 0.6, trim = FALSE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
@@ -543,7 +541,7 @@ p4 <- train_set %>%
     theme(legend.position = "none") +
     guides(fill = guide_legend(title = "Transport Mode"))
 
-grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
 ```
 
 ## Python Code
@@ -641,7 +639,7 @@ fig
 #| message: false
 #| warning: false
 cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-p3 <- train_set %>%
+p1 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
     geom_violin(alpha = 0.6, trim = FALSE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
@@ -652,7 +650,7 @@ p3 <- train_set %>%
     theme_bw() +
     theme(legend.position = "none") +
     guides(fill = guide_legend(title = "Transport Mode"))
-p4 <- train_set %>%
+p2 <- train_set %>%
     ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
     geom_violin(alpha = 0.6, trim = FALSE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
@@ -663,7 +661,7 @@ p4 <- train_set %>%
     theme_bw() +
     theme(legend.position = "none") +
     guides(fill = guide_legend(title = "Transport Mode"))
-grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots", gp = grid::gpar(fontsize = 16, fontface = "bold")))
 ```
 
 ## Python Output
@@ -719,7 +717,7 @@ ax1.set_xlabel("Transport Mode")
 ax1.set_ylabel("Commute Distance (km)")
 ax1.get_legend()  # no legend to remove manually
 
-# Plot p4: Age vs Transport Mode
+# Plot p2: Age vs Transport Mode
 ax2 = fig.add_subplot(gs[0, 1])
 sns.violinplot(
     data=train_set,
@@ -755,22 +753,15 @@ fig
 
 :::
 
-The plots in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py show how commute distance and age vary across different transport modes. Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 17–18 km.
-Car users also have moderately long commutes, with a median around 10-11 km and a relatively broad spread.
-Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end.
-All modes show some long-distance commuters (long tails), especially public transit and car.
+The plots in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py show how commute distance and age vary across different transport modes. Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 17–18 km. Car users also have moderately long commutes, with a median around 10-11 km and a relatively broad spread. Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end.
+All transport modes show some long-distance commuters, which are shown by long tails, and there are a few outliers for commute distance in `Bicycle`.
 
 Car and public transit users have similar age distributions, with median ages in the mid-30s to early 40s.
-Bicycle users skew slightly younger, but with a long tail of older users.
-Walking has a much wider spread in age, with a high median (around 60) and some very young walkers as well.
-The variability in age is greatest for walking, suggesting diverse usage across age groups.
+Bicycle users have a more skewed age distribution with a higher median age in mid-50s. Walking has a much wider spread in age, with a high median (around 60) and some very young walkers as well. The variability in age is the highest for walking, which suggests diverse usage across age groups.
 
 ### Categorical Variables
 
 The categorical variables can be visualized using stacked bar charts. The bar charts are very effective because they display the frequency of each category, helping us understand the distribution of qualitative attributes. The stacked bar charts in @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py display the distribution of transport mode across car availability (`has_car_available`) and weekend commuter status (`weekend_commuter`). 
-
-The bar chart on the left shows that car is the dominant mode of transport, especially among those who have access to a car. Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
-Bicycle and Walking are rare overall but tend to occur more when no car is available. 
 
 ::: {.panel-tabset}
 
@@ -927,21 +918,64 @@ fig
 
 :::
 
-Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the non-weekend commuter group (orange).
-However, Public Transit has a noticeable number of weekend commuters (blue), which indicates some weekend reliance on public transit.
-Walking and Bicycling show little weekend commuting activity.
+The bar charts show that car is the dominant mode of transport, especially among those who have access to a car. Public transit is used by both those with and without car availability, but it is more common among those without a car, as shown by a relatively larger orange bar. `Bicycle` and `Walking` are minority classes in the train set, as shown by the tiny bars in  @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py.
+
+Most weekend commuters do not significantly change their transport mode. The overall proportions in the train set are largely dominated by the non-weekend commuters, shown by the orange bars. However, `Public Transit` has a noticeable number of weekend commuters, shown by the blue bar, which signals some weekend reliance on public transit. Among the `Bicycle` riders, the majority have access to a car and the majority of them are not weekend commuters, according to the stacked bar charts. The number of observations with `transport_mode=Walking` is very small in the train set, as shown by the minuscule bars corresponding to individuals with Walking as the primary mode of transport. As the distribution of categorical variables is not clear for `Walking`, let's filter the corresponding rows from train set. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Filter the rows in train set with transport_mode = "Walking"
+print(filter(train_set, transport_mode=="Walking"))
+```
+
+## Python Code
+
+```{.python}
+# Filter the rows in train set with transport_mode = "Walking"
+print(train_set[train_set["transport_mode"] == "Walking"])
+```
+
+:::
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+print(filter(train_set, transport_mode=="Walking"))
+```
+
+## Python Output
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+print(train_set[train_set["transport_mode"] == "Walking"])
+```
+
+:::
+
+As shown in the outputs above, there are $4$ observations with `transport_mode=Walking` in the train set, which corresponds to $5\%$ of total observations in the train set. There is no clear dominance of any `has_car_available` and `weekend_commuter` categories for individuals with Walking as the primary mode of transport.
 
 You can also visualize the relationship across other regressors in various types of figures for practice.
 
 ### Key Takeaways from EDA
 
-Conducting Exploratory Data Analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. .....
+Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and Car versus Public Transit as the transport mode signals that the availability of car might be a factor for choosing car over public transit. Similarly the median commute distance increases across `Bicycle`, `Car`, and `Public Transit` in the train set, which suggests that there might be relationship between commute distance and primary mode of transport in the population of commuters.
 
 It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modelling strategy. With this foundation, we are better prepared to build a Multinomial Logistic regression model on data that has been carefully examined and understood.
 
 ## Data Modelling
 
-A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is a categorical and nominal outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
+After conducting Exploratory Data Analysis (EDA), we transition to the modelling stage, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modelling linear relationships.
+
+A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
 
 This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
 $$P(Y_i=1)=p_{i,1},\newline
@@ -960,21 +994,8 @@ Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookboo
 
 Here is what we can do:
 
-1. Pick one of the categories to be the **baseline**.
+1. Pick one of the categories to be the baseline.
 2. For each of the other categories, we model the logarithm of the odds to the baseline category.
-
-Now, **what is the mathematics for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ **logit link** functions:
-
-$$
-\begin{gathered}
-\eta_i^{(2,1)} = \log\left[\frac{P(Y_i = 2\mid x_{i,1}, ..., x_{i,K}}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(2,1)} + \beta_1^{(2,1)} x_{i, 1} + \beta_2^{(2,1)} x_{i, 2} + \ldots + \beta_K^{(2,1)} x_{i, k} \\
-\eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 3\mid x_{i,1}, ..., x_{i,K}}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(3,1)} + \beta_1^{(3,1)} x_{i, 1} + \beta_2^{(3,1)} x_{i, 2} + \ldots + \beta_K^{(3,1)} x_{i, k} \\
-\vdots \\
-\eta_i^{(m,1)} = \log\left[\frac{P(Y_i = m\mid x_{i,1}, ..., x_{i,K}}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(m,1)} + \beta_1^{(m,1)} x_{i, 1} + \beta_2^{(m,1)} x_{i, 2} + \ldots + \beta_K^{(m,1)} x_{i, k}.
-\end{gathered}
-$$ {#eq-multinomial}
-
-Note that the superscript $(j, 1)$ in @eq-multinomial indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, the regression coefficients are different for each link function.
 
 **Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,K})$, the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
 
@@ -982,12 +1003,25 @@ $$
 \mathbf{x}_i = (x_{i,1},...,x_{i,K}),
 $$ 
 
-where $\mathbf{x}_i$ is a vector of size $k$ that bundles all $k$ regressors into a single object, so we can refer to them all at once instead of listing each one, and write
+where $\mathbf{x}_i$ is a vector of size $k$ that bundles all $k$ regressors into a single object, so we can refer to them all at once instead of listing each one. For example,
 
 $$
 P(Y_i = 1 \mid \mathbf{x}_i).
 $$
 This notation simplifies expressions and improves readability.
+
+Now, **what is the mathematics for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ **logit link** functions:
+
+$$
+\begin{gathered}
+\eta_i^{(2,1)} = \log\left[\frac{P(Y_i = 2\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(2,1)} + \beta_1^{(2,1)} x_{i, 1} + \beta_2^{(2,1)} x_{i, 2} + \ldots + \beta_K^{(2,1)} x_{i, k} \\
+\eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 3\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(3,1)} + \beta_1^{(3,1)} x_{i, 1} + \beta_2^{(3,1)} x_{i, 2} + \ldots + \beta_K^{(3,1)} x_{i, k} \\
+\vdots \\
+\eta_i^{(m,1)} = \log\left[\frac{P(Y_i = m\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(m,1)} + \beta_1^{(m,1)} x_{i, 1} + \beta_2^{(m,1)} x_{i, 2} + \ldots + \beta_K^{(m,1)} x_{i, k}.
+\end{gathered}
+$$ {#eq-multinomial}
+
+Note that the superscript $(j, 1)$ in @eq-multinomial indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, the regression coefficients are different for each link function.
 
 Each of the logit-linear functions in @eq-multinomial writes the log of odds between each category $j=2,\dots,m$ and the baseline category $j=1$ as a linear combination of the regressors. To compare between the categories $j=2,\dots,m$, we can simply deduct one equation from another, e.g.,
 $$
