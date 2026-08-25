@@ -128,13 +128,13 @@ Please ensure contributions maintain bilingual `R` + `Python` parity and reprodu
 
 ## Authors
 
-[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), and [Ben Chen](https://github.com/phchen5).
+[G. Alexi Rodriguez-Arelis](https://alexrod.netlify.app/), [Andy Tai](https://andytai7.github.io/Andy-Tai/), [Ben Chen](https://github.com/phchen5), and [Payman Nickchi](https://pnickchi.github.io/).
 
 For questions or feedback, open an issue on [GitHub](https://github.com/alexrod61/regression-cookbook/issues).
 
 ## Collaborators
 
-We extend our warmest thanks to the collaborators whose insight and enthusiasm have strengthened every part of this project. We are especially grateful to **Olivia Liu**, **Michael Sekatchev**, and **Aviv Milner**, whose hard work on chapter drafts, code examples, pedagogical framing, and workflow structure has helped shape the Regression Cookbook into a more rigorous, accessible, and thoughtfully crafted resource.
+We extend our warmest thanks to our collaborators whose insight and enthusiasm have strengthened every part of this project. We are especially grateful to **Karan Bains**, **Lavanya Gupta**, **Olivia Liu**, **Aviv Milner**, **Héctor Palafox Prieto**, **Michael Sekatchev**, and **Shuyuan Wang** whose hard work on chapter drafts, code examples, pedagogical framing, and workflow structure has helped shape the Regression Cookbook into a more rigorous, accessible, and thoughtfully crafted resource.
 
 Your willingness to engage deeply with the material and provide constructive work has made this project richer than it could have been on its own. We are sincerely appreciative of the time, expertise, and encouragement each of you contributed. Thank you for helping build an OER that reflects both technical excellence and the collaborative spirit of the data-science and statistics community.
 
@@ -150,17 +150,17 @@ We gratefully acknowledge this funding, which enables the creation, maintenance,
 
 If you use this material in teaching or research, please cite it as:
 
-> Rodríguez-Arelis, G. A., Tai, A., & Chen, B. (2025). *The Regression Cookbook*. University of British Columbia / OER Fund. https://alexrod61.github.io/regression-cookbook/
+> Rodríguez-Arelis, G. A., Tai, A., Chen, B., & Nickchi, P. (2026). *The Regression Cookbook*. University of British Columbia / OER Fund. https://alexrod61.github.io/regression-cookbook/
 
 Here is a BibTeX entry you can use:
 
 ```bash
 @book{regressioncookbook,
   title     = {The Regression Cookbook},
-  author    = {Rodríguez-Arelis, G. Alexi and Tai, Andy and Chen, Ben},
-  year      = {2025},
+  author    = {Rodríguez-Arelis, G. Alexi and Tai, Andy and Chen, Ben and Nickchi, Payman},
+  year      = {2026},
   url       = {https://alexrod61.github.io/regression-cookbook/},
-  note      = {Open-access bilingual (R + Python) textbook},
+  note      = {Open-access bilingual (R and Python) textbook},
   publisher = {University of British Columbia / OER Fund}
 }
 ```

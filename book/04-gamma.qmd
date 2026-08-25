@@ -1433,3 +1433,1997 @@ Finally, regional differences highlight potential network-level optimization opp
 And that wraps up the entire data science workflow. By walking through a complete example from start to finish, we have seen how Gamma regression fits naturally into each stage of the process, from study design and exploratory analysis to modeling, diagnostics, and storytelling. This chapter showed how Gamma regression provides a principled way to model continuous, strictly positive, and right-skewed outcomes, and how it can transform raw data into meaningful insights.
 
 Gamma regression is a powerful tool, but the workflow that surrounds it is even more important. Asking the right question, understanding the data, choosing an appropriate model, checking that the model fits well, and interpreting the results in context are the steps that make an analysis reliable and useful. With these ideas in place, you can confidently apply Gamma regression to real problems and guide decisions with evidence.
+
+## Practice Exercises {#sec-gamma-exercises}
+
+The following practice exercises reinforce the main ideas from this chapter. They are designed to help you move between the **conceptual**, **computational**, and **interpretive** parts of Gamma regression. Some questions focus on the model structure itself: the Gamma random component, the systematic component, the log link, the mean-variance relationship, coefficient interpretation, and model diagnostics. Others ask you to work through an applied case study involving food-delivery times.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464611/).](img/exercises.png){width="550"}
+
+As you work through the problems, keep in mind that Gamma regression is useful because it respects the positive and often right-skewed nature of the response. The main goal is not only to fit a model, but also to decide whether the model is reasonable for the data, interpret the fitted effects on the response scale, evaluate held-out performance, and communicate the results in context.
+
+::: {.quiz}
+
+### Conceptual Questions {#sec-gamma-exercises-conceptual}
+
+::: {.Question}
+::::{.Question-header}
+Question 4.1
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Which response variable would be most appropriate for a Gamma regression model? Select the correct option:
+
+**A.** Whether a customer clicked on an advertisement, coded as `Yes` or `No`.
+
+**B.** The number of support tickets submitted by a user in one month.
+
+**C.** The response time of a web server in milliseconds, where all values are positive and the distribution is right-skewed.
+
+**D.** A student's letter grade, with categories `A`, `B`, `C`, `D`, and `F`.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.1
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** C.
+
+**Rationale:**
+
+Gamma regression is designed for response variables that are **continuous**, **strictly positive**, and often **right-skewed**. A binary response would suggest logistic regression, a count response would suggest a count regression model, and an unordered categorical response would suggest a categorical outcome model.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.2
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Why can ordinary linear regression be a poor choice for modeling positive, right-skewed outcomes such as `response_time_ms`? Select the correct option:
+
+**A.** Ordinary linear regression always requires the response variable to be categorical.
+
+**B.** Ordinary linear regression can produce negative fitted values and assumes constant variance around a linear mean structure.
+
+**C.** Ordinary linear regression cannot include more than one predictor.
+
+**D.** Ordinary linear regression forces all fitted values to be between 0 and 1.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.2
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+For positive, skewed outcomes, ordinary linear regression can produce impossible negative predictions and may fail to capture increasing variability as the mean grows. Gamma regression with a log link keeps the expected response positive and is built for outcomes whose variability often increases with the mean.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.3
+::::
+::::{.Question-container}
+**Short Answer**
+
+The chapter describes the Gamma distribution as flexible because of its shape parameter. In words, what happens to the distribution when the shape parameter is small versus when it is larger?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.3
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
+When the shape parameter is small, the Gamma distribution is strongly right-skewed: many observations are near zero, with a long tail of larger values. When the shape parameter is larger, the distribution becomes more balanced and less sharply skewed, while still only allowing positive values.
+
+```{r}
+#| echo: false
+
+gamma_shapes <- tibble(
+  value = rep(seq(0.01, 220, length.out = 500), 2),
+  shape = rep(c("Small shape: 1", "Large shape: 8"), each = 500)
+) %>%
+  mutate(
+    density = case_when(
+      shape == "Small shape: 1" ~ dgamma(value, shape = 1, scale = 20),
+      shape == "Large shape: 8" ~ dgamma(value, shape = 8, scale = 20)
+    )
+  )
+
+ggplot(gamma_shapes, aes(x = value, y = density, color = shape)) +
+  geom_line(linewidth = 1.1) +
+  theme_minimal() +
+  labs(
+    x = "Response value",
+    y = "Density",
+    color = "Case",
+    title = "Small and Large Gamma Shape Parameters"
+  )
+```
+
+In this idealized plot, the scale parameter is held fixed at 20. The small-shape case has much more mass near zero and a long right tail, while the larger-shape case is shifted toward larger values and is less sharply skewed.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.4
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+In the GLM framework, which component specifies the probability distribution of the response variable? Select the correct option:
+
+**A.** The random component.
+
+**B.** The systematic component.
+
+**C.** The link function.
+
+**D.** The deviance residual.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.4
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+The **random component** specifies the distribution of the response variable. In Gamma regression, this means assuming the response is Gamma-distributed, which is appropriate for continuous, positive, right-skewed outcomes.
+
+In equation form, we can write this as
+
+$$
+Y_i \mid \mathbf{x}_i \sim \operatorname{Gamma}(\mu_i, \phi),
+$$
+
+where
+
+$$
+\mathbb{E}(Y_i \mid \mathbf{x}_i) = \mu_i
+\qquad \text{and} \qquad
+\operatorname{Var}(Y_i \mid \mathbf{x}_i) = \phi \mu_i^2.
+$$
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.5
+::::
+::::{.Question-container}
+**Short Answer**
+
+In Gamma regression with a log link, the model uses
+
+$$
+\log(\mu_i) = \eta_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_k x_{ik}.
+$$
+
+Here, $\eta_i$ is the **linear predictor**, meaning the linear combination of the model's regressors. Why does this help keep the expected response $\mu_i$ positive?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.5
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+If $\log(\mu_i) = \eta_i$, then
+
+$$
+\mu_i = \exp(\eta_i)
+= \exp(\beta_0 + \beta_1 x_{i1} + \cdots + \beta_k x_{ik}).
+$$
+
+The exponential function is always positive, so the fitted mean response is always greater than zero, no matter what value the linear predictor $\eta_i$ takes.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.6
+::::
+::::{.Question-container}
+**Short Answer**
+
+Suppose $Y_i$ is the positive response time for observation $i$, measured in minutes, $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ is the expected response time for that observation, and $\phi > 0$ is a dispersion parameter. Gamma regression often assumes
+
+$$
+\operatorname{Var}(Y_i \mid \mathbf{x}_i) = \phi \mu_i^2.
+$$
+
+What does this imply about observations with larger expected response times?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.6
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+This variance relationship means that observations with larger expected response times $\mu_i$ also have larger variance. In practical terms, if $Y_i$ is response time in minutes, orders or requests expected to take longer may also be more variable. This matches many cost, duration, and latency datasets, where larger expected outcomes often come with more spread.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.7
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Which statement best describes the systematic component of the Gamma regression model in this chapter? Select the correct option:
+
+**A.** It is the histogram of `response_time_ms`.
+
+**B.** It is the linear predictor $\eta_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_k x_{ik}$.
+
+**C.** It is the rule that all observations must have the same response time.
+
+**D.** It is the residual deviance after fitting the model.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.7
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+The systematic component is the linear combination of regressors. In this chapter, variables such as `concurrent_users`, `database_queries`, `cache_hit_rate`, `server_load`, and the dummy variables for categorical regressors enter the model through this linear predictor. The notation $k$ simply means that the model can include $k$ regressors.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.8
+::::
+::::{.Question-container}
+**Short Answer**
+
+Suppose we model web-server response time using a Gamma regression with regressors such as `server_load`, `cache_hit_rate`, and `concurrent_users`. If the fitted coefficient for `server_load` is $\hat{\beta} = 0.20$, interpret this coefficient on the original response-time scale, holding the other regressors fixed.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.8
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
+Because the model uses a log link, exponentiating the coefficient gives the multiplicative change in the expected response. Here, $\exp(0.20) \approx 1.22$, so a one-unit increase in `server_load` is associated with about a 22% increase in expected server response time, holding `cache_hit_rate`, `concurrent_users`, and the other regressors fixed.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.9
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+If a Gamma regression coefficient is negative, what does that usually imply about the expected response on the original scale? Select the correct option:
+
+**A.** The predictor is associated with a multiplicative decrease in the expected response.
+
+**B.** The predictor makes the expected response negative.
+
+**C.** The predictor must be removed from the model.
+
+**D.** The response variable is no longer Gamma-distributed.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.9
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+With a log link, $\exp(\hat{\beta})$ gives the multiplicative effect on the expected response. If $\hat{\beta} < 0$, then $\exp(\hat{\beta}) < 1$, which corresponds to a decrease in the expected response, not a negative fitted value.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.10
+::::
+::::{.Question-container}
+**Short Answer**
+
+In the server response case study, why does the chapter focus on an inferential analysis rather than a predictive analysis?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.10
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+The main goal is to understand which server and request characteristics are associated with average response time, not simply to forecast future response times. An inferential analysis helps quantify effects such as how CDN usage, request complexity, server load, and cache hit rate relate to expected latency.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.11
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Before fitting a Gamma regression model, why should we check that `response_time_ms` has no zero or negative values? Select the correct option:
+
+**A.** Gamma regression requires the response to be strictly positive.
+
+**B.** Gamma regression requires every predictor to be strictly positive.
+
+**C.** Zero response times make dummy variables impossible to create.
+
+**D.** Negative response times are acceptable as long as the mean is positive.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.11
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+The Gamma distribution is defined for positive values only. If the response contains zeros or negative values, the analyst may need to remove problematic observations, add a carefully justified offset, or choose a different modeling approach.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.12
+::::
+::::{.Question-container}
+**Short Answer**
+
+Why does the chapter use one-hot encoding for categorical predictors such as `request_complexity`, `geographic_region`, `day_of_week`, and `cdn_usage` before fitting the model?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.12
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+Gamma regression software needs numeric inputs. One-hot encoding converts category labels into binary indicator variables so they can enter the model matrix. Dropping one category from each group also creates a reference level, so the remaining coefficients are interpreted relative to that baseline category.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.13
+::::
+::::{.Question-container}
+**Short Answer**
+
+In the chapter, `Complex` is the reference category for `request_complexity`. What does the coefficient for `request_complexity_Simple` compare?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.13
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
+The coefficient for `request_complexity_Simple` compares simple requests to complex requests, holding the other regressors fixed. After exponentiating the coefficient, the result describes the multiplicative change in expected response time for simple requests relative to complex requests.
+
+::: {.panel-tabset}
+## R Code
+```{r}
+complexity_example <- tibble(
+  request_complexity = factor(
+    c("Complex", "Moderate", "Simple"),
+    levels = c("Complex", "Moderate", "Simple")
+  )
+)
+
+fastDummies::dummy_cols(
+  complexity_example,
+  select_columns = "request_complexity",
+  remove_first_dummy = TRUE,
+  remove_selected_columns = TRUE
+)
+```
+
+## Python Code
+```{python}
+import pandas as pd
+
+complexity_example = pd.DataFrame({
+    "request_complexity": pd.Categorical(
+        ["Complex", "Moderate", "Simple"],
+        categories=["Complex", "Moderate", "Simple"]
+    )
+})
+
+pd.get_dummies(
+    complexity_example,
+    columns=["request_complexity"],
+    drop_first=True
+)
+```
+:::
+
+The reference category, `Complex`, is represented by zeros for the remaining dummy variables. The `Simple` row has `request_complexity_Simple = 1`, so that coefficient compares simple requests against the complex-request baseline.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.14
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+How are the coefficients in the Gamma regression model estimated in this chapter? Select the correct option:
+
+**A.** By minimizing the sum of squared residuals exactly as in OLS.
+
+**B.** By maximum likelihood estimation under the Gamma model.
+
+**C.** By choosing the coefficients that make every fitted value equal to the sample mean.
+
+**D.** By computing separate means for each category and stopping there.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.14
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+Gamma regression is fit using **maximum likelihood estimation**. This approach uses the Gamma distributional assumption for the response, rather than minimizing squared residuals as in ordinary least squares.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.15
+::::
+::::{.Question-container}
+**Short Answer**
+
+Suppose the fitted linear predictor for a request is $\hat{\eta}_i = 4.50$. What is the fitted expected response time $\hat{\mu}_i$ under the log-link Gamma model?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.15
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+Under the log link, $\hat{\mu}_i = \exp(\hat{\eta}_i)$. Therefore,
+
+$$
+\hat{\mu}_i = \exp(4.50) \approx 90.0.
+$$
+
+If `response_time_ms` is measured in milliseconds, this corresponds to a fitted expected response time of about 90 milliseconds.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.16
+::::
+::::{.Question-container}
+**Short Answer**
+
+What should you look for in a deviance residuals versus fitted values plot when checking the fit of a Gamma regression model?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.16
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+For a well-fitting model, the deviance residuals should be centered around zero without a clear pattern, curve, or systematic trend. Large outlying residuals or visible structure may suggest missing predictors, nonlinear relationships, an inappropriate link function, or another form of model misspecification.
+
+```{r}
+#| echo: false
+
+set.seed(123)
+ideal_residuals <- tibble(
+  fitted = seq(10, 100, length.out = 120),
+  residual = rnorm(120, mean = 0, sd = 0.45)
+)
+
+ggplot(ideal_residuals, aes(x = fitted, y = residual)) +
+  geom_point(alpha = 0.65) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(
+    x = "Fitted values",
+    y = "Deviance residuals",
+    title = "Idealized Residual Pattern for a Well-Behaved Gamma Model"
+  )
+```
+
+This idealized plot is not from the case study data. It shows the kind of pattern we hope to see: residuals scattered randomly around zero with no obvious curve, funnel shape, or systematic structure.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.17
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+The chapter reports a large drop from null deviance to residual deviance. What does this suggest? Select the correct option:
+
+**A.** The model with predictors explains substantially more variation than the intercept-only model.
+
+**B.** The response variable must be normally distributed.
+
+**C.** The model has no remaining uncertainty.
+
+**D.** The predictors should all be removed.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.17
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+Null deviance summarizes the error from an intercept-only model, while residual deviance summarizes the remaining error after including predictors. A large decrease suggests that the predictors improve the model's ability to explain variation in the response.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.18
+::::
+::::{.Question-container}
+**Short Answer**
+
+Why is AIC most useful when comparing two or more candidate models rather than when reading a single model summary in isolation?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.18
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Rationale:**
+
+AIC balances model fit against model complexity. A single AIC value does not say much by itself; it becomes useful when comparing candidate models fit to the same response data. In that setting, the model with the lower AIC is usually preferred because it achieves a better fit-complexity tradeoff.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 4.19
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+**In three to five sentences**, write a short storytelling summary for the server performance case study. Your summary should mention one main driver of slower response times, one factor associated with faster response times, and one practical recommendation for a technical team.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 4.19
+::::
+::::{.Answer-container}
+<details>
+
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Answer:**
+
+A strong answer would explain that heavier system load, more concurrent users, more database queries, and more complex requests are associated with slower response times. It should also mention that caching-related features, such as higher cache hit rate or CDN usage, are associated with faster response times. A practical recommendation could be to improve caching, optimize expensive endpoints, refine load balancing, or expand regional infrastructure, while remembering that the fitted effects are associations rather than causal guarantees.
+
+</details>
+::::
+:::
+
+### Case Study {#sec-gamma-exercises-case-study}
+
+::: {.CodingCase}
+:::: {.CodingCase-header}
+Food Delivery Times
+::::
+:::: {.CodingCase-container}
+A food delivery company wants to understand what kinds of orders tend to take longer. Each order includes information about the trip distance, order size, restaurant conditions, time of day, traffic, weather, weekend status, driver experience, and total delivery time.
+
+Delivery time is a natural setting for Gamma regression because the response is **continuous**, **strictly positive**, and often **right-skewed**. Most orders arrive in a moderate amount of time, but a smaller number of orders take much longer because of distance, traffic, restaurant delays, weather, or other operational conditions.
+
+![Image by [*manfredsteger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-traffic-lights-police-6230164/).](img/traffic-lights.png){width="475"}
+
+You will reproduce the modelling workflow developed in this chapter:
+
+1. Formulate the statistical questions.
+2. Define the Gamma regression model mathematically.
+3. Understand and wrangle the variables.
+4. Split the data before EDA.
+5. Explore the training data.
+6. Fit and interpret a Gamma regression model.
+7. Check model fit and held-out performance.
+8. Predict the expected delivery time for a new order.
+9. Communicate the results in plain language.
+
+@tbl-gamma-exercise-delivery-variables summarizes the variables in this dataset.
+
+| Variable | Description |
+|:---:|:---:|
+| `delivery_time_minutes` | Total delivery time in minutes. This is continuous and strictly positive. |
+| `distance_km` | Delivery distance from the restaurant to the customer in kilometers. |
+| `order_items` | Number of items in the food order. |
+| `restaurant_busyness` | Restaurant busyness score from 0 to 100. |
+| `time_of_day` | Hour when the order was placed, using a 24-hour clock. |
+| `traffic_level` | Traffic level during the order: `Low`, `Medium`, or `High`. |
+| `weather` | Weather during the order: `Clear`, `Light_Rain`, or `Heavy_Rain`. |
+| `is_weekend` | Whether the order was placed on a weekend: `No` or `Yes`. |
+| `driver_experience_months` | Driver's experience in months. |
+
+: Variables used in the food-delivery Gamma regression exercise. {#tbl-gamma-exercise-delivery-variables .striped .hover}
+
+The response `delivery_time_minutes` records how long the order took to arrive. The regressors describe route conditions, restaurant conditions, order characteristics, timing, and driver experience. Because this dataset is simulated for practice, the exercise is mainly about learning the Gamma regression workflow rather than making real operational claims about a specific company.
+::::
+:::
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on libraries for this exercise!
+::::
+:::: {.Tip-container}
+The complete dependencies are listed:
+
+- `R`: [{readr}](https://readr.tidyverse.org), [{tidyverse}](https://www.tidyverse.org), [{ggplot2}](https://ggplot2.tidyverse.org), [{reticulate}](https://rstudio.github.io/reticulate/), and base `glm()`.
+- `Python`: [{pandas}](https://pandas.pydata.org/), [{numpy}](https://numpy.org/), [{matplotlib}](https://matplotlib.org/), and [{statsmodels}](https://www.statsmodels.org/stable/index.html).
+::::
+:::
+
+#### Study Design
+
+Before analyzing the data, we translate the delivery company's goal into statistical questions. As in the chapter workflow, we distinguish between an **inferential inquiry** and a **predictive inquiry**.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.20 — Inferential Inquiry
+::::
+:::: {.Question-container}
+Formulate an **inferential inquiry** that could reasonably be answered using this dataset.
+
+> **Hint:** Focus on understanding associations with expected delivery time rather than predicting the exact time for every order.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.20
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable inferential inquiry is:
+
+> **Which order, restaurant, weather, traffic, and driver characteristics are associated with longer expected delivery times?**
+
+This inquiry is about conditional associations in the simulated data. It does not claim that changing one variable would necessarily cause the exact same change in delivery time for every future order.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.21 — Predictive Inquiry
+::::
+:::: {.Question-container}
+Formulate a **predictive inquiry** for this study.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.21
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable predictive inquiry is:
+
+> **How accurately can expected delivery time be predicted for new orders using distance, order size, restaurant busyness, time of day, traffic, weather, weekend status, and driver experience?**
+
+This inquiry focuses on held-out prediction rather than coefficient interpretation.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.22 — Statistical Model
+::::
+:::: {.Question-container}
+Define the **observational units**, **response variable**, and **random component** of a Gamma regression model for this study. Then write the probability model mathematically.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.22
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The observational units are **food delivery orders**.
+
+For the $i$th order, the response variable is
+
+$$
+Y_i
+=
+\text{delivery time in minutes}.
+$$
+
+The random component is
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\operatorname{Gamma}(\mu_i,\phi),
+$$
+
+where $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i) > 0$ is the expected delivery time for the $i$th order and $\phi > 0$ is the dispersion parameter. Under the Gamma mean-variance relationship used in this chapter,
+
+$$
+\operatorname{Var}(Y_i \mid \mathbf{x}_i)
+=
+\phi \mu_i^2.
+$$
+
+The systematic component will be specified after we examine the available regressors and baseline categories.
+
+</details>
+::::
+:::
+
+#### Data Understanding
+
+The dataset contains **one row per order**. Refer to @tbl-gamma-exercise-delivery-variables.
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.23 — Understanding the Variables
+::::
+:::: {.Question-container}
+Using the variables table:
+
+1. Identify the response variable.
+2. Identify the continuous regressors.
+3. Identify the categorical regressors.
+4. Determine which regressors will later require indicator variables.
+
+Do **not** use software yet.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.23
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Response:**
+
+- `delivery_time_minutes`.
+
+**Continuous regressors:**
+
+- `distance_km`,
+- `order_items`,
+- `restaurant_busyness`,
+- `time_of_day`,
+- `driver_experience_months`.
+
+**Categorical regressors:**
+
+- `traffic_level`,
+- `weather`,
+- `is_weekend`.
+
+The categorical regressors will require indicator variables once baseline categories are chosen.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.24 — Statistical Notation
+::::
+:::: {.Question-container}
+Assign **mathematical notation** to the response variable and each regressor following the notation used throughout this chapter.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.24
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+| Variable | Notation |
+|:---:|:---:|
+| `delivery_time_minutes` | $Y_i$ |
+| `distance_km` | $x_{i,1}$ |
+| `order_items` | $x_{i,2}$ |
+| `restaurant_busyness` | $x_{i,3}$ |
+| `time_of_day` | $x_{i,4}$ |
+| `traffic_level` | Indicator regressors defined after selecting the baseline |
+| `weather` | Indicator regressors defined after selecting the baseline |
+| `is_weekend` | Indicator regressor defined after selecting the baseline |
+| `driver_experience_months` | $x_{i,10}$ |
+
+One possible later coding is to use $x_{i,5}$ and $x_{i,6}$ for medium and high traffic, $x_{i,7}$ and $x_{i,8}$ for light and heavy rain, $x_{i,9}$ for weekend orders, and $x_{i,10}$ for driver experience.
+
+</details>
+::::
+:::
+
+#### Data Wrangling
+
+Before fitting a Gamma regression model, we verify that the variables have the appropriate storage types and coding. Gamma regression requires the response to be strictly positive, while categorical regressors should have clear baseline categories.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.25 — Importing and Inspecting the Dataset
+::::
+:::: {.Question-container}
+Load `problem-1-data.csv` and store it as `delivery_raw`. Then:
+
+1. Display the first few observations.
+2. Report the number of observations and variables.
+3. Inspect the column names and storage types.
+4. Verify that one row represents one delivery order.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.25
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+
+delivery_data_path <- "./04-gamma_files/simulations/problem-1-data.csv"
+if (!file.exists(delivery_data_path)) {
+  delivery_data_path <- "../docs/book/04-gamma_files/simulations/problem-1-data.csv"
+}
+
+delivery_raw <- read_csv(delivery_data_path)
+
+head(delivery_raw)
+dim(delivery_raw)
+glimpse(delivery_raw)
+```
+
+## **`Python`**
+
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from pathlib import Path
+
+delivery_data_path = Path("./04-gamma_files/simulations/problem-1-data.csv")
+if not delivery_data_path.exists():
+    delivery_data_path = Path("../docs/book/04-gamma_files/simulations/problem-1-data.csv")
+
+delivery_raw = pd.read_csv(delivery_data_path)
+
+print(delivery_raw.head())
+print(delivery_raw.shape)
+print(delivery_raw.dtypes)
+```
+
+:::
+
+The imported dataset has one row per order. The response is measured in minutes, the continuous regressors are numeric, and the categorical regressors are stored as character strings before we explicitly set their baseline order.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.26 — Checking Missing Values, Positivity, and Baselines
+::::
+:::: {.Question-container}
+Using `delivery_raw`:
+
+1. Count missing values in each variable.
+2. Drop rows with missing entries and store the result as `delivery_data`.
+3. Verify that `delivery_time_minutes` is strictly positive.
+4. Convert `traffic_level`, `weather`, and `is_weekend` to categorical variables.
+5. Use the following baseline categories:
+
+   - `Low` for `traffic_level`;
+   - `Clear` for `weather`;
+   - `No` for `is_weekend`.
+
+6. Report the number of orders in each categorical level.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.26
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+delivery_missing_summary <- delivery_raw %>%
+  summarize(across(everything(), ~ sum(is.na(.x)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "missing_values"
+  )
+
+print(delivery_missing_summary)
+
+delivery_data <- delivery_raw %>%
+  drop_na() %>%
+  mutate(
+    traffic_level = factor(traffic_level, levels = c("Low", "Medium", "High")),
+    weather = factor(weather, levels = c("Clear", "Light_Rain", "Heavy_Rain")),
+    is_weekend = factor(is_weekend, levels = c("No", "Yes"))
+  )
+
+delivery_response_check <- tibble(
+  quantity = c(
+    "Number of retained orders",
+    "Minimum delivery time",
+    "All delivery times are positive"
+  ),
+  value = c(
+    nrow(delivery_data),
+    min(delivery_data$delivery_time_minutes),
+    all(delivery_data$delivery_time_minutes > 0)
+  )
+)
+
+print(delivery_response_check)
+table(delivery_data$traffic_level)
+table(delivery_data$weather)
+table(delivery_data$is_weekend)
+```
+
+## **`Python`**
+
+```{python}
+delivery_missing_summary = (
+    delivery_raw
+    .isna()
+    .sum()
+    .rename("missing_values")
+    .rename_axis("variable")
+    .reset_index()
+)
+
+print(delivery_missing_summary)
+
+traffic_levels = ["Low", "Medium", "High"]
+weather_levels = ["Clear", "Light_Rain", "Heavy_Rain"]
+weekend_levels = ["No", "Yes"]
+
+delivery_data = delivery_raw.dropna().copy()
+delivery_data["traffic_level"] = pd.Categorical(
+    delivery_data["traffic_level"],
+    categories=traffic_levels
+)
+delivery_data["weather"] = pd.Categorical(
+    delivery_data["weather"],
+    categories=weather_levels
+)
+delivery_data["is_weekend"] = pd.Categorical(
+    delivery_data["is_weekend"],
+    categories=weekend_levels
+)
+
+delivery_response_check = pd.DataFrame({
+    "quantity": [
+        "Number of retained orders",
+        "Minimum delivery time",
+        "All delivery times are positive"
+    ],
+    "value": [
+        len(delivery_data),
+        delivery_data["delivery_time_minutes"].min(),
+        (delivery_data["delivery_time_minutes"] > 0).all()
+    ]
+})
+
+print(delivery_response_check)
+print(delivery_data["traffic_level"].value_counts().reindex(traffic_levels))
+print(delivery_data["weather"].value_counts().reindex(weather_levels))
+print(delivery_data["is_weekend"].value_counts().reindex(weekend_levels))
+```
+
+:::
+
+There are a small number of missing values in `restaurant_busyness` and `driver_experience_months`, so dropping incomplete rows is reasonable here. The retained response values are strictly positive, which satisfies the basic support requirement for Gamma regression.
+
+</details>
+::::
+:::
+
+#### Exploratory Data Analysis
+
+We now split the observations before making plots. The **training set** supports EDA, model fitting, and model diagnostics. The **testing set** remains untouched until the results stage, where it is used for held-out prediction.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-outlook-success-3704053/).](img/explore.png){width="400"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.27 — Creating and Aligning the Training and Testing Sets
+::::
+:::: {.Question-container}
+Using `delivery_data`:
+
+1. Create an 80/20 training/testing split in `R` using a seed of `123`.
+2. Report the number and proportion of observations in each subset.
+3. Via [{reticulate}](https://rstudio.github.io/reticulate/), import the `R`-generated training and testing sets into `Python`.
+4. Explain why all subsequent EDA and model development should use only the training data.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.27
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+set.seed(123)
+
+delivery_train_index <- sample(
+  seq_len(nrow(delivery_data)),
+  size = floor(0.8 * nrow(delivery_data))
+)
+
+delivery_training_data <- delivery_data[delivery_train_index, ]
+delivery_testing_data <- delivery_data[-delivery_train_index, ]
+
+delivery_split_summary <- tibble(
+  split = c("Training", "Testing"),
+  rows = c(nrow(delivery_training_data), nrow(delivery_testing_data)),
+  proportion = rows / nrow(delivery_data)
+)
+
+print(delivery_split_summary)
+```
+
+## **`Python`**
+
+```{python}
+delivery_training_data = r.delivery_training_data.copy().reset_index(drop=True)
+delivery_testing_data = r.delivery_testing_data.copy().reset_index(drop=True)
+
+for delivery_subset in [delivery_training_data, delivery_testing_data]:
+    delivery_subset["traffic_level"] = pd.Categorical(
+        delivery_subset["traffic_level"],
+        categories=traffic_levels
+    )
+    delivery_subset["weather"] = pd.Categorical(
+        delivery_subset["weather"],
+        categories=weather_levels
+    )
+    delivery_subset["is_weekend"] = pd.Categorical(
+        delivery_subset["is_weekend"],
+        categories=weekend_levels
+    )
+
+delivery_split_summary_py = pd.DataFrame({
+    "split": ["Training", "Testing"],
+    "rows": [len(delivery_training_data), len(delivery_testing_data)],
+    "proportion": [
+        len(delivery_training_data) / len(delivery_data),
+        len(delivery_testing_data) / len(delivery_data)
+    ]
+})
+
+print(delivery_split_summary_py)
+```
+
+:::
+
+All EDA and model development should use only the training data so that the testing data can provide a clean held-out check later. This avoids double dipping: the same observations should not guide the modelling choices and then be used as if they were untouched validation data.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.28 — Exploring the Distribution of Delivery Time
+::::
+:::: {.Question-container}
+Using only `delivery_training_data`:
+
+1. Summarize the distribution of `delivery_time_minutes`.
+2. Plot a histogram of `delivery_time_minutes`.
+3. Describe whether the response is positive and right-skewed.
+4. Explain why this distribution is compatible with Gamma regression.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.28
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+delivery_response_summary <- tibble(
+  quantity = c(
+    "Number of training orders",
+    "Minimum",
+    "Median",
+    "Mean",
+    "Sample variance",
+    "Maximum"
+  ),
+  value = c(
+    nrow(delivery_training_data),
+    min(delivery_training_data$delivery_time_minutes),
+    median(delivery_training_data$delivery_time_minutes),
+    mean(delivery_training_data$delivery_time_minutes),
+    var(delivery_training_data$delivery_time_minutes),
+    max(delivery_training_data$delivery_time_minutes)
+  )
+)
+
+print(delivery_response_summary)
+
+ggplot(delivery_training_data, aes(x = delivery_time_minutes)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(
+    x = "Delivery time in minutes",
+    y = "Number of orders",
+    title = "Distribution of delivery time in the training data"
+  )
+```
+
+## **`Python`**
+
+```{python}
+delivery_response = delivery_training_data["delivery_time_minutes"]
+
+delivery_response_summary_py = pd.DataFrame({
+    "quantity": [
+        "Number of training orders",
+        "Minimum",
+        "Median",
+        "Mean",
+        "Sample variance",
+        "Maximum"
+    ],
+    "value": [
+        len(delivery_response),
+        delivery_response.min(),
+        delivery_response.median(),
+        delivery_response.mean(),
+        delivery_response.var(ddof=1),
+        delivery_response.max()
+    ]
+})
+
+print(delivery_response_summary_py.round(3))
+
+plt.figure()
+plt.hist(delivery_training_data["delivery_time_minutes"], bins=30)
+plt.xlabel("Delivery time in minutes")
+plt.ylabel("Number of orders")
+plt.title("Distribution of delivery time in the training data")
+plt.show()
+```
+
+:::
+
+The response is strictly positive and right-skewed, with many moderate delivery times and a smaller number of long delivery times. This is compatible with Gamma regression because the Gamma distribution is designed for positive continuous outcomes and can represent right-skewed variation.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.29 — Exploring Delivery Conditions
+::::
+:::: {.Question-container}
+Using only `delivery_training_data`:
+
+1. Plot `delivery_time_minutes` against `distance_km`.
+2. Plot `delivery_time_minutes` by `traffic_level`.
+3. Plot mean delivery time across binned values of `restaurant_busyness`, separated by `weather`.
+4. Summarize what you see in each plot using a small table of findings.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.29
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+ggplot(delivery_training_data, aes(x = distance_km, y = delivery_time_minutes)) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(se = FALSE, color = "darkorange") +
+  theme_minimal() +
+  labs(x = "Distance, km", y = "Delivery time in minutes")
+
+ggplot(delivery_training_data, aes(x = traffic_level, y = delivery_time_minutes, fill = traffic_level)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_minimal() +
+  labs(x = "Traffic level", y = "Delivery time in minutes")
+
+delivery_training_data %>%
+  mutate(busyness_bin = cut(restaurant_busyness, breaks = seq(0, 100, by = 10))) %>%
+  group_by(busyness_bin, weather) %>%
+  summarize(mean_time = mean(delivery_time_minutes), .groups = "drop") %>%
+  ggplot(aes(x = busyness_bin, y = mean_time, color = weather, group = weather)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(x = "Restaurant busyness", y = "Mean delivery time", color = "Weather")
+
+delivery_plot_findings <- tibble(
+  Plot = c(
+    "Delivery time vs. distance",
+    "Delivery time by traffic",
+    "Busyness and weather"
+  ),
+  Finding = c(
+    "Average delivery time tends to increase as distance increases.",
+    "High-traffic orders tend to have longer delivery times than low-traffic orders.",
+    "Mean delivery time tends to rise as restaurants get busier, especially when weather is rainy."
+  )
+)
+
+print(delivery_plot_findings)
+```
+
+## **`Python`**
+
+```{python}
+distance_bins = pd.cut(
+    delivery_training_data["distance_km"],
+    bins=np.linspace(
+        delivery_training_data["distance_km"].min(),
+        delivery_training_data["distance_km"].max(),
+        11
+    )
+)
+distance_means = (
+    delivery_training_data
+    .groupby(distance_bins, observed=True)["delivery_time_minutes"]
+    .mean()
+)
+distance_centers = [interval.mid for interval in distance_means.index]
+
+plt.figure()
+plt.scatter(
+    delivery_training_data["distance_km"],
+    delivery_training_data["delivery_time_minutes"],
+    alpha=0.35
+)
+plt.plot(distance_centers, distance_means.values, marker="o")
+plt.xlabel("Distance, km")
+plt.ylabel("Delivery time in minutes")
+plt.show()
+
+traffic_groups = [
+    delivery_training_data.loc[
+        delivery_training_data["traffic_level"] == level,
+        "delivery_time_minutes"
+    ]
+    for level in traffic_levels
+]
+
+plt.figure()
+plt.boxplot(traffic_groups, tick_labels=traffic_levels)
+plt.xlabel("Traffic level")
+plt.ylabel("Delivery time in minutes")
+plt.show()
+
+busyness_bins = pd.cut(
+    delivery_training_data["restaurant_busyness"],
+    bins=np.arange(0, 111, 10)
+)
+busyness_means = pd.pivot_table(
+    delivery_training_data,
+    values="delivery_time_minutes",
+    index=busyness_bins,
+    columns="weather",
+    aggfunc="mean",
+    observed=True
+).reindex(columns=weather_levels)
+
+centers = [interval.mid for interval in busyness_means.index]
+
+plt.figure()
+for level in weather_levels:
+    plt.plot(centers, busyness_means[level], marker="o", label=level)
+plt.xlabel("Restaurant busyness")
+plt.ylabel("Mean delivery time")
+plt.legend(title="Weather", loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=3)
+plt.tight_layout()
+plt.show()
+
+delivery_plot_findings_py = pd.DataFrame({
+    "Plot": [
+        "Delivery time vs. distance",
+        "Delivery time by traffic",
+        "Busyness and weather"
+    ],
+    "Finding": [
+        "Average delivery time tends to increase as distance increases.",
+        "High-traffic orders tend to have longer delivery times than low-traffic orders.",
+        "Mean delivery time tends to rise as restaurants get busier, especially when weather is rainy."
+    ]
+})
+
+print(delivery_plot_findings_py)
+```
+
+:::
+
+The training-set EDA suggests that delivery time generally increases with distance, is higher under heavier traffic, and tends to rise when restaurants are busier. Rainy weather also appears to shift delivery times upward. These are descriptive findings, not final model conclusions.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.30 — Translating the EDA into Modelling Decisions
+::::
+:::: {.Question-container}
+Summarize the main findings from the training-set EDA. Explain:
+
+1. why Gamma regression remains a reasonable starting model;
+2. which order conditions appear related to delivery time;
+3. why the testing data should remain unused until the final evaluation; and
+4. why the EDA does not yet answer the inferential inquiry.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.30
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+| EDA component | Main training-set finding | Consequence for the modelling workflow |
+|:---:|:---:|:---:|
+| Data split | The data have been split into training and testing sets. | All exploration and model development should use only the training set. |
+| Response distribution | Delivery time is positive, continuous, and right-skewed. | Gamma regression with a log link remains a reasonable starting model. |
+| Distance | Longer trips tend to have longer delivery times. | `distance_km` should be included in the model. |
+| Traffic and weather | High traffic and rainy weather tend to be associated with longer delivery times. | These categorical regressors should be included using baseline categories. |
+| Restaurant busyness | Mean delivery time tends to increase with busyness. | `restaurant_busyness` should be included as a continuous regressor. |
+| Scope of interpretation | The plots are descriptive and based only on the training data. | Formal interpretation should wait until the Gamma regression model is fitted and evaluated. |
+
+The EDA supports fitting a full Gamma regression model with distance, order size, restaurant busyness, time of day, traffic, weather, weekend status, and driver experience. The testing data remain untouched so they can later provide a held-out evaluation of predictive performance.
+
+</details>
+::::
+:::
+
+#### Gamma Regression Modelling and Evaluation
+
+The EDA suggests several practical delivery conditions that may help explain expected delivery time. We now use the training data to estimate a Gamma regression model with a log link.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-coffee-3702057/).](img/coffee.png){width="610"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.31 — Specifying and Fitting the Gamma Regression
+::::
+:::: {.Question-container}
+Using only `delivery_training_data`:
+
+1. Write the random component, systematic component, and log-link formulation of the full Gamma regression.
+2. Fit the model in `R` and `Python`.
+3. Report the fitted coefficients, exponentiated coefficients, and percentage changes.
+4. Identify which regressors appear most important for expected delivery time.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.31
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Let $Y_i$ be the delivery time in minutes for order $i$, and let $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ be the expected delivery time for that order. The model is
+
+$$
+Y_i \mid \mathbf{x}_i \sim \operatorname{Gamma}(\mu_i,\phi),
+$$
+
+with log link
+
+$$
+\begin{aligned}
+\log(\mu_i) = \eta_i
+&= \beta_0 + \beta_1 \text{distance}_{i} + \beta_2 \text{items}_{i}
++ \beta_3 \text{busyness}_{i} + \beta_4 \text{time}_{i} \\
+&\quad + \beta_5 \mathbb{I}(\text{traffic}_{i}=\text{Medium})
++ \beta_6 \mathbb{I}(\text{traffic}_{i}=\text{High}) \\
+&\quad + \beta_7 \mathbb{I}(\text{weather}_{i}=\text{Light Rain})
++ \beta_8 \mathbb{I}(\text{weather}_{i}=\text{Heavy Rain}) \\
+&\quad + \beta_9 \mathbb{I}(\text{weekend}_{i}=\text{Yes})
++ \beta_{10} \text{experience}_{i}.
+\end{aligned}
+$$
+
+The reference levels are low traffic, clear weather, and non-weekend orders.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+delivery_model_formula <- delivery_time_minutes ~ distance_km + order_items +
+  restaurant_busyness + time_of_day + traffic_level + weather +
+  is_weekend + driver_experience_months
+
+delivery_gamma_model <- glm(
+  delivery_model_formula,
+  data = delivery_training_data,
+  family = Gamma(link = "log")
+)
+
+summary(delivery_gamma_model)
+
+delivery_coef_table <- tibble(
+  term = names(coef(delivery_gamma_model)),
+  estimate = coef(delivery_gamma_model),
+  multiplier = exp(estimate),
+  percent_change = 100 * (multiplier - 1)
+) %>%
+  mutate(across(where(is.numeric), round, 3))
+
+print(delivery_coef_table)
+```
+
+## **`Python`**
+
+```{python}
+delivery_model_formula = """
+delivery_time_minutes ~ distance_km + order_items +
+restaurant_busyness + time_of_day + C(traffic_level) + C(weather) +
+C(is_weekend) + driver_experience_months
+"""
+
+delivery_gamma_model = smf.glm(
+    formula=delivery_model_formula,
+    data=delivery_training_data,
+    family=sm.families.Gamma(link=sm.families.links.Log())
+).fit()
+
+print(delivery_gamma_model.summary())
+
+delivery_coef_table = pd.DataFrame({
+    "term": delivery_gamma_model.params.index,
+    "estimate": delivery_gamma_model.params,
+    "multiplier": np.exp(delivery_gamma_model.params),
+    "percent_change": 100 * (np.exp(delivery_gamma_model.params) - 1)
+})
+
+print(delivery_coef_table.round(3))
+```
+
+:::
+
+Longer distance, more restaurant busyness, high traffic, and rainy weather are the regressors most clearly associated with longer expected delivery times. More driver experience is associated with somewhat shorter expected delivery times. These effects are multiplicative because the model uses a log link.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.32 — Checking Fit and Held-Out Performance
+::::
+:::: {.Question-container}
+Using the model fitted in **Question 4.31**:
+
+1. Plot deviance residuals against fitted values.
+2. Fit a simpler Gamma model using only `distance_km` and `order_items`.
+3. Compare the full model to the simple model using training-set residual deviance and AIC.
+4. Compare the full model, simple model, and a training-mean baseline using testing-set mean absolute error.
+5. Explain what these checks suggest about model fit and predictive usefulness.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.32
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+delivery_diag <- tibble(
+  fitted = fitted(delivery_gamma_model),
+  deviance_resid = residuals(delivery_gamma_model, type = "deviance")
+)
+
+ggplot(delivery_diag, aes(x = fitted, y = deviance_resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(x = "Fitted values", y = "Deviance residuals")
+
+delivery_simple_gamma_model <- glm(
+  delivery_time_minutes ~ distance_km + order_items,
+  data = delivery_training_data,
+  family = Gamma(link = "log")
+)
+
+delivery_test_full_pred <- predict(
+  delivery_gamma_model,
+  newdata = delivery_testing_data,
+  type = "response"
+)
+
+delivery_test_simple_pred <- predict(
+  delivery_simple_gamma_model,
+  newdata = delivery_testing_data,
+  type = "response"
+)
+
+delivery_test_baseline_pred <- rep(
+  mean(delivery_training_data$delivery_time_minutes),
+  nrow(delivery_testing_data)
+)
+
+delivery_fit_stats <- tibble(
+  Model = c("Training-mean baseline", "Simple Gamma", "Full Gamma"),
+  Residual_Deviance = c(
+    NA,
+    deviance(delivery_simple_gamma_model),
+    deviance(delivery_gamma_model)
+  ),
+  AIC = c(
+    NA,
+    AIC(delivery_simple_gamma_model),
+    AIC(delivery_gamma_model)
+  ),
+  Test_MAE = c(
+    mean(abs(delivery_testing_data$delivery_time_minutes - delivery_test_baseline_pred)),
+    mean(abs(delivery_testing_data$delivery_time_minutes - delivery_test_simple_pred)),
+    mean(abs(delivery_testing_data$delivery_time_minutes - delivery_test_full_pred))
+  )
+) %>%
+  mutate(across(where(is.numeric), round, 2))
+
+print(delivery_fit_stats)
+```
+
+## **`Python`**
+
+```{python}
+plt.figure()
+plt.scatter(
+    delivery_gamma_model.fittedvalues,
+    delivery_gamma_model.resid_deviance,
+    alpha=0.5
+)
+plt.axhline(0, color="red", linestyle="--")
+plt.xlabel("Fitted values")
+plt.ylabel("Deviance residuals")
+plt.show()
+
+delivery_simple_gamma_model = smf.glm(
+    formula="delivery_time_minutes ~ distance_km + order_items",
+    data=delivery_training_data,
+    family=sm.families.Gamma(link=sm.families.links.Log())
+).fit()
+
+delivery_test_full_pred = delivery_gamma_model.predict(delivery_testing_data)
+delivery_test_simple_pred = delivery_simple_gamma_model.predict(delivery_testing_data)
+delivery_test_baseline_pred = np.repeat(
+    delivery_training_data["delivery_time_minutes"].mean(),
+    len(delivery_testing_data)
+)
+
+delivery_fit_stats = pd.DataFrame({
+    "Model": ["Training-mean baseline", "Simple Gamma", "Full Gamma"],
+    "Residual_Deviance": [
+        np.nan,
+        delivery_simple_gamma_model.deviance,
+        delivery_gamma_model.deviance
+    ],
+    "AIC": [
+        np.nan,
+        delivery_simple_gamma_model.aic,
+        delivery_gamma_model.aic
+    ],
+    "Test_MAE": [
+        np.mean(np.abs(delivery_testing_data["delivery_time_minutes"] - delivery_test_baseline_pred)),
+        np.mean(np.abs(delivery_testing_data["delivery_time_minutes"] - delivery_test_simple_pred)),
+        np.mean(np.abs(delivery_testing_data["delivery_time_minutes"] - delivery_test_full_pred))
+    ]
+})
+
+print(delivery_fit_stats.round(2))
+```
+
+:::
+
+The deviance residuals should be centered around zero without a strong pattern. The full model should have lower training-set AIC and residual deviance than the simple model if traffic, weather, busyness, weekend status, and driver experience add useful information beyond distance and order size alone. The testing-set MAE compares predictive performance on data that were not used for EDA or model fitting.
+
+</details>
+::::
+:::
+
+#### Results
+
+The results stage returns to the two study questions: which conditions are associated with longer expected delivery times, and how well the fitted model predicts held-out delivery times.
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.33 — Answering the Delivery-Time Questions
+::::
+:::: {.Question-container}
+Using the fitted full Gamma model:
+
+1. Interpret the coefficient for `distance_km` on the original response scale.
+2. Interpret the coefficient for high traffic relative to low traffic.
+3. Predict the expected delivery time for an order that travels 6 km, has 4 items, has restaurant busyness of 75, is placed at 6:30 PM, occurs in high traffic and light rain, is on a weekend, and has a driver with 12 months of experience.
+4. State which order conditions are associated with longer expected delivery times.
+5. Explain one limitation of these results.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.33
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+delivery_coef_table %>%
+  filter(term %in% c(
+    "distance_km",
+    "traffic_levelHigh",
+    "weatherLight_Rain",
+    "restaurant_busyness",
+    "driver_experience_months"
+  )) %>%
+  print()
+
+delivery_new_order <- data.frame(
+  distance_km = 6,
+  order_items = 4,
+  restaurant_busyness = 75,
+  time_of_day = 18.5,
+  traffic_level = factor("High", levels = levels(delivery_training_data$traffic_level)),
+  weather = factor("Light_Rain", levels = levels(delivery_training_data$weather)),
+  is_weekend = factor("Yes", levels = levels(delivery_training_data$is_weekend)),
+  driver_experience_months = 12
+)
+
+delivery_new_order_prediction <- predict(
+  delivery_gamma_model,
+  newdata = delivery_new_order,
+  type = "response"
+)
+
+delivery_new_order_prediction
+```
+
+## **`Python`**
+
+```{python}
+print(delivery_coef_table[
+    delivery_coef_table["term"].isin([
+        "distance_km",
+        "C(traffic_level)[T.High]",
+        "C(weather)[T.Light_Rain]",
+        "restaurant_busyness",
+        "driver_experience_months"
+    ])
+].round(3))
+
+delivery_new_order = pd.DataFrame({
+    "distance_km": [6],
+    "order_items": [4],
+    "restaurant_busyness": [75],
+    "time_of_day": [18.5],
+    "traffic_level": ["High"],
+    "weather": ["Light_Rain"],
+    "is_weekend": ["Yes"],
+    "driver_experience_months": [12]
+})
+
+delivery_new_order_prediction = delivery_gamma_model.predict(delivery_new_order)
+print(delivery_new_order_prediction.round(1))
+```
+
+:::
+
+The `distance_km` coefficient is positive, so each additional kilometer is associated with a multiplicative increase in expected delivery time, holding the other regressors fixed. The high-traffic coefficient compares high-traffic orders to low-traffic orders; after exponentiating, a value above 1 means high traffic is associated with longer expected delivery times.
+
+Overall, the model suggests that delivery time is shaped by practical delay sources: distance, restaurant busyness, traffic, weather, and driver experience. The prediction for the new order is an expected delivery time, not a guaranteed exact arrival time. A key limitation is that the model is trained on simulated observational data, so the fitted associations should not be read as causal effects.
+
+</details>
+::::
+:::
+
+#### Storytelling
+
+The storytelling stage translates the technical results into a message that a delivery operations team could use. The audience does not need every coefficient; it needs the main pattern, what the model can and cannot say, and how the result could guide planning.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-thread-needle-diy-sew-6230155/).](img/thread.png){width="350"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 4.34 — Communicating the Delivery-Time Results
+::::
+:::: {.Question-container}
+Write a short storytelling summary for a delivery operations team. Your summary should:
+
+1. lead with the main practical message;
+2. mention the main conditions associated with longer expected delivery times;
+3. explain that the model predicts expected delivery time rather than an exact arrival time;
+4. keep association separate from causation; and
+5. give one practical implication in plain language.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 4.34
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A short storytelling summary could be:
+
+> Food delivery time is usually moderate, but it has a long right tail because some orders are delayed by distance, high traffic, busy restaurants, and rain. The Gamma regression model helps quantify these patterns by estimating expected delivery time for orders with different conditions, but it does not guarantee the exact arrival time of any single order. The results are associations in simulated data, not proof that changing one condition would directly cause the exact fitted change. For a delivery operations team, the practical implication is to plan extra capacity around high-traffic, rainy, and high-busyness periods, while using the model as a guide rather than a perfect clock.
+
+</details>
+::::
+:::
+
+:::
