@@ -507,13 +507,9 @@ print(f"Test set size: {len(test_set)}")
 
 Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. The Exploratory Data Analysis (EDA) stage helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions.
 
-### Categorical Variables
+### Continuous Variables
 
-The categorical variables can be visualized using stacked bar charts. The bar charts are very effective because they display the frequency of each category, helping us understand the distribution of qualitative attributes. The stacked bar charts in @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py display the distribution of transport mode across car availability (`has_car_available`) and weekend commute status (`weekend_commuter`). 
-
-The blue bar is much taller than the orange bar, which means that car is the dominant mode of transport, especially among those who have access to a car. Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
-Bicycle and Walking are rare overall but tend to occur more when no car is available. 
-
+We will begin by examining continuous variables. Let's visualize the relationship between `transport_mode` and continuous regressors - `age` and `commute_distance`. This is best visualized using box plots and violin plots. 
 
 ::: {.panel-tabset}
 
@@ -522,179 +518,6 @@ Bicycle and Walking are rare overall but tend to occur more when no car is avail
 ```{.r}
 # Custom color palette `cbPalette` 
 cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-# Sort `transport_mode` by frequency
-train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
-
-p1 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = has_car_available)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(y = "Count", title = "With Car Availability") +
-  scale_fill_manual(values=cbPalette) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Car Availability"))
-
-p2 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "Count", title = "With Weekend Commuter Status") +
-  scale_fill_manual(values=cbPalette) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Weekend Commuter"))
-
-grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
-```
-
-## Python Code
-
-```{.python}
-# Custom color palette `cbPalette` 
-cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
-
-# Sort transport_mode by frequency
-order = train_set['transport_mode'].value_counts().index
-train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
-
-# Set up the plot
-sns.set_theme(style="whitegrid")
-fig = plt.figure()
-fig.set_size_inches(8, 6)
-gs = GridSpec(1, 2, figure=fig)
-fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
-
-# Plot: Stacked bar for Car Availability
-car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
-car_counts = car_counts.loc[order] 
-
-ax1 = fig.add_subplot(gs[0, 0])
-bottom = None
-for i, col in enumerate(car_counts.columns):
-    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
-    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
-ax1.set_title("With Car Availability")
-ax1.set_xlabel("Transport Mode")
-ax1.set_ylabel("Count")
-ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
-
-# Plot: Stacked bar for Weekend Commuter
-weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
-weekend_counts = weekend_counts.loc[order]
-
-ax2 = fig.add_subplot(gs[0, 1])
-bottom = None
-for i, col in enumerate(weekend_counts.columns):
-    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
-    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
-ax2.set_title("With Weekend Commuter Status")
-ax2.set_xlabel("Transport Mode")
-ax2.set_ylabel("")
-ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
-
-# Adjust plot layout
-fig.tight_layout(rect=[0, 0.05, 1, 1])
-fig
-```
-
-:::
-
-::: {.panel-tabset}
-
-## R Output
-
-```{r}
-#| label: fig-eda-transport-mode-distribution-R
-#| fig-cap:
-#|   - "Stacked bar chart of transport mode counts by car availability."
-#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
-#| echo: false
-#| message: false
-#| warning: false
-cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
-train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
-p1 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = has_car_available)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "Count", title = "With Car Availability") +
-  scale_fill_manual(values=cbPalette) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Car Availability"))
-p2 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
-  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "", title = "With Weekend Commuter Status") +
-  scale_fill_manual(values=cbPalette) +
-  theme_bw() +
-  theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Weekend Commuter"))
-grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
-```
-
-## Python Output
-
-```{python}
-#| label: fig-eda-transport-mode-distribution-py
-#| fig-cap:
-#|   - "Stacked bar chart of transport mode counts by car availability."
-#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
-#| echo: false
-#| message: false
-#| warning: false
-cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
-order = train_set['transport_mode'].value_counts().index
-train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
-
-sns.set_theme(style="whitegrid")
-fig = plt.figure()
-fig.set_size_inches(8, 6)
-gs = GridSpec(1, 2, figure=fig)
-fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
-
-# Plot 1: Stacked bar for Car Availability
-car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
-car_counts = car_counts.loc[order] 
-ax1 = fig.add_subplot(gs[0, 0])
-bottom = None
-for i, col in enumerate(car_counts.columns):
-    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
-    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
-ax1.set_title("With Car Availability")
-ax1.set_xlabel("Transport Mode")
-ax1.set_ylabel("Count")
-ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
-
-# Plot 2: Stacked bar for Weekend Commuter
-weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
-weekend_counts = weekend_counts.loc[order]
-ax2 = fig.add_subplot(gs[0, 1])
-bottom = None
-for i, col in enumerate(weekend_counts.columns):
-    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
-    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
-ax2.set_title("With Weekend Commuter Status")
-ax2.set_xlabel("Transport Mode")
-ax2.set_ylabel("")
-ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
-
-# Adjust layout
-fig.tight_layout(rect=[0, 0.05, 1, 1])
-fig
-```
-
-:::
-
-Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the non-weekend commuter group (orange).
-However, Public Transit has a noticeable number of weekend commuters (blue), which indicates some weekend reliance on public transit.
-Walking and Bicycling show little weekend commuting activity.
-
-Now let's visualize the relationship between `transport_mode` and continuous regressors `commute_distance` and `age`.
-
-::: {.panel-tabset}
-
-## R Code
-
-```{.r}
 # visualize boxplots and violin plots of commute_distance v.s. transport_mode
 p3 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
@@ -727,6 +550,13 @@ grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots"
 
 ```{.python}
 sns.set_theme(style="whitegrid")
+
+# Custom color palette `cbPalette` 
+cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+
+# Sort transport_mode by frequency
+order = train_set['transport_mode'].value_counts().index
+train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
 
 # Set up side-by-side subplots with shared layout
 fig = plt.figure(figsize=(8, 7))
@@ -810,6 +640,7 @@ fig
 #| echo: false
 #| message: false
 #| warning: false
+cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 p3 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
     geom_violin(alpha = 0.6, trim = FALSE) +
@@ -845,6 +676,13 @@ grid.arrange(p3, p4, ncol = 2, top = grid::textGrob("Box Plots and Violin Plots"
 #| message: false
 #| warning: false
 sns.set_theme(style="whitegrid")
+
+# Custom color palette `cbPalette` 
+cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
+
+# Sort transport_mode by frequency
+order = train_set['transport_mode'].value_counts().index
+train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
 
 # Set up side-by-side subplots with shared layout
 fig = plt.figure(figsize=(8, 7))
@@ -917,9 +755,7 @@ fig
 
 :::
 
-Box and violin plots show how commute distance and age vary across different transport modes.
-
-Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 17–18 km.
+The plots in @fig-eda-transport-mode-continuous-r and @fig-eda-transport-mode-continuous-py show how commute distance and age vary across different transport modes. Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 17–18 km.
 Car users also have moderately long commutes, with a median around 10-11 km and a relatively broad spread.
 Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end.
 All modes show some long-distance commuters (long tails), especially public transit and car.
@@ -928,6 +764,172 @@ Car and public transit users have similar age distributions, with median ages in
 Bicycle users skew slightly younger, but with a long tail of older users.
 Walking has a much wider spread in age, with a high median (around 60) and some very young walkers as well.
 The variability in age is greatest for walking, suggesting diverse usage across age groups.
+
+### Categorical Variables
+
+The categorical variables can be visualized using stacked bar charts. The bar charts are very effective because they display the frequency of each category, helping us understand the distribution of qualitative attributes. The stacked bar charts in @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py display the distribution of transport mode across car availability (`has_car_available`) and weekend commuter status (`weekend_commuter`). 
+
+The bar chart on the left shows that car is the dominant mode of transport, especially among those who have access to a car. Public Transit is used by both those with and without car availability, but is more common among those without a car (orange section is relatively larger). 
+Bicycle and Walking are rare overall but tend to occur more when no car is available. 
+
+::: {.panel-tabset}
+
+## R Code
+
+```{.r}
+# Sort `transport_mode` by frequency
+train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
+
+p1 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
+  labs(y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Car Availability"))
+
+p2 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "Count", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Weekend Commuter"))
+
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Code
+
+```{.python}
+# Set up the plot
+sns.set_theme(style="whitegrid")
+fig = plt.figure()
+fig.set_size_inches(8, 6)
+gs = GridSpec(1, 2, figure=fig)
+fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
+
+# Plot: Stacked bar for Car Availability
+car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
+car_counts = car_counts.loc[order] 
+
+ax1 = fig.add_subplot(gs[0, 0])
+bottom = None
+for i, col in enumerate(car_counts.columns):
+    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
+ax1.set_title("With Car Availability")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Count")
+ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Plot: Stacked bar for Weekend Commuter
+weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts.loc[order]
+
+ax2 = fig.add_subplot(gs[0, 1])
+bottom = None
+for i, col in enumerate(weekend_counts.columns):
+    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
+ax2.set_title("With Weekend Commuter Status")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("")
+ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Adjust plot layout
+fig.tight_layout(rect=[0, 0.05, 1, 1])
+fig
+```
+
+:::
+
+::: {.panel-tabset}
+
+## R Output
+
+```{r}
+#| label: fig-eda-transport-mode-distribution-R
+#| fig-cap:
+#|   - "Stacked bar chart of transport mode counts by car availability."
+#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
+#| echo: false
+#| message: false
+#| warning: false
+train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
+p1 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Car Availability"))
+p2 <- train_set %>%
+  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
+  labs(x = "Transport Mode", y = "", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values=cbPalette) +
+  theme_bw() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(title = "Weekend Commuter"))
+grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
+```
+
+## Python Output
+
+```{python}
+#| label: fig-eda-transport-mode-distribution-py
+#| fig-cap:
+#|   - "Stacked bar chart of transport mode counts by car availability."
+#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
+#| echo: false
+#| message: false
+#| warning: false
+sns.set_theme(style="whitegrid")
+fig = plt.figure()
+fig.set_size_inches(8, 6)
+gs = GridSpec(1, 2, figure=fig)
+fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
+
+# Plot 1: Stacked bar for Car Availability
+car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
+car_counts = car_counts.loc[order] 
+ax1 = fig.add_subplot(gs[0, 0])
+bottom = None
+for i, col in enumerate(car_counts.columns):
+    ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
+ax1.set_title("With Car Availability")
+ax1.set_xlabel("Transport Mode")
+ax1.set_ylabel("Count")
+ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Plot 2: Stacked bar for Weekend Commuter
+weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts.loc[order]
+ax2 = fig.add_subplot(gs[0, 1])
+bottom = None
+for i, col in enumerate(weekend_counts.columns):
+    ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
+    bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
+ax2.set_title("With Weekend Commuter Status")
+ax2.set_xlabel("Transport Mode")
+ax2.set_ylabel("")
+ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+
+# Adjust layout
+fig.tight_layout(rect=[0, 0.05, 1, 1])
+fig
+```
+
+:::
+
+Most weekend commuters do not significantly change their transport mode: the proportions are largely dominated by the non-weekend commuter group (orange).
+However, Public Transit has a noticeable number of weekend commuters (blue), which indicates some weekend reliance on public transit.
+Walking and Bicycling show little weekend commuting activity.
 
 You can also visualize the relationship across other regressors in various types of figures for practice.
 
