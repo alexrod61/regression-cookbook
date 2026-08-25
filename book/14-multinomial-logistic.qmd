@@ -500,7 +500,7 @@ print(f"Test set size: {len(test_set)}")
 
 :::
 
-## Exploratory Data Analysis
+## Exploratory Data Analysis {#sec-eda}
 
 Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. The Exploratory Data Analysis (EDA) stage helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions.
 
@@ -1605,6 +1605,134 @@ As a reminder, we just completed the estimation step of the [data science workfl
 ## Checking Goodness of Fit and Model Stability
 
 Now let's assess how well the fitted Multinomial Logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
+
+### Convergence and Separation
+A particularly important problem for convergence of the MLE solution is **separation**. 
+
+:: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on complete and quasi-complete separation!
+::::
+:::: {.Heads-up-container}
+Consider a Binary Logistic regression model with an intercept-augmented regressor vector $\widetilde{\mathbf{x}}_i$. **Complete separation** occurs when there is some nonzero vector $\mathbf{a}$ such that
+
+$$
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}>0
+\quad
+\text{for every observation with }Y_i=1,
+$$
+
+and
+
+$$
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}<0
+\quad
+\text{for every observation with }Y_i=0.
+$$
+::::
+
+In other words, a linear boundary in the regressor space perfectly separates all events from all non-events.
+
+**Quasi-complete separation** occurs when the same inequalities can be made non-strict,
+
+$$
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}\geq0
+\quad\text{for }Y_i=1,
+$$
+
+and
+
+$$
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}\leq0
+\quad\text{for }Y_i=0,
+$$
+
+with at least some observations lying exactly on the separating boundary.
+::::
+:::
+
+Under complete separation, the ordinary Bernoulli likelihood can keep increasing as one or more coefficient magnitudes grow without bound. A finite ordinary MLE therefore does not exist. Under quasi-complete separation, the same instability occurs along at least one coefficient direction. As a result:
+
+- coefficient estimates may become extremely large;
+- standard errors based on the inverse Fisher information may become extremely large or unstable;
+- fitted probabilities can be pushed increasingly close to $0$ or $1$;
+- the Fisher-information matrix can become nearly singular; and
+- ordinary Wald-type inference can become unreliable.
+
+Software often alerts us to the problem. In `R`, common warnings include messages such as
+
+```text
+glm.fit: algorithm did not converge
+```
+
+or
+
+```text
+glm.fit: fitted probabilities numerically 0 or 1 occurred
+```
+
+depending on the severity of the problem. In `Python`'s [{statsmodels}](https://www.statsmodels.org/stable/index.html), a separated or nearly separated fit may generate a `PerfectSeparationWarning`, fail to converge, or produce extreme coefficient estimates and standard errors.
+
+These warnings are useful, but diagnostics should not rely on warning text alone. Convergence, finite coefficients, finite standard errors, fitted probabilities, regressor overlap, and information-matrix stability should be considered together.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+
+fitted_probs <- fitted(multinom_fit)
+
+cat(sprintf(
+  paste0(
+    "Converged: %s\n",
+    "All coefficients finite: %s\n",
+    "All standard errors finite: %s\n",
+    "All fitted probabilities finite: %s\n",
+    "Fitted probabilities strictly inside (0, 1): %s\n",
+    "Fitted-probability range: %.4f to %.4f\n"
+  ),
+  ifelse(isTRUE(multinom_fit$convergence == 0), "Yes", "No"),
+  ifelse(all(is.finite(coef(multinom_fit))), "Yes", "No"),
+  ifelse(all(is.finite(sqrt(diag(vcov(multinom_fit))))), "Yes", "No"),
+  ifelse(all(is.finite(fitted_probs)), "Yes", "No"),
+  ifelse(all(fitted_probs > 0 & fitted_probs < 1), "Yes", "No"),
+  min(fitted_probs),
+  max(fitted_probs)
+))
+```
+
+## **`Python`**
+
+```{python}
+#| echo: true
+#| message: false
+#| warning: false
+
+converged = bool(multinom_fit.mle_retvals["converged"])
+coefs = np.asarray(multinom_fit.params, dtype=float)
+ses = np.asarray(multinom_fit.bse, dtype=float)
+fitted = np.asarray(multinom_fit.predict(), dtype=float)
+
+yes_no = lambda flag: "Yes" if flag else "No"
+
+print(
+    f"Converged: {yes_no(converged)}\n"
+    f"All coefficients finite: {yes_no(np.all(np.isfinite(coefs)))}\n"
+    f"All standard errors finite: {yes_no(np.all(np.isfinite(ses)))}\n"
+    f"All fitted probabilities finite: {yes_no(np.all(np.isfinite(fitted)))}\n"
+    f"Fitted probabilities strictly inside (0, 1): "
+    f"{yes_no(np.all((fitted > 0) & (fitted < 1)))}\n"
+    f"Fitted-probability range: {fitted.min():.4f} to {fitted.max():.4f}"
+)
+```
+
+:::
+
+The fitted model converges, returns finite coefficients and standard errors, and produces fitted probabilities strictly inside $(0,1)$. According to the plots in @sec-eda, there is overlap between the age range and the commute distance range among all four categories of transport mode: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. These checks provide **no obvious evidence of complete or quasi-complete separation in this fitted model.**
 
 ### Likelihood-Based Measures
 
