@@ -761,7 +761,7 @@ Bicycle users have a more skewed age distribution with a higher median age in mi
 
 ### Categorical Variables
 
-The categorical variables can be visualized using stacked bar charts. The bar charts are very effective because they display the frequency of each category, helping us understand the distribution of qualitative attributes. The stacked bar charts in @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py display the distribution of transport mode across car availability (`has_car_available`) and weekend commuter status (`weekend_commuter`). 
+The categorical variables can be visualized using stacked bar charts. The bar charts are very effective because they display the frequency of each category, helping us understand the distribution of qualitative attributes. The stacked bar charts in @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py display the distributions of transport mode across car availability (`has_car_available`) and weekend commuter status (`weekend_commuter`). 
 
 ::: {.panel-tabset}
 
@@ -844,9 +844,7 @@ fig
 ```{r}
 #| label: fig-eda-transport-mode-distribution-R
 #| fig-cap:
-#|   - "Stacked bar chart of transport mode counts by car availability."
-#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
-#| echo: false
+#|   - "Stacked bar charts of transport mode counts by car availability and weekend commuter status."
 #| message: false
 #| warning: false
 train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
@@ -874,8 +872,7 @@ grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport M
 ```{python}
 #| label: fig-eda-transport-mode-distribution-py
 #| fig-cap:
-#|   - "Stacked bar chart of transport mode counts by car availability."
-#|   - "Stacked bar chart of transport mode counts by weekend commuter status."
+#|   - "Stacked bar charts of transport mode counts by car availability and weekend commuter status."
 #| echo: false
 #| message: false
 #| warning: false
@@ -920,7 +917,9 @@ fig
 
 The bar charts show that car is the dominant mode of transport, especially among those who have access to a car. Public transit is used by both those with and without car availability, but it is more common among those without a car, as shown by a relatively larger orange bar. `Bicycle` and `Walking` are minority classes in the train set, as shown by the tiny bars in  @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py.
 
-Most weekend commuters do not significantly change their transport mode. The overall proportions in the train set are largely dominated by the non-weekend commuters, shown by the orange bars. However, `Public Transit` has a noticeable number of weekend commuters, shown by the blue bar, which signals some weekend reliance on public transit. Among the `Bicycle` riders, the majority have access to a car and the majority of them are not weekend commuters, according to the stacked bar charts. The number of observations with `transport_mode=Walking` is very small in the train set, as shown by the minuscule bars corresponding to individuals with Walking as the primary mode of transport. As the distribution of categorical variables is not clear for `Walking`, let's filter the corresponding rows from train set. 
+Most weekend commuters do not significantly change their transport mode. The overall proportions in the train set are largely dominated by the non-weekend commuters, shown by the orange bars. However, `Public Transit` has a noticeable number of weekend commuters, shown by the blue bar, which signals some weekend reliance on public transit. Among the `Bicycle` riders, the majority have access to a car and the majority of them are not weekend commuters, according to the stacked bar charts. 
+
+The number of observations with `transport_mode=Walking` is very small in the train set, as shown by the minuscule bars corresponding to individuals with Walking as the primary mode of transport. As the distribution of categorical variables is not clear for `Walking`, let's filter the corresponding rows from train set. 
 
 ::: {.panel-tabset}
 
@@ -967,28 +966,80 @@ You can also visualize the relationship across other regressors in various types
 
 ### Key Takeaways from EDA
 
-Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and Car versus Public Transit as the transport mode signals that the availability of car might be a factor for choosing car over public transit. Similarly the median commute distance increases across `Bicycle`, `Car`, and `Public Transit` in the train set, which suggests that there might be relationship between commute distance and primary mode of transport in the population of commuters.
+Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and Car versus Public Transit as the transport mode signals that the availability of car might be a factor for choosing car over public transit. Similarly the median commute distance increases across `Bicycle`, `Car`, and `Public Transit` in the train set, which suggests that there might be an association between commute distance and primary mode of transport in the population of commuters.
 
 It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modelling strategy. With this foundation, we are better prepared to build a Multinomial Logistic regression model on data that has been carefully examined and understood.
 
 ## Data Modelling
 
-After conducting Exploratory Data Analysis (EDA), we transition to the modelling stage, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modelling linear relationships.
+After conducting [EDA](http://localhost:54321/book/14-multinomial-logistic.html#exploratory-data-analysis), we transition to the modelling stage, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modelling linear relationships.
 
-A Multinomial Logistic Regression model is a suitable approach to our statistical inquiries given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
+A Multinomial Logistic Regression model is a suitable approach for our statistical inquiries, given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
 
-This regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
-$$P(Y_i=1)=p_{i,1},\newline
+### Defining modelling parameters
+
+Once we select Multinomial Logistic regression, we define the key modelling components: the response variable (dependent variable) and the regressors (independent variables).
+
+#### Response Variable (Y):
+
+The response variable, also known as the dependent variable, represents the financial outcome we aim to explain:
+
+- `transport_mode`: The dependent variable representing primary mode of transport.
+
+#### Regressors (X):
+
+Each regressor is chosen based on its theoretical and statistical relevance in explaining the choice of primary transport mode:
+
+- `commute_distance` (Continuous) – Represents the one-way commuting distance in kilometers.
+- `age` (Continuous) – Represents the age of the individual in years.
+- `has_car_available` (Binary) – Indicates whether the individual has access to a car
+- `weekend_commuter` (Binary) – Indicates whether the individual commutes during weekends.
+
+### The Random Component
+
+The Multinomial Logistic regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
+$$
+\begin{align*}
+P(Y_i=1)=p_{i,1},\newline
 P(Y_i=2)=p_{i,2}, \newline
 \dots\newline
 \dots\newline
-P(Y_i=m)=p_{i,m}$$ {#eq-multinomial-dist}
+P(Y_i=m)=p_{i,m}
+\end{align*}
+$$ {#eq-multinomial-dist}
 where
 $$
 \sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
 $$
 
 *A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$.*
+
+Let $Y_i$ denote the transport mode of the $i$th commuter in the training data, for $i=1,2,...,n$, such that $Y_i$ can be one of `Public_Transit`, `Car`, `Bicycle`, or `Walking`. 
+
+Let
+$$
+\mathbf{x}_i = (x_{i,1},...,x_{i,K}),
+$$ 
+denote the vector of observed regressor values for commuter $i$. For the largest candidate specification in this chapter, $k=4$, corresponding to commute distance, age, car availability, and weekend commuter status. 
+
+The random component of Multinomial Logistic regression assumes
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\operatorname{Multinoulli}(\pi_{i,1}, \pi_{i,2},...,\pi_{i,m-1}),
+$$
+
+where
+
+$$
+\pi_{i,k}
+=
+\Pr(Y_i=k\mid\mathbf{x}_i)
+$$
+is the **conditional probability** that $Y_i$ belongs to category $k$, given the regressor values $\mathbf{x}_i$. Consequently,
+$$\Pr(Y_i=m\mid\mathbf{x}_i)=1-\Sigma_{j=1}^{m-1}\pi_{i,j}$$
+As $0\leq\pi_{i,k}\leq1$ and $\Sigma_{j=1}^m\pi_{i,j}=1$, it follows that the sum $\Sigma_{j=1}^{m=1}\pi_{i,j}$ is between $0$ and $1$. 
 
 Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
 
@@ -1278,8 +1329,15 @@ The output reports the estimated parameters. For each non-baseline category $k$,
 In the case study model with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt{age}}$, $Z_{i,\texttt{car}}$, and $Z_{i,\texttt{weekend}}$, the fitted model can be written as
 
 $$
-\log \left( \frac{P(Y_i = k\mid\mathbf{x}_i)}{P(Y_i = \text{Car}\mid\mathbf{x}_i)} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}} + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}} + \hat{\beta}_{3}^{(k,\text{Car})} Z_{i,\texttt{car}} + \hat{\beta}_{4}^{(k,\text{Car})}Z_{i,\texttt{weekend}},
+\begin{aligned}
+\log \left( \frac{P(Y_i = k \mid \mathbf{x}_i)}{P(Y_i = \text{Car} \mid \mathbf{x}_i)} \right) &= \hat{\beta}_{0}^{(k,\text{Car})}\\
+&\quad + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}}\\
+&\quad + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}}\\
+&\quad + \hat{\beta}_{3}^{(k,\text{Car})} Z_{i,\texttt{car}}\\
+&\quad + \hat{\beta}_{4}^{(k,\text{Car})} Z_{i,\texttt{weekend}},
+\end{aligned}
 $$
+
 where $k$ can be one of the non-baseline levels: `Public Transit`, `Bicycle`, or `Walking`.
 
 In Multinomial Logistic regression, we model the probability of each outcome category given regressors. The key assumption is that we have enough data for each category to estimate the model parameters reliably. 
