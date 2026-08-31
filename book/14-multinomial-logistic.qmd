@@ -160,6 +160,18 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, log_loss, accuracy_score, recall_score, f1_score
 from sklearn.utils import resample
 import statsmodels.api as sm
+
+def scrollable_table_html(data, **kwargs):
+    kwargs.setdefault("index", False)
+    kwargs.setdefault("border", 0)
+
+    return (
+        '<div class="table-responsive">'
+        + data.to_html(
+            **kwargs
+        )
+        + '</div>'
+    )
 ```
 
 ::: {.LO}
@@ -1723,8 +1735,17 @@ train_set$transport_mode <- relevel(train_set$transport_mode, ref = "Car")
 # Fit Multinomial Logistic regression
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
 
+# Tidy the fitted model into a data frame of coefficient estimates
+multinom_table <- tidy(multinom_fit)
+
 # Print the fitted model
-print(summary(multinom_fit))
+multinom_table |>
+  kable(
+    digits = 3,
+    col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value"),
+    align = c("l", "l", "c", "c", "c", "c"),
+    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+  )
 ```
 
 ## Python Code
@@ -1753,11 +1774,33 @@ for col in ['has_car_available', 'weekend_commuter']:
 model = sm.MNLogit(y, X_numeric)
 multinom_fit = model.fit()
 
+# Recover the category labels assigned by the model
+ynames = multinom_fit.model._ynames_map
+non_baseline = [ynames[i] for i in range(1, len(ynames))]
+
+# Collect the estimates for each non-baseline category
+multinom_table = pd.concat(
+    [
+        pd.DataFrame({
+            "Category": category,
+            "Term": multinom_fit.params.index,
+            "Estimate": multinom_fit.params.iloc[:, i].values,
+            "Standard error": multinom_fit.bse.iloc[:, i].values,
+            "Wald statistic": multinom_fit.tvalues.iloc[:, i].values,
+            "p-value": multinom_fit.pvalues.iloc[:, i].values,
+        })
+        for i, category in enumerate(non_baseline)
+    ],
+    ignore_index=True
+).round(3)
+
 # Print the fitted model
-print(multinom_fit.summary())
+multinom_fit_html = scrollable_table_html(multinom_table)
 ```
 
 :::
+
+Both languages have now estimated the Multinomial Logistic regression model from the same training data by maximum likelihood estimation through the Newton-Raphson method, which was discussed in [Section 14.5.5](https://alexrod61.github.io/regression-cookbook/book/14-multinomial-logistic.html#the-log-likelihood-function).
 
 ::: {.panel-tabset}
 
@@ -1767,10 +1810,26 @@ print(multinom_fit.summary())
 #| echo: false
 #| message: false
 #| warning: false
+#| label: tbl-multinom-fit-r
+#| tbl-cap: "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+
+# Set the baseline model
 train_set$transport_mode <- relevel(train_set$transport_mode, ref = "Car")
+
+# Fit Multinomial Logistic regression
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
-#print(t(round(summary(multinom_fit)$coefficients, 3)))
-print(summary(multinom_fit))
+
+# Tidy the fitted model into a data frame of coefficient estimates
+multinom_table <- tidy(multinom_fit)
+
+# Print the fitted model
+multinom_table |>
+  kable(
+    digits = 3,
+    col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value"),
+    align = c("l", "l", "c", "c", "c", "c"),
+    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+  )
 ```
 
 ### Python Output
@@ -1779,205 +1838,103 @@ print(summary(multinom_fit))
 #| echo: false
 #| message: false
 #| warning: false
+
+# Factorize the response and set the baseline model
 train_set["transport_mode"] = pd.Categorical(
     train_set["transport_mode"],
     categories=["Car", "Bicycle", "Public_Transit", "Walking"],
     ordered=False
 )
+
+# Design matrix and response
 y = train_set["transport_mode"]
 X = train_set[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
+
+# Add intercept
 X = sm.add_constant(X)
+
+# Convert categorical variables to numeric codes for statsmodels MNLogit
 X_numeric = X.copy()
 for col in ['has_car_available', 'weekend_commuter']:
     X_numeric[col] = X_numeric[col].cat.codes
+
+# Fit Multinomial Logistic regression
 model = sm.MNLogit(y, X_numeric)
 multinom_fit = model.fit()
-print(multinom_fit.summary())
+
+# Recover the category labels assigned by the model
+ynames = multinom_fit.model._ynames_map
+non_baseline = [ynames[i] for i in range(1, len(ynames))]
+
+# Collect the estimates for each non-baseline category
+multinom_table = pd.concat(
+    [
+        pd.DataFrame({
+            "Category": category,
+            "Term": multinom_fit.params.index,
+            "Estimate": multinom_fit.params.iloc[:, i].values,
+            "Standard error": multinom_fit.bse.iloc[:, i].values,
+            "Wald statistic": multinom_fit.tvalues.iloc[:, i].values,
+            "p-value": multinom_fit.pvalues.iloc[:, i].values,
+        })
+        for i, category in enumerate(non_baseline)
+    ],
+    ignore_index=True
+).round(3)
+
+# Print the fitted model
+multinom_fit_html = scrollable_table_html(multinom_table)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-multinom-fit-python
+#| tbl-cap: "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$multinom_fit_html,
+  "\n",
+  sep = ""
+)
 ```
 
 :::
 
-The output reports the estimated parameters. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0}^{(j,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(j,1)}, \ldots, \hat{\beta}_{k}^{(j,1)}$ (one per regressor) are reported, each with its standard error. Since `Car` was set as the baseline category, the output contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`; the coefficients of the baseline category itself are fixed at zero for identifiability and therefore do not appear in the output. With $m = 4$ response categories and $K = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the parameter count derived above.
+The outputs in @tbl-multinom-fit-r and @tbl-multinom-fit-python report the estimated regression coefficient. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0}^{(j,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(j,1)}, \ldots, \hat{\beta}_{k}^{(j,1)}$ are reported, each with its standard error. Since `Car` was set as the baseline category, the output contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`. With $m = 4$ response categories and $k = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the number of rows in @tbl-multinom-fit-r and @tbl-multinom-fit-python.
 
-In the case study model with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt{age}}$, $Z_{i,\texttt{car}}$, and $Z_{i,\texttt{weekend}}$, the fitted model can be written as
+The Multinomial Logisitc regression model fitted above with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt{age}}$, $x_{i,\texttt{car}}$, and $x_{i,\texttt{weekend}}$, can be written as
 
 $$
 \begin{aligned}
-\log \left( \frac{P(Y_i = j \mid \mathbf{x}_i)}{P(Y_i = \text{Car} \mid \mathbf{x}_i)} \right) &= \hat{\beta}_{0}^{(k,\text{Car})}\\
+\log \left( \frac{P(Y_i = j \mid \mathbf{x}_i)}{P(Y_i = \text{Car} \mid \mathbf{x}_i)} \right) &= \hat{\beta}_{0}^{(j,\text{Car})}\\
 &\quad + \hat{\beta}_{1}^{(j,\text{Car})} x_{i,\texttt{distance}}\\
 &\quad + \hat{\beta}_{2}^{(j,\text{Car})} x_{i,\texttt{age}}\\
-&\quad + \hat{\beta}_{3}^{(j,\text{Car})} Z_{i,\texttt{car}}\\
-&\quad + \hat{\beta}_{4}^{(j,\text{Car})} Z_{i,\texttt{weekend}},
+&\quad + \hat{\beta}_{3}^{(j,\text{Car})} x_{i,\texttt{car}}\\
+&\quad + \hat{\beta}_{4}^{(j,\text{Car})} x_{i,\texttt{weekend}},
 \end{aligned}
 $$
 
-where $k$ can be one of the non-baseline levels: `Public Transit`, `Bicycle`, or `Walking`.
+where $j$ can be any of the three non-baseline levels: `Public Transit`, `Bicycle`, or `Walking`.
 
-In Multinomial Logistic regression, we model the probability of each outcome category given regressors. The key assumption is that we have enough data for each category to estimate the model parameters reliably. 
-If one category is much more frequent than the others (i.e., unbalanced outcomes), the model may:
+In Multinomial Logistic regression, we model the probability of each outcome category given regressors. The key assumption is that we have enough data for each category to estimate the model parameters reliably. If one category is much more frequent than the others (i.e., unbalanced outcomes), the model may:
 
 1. Bias coefficients toward the majority class because the likelihood function is dominated by majority observations.
 2. Underestimate uncertainty for rare categories (small sample size → large variance).
 3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
 4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates (complete separation).
 
-For example, in our training data, only $5\%$ of the observations are `Walking`, so the model has little incentive to adjust parameters for `Walking`. There are two common approaches: 
-
-1. Downsampling: Reduce the majority class size so that each class is roughly balanced. This risks throwing away data, but helps balance influence.
-2. Upsampling: Duplicate (or synthetically generate) minority class cases until classes are balanced. This risks overfitting, but improves minority estimation.
-
-Let's check the class counts of the outcome below.
-
-::: {.panel-tabset}
-
-## R Code
-
-```{.r}
-cat("Class counts before balancing:", "\n")
-print(table(train_set$transport_mode))
-```
-
-## Python Code
-
-```{.python}
-print("Class counts before balancing:", "\n")
-print(y.value_counts())
-```
-
-:::
-
-::: {.panel-tabset}
-
-## R Output
-
-```{r}
-#| echo: false
-#| message: false
-#| warning: false
-cat("Class counts before balancing:", "\n")
-print(table(train_set$transport_mode))
-```
-
-## Python Output
-
-```{python}
-#| echo: false
-#| message: false
-#| warning: false
-print("Class counts before balancing:", "\n")
-print(y.value_counts())
-```
-
-:::
-
-To handle the imbalanced groups, we resample the train sets to balance out the groups to eliminate the bias in modelling. The fitted model on upsampled train set is below. The upsampling is performed once in `R` with `caret::upSample`, which retains every original training row and tops up only the classes below the majority size with duplicated rows sampled with replacement. The resulting `train_set_balanced` is then shared with `Python` through `reticulate`, so that both languages fit the model on the identical balanced train set and produce matching estimates. The upsampling can be performed in `Python` with `RandomOverSampler` from the imbalanced-learn (`imblearn`) package. For more details on the `RandomOverSampler` function, refer to its [documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.RandomOverSampler.html).
-
-::: {.panel-tabset}
-
-## R Code
-
-```{.r}
-# Upsample the outcome classes
-set.seed(352) # set a seed for sampling
-train_set_balanced <- upSample(x = train_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
-                  y = train_set$transport_mode,
-                  yname = "transport_mode")
-# Fit the multinomial logit regression
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
-print(summary(multinom_fit_balanced))
-```
-
-## Python Code
-
-```{.python}
-# The upsampled train set is created once in R (caret::upSample; see the
-# R tab) and pulled into Python via reticulate's `r` object, so both languages
-# fit the model on the identical balanced train set.
-train_set_balanced = r.train_set_balanced.reset_index(drop=True)
-
-X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-
-y_bal = pd.Series(
-    pd.Categorical(
-        train_set_balanced["transport_mode"],
-        categories=["Car", "Bicycle", "Public_Transit", "Walking"],
-        ordered=False
-    ),
-    name="transport_mode"
-)
-X_bal = sm.add_constant(X_bal)
-
-# Convert categorical variables to numeric codes for statsmodels MNLogit
-X_bal_num = X_bal.copy()
-for col in ['has_car_available', 'weekend_commuter']:
-    X_bal_num[col] = X_bal_num[col].cat.codes
-
-# Fit the multinomial logit regression
-model_balanced = sm.MNLogit(y_bal, X_bal_num)
-multinom_fit_balanced = model_balanced.fit()
-print(multinom_fit_balanced.summary())
-```
-
-:::
-
-::: {.panel-tabset}
-
-## R Output
-
-```{r}
-#| echo: false
-#| message: false
-#| warning: false
-set.seed(352)
-train_set_balanced <- upSample(x = train_set[, c("age","commute_distance","has_car_available", "weekend_commuter")],
-                  y = train_set$transport_mode,
-                  yname = "transport_mode")
-multinom_fit_balanced <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set_balanced)
-print(summary(multinom_fit_balanced))
-```
-
-## Python Output
-
-```{python}
-#| echo: false
-#| message: false
-#| warning: false
-# The upsampled train set is created once in R (caret::upSample; see the
-# R tab) and pulled into Python via reticulate's `r` object, so both languages
-# fit the model on the identical balanced train set.
-train_set_balanced = r.train_set_balanced.reset_index(drop=True)
-
-X_bal = train_set_balanced[["age", "commute_distance", "has_car_available", "weekend_commuter"]]
-
-y_bal = pd.Series(
-    pd.Categorical(
-        train_set_balanced["transport_mode"],
-        categories=["Car", "Bicycle", "Public_Transit", "Walking"],
-        ordered=False
-    ),
-    name="transport_mode"
-)
-X_bal = sm.add_constant(X_bal)
-
-X_bal_num = X_bal.copy()
-for col in ['has_car_available', 'weekend_commuter']:
-    X_bal_num[col] = X_bal_num[col].cat.codes
-
-model_balanced = sm.MNLogit(y_bal, X_bal_num)
-multinom_fit_balanced = model_balanced.fit()
-print(multinom_fit_balanced.summary())
-```
-
-:::
-
-As a reminder, we just completed the estimation step of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow). For the **inferential inquiry**, we should not use the same dataset both to explore the model structure and to produce the final inferential claims. Recall that the train set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later in @sec-regressors after the model-building workflow has been completed.
+As a reminder, we just completed the estimation step of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow). For the **inferential inquiry**, we should not use the same dataset both to explore the model structure and to produce the final inferential claims. Recall that the train set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later in @sec-regressors after the model building workflow has been completed.
 
 ## Checking Goodness of Fit and Model Stability
 
 Now let's assess how well the fitted Multinomial Logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
 
 ### Convergence and Separation
-A particularly important problem for convergence of the MLE solution is **separation**. 
+A particularly important problem for convergence of the maximum-likelihood estimation (MLE) solution is **separation**. 
 
 ::::: {.Heads-up}
 
@@ -1987,12 +1944,12 @@ Heads-up on complete and quasi-complete separation!
 
 :::: {.Heads-up-container}
 
-Consider a Binary Logistic regression model with an intercept-augmented regressor vector $\widetilde{\mathbf{x}}_i$. **Complete separation** occurs when there is some nonzero vector $\mathbf{a}$ such that
+Consider a Multinomial Logistic regression model with an intercept-augmented regressor vector $\widetilde{\mathbf{x}}_i$. **Complete separation** occurs when there exists some nonzero vector $\mathbf{a}$ and a response category $j$ such that
 
 $$
 \widetilde{\mathbf{x}}_i^\top\mathbf{a}>0
 \quad
-\text{for every observation with }Y_i=1,
+\text{for every observation with }Y_i=j,
 $$
 
 and
@@ -2000,23 +1957,23 @@ and
 $$
 \widetilde{\mathbf{x}}_i^\top\mathbf{a}<0
 \quad
-\text{for every observation with }Y_i=0.
+\text{for every observation with }Y_i\neq j.
 $$
 
-In other words, a linear boundary in the regressor space perfectly separates all events from all non-events.
+In other words, a linear boundary in the regressor space perfectly separates a response category from the other response categories.
 
 **Quasi-complete separation** occurs when the same inequalities can be made non-strict,
 
 $$
 \widetilde{\mathbf{x}}_i^\top\mathbf{a}\geq0
-\quad\text{for }Y_i=1,
+\quad\text{for }Y_i=j,
 $$
 
 and
 
 $$
 \widetilde{\mathbf{x}}_i^\top\mathbf{a}\leq0
-\quad\text{for }Y_i=0,
+\quad\text{for }Y_i\neq j,
 $$
 
 with at least some observations lying exactly on the separating boundary.
@@ -2025,7 +1982,7 @@ with at least some observations lying exactly on the separating boundary.
 
 :::::
 
-Under complete separation, the Multinomial likelihood function can keep increasing as one or more coefficient magnitudes grow without bound. A finite ordinary MLE therefore does not exist. Under quasi-complete separation, the same instability occurs along at least one coefficient direction. As a result:
+Under complete separation, the multinomial likelihood function can keep increasing as one or more coefficient magnitudes grow without bound. A finite maximum likelihood therefore does not exist. Under quasi-complete separation, the same instability occurs along at least one coefficient direction. As a result:
 
 - coefficient estimates may become extremely large;
 - standard errors based on the inverse Fisher information may become extremely large or unstable;
@@ -2106,7 +2063,7 @@ print(
 
 :::
 
-The fitted model converges, returns finite coefficients and standard errors, and produces fitted probabilities strictly inside $(0,1)$. According to the plots in @sec-eda, there is overlap between the age range and the commute distance range among all four categories of transport mode: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. These checks provide **no obvious evidence of complete or quasi-complete separation in this fitted model.**
+The fitted model converges, returns finite coefficients and standard errors, and produces fitted probabilities strictly inside the interval between $0$ and $1$. According to the plots in @sec-eda, there is overlap between the age range and the commute distance range among all four categories of transport mode: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. Similarly, there exists at least one observation for each transport mode among commuters with and without a car available, and among weekend and non-weekend commuters, so no combination of a binary regressor level and a response category is empty in the train set. These checks provide **no obvious evidence of complete or quasi-complete separation in this fitted model.**
 
 ### Likelihood-Based Measures
 
@@ -2144,7 +2101,7 @@ $$
 \text{AIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + p\log n,
 $$
 
-where $p$ is the total number of estimated parameters (the category-specific intercepts and slopes across all non-baseline categories) and $n$ is the sample size. Lower AIC and BIC scores indicate better fit, and they are most useful for comparing competing models (e.g. this imbalanced fit versus the upsampled fit).
+where $p$ is the total number of estimated parameters (the category-specific intercepts and slopes across all non-baseline categories) and $n$ is the sample size. Lower AIC and BIC scores indicate better fit, and they are most useful for comparing competing models.
 
 We compute all of these measures below.
 
@@ -2265,7 +2222,7 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status fits the training data better than the null (intercept-only) model. McFadden's $R^2$ (`r round(mcfadden_r2,4)`) is below the 0.2–0.4 range commonly associated with a good fit for discrete-response models, which indicates that these four regressors together explain only a modest share of variability in `transport_mode` on the log-likelihood scale, even though their joint contribution is highly significant. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the imbalanced training model, and they are useful later for comparing this fit against the upsampled model or other model specifications.
+The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status is correctly specified in comparison to the null (intercept-only) model. McFadden's $R^2$ is `r round(mcfadden_r2,4)`, which falls within the $0.2-0.4$ range commonly associated with a good fit for discrete-response models. This indicates that these four regressors together explain a substantial share of variability in `transport_mode` on the log-likelihood scale, consistent with their highly significant joint contribution. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the imbalanced training model, and they are useful for comparing a fitted model against other model specifications (eg. a nested model with fewer or more regressors).
 
 ### Classification-Based Measures
 
@@ -2513,23 +2470,21 @@ test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
 # Fit Multinomial Logistic regression model on test set
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
+# Tidy the fitted model into a data frame of coefficient estimates
+results <- tidy(multinom_test)
+
+# Add the testing decision at the 5% significance level
+results <- results |>
+  mutate(decision = if_else(p.value < 0.05, "Reject H0", "Fail to reject H0"))
+
 # Print the fitted model
-broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::rename(outcome_class = y.level) |>
-  dplyr::mutate_if(is.numeric, round, 3) |>
-  print(n = Inf, width = Inf)
-
-# Significant coefficients only
-cat("\nSignificant coefficients (5% threshold):\n")
-
-results_df <- broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::mutate_if(is.numeric, round, 3) |>
-  dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
-  rename(outcome_class = y.level) |>
-  print(n = Inf, width = Inf)               # show full term names without truncation
-
-# Display the results
-results_df
+results |>
+  kable(
+    digits = 3,
+    col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value", "Decision"),
+    align = c("l", "l", "c", "c", "c", "c", "l"),
+    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the test data."
+  )
 ```
 
 ## Python Code
@@ -2558,8 +2513,34 @@ for col in ['has_car_available', 'weekend_commuter']:
 model = sm.MNLogit(y, X_numeric)
 multinom_fit = model.fit()
 
+# Recover the category labels assigned by the model
+ynames = multinom_fit.model._ynames_map
+non_baseline = [ynames[i] for i in range(1, len(ynames))]
+
+# Collect the estimates for each non-baseline category,
+# along with the testing decision at the 5% significance level
+multinom_table = pd.concat(
+    [
+        pd.DataFrame({
+            "Category": category,
+            "Term": multinom_fit.params.index,
+            "Estimate": multinom_fit.params.iloc[:, i].values,
+            "Standard error": multinom_fit.bse.iloc[:, i].values,
+            "Wald statistic": multinom_fit.tvalues.iloc[:, i].values,
+            "p-value": multinom_fit.pvalues.iloc[:, i].values,
+            "Decision": np.where(
+                multinom_fit.pvalues.iloc[:, i].values < 0.05,
+                "Reject H0",
+                "Fail to reject H0"
+            ),
+        })
+        for i, category in enumerate(non_baseline)
+    ],
+    ignore_index=True
+).round(3)
+
 # Print the fitted model
-print(multinom_fit.summary())
+multinom_fit_html = scrollable_table_html(multinom_table)
 ```
 
 :::
@@ -2578,17 +2559,22 @@ test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
 # Fit Multinomial Logistic regression model on test set
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
-# Significant coefficients only
-cat("\nSignificant coefficients (5% threshold):\n")
 
-results_df <-broom::tidy(multinom_test, conf.int = TRUE, exponentiate = TRUE) |>
-  dplyr::mutate_if(is.numeric, round, 3) |>
-  dplyr::filter(p.value < 0.05 & term != "(Intercept)") |>          # keep only significant coefficients
-  rename(outcome_class = y.level) |>
-  print(n = Inf, width = Inf)               # show full term names without truncation
+# Tidy the fitted model into a data frame of coefficient estimates
+results <- tidy(multinom_test)
 
-# Display the results
-results_df
+# Add the testing decision at the 5% significance level
+results <- results |>
+  mutate(decision = if_else(p.value < 0.05, "Reject H0", "Fail to reject H0"))
+
+# Print the fitted model
+results |>
+  kable(
+    digits = 3,
+    col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value", "Decision"),
+    align = c("l", "l", "c", "c", "c", "c", "l"),
+    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+  )
 ```
 
 ## Python Output
@@ -2620,8 +2606,50 @@ for col in ['has_car_available', 'weekend_commuter']:
 model = sm.MNLogit(y, X_numeric)
 multinom_fit = model.fit()
 
+# Recover the category labels assigned by the model
+ynames = multinom_fit.model._ynames_map
+non_baseline = [ynames[i] for i in range(1, len(ynames))]
+
+# Collect the estimates for each non-baseline category,
+# along with the testing decision at the 5% significance level
+multinom_table = pd.concat(
+    [
+        pd.DataFrame({
+            "Category": category,
+            "Term": multinom_fit.params.index,
+            "Estimate": multinom_fit.params.iloc[:, i].values,
+            "Standard error": multinom_fit.bse.iloc[:, i].values,
+            "Wald statistic": multinom_fit.tvalues.iloc[:, i].values,
+            "p-value": multinom_fit.pvalues.iloc[:, i].values,
+            "Decision": np.where(
+                multinom_fit.pvalues.iloc[:, i].values < 0.05,
+                "Reject H0",
+                "Fail to reject H0"
+            ),
+        })
+        for i, category in enumerate(non_baseline)
+    ],
+    ignore_index=True
+).round(3)
+
 # Print the fitted model
-print(multinom_fit.summary())
+multinom_fit_html = scrollable_table_html(multinom_table)
+```
+
+```{r}
+#| echo: false
+#| label: tbl-multinom-test-fit-python
+#| tbl-cap: "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the test data."
+#| message: false
+#| warning: false
+#| results: asis
+
+cat(
+  "\n",
+  py$multinom_fit_html,
+  "\n",
+  sep = ""
+)
 ```
 
 :::
@@ -3153,208 +3181,28 @@ The `Car` and `Public Transit` classes are predicted most reliably with recalls 
 Class Imbalance and Prediction
 ::::
 ::::{.Tip-container}
-The absence of `Bicycle` and `Walking` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood function in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation:
+The absence of `Bicycle` predictions follows from the structure of the maximum likelihood solution under class imbalance. Differentiating the log-likelihood function in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation:
 
 $$
 \sum_{i=1}^n \hat{p}_{i,j} = \sum_{i=1}^n y_{i,j} = n_j,
 $$
 
-where $n_j$ is the number of observations in category $j$ in the train set. Consequently, the fitted probabilities of each category average exactly its sample proportion in the train set, which is roughly $2.4\%$ for `Bicycle` and less than $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. Neither `Bicycle` nor `Walking` therefore ever attains the maximum fitted probability, due to which these minority classes are not predicted at all in the test set.
+where $n_j$ is the number of observations in category $j$ in the train set. Consequently, the fitted probabilities of each category average exactly its sample proportion in the train set, which is roughly $2.4\%$ for `Bicycle` and less than $1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. `Bicycle` never attains the maximum fitted probability for the regressor values observed in the test set, due to which `Bicycle` is never predicted in the confusion matrix above.
 ::::
 :::
 
-Now let's use the upsampled model (`multinom_fit_balanced`) from @sec-estimation to predict on the held-out test set. The confusion matrix and performance metrics are reported below.
-
-::: {.panel-tabset}
-
-## R Code
-```{.r}
-# Predict on the test set using the fitted multinom_fit_balanced model
-y_pred <- predict(multinom_fit_balanced, newdata = test_set)
-
-# Compute confusion matrix
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
-conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
-                              factor(test_set$transport_mode, levels = mode_levels))
-
-# Visualise
-cm_df <- as.data.frame(as.table(conf_matrix$table))
-colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-
-# Order axes so the main diagonal (correct matches) runs top-left to
-# bottom-right: Predicted increases left -> right (Car -> Walking), and
-# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
-# factor level at the bottom of the y-axis, so we reverse Actual's levels to
-# place "Car" at the top.
-cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
-cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
-
-cm_df |>
-  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = Freq), color = "black", size = 5) +
-  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)",
-       x = "Predicted label", y = "True label") +
-  theme_bw(base_size = 13)
-```
-
-## Python Code
-```{.python}
-# Predict on the test set using the fitted model
-y_pred_test = multinom_fit_balanced.predict(X_test_num).idxmax(axis=1)
-
-# Confusion matrix
-labels = y_test.cat.categories
-cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y_test.cat.categories)
-disp.plot(cmap="Blues")
-disp.ax_.set_title("Confusion Matrix (Test Set)")
-fig = disp.figure_
-fig.tight_layout()
-fig
-```
-
-:::
-
-::: {.panel-tabset}
-
-## R Output
-```{r}
-#| echo: false
-#| message: false
-#| warning: false
-# Predict on the test set using the fitted multinom_fit_balanced model
-y_pred <- predict(multinom_fit_balanced, newdata = test_set)
-
-# Compute confusion matrix
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
-conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
-                              factor(test_set$transport_mode, levels = mode_levels))
-
-# Visualise
-cm_df <- as.data.frame(as.table(conf_matrix$table))
-colnames(cm_df) <- c("Predicted", "Actual", "Freq")
-
-# Order axes so the main diagonal (correct matches) runs top-left to
-# bottom-right: Predicted increases left -> right (Car -> Walking), and
-# Actual increases top -> bottom (Car -> Walking). ggplot draws the first
-# factor level at the bottom of the y-axis, so we reverse Actual's levels to
-# place "Car" at the top.
-cm_df$Predicted <- factor(cm_df$Predicted, levels = levels(cm_df$Predicted))
-cm_df$Actual    <- factor(cm_df$Actual,    levels = rev(levels(cm_df$Actual)))
-
-cm_df |>
-  ggplot(aes(x = Predicted, y = Actual, fill = Freq)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = Freq), color = "black", size = 5) +
-  scale_fill_gradient(low = "#f7fbff", high = "#2171b5") +
-  labs(title = "Confusion Matrix (Test Set)",
-       x = "Predicted label", y = "True label") +
-  theme_bw(base_size = 13)
-```
-
-## Python Output
-```{python}
-#| echo: false
-#| message: false
-#| warning: false
-# Predict on the test set using the fitted model
-y_pred_test = multinom_fit_balanced.predict(X_test_num).idxmax(axis=1)
-
-# Confusion matrix
-labels = y_test.cat.categories
-cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
-disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y_test.cat.categories)
-disp.plot(cmap="Blues")
-disp.ax_.set_title("Confusion Matrix (Test Set)")
-fig = disp.figure_
-fig.tight_layout()
-fig
-```
-:::
-
-::: {.panel-tabset}
-
-## R Code
-
-```{.r}
-# Compute the performance metrics
-overall_accuracy <- conf_matrix$overall['Accuracy']
-macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
-macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
-cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
-cat("Macro Recall:", round(macro_recall, 3), "\n")
-cat("Macro F1:", round(macro_f1, 3), "\n")
-```
-
-## Python Code
-
-```{.python}
-# Compute the performance metrics
-acc = accuracy_score(y_test.cat.codes, y_pred_test)
-recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(y_pred_test)
-f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
-print(f"Overall Accuracy: {acc:.3f}")
-print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1-score: {f1:.3f}")
-```
-
-:::
-
-::: {.panel-tabset}
-
-## R Output
-
-```{r}
-#| echo: false
-#| message: false
-#| warning: false
-overall_accuracy <- conf_matrix$overall['Accuracy']
-macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
-macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
-cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
-cat("Macro Recall:", round(macro_recall, 3), "\n")
-cat("Macro F1:", round(macro_f1, 3), "\n")
-```
-
-## Python Output
-
-```{python}
-#| echo: false
-#| message: false
-#| warning: false
-acc = accuracy_score(y_test.cat.codes, y_pred_test)
-recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(y_pred_test)
-f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
-print(f"Overall Accuracy: {acc:.3f}")
-print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1-score: {f1:.3f}")
-```
-
-:::
-
-On the test set, the upsampled model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**,, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. Overall this upsampled model has a lower accuracy on the test set than the original `multinom_fit` model; however, it correctly classifies some of the `Bicycle` and `Walking` observations in the test set with recalls of roughly $66.7\%$ and $50\%$ respectively. As discussed in @sec-estimation, there is evidence that the upsampled model improves recall of minority classes but the trade-off is that the overall accuracy is lower, meaning that it is an overfit model. 
 
 ## Storytelling
 
-To complete the data science workflow, let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real world decision making.
+The **storytelling stage** is where we translate the technical results of the Multinomial Logistic regression workflow into a message that is useful for an applied audience. Up to this point, we have defined the study design, wrangled the transport data, explored the response and regressors, fitted a Multinomial Logistic regression model, checked goodness of fit, and organized the inferential and predictive results.
+
+To complete the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real world decision making.
 
 In this case study, the Multinomial Logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public Transit`, `Bicycle`, and `Walking`. We will distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
 
 ### Key Insights From the Model
 
-Car availability and commute distance are the two most consistently significant regressors across both the imbalanced and upsampled models. Having access to a car is associated with lower odds of using public transit instead of driving; the corresponding effect for cycling is not statistically significant, so car access alone does not appear to explain the choice to bike in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
+Car availability and commute distance are the two significant regressors in our model. Having access to a car is associated with lower odds of using public transit instead of driving; the corresponding effect for cycling or walking is not statistically significant, so car access alone does not appear to explain the choice to bike or walk in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
 
 Age and weekend commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ because a lack of significance can potentially reflect insufficient data rather than a genuinely null effect for rare categories.
 
