@@ -257,14 +257,14 @@ Our dataset captures various characteristics of commuters and each commuter's pr
 
 : Classification table for variables in the transport dataset. {#tbl-variables}
 
-Let's load this sample of $n=1000$ commuters in both `R` and `Python`. In `R`, we use the `tidyverse` library, and in `Python`, we use the `pandas` library. 
+Let's load this sample of $n=1000$ commuters in both `R` and `Python` from the local file `data/multinom_transport.rda`. In `R`, we read the `.rda` file with `load()` and wrangle it with the `tidyverse` library, and in `Python`, we read the same `.rda` file with the `pyreadr` library and wrangle it with the `pandas` library. 
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-data(multinomial_transport)
+load("data/multinom_transport.rda")
 data <- multinomial_transport[,-1]
 cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
 head(data, n = 100) |>
@@ -274,8 +274,10 @@ head(data, n = 100) |>
 ## Python Code
 
 ```{.python}
-url = "https://raw.githubusercontent.com/andytai7/cookbook/refs/heads/main/raw-data/multinomial_transport.csv"
-data = pd.read_csv(url)
+import pyreadr
+
+rda = pyreadr.read_r("data/multinom_transport.rda")
+data = rda["multinomial_transport"]
 data = data.iloc[:, :-1]
 print(f"There are {data.shape[0]} observations and {data.shape[1]} variables in the dataset.")
 print(data)
@@ -291,7 +293,7 @@ print(data)
 #| echo: false
 #| message: false
 #| warning: false
-data(multinomial_transport)
+load("data/multinom_transport.rda")
 data <- multinomial_transport %>% select(-'income_bracket')
 cat("There are", nrow(data), "observations and", ncol(data), "variables in the dataset.")
 head(data, n = 100) |>
@@ -304,8 +306,10 @@ head(data, n = 100) |>
 #| echo: false
 #| message: false
 #| warning: false
-url = "https://raw.githubusercontent.com/andytai7/cookbook/refs/heads/main/raw-data/multinomial_transport.csv"
-data = pd.read_csv(url)
+import pyreadr
+
+rda = pyreadr.read_r("data/multinom_transport.rda")
+data = rda["multinomial_transport"]
 data = data.iloc[:, :-1]
 print(f"There are {data.shape[0]} observations and {data.shape[1]} variables in the dataset.")
 ```
@@ -322,9 +326,9 @@ head(data, n = 100) |>
 
 This dataset provides a structured way to analyze the behaviors of commuters and determine which factors are associated with their modes of transport. 
 
-### Study Design
+### Study Design {#sec-study-design}
 
-Now that we’ve introduced our case study and dataset, it’s time to follow the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html) step by step. The first step is to define the main statistical inquiries we want to address. Our goal in this case study is to understand which factors impact an individual's mode of transport. We aim to identify which characteristics, such as age, commute distance, having a car, and commuting on weekends or not, explain whether people commute by public transit, car, bicycle, or walk. 
+Now that we’ve introduced our case study and dataset, it is time to follow the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html) step by step. The first step is to define the main statistical inquiries we want to address. Our goal in this case study is to understand which factors impact an individual's mode of transport. We aim to identify which characteristics, such as age, commute distance, having a car, and commuting on weekends or not, explain whether people commute by public transit, car, bicycle, or walk. 
 
 We will explore two primary questions based on this dataset.
 
@@ -430,7 +434,7 @@ To ensure that our model generalizes well to unseen data, we will split the data
 
 ```{.r}
 # Randomly split the data into train and test sets
-set.seed(352)
+set.seed(42)
 train_idx <- sample(seq_len(nrow(data)), size = 0.8 * nrow(data))
 train_set <- data[train_idx, ]
 test_set  <- data[-train_idx, ]
@@ -768,26 +772,26 @@ The categorical variables can be visualized using stacked bar charts. The bar ch
 ## R Code
 
 ```{.r}
-# Sort `transport_mode` by frequency
+# Sort `transport_mode` by frequency, so the fill levels stack in a stable order
 train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
 
 p1 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  ggplot(aes(x = has_car_available, fill = transport_mode)) +
   geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(y = "Count", title = "With Car Availability") +
-  scale_fill_manual(values=cbPalette) +
+  labs(x = "Car Availability", y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values = cbPalette) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Car Availability"))
+  guides(fill = guide_legend(title = "Transport Mode"))
 
 p2 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  ggplot(aes(x = weekend_commuter, fill = transport_mode)) +
   geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "Count", title = "With Weekend Commuter Status") +
-  scale_fill_manual(values=cbPalette) +
+  labs(x = "Weekend Commuter", y = "", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values = cbPalette) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Weekend Commuter"))
+  guides(fill = guide_legend(title = "Transport Mode"))
 
 grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
 ```
@@ -803,8 +807,8 @@ gs = GridSpec(1, 2, figure=fig)
 fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
 
 # Plot: Stacked bar for Car Availability
-car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
-car_counts = car_counts.loc[order] 
+car_counts = train_set.groupby(['has_car_available', 'transport_mode']).size().unstack(fill_value=0)
+car_counts = car_counts[order]
 
 ax1 = fig.add_subplot(gs[0, 0])
 bottom = None
@@ -812,13 +816,13 @@ for i, col in enumerate(car_counts.columns):
     ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
     bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
 ax1.set_title("With Car Availability")
-ax1.set_xlabel("Transport Mode")
+ax1.set_xlabel("Car Availability")
 ax1.set_ylabel("Count")
-ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+ax1.legend(title="Transport Mode", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
 
 # Plot: Stacked bar for Weekend Commuter
-weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
-weekend_counts = weekend_counts.loc[order]
+weekend_counts = train_set.groupby(['weekend_commuter', 'transport_mode']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts[order]
 
 ax2 = fig.add_subplot(gs[0, 1])
 bottom = None
@@ -826,9 +830,9 @@ for i, col in enumerate(weekend_counts.columns):
     ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
     bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
 ax2.set_title("With Weekend Commuter Status")
-ax2.set_xlabel("Transport Mode")
+ax2.set_xlabel("Weekend Commuter")
 ax2.set_ylabel("")
-ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+ax2.legend(title="Transport Mode", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
 
 # Adjust plot layout
 fig.tight_layout(rect=[0, 0.05, 1, 1])
@@ -847,23 +851,27 @@ fig
 #|   - "Stacked bar charts of transport mode counts by car availability and weekend commuter status."
 #| message: false
 #| warning: false
+# Sort `transport_mode` by frequency, so the fill levels stack in a stable order
 train_set$transport_mode <- factor(train_set$transport_mode, levels = names(sort(table(train_set$transport_mode), decreasing = TRUE)))
+
 p1 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = has_car_available)) +
+  ggplot(aes(x = has_car_available, fill = transport_mode)) +
   geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "Count", title = "With Car Availability") +
-  scale_fill_manual(values=cbPalette) +
+  labs(x = "Car Availability", y = "Count", title = "With Car Availability") +
+  scale_fill_manual(values = cbPalette) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Car Availability"))
+  guides(fill = guide_legend(title = "Transport Mode"))
+
 p2 <- train_set %>%
-  ggplot(aes(x = transport_mode, fill = weekend_commuter)) +
+  ggplot(aes(x = weekend_commuter, fill = transport_mode)) +
   geom_bar(position = position_stack(reverse = TRUE)) +  # use "stack" for counts, "fill" for proportions
-  labs(x = "Transport Mode", y = "", title = "With Weekend Commuter Status") +
-  scale_fill_manual(values=cbPalette) +
+  labs(x = "Weekend Commuter", y = "", title = "With Weekend Commuter Status") +
+  scale_fill_manual(values = cbPalette) +
   theme_bw() +
   theme(legend.position = "bottom") +
-  guides(fill = guide_legend(title = "Weekend Commuter"))
+  guides(fill = guide_legend(title = "Transport Mode"))
+
 grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport Mode", gp = grid::gpar(fontsize = 16, fontface = "bold")))
 ```
 
@@ -876,46 +884,49 @@ grid.arrange(p1, p2, ncol = 2, top = grid::textGrob("Distribution of Transport M
 #| echo: false
 #| message: false
 #| warning: false
+# Set up the plot
 sns.set_theme(style="whitegrid")
 fig = plt.figure()
 fig.set_size_inches(8, 6)
 gs = GridSpec(1, 2, figure=fig)
 fig.suptitle("Distribution of Transport Mode", fontsize=16, fontweight='bold')
 
-# Plot 1: Stacked bar for Car Availability
-car_counts = train_set.groupby(['transport_mode', 'has_car_available']).size().unstack(fill_value=0)
-car_counts = car_counts.loc[order] 
+# Plot: Stacked bar for Car Availability
+car_counts = train_set.groupby(['has_car_available', 'transport_mode']).size().unstack(fill_value=0)
+car_counts = car_counts[order]
+
 ax1 = fig.add_subplot(gs[0, 0])
 bottom = None
 for i, col in enumerate(car_counts.columns):
     ax1.bar(car_counts.index, car_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
     bottom = car_counts[col] if bottom is None else bottom + car_counts[col]
 ax1.set_title("With Car Availability")
-ax1.set_xlabel("Transport Mode")
+ax1.set_xlabel("Car Availability")
 ax1.set_ylabel("Count")
-ax1.legend(title="Car Availability", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+ax1.legend(title="Transport Mode", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
 
-# Plot 2: Stacked bar for Weekend Commuter
-weekend_counts = train_set.groupby(['transport_mode', 'weekend_commuter']).size().unstack(fill_value=0)
-weekend_counts = weekend_counts.loc[order]
+# Plot: Stacked bar for Weekend Commuter
+weekend_counts = train_set.groupby(['weekend_commuter', 'transport_mode']).size().unstack(fill_value=0)
+weekend_counts = weekend_counts[order]
+
 ax2 = fig.add_subplot(gs[0, 1])
 bottom = None
 for i, col in enumerate(weekend_counts.columns):
     ax2.bar(weekend_counts.index, weekend_counts[col], bottom=bottom, label=col, color=cbPalette[i % len(cbPalette)])
     bottom = weekend_counts[col] if bottom is None else bottom + weekend_counts[col]
 ax2.set_title("With Weekend Commuter Status")
-ax2.set_xlabel("Transport Mode")
+ax2.set_xlabel("Weekend Commuter")
 ax2.set_ylabel("")
-ax2.legend(title="Weekend Commuter", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+ax2.legend(title="Transport Mode", loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
 
-# Adjust layout
+# Adjust plot layout
 fig.tight_layout(rect=[0, 0.05, 1, 1])
 fig
 ```
 
 :::
 
-The bar charts show that car is the dominant mode of transport, especially among those who have access to a car. Public transit is used by both those with and without car availability, but it is more common among those without a car, as shown by a relatively larger orange bar. `Bicycle` and `Walking` are minority classes in the train set, as shown by the tiny bars in  @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py.
+The bar charts show that public transit is the dominant mode of transport, especially among those who do not have access to a car. Public transit is used by both those with and without car availability, but it is more common among those without a car, as shown by a relatively larger orange bar. `Bicycle` and `Walking` are minority classes in the train set, as shown by the tiny bars in  @fig-eda-transport-mode-distribution-R and @fig-eda-transport-mode-distribution-py.
 
 Most weekend commuters do not significantly change their transport mode. The overall proportions in the train set are largely dominated by the non-weekend commuters, shown by the orange bars. However, `Public Transit` has a noticeable number of weekend commuters, shown by the blue bar, which signals some weekend reliance on public transit. Among the `Bicycle` riders, the majority have access to a car and the majority of them are not weekend commuters, according to the stacked bar charts. 
 
@@ -966,15 +977,29 @@ You can also visualize the relationship across other regressors in various types
 
 ### Key Takeaways from EDA
 
-Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and Car versus Public Transit as the transport mode signals that the availability of car might be a factor for choosing car over public transit. Similarly the median commute distance increases across `Bicycle`, `Car`, and `Public Transit` in the train set, which suggests that there might be an association between commute distance and primary mode of transport in the population of commuters.
+Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and Car versus Public Transit as the transport mode signals that the availability of car can potentially be a factor for choosing car over public transit. Similarly the median commute distance increases across `Walking`, `Bicycle`, `Car`, and `Public Transit` in the train set, which suggests that can be a relationship between commute distance and primary mode of transport in the population of commuters.
 
 It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modelling strategy. With this foundation, we are better prepared to build a Multinomial Logistic regression model on data that has been carefully examined and understood.
 
 ## Data Modelling
 
-After conducting [EDA](http://localhost:54321/book/14-multinomial-logistic.html#exploratory-data-analysis), we transition to the modelling stage, where we apply a structured approach to uncover relationships between variables and predict outcomes. In this section, we focus on Ordinary Least Squares (OLS) regression, a widely used statistical technique for modelling linear relationships.
+After conducting [EDA](http://localhost:54321/book/14-multinomial-logistic.html#exploratory-data-analysis), we transition to the modelling stage, where we apply a structured approach to answer both the **inferential** and **predictive** inquiries from @sec-study-design.
 
-A Multinomial Logistic Regression model is a suitable approach for our statistical inquiries, given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`. 
+A Multinomial Logistic Regression model is a suitable approach for our statistical inquiries, given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and binary categorical regressors `has_car_available` and `weekend_commuter`.
+
+The EDA showed that the choice of primary transport mode varies across several commuter characteristics, but those empirical comparisons were still descriptive. We now need a probability model that respects the unordered categorical nature of the response while allowing the conditional probability of each mode to vary systematically with the regressors.
+
+Multinomial Logistic regression is a **GLM** with the following three-part structure:
+
+1. a **random component**, which specifies the conditional probability distribution of the response;
+2. a **systematic component**, which combines the regressors through linear predictor(s); and
+3. a **link function**, which connects the conditional mean of the response to that linear predictor.
+
+This GLM view is useful because it makes clear what remains linear in Multinomial Logistic regression and what does not. The regressors are combined linearly on the **log-odds scale**, where each non-baseline category is compared against a common baseline category, while the conditional probabilities themselves are obtained through a nonlinear transformation.
+
+Unlike the binary case, the response here has more than two categories, so a single linear predictor is not enough. The model instead requires one linear predictor for each non-baseline category, and these predictors are normalized jointly so that the resulting probabilities across all categories sum to one.
+
+Now, we develop these three components for our case study.
 
 ### Defining modelling parameters
 
@@ -982,7 +1007,7 @@ Once we select Multinomial Logistic regression, we define the key modelling comp
 
 #### Response Variable (Y):
 
-The response variable, also known as the dependent variable, represents the financial outcome we aim to explain:
+The response variable, also known as the dependent variable, represents the primary mode of transport that we aim to explain:
 
 - `transport_mode`: The dependent variable representing primary mode of transport.
 
@@ -992,45 +1017,87 @@ Each regressor is chosen based on its theoretical and statistical relevance in e
 
 - `commute_distance` (Continuous) – Represents the one-way commuting distance in kilometers.
 - `age` (Continuous) – Represents the age of the individual in years.
-- `has_car_available` (Binary) – Indicates whether the individual has access to a car
-- `weekend_commuter` (Binary) – Indicates whether the individual commutes during weekends.
+- `has_car_available` (Binary) – Indicates whether the individual has access to a car or not.
+- `weekend_commuter` (Binary) – Indicates whether the individual commutes during weekends or not.
 
 ### The Random Component
 
-The random component of Multinomial Logistic regression approach assumes a [Multinoulli distribution](https://www.britannica.com/science/multinomial-distribution) where $p_{i,1},p_{i,2},\dots,p_{i,m}$ are the probabilities of belonging to categories $1,2,\dots,m$ respectively; i.e., 
+The random component of the Multinomial Logistic regression approach assumes a [Multinomial distribution](https://www.britannica.com/science/multinomial-distribution). Let's say that we have $m$ distinct categories denoted by positive integers $1,...,m$, where $m\geq2$ and $p_{i,0},...\dots,p_{i,m-1}$ are the probabilities of belonging to categories $0,\dots,m-1$ respectively; i.e., 
 $$
 \begin{align*}
-P(Y_i=1)=p_{i,1},\newline
-P(Y_i=2)=p_{i,2}, \newline
+P(Y_i=0)=p_{i,0},\newline
 \dots\newline
 \dots\newline
-P(Y_i=m)=p_{i,m}
+P(Y_i=m-1)=p_{i,m-1}
 \end{align*}
 $$ {#eq-multinomial-dist}
 where
 $$
-\sum_{j = 1}^m p_{i,j} = p_{i,1} + p_{i,2} + \dots + p_{i,m} = 1.
+\sum_{j = 0}^{m-1} p_{i,j} = p_{i,0} + \dots + p_{i,m-1} = 1.
 $$
 
-*A particular highlight is that the Bernoulli distribution is a special case of the Multinoulli distribution with two possible outcomes, i.e. $m=2$.*
+*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$.*
 
-Let $Y_i$ denote the transport mode of the $i$th commuter in the training data, for $i=1,2,...,n$, such that $Y_i$ can be one of `Public_Transit`, `Car`, `Bicycle`, or `Walking`. 
+In our study, the response variable consists of $4$ possible categories, and therefore we assume a Multinomial distribution with $m=4$ for the random component. Let $Y_i$ denote the transport mode of the $i$th commuter in the training data, for $i=1,2,...,n$, such that $Y_i$ can be one of `Public_Transit`, `Car`, `Bicycle`, or `Walking`. We will use the following coding for $Y_i$ with `Car` as the reference category:
+
+$$
+Y_i
+=
+\begin{cases}
+0, & \text{if the primary transport mode of commuter } i \text{ is Car},\\
+1, & \text{if the primary transport mode of commuter } i \text{ is Public Transit},\\
+2, & \text{if the primary transport mode of commuter } i \text{ is Bicycle},\\
+3, & \text{if the primary transport mode of commuter } i \text{ is Walking}.
+\end{cases}
+$$
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on the numerical coding of the categories!
+::::
+
+:::: {.Heads-up-container}
+The values $0$, $1$, $2$, and $3$ assigned above are notational labels used to index
+the four categories of the response variable. The Multinomial distribution treats
+these categories as nominal, so the labels carry no ordering and no magnitude.
+Assigning the labels in a different order, or selecting a different category as the
+reference level, produces an equivalent reparametrization of the same model. The
+estimated probabilities for each category, the maximized log-likelihood function, and the
+resulting predictions are unchanged by either choice.
+
+The estimated regression coefficients, however, are defined as **log-odds** relative to the reference category. Changing the reference level therefore changes
+the numerical values of the coefficients and the comparisons they represent, along
+with the associated hypothesis tests and confidence intervals. The underlying
+inferential conclusions are equivalent, since any contrast between two categories can
+be recovered under any choice of reference level. We select `Car` as the reference
+category here for interpretability, and not because the modelling assumption strictly requires it.
+
+If the categories of the response variable are **ordered**, and the ordering carries
+information that a Multinomial model does not incorporate, then use
+[Ordinal Logistic Regression](15-ordinal-logistic.qmd) in this case.
+::::
+:::
 
 Let
 $$
 \mathbf{x}_i = (x_{i,1},...,x_{i,k}),
 $$ 
-denote the vector of observed regressor values for commuter $i$. For the largest candidate specification in this chapter, $k=4$, corresponding to commute distance, age, car availability, and weekend commuter status. 
+denote the vector of observed regressor values for commuter $i$. As there are $4$ regressors (commute distance, age, car availability, and weekend commuter status) in our study, it follows that $k=4$. 
 
-The random component of Multinomial Logistic regression assumes
+For a single trial $Y_i$ with regressors given by $\mathbf{x}_i$, the random component of Multinomial Logistic regression assumes
 
 $$
 Y_i \mid \mathbf{x}_i
 \sim
-\operatorname{Multinoulli}(p_{i,1}, ...,p_{i,m-1}),
+\operatorname{Multinomial}(\mathbf{\pi}_i),
 $$
 
 where
+
+$$
+\mathbf{\pi}_i=(p_{i,1},...,p_{i,m-1})
+$$
+and
 
 $$
 p_{i,k}
@@ -1038,247 +1105,567 @@ p_{i,k}
 \Pr(Y_i=k\mid\mathbf{x}_i)
 $$
 is the **conditional probability** that $Y_i$ belongs to category $k$, given the regressor values $\mathbf{x}_i$. Consequently,
-$$\Pr(Y_i=m\mid\mathbf{x}_i)=1-\Sigma_{j=1}^{m-1}p_{i,j}$$
-As $0\leq p_{i,k}\leq1$ and $\Sigma_{j=1}^mp_{i,j}=1$, it follows that the sum of parameters, $\Sigma_{j=1}^{m-1}p_{i,j}$ is a real number between $0$ and $1$. 
+$$\Pr(Y_i=0\mid\mathbf{x}_i)=1-\Sigma_{j=1}^{m-1}p_{i,j}$$
+is the corresponding probability that $Y_i$ belongs to the reference category, given the regressor values $\mathbf{x}_i$.
 
-The random component tells us what kind of response is being modelled, but it does not yet explain why two commuters with different characteristics may have different values of $p_{i,1}, ...,p_{i,m-1}$.That role belongs to the systematic component.
+We first encode each individual's observed response category using indicator variables. Let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. Since each individual belongs to exactly one of the $m$ possible categories, the vector $\mathbf{y}_i = (y_{i,1}, y_{i,2}, \ldots, y_{i,m})$ contains exactly one entry equal to $1$, with all remaining entries equal to $0$. This representation is often called a one-hot encoding of the response category. For the $i$-th individual, the conditional probability mass function (PMF) can be written as
+
+$$
+p_Y(y_i;\mathbf{\pi}_i) = \Pr(Y_i=y_i\mid\mathbf{x}_i)
+= \prod_{k=0}^{3} p_{i,k}^{y_i,k},
+$$ {#eq-pmf}
+
+The random component tells us **what kind of response is being modelled**, but it does not yet explain why two commuters with different characteristics may have different values of $p_{i,1}, ...,p_{i,m-1}$. That role belongs to the systematic component.
 
 ### The Systematic Component
 
-Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the systematic component combines the regressors through a **linear predictor**. With $k$ regressors,
+Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html),
+the systematic component in Multinomial Logistic regression combines the
+regressors through **linear predictors**; however, only one linear predictor will
+not be enough anymore. With $k=4$ regressors and $m = 4$ categories in our case
+study, there are $3$ systematic components, one for
+each category other than the reference category `Car`:
 
 $$
-\eta_i^{(j,1)}
-=
-\beta_0
-+
-\beta_1x_{i,1}
-+
-\beta_2x_{i,2}
-+
-\cdots
-+
-\beta_kx_{i,k}.
+\begin{aligned}
+\eta_{i,1} &= \beta_{0,1} + \beta_{1,1} x_{i,1} + \beta_{2,1} x_{i,2}+\beta_{3,1} x_{i,3} + \beta_{4,1} x_{i,4}, \\
+\eta_{i,2} &= \beta_{0,2} + \beta_{1,2} x_{i,1} + \beta_{2,2} x_{i,2}+\beta_{3,2} x_{i,3} + \beta_{4,2} x_{i,4}, \\
+\eta_{i,3} &= \beta_{0,3} + \beta_{1,3} x_{i,1} + \beta_{2,3} x_{i,2}+\beta_{3,1} x_{i,3} + \beta_{4,3} x_{i,k},
+\end{aligned}
 $${#eq-systematic-component}
 
-Equivalently,
+where $\eta_{i,1}$, $\eta_{i,2}$ and $\eta_{i,3}$ correspond to `Public_Transit`,
+`Bicycle` and `Walking` respectively, each with respect to `Car`.
+
+For the general case with $k$ regressors and $m$ categories, these equations can be represented as
 
 $$
-\eta_i
+\eta_{i,j}
 =
-\beta_0
+\beta_{0,j}
 +
 \mathbf{x}_i^\top
-\boldsymbol{\beta},
+\boldsymbol{\beta}_j,
+\qquad j = 1, \dots, m-1,
 $$
 
-where
+where $\mathbf{x}_i$ is a $k-$dimensional vector and
 
 $$
-\boldsymbol{\beta}
+\boldsymbol{\beta}_j
 =
 \left(
-\beta_1,
-\beta_2,
+\beta_{1,j},
+\beta_{2,j},
 \ldots,
-\beta_k
+\beta_{k,j}
 \right)^\top.
 $$
 
 Thus:
 
-- $\eta_i$ is the **linear predictor** for commuter $i$;
-- $\beta_0$ is the intercept;
-- $\beta_1,\ldots,\beta_k$ are fixed but unknown regression coefficients;
-- $x_{i,1},\ldots,x_{i,k}$ are the observed regressor values for commuter $i$;
+- $\eta_{i,j}$ is the **linear predictor** for commuter $i$ and category $j$;
+- $\beta_{0,j}$ is the intercept for category $j$;
+- $\beta_{1,j}, \ldots, \beta_{k,j}$ are fixed but unknown regression
+  coefficients for category $j$;
+- $x_{i,1}, \ldots, x_{i,k}$ are the observed regressor values for commuter $i$;
 - $\mathbf{x}_i$ collects those $k$ regressor values; and
-- $\boldsymbol{\beta}$ collects the corresponding $k$ regression coefficients.
+- $\boldsymbol{\beta}_j$ collects the corresponding $k$ regression coefficients
+  for category $j$.
 
-Some texts absorb the intercept into the vector notation by adding a leading $1$ to the regressor vector. We keep $\beta_0$ visible here so that $\mathbf{x}_i$ remains consistent with the regressor-vector notation introduced earlier in the chapter. 
+Note that the regressor values $\mathbf{x}_i$ are the **same** across all three
+equations; however, each non-reference category
+has its own $\boldsymbol{\beta}_j$, which means that a regressor may push a commuter towards
+one transport mode and away from another. For a general case with $m$ categories in the response variable and $k$ regressors, the model estimates $(m-1)(k+1)$
+parameters in total. In our case study with $k = 4$ regressors and
+$m = 4$ categories, there are $15$ parameters in total.
 
-The word **linear** in *linear predictor* refers to the way the regression coefficients enter $\eta_i$. It does **not** mean that the default probability itself is a straight-line function of the regressors.
+The reference category `Car` has no equation of its own. Its linear predictor is
+fixed at $\eta_{i,0} = 0$ for every commuter, which is what makes the remaining
+$m-1$ sets of coefficients identifiable. Without this constraint, adding the same
+constant to all $m$ linear predictors would leave every probability unchanged.
+
+Some texts absorb the intercept into the vector notation by adding a leading $1$
+to the regressor vector. We keep $\beta_{0,j}$ visible here so that
+$\mathbf{x}_i$ remains consistent with the regressor-vector notation introduced
+earlier in the chapter.
+
+Recall that the word **linear** in *linear predictor* refers to the way the regression coefficients enter $\eta_{i,j}$. It does **not** mean that the probability of choosing transport mode $j$ is a linear function of the regressors.
 
 ::: {.Heads-up}
+
 :::: {.Heads-up-header}
 Heads-up on what is linear in Multinomial Logistic regression!
 ::::
+
 :::: {.Heads-up-container}
-The systematic component for each non-baseline category $j$ is $\eta_i^{(j,1)}$. In other words,
+
+The systematic component for each non-baseline category $j$ is $\eta_{i,j}$. Each
+of the $m-1$ equations
 
 $$
-\eta_i
+\eta_{i,j}
 =
-\beta_0
+\beta_{0,j}
 +
-\mathbf{x}_i^\top\boldsymbol{\beta}
+\mathbf{x}_i^\top\boldsymbol{\beta}_j,
+\qquad j = 1, \dots, m-1,
 $$
 
-is linear in the regression coefficients, while
+is linear in the regression coefficients, while the conditional probabilities
 
 $$
-\pi_i
+p_{i,j}
 =
-\Pr(Y_i=1\mid\mathbf{x}_i)
+\Pr(Y_i = j \mid \mathbf{x}_i)
 $$
 
-lives on the probability scale.
+live on the probability scale.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
 
-Therefore, we still need a link function that connects the unrestricted real-valued linear predictor $\eta_i$ to a valid probability between $0$ and $1$.
+Therefore, we still need a link function that connects the $m-1$ unrestricted
+real-valued linear predictors $\eta_{i,1}, \dots, \eta_{i,m-1}$ to $m$ valid
+probabilities. Each $p_{i,j}$ must lie between $0$ and $1$, and together they must
+sum to one across all $m$ categories, including the probability of belonging to the reference category `Car`.
+
+::::
+
+:::
+
+This separation between the linear predictors and the response-scale
+probabilities is what allows a GLM to retain a regression structure without
+forcing the conditional probabilities themselves to be linear.
+
+### The Logit Link Functions {#sec-multinomial-logistic-logit-link}
+
+Recall that a link function connects the conditional distribution of the response variable to the
+systematic component. In [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), a single probability $\pi_i$
+described the whole conditional distribution, so one link function was sufficient. In this chapter, the
+random component is parameterized by $m$ conditional probabilities
+
+$$
+p_{i,j}=\Pr(Y_i=j\mid\mathbf{x}_i),
+\qquad j=0,1,\dots,m-1,
+$$
+
+which must each lie within $(0,1)$ and sum to one. Multinomial Logistic regression
+therefore needs a system of $m-1$ **logit links**, one for each non-reference category.
+
+Here is what we do:
+
+1. Pick one of the categories to be the baseline. In our study, this is
+   `Car`, which is indexed as $j=0$.
+2. For each of the other categories, model the logarithm of the odds of that
+   category against the baseline.
+
+The logit link applied to each baseline-category
+comparison is given by
+
+$$
+\operatorname{logit}(p_{i,j})
+=
+\log\left(
+\frac{p_{i,j}}{p_{i,0}}
+\right)
+=
+\eta_{i,j},
+\qquad j=1,\dots,m-1.
+$${#eq-multinomial-logistic-logit-link}
+
+Combining @eq-multinomial-logistic-logit-link with @eq-systematic-component gives
+the Multinomial Logistic regression model, which is a system of $m-1$ equations:
+
+$$
+\log\left(
+\frac{p_{i,j}}{p_{i,0}}
+\right)
+=
+\beta_{0,j}
++
+\beta_{1,j}x_{i,1}
++
+\cdots
++
+\beta_{k,j}x_{i,k},
+\qquad j=1,\dots,m-1.
+$$
+
+The fraction
+
+$$
+\frac{p_{i,j}}{p_{i,0}}
+$$
+
+is the **odds of choosing transport mode $j$ instead of the baseline mode** for commuter
+$i$. Each $\eta_{i,j}$ is therefore that commuter's **log-odds** of choosing transport mode $j$
+versus `Car` under the model. Note that the regression coefficients are
+different for each link function, and that the baseline itself has no equation. The linear predictor of `Car` is fixed at $\eta_{i,0}=0$, which corresponds to
+$\log(p_{i,0}/p_{i,0})=0$.
+
+The logit link solves the range problem of OLS regression:
+
+- When $0<p_{i,j}<1$ and $0<p_{i,0}<1$, the odds $p_{i,j}/p_{i,0}$ are positive;
+- Taking the logarithm maps those positive odds to any real number;
+- Therefore, each $\eta_{i,j}$ can range freely from $-\infty$ to $+\infty$ even
+  though every $p_{i,j}$ must remain between $0$ and $1$ and the $m$
+  probabilities must sum to one.
+
+For example,
+
+$$
+p_{i,j}=p_{i,0}
+\quad\Longrightarrow\quad
+\frac{p_{i,j}}{p_{i,0}}=1
+\quad\Longrightarrow\quad
+\operatorname{logit}(p_{i,j})=0.
+$$
+
+A commuter equally likely to choose mode $j$ or the baseline has log-odds of
+zero. Modes less likely than the baseline correspond to negative log-odds, while
+modes more likely than the baseline correspond to positive log-odds.
+
+::: {.callout-tip}
+## The Baseline Category is Arbitrary
+
+Although every equation is written against the same reference category, the model can be used to compare between any two non-reference categories. Subtracting one equation from another cancels the common denominator $p_{i,0}$, e.g. for categories $1$ and $2$,
+
+$$
+\begin{aligned}
+\eta_{i,1}-\eta_{i,2}
+&=
+\log\left(\frac{p_{i,1}}{p_{i,0}}\right)
+-
+\log\left(\frac{p_{i,2}}{p_{i,0}}\right)
+=
+\log\left(\frac{p_{i,1}}{p_{i,2}}\right) \\[0.4em]
+&=
+(\beta_{0,1}-\beta_{0,2})
++
+(\beta_{1,1}-\beta_{1,2})x_{i,1}
++
+\cdots
++
+(\beta_{k,1}-\beta_{k,2})x_{i,k}.
+\end{aligned}
+$$
+
+The choice of baseline is therefore arbitrary and the model does not inherently incorporate any rank of the response categories.
+:::
+
+With some algebraic manipulation, the system can be solved for the
+probabilities themselves:
+
+$$
+\begin{aligned}
+p_{i,0}
+&=
+\Pr(Y_i=0\mid\mathbf{x}_i)
+=
+\frac{1}{1+\sum_{l=1}^{m-1}\exp(\eta_{i,l})}, \\[0.6em]
+p_{i,j}
+&=
+\Pr(Y_i=j\mid\mathbf{x}_i)
+=
+\frac{\exp(\eta_{i,j})}{1+\sum_{l=1}^{m-1}\exp(\eta_{i,l})},
+\qquad j=1,\dots,m-1.
+\end{aligned}
+$${#eq-prob-multinomial}
+
+The $1$ in each denominator corresponds to $\exp(\eta_{i,0})=\exp(0)$, which is the baseline's
+contribution. Adding all $m$ expressions in @eq-prob-multinomial gives a sum of
+$1$, so the model always returns a valid probability
+distribution over the four transport modes. This matters when we use the model
+for prediction and classification later in the chapter.
+
+::: {#Definition-multinomial-logistic-logit .definition}
+:::: {.definition-header}
+Definition of the multinomial logit link
+::::
+:::: {.definition-container}
+
+For category probabilities $p_{i,0},\dots,p_{i,m-1}$ satisfying $0<p_{i,j}<1$ and
+$\sum_{j=0}^{m-1}p_{i,j}=1$, with category $0$ taken as the baseline, the
+**logit function** for category $j$ is
+
+$$
+\operatorname{logit}(p_{i,j})
+=
+\log\left(
+\frac{p_{i,j}}{p_{i,0}}
+\right),
+\qquad j=1,\dots,m-1.
+$$
+
+The quantity $p_{i,j}/p_{i,0}$ is the **odds** of category $j$ against the
+baseline, and the logit is the **log-odds**. In Multinomial Logistic regression,
+the logit link sets those log-odds equal to the corresponding linear predictor
+with $k$ regressors:
+
+$$
+\begin{aligned}
+\operatorname{logit}(p_{i,j})
+&= \eta_{i,j} \\
+&=
+\beta_{0,j}
++
+\beta_{1,j}x_{i,1}
++
+\cdots
++
+\beta_{k,j}x_{i,k},
+\qquad j=1,\dots,m-1.
+\end{aligned}
+$$
+
 ::::
 :::
 
-This separation between the linear predictor and the response-scale probability is what allows a GLM to retain a regression structure without forcing the conditional probability itself to be linear.
-
-
-### The Logit Link Functions
-
-Like [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), the Multinomial Logistic regression also models the **logits**, which are logarithm of the odds. However, only one logit will not be enough anymore. Recall that we can capture the odds between two categories with a single logit function. What about adding some other ones?
-
-Here is what we can do:
-
-1. Pick one of the categories to be the baseline.
-2. For each of the other categories, we model the logarithm of the odds to the baseline category.
-
-**Notation:** To avoid lengthy formulas, we introduce compact notation that will be used consistently throughout this chapter. In expressions such as $P(Y_i = 1 \mid x_{i,1}, ..., x_{i,K})$, the conditioning is on all regressors. Instead of repeatedly writing all regressors, we define:  
+Let us now set up the model for our case study. The response `transport_mode`
+has $m=4$ classes: `Car`, `Public_Transit`, `Bicycle` and `Walking`, with `Car`
+as the baseline level. The $k=4$ regressors are the continuous
+`commute_distance` and `age`, denoted $x_{i,1}$ and $x_{i,2}$, and the binary
+`has_car_available` and `weekend_commuter`, whose `Yes` dummy variables are
+denoted $x_{i,3}$ and $x_{i,4}$. Writing $j=1,2,3$ for `Public_Transit`,
+`Bicycle` and `Walking` respectively, the three link functions are
 
 $$
-\mathbf{x}_i = (x_{i,1},...,x_{i,K}),
-$$ 
+\begin{aligned}
+\eta_{i,1}
+&=
+\log\left(\frac{p_{i,1}}{p_{i,0}}\right)
+=
+\beta_{0,1}
++
+\beta_{1,1}x_{i,1}
++
+\beta_{2,1}x_{i,2}
++
+\beta_{3,1}x_{i,3}
++
+\beta_{4,1}x_{i,4}, \\[0.6em]
+\eta_{i,2}
+&=
+\log\left(\frac{p_{i,2}}{p_{i,0}}\right)
+=
+\beta_{0,2}
++
+\beta_{1,2}x_{i,1}
++
+\beta_{2,2}x_{i,2}
++
+\beta_{3,2}x_{i,3}
++
+\beta_{4,2}x_{i,4}, \\[0.6em]
+\eta_{i,3}
+&=
+\log\left(\frac{p_{i,3}}{p_{i,0}}\right)
+=
+\beta_{0,3}
++
+\beta_{1,3}x_{i,1}
++
+\beta_{2,3}x_{i,2}
++
+\beta_{3,3}x_{i,3}
++
+\beta_{4,3}x_{i,4}.
+\end{aligned}
+$$ {#eq-link}
 
-where $\mathbf{x}_i$ is a vector of size $k$ that bundles all $k$ regressors into a single object, so we can refer to them all at once instead of listing each one. For example,
+Each link function has its own intercept and its own set of regression
+coefficients, so the model estimates $(m-1)(k+1)=15$ coefficients in total.
 
-$$
-P(Y_i = 1 \mid \mathbf{x}_i).
-$$
-This notation simplifies expressions and improves readability.
-
-Now, **what is the mathematics for the general case with $m$ response categories and $K$ regressors?** For the $i$th observation, we end up with a system of $m - 1$ **logit link** functions:
-
-$$
-\begin{gathered}
-\eta_i^{(2,1)} = \log\left[\frac{P(Y_i = 2\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(2,1)} + \beta_1^{(2,1)} x_{i, 1} + \beta_2^{(2,1)} x_{i, 2} + \ldots + \beta_K^{(2,1)} x_{i, k} \\
-\eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 3\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(3,1)} + \beta_1^{(3,1)} x_{i, 1} + \beta_2^{(3,1)} x_{i, 2} + \ldots + \beta_K^{(3,1)} x_{i, k} \\
-\vdots \\
-\eta_i^{(m,1)} = \log\left[\frac{P(Y_i = m\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] = \beta_0^{(m,1)} + \beta_1^{(m,1)} x_{i, 1} + \beta_2^{(m,1)} x_{i, 2} + \ldots + \beta_K^{(m,1)} x_{i, k}.
-\end{gathered}
-$$ {#eq-multinomial}
-
-Note that the superscript $(j, 1)$ in @eq-multinomial indicates that the equation is on level $j$ (for $j = 2, \dots, m$) with respect to level $1$. Furthermore, the regression coefficients are different for each link function.
-
-Each of the logit-linear functions in @eq-multinomial writes the log of odds between each category $j=2,\dots,m$ and the baseline category $j=1$ as a linear combination of the regressors. To compare between the categories $j=2,\dots,m$, we can simply deduct one equation from another, e.g.,
-$$
-\begin{gather*} \label{eq:multinomial-deduct}
-\eta_i^{(2,1)} - \eta_i^{(3,1)} = \log\left[\frac{P(Y_i = 2\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] - \log\left[\frac{P(Y_i = 3\mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)}\right] \\
-= \log\left[\frac{P(Y_i = 3\mid \mathbf{x}_i)}{P(Y_i = 2 \mid \mathbf{x}_i)}\right] 
-= (\beta_0^{(2,1)}-\beta_0^{(3,1)}) + (\beta_1^{(2,1)}-\beta_1^{(3,1)}) x_{i, 1} + (\beta_2^{(2,1)}-\beta_2^{(3,1)}) x_{i, 2} + \ldots
-\end{gather*}
-$$
-
-With some algebraic manipulation, we can show that the probabilities $p_{i,1}, p_{i,2}, \dots, p_{i,m}$ of $Y_i$ belonging to categories $1, 2, \dots, m$ are:
-
-$$ 
-\begin{gathered}
-p_{i,1} = P(Y_i = 1 \mid \mathbf{x}_i) = \frac{1}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)} \\
-p_{i,2} = P(Y_i = 2 \mid \mathbf{x}_i) = \frac{\exp \big( \eta_i^{(2,1)} \big)}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)} \\
-\vdots \\
-p_{i,m} = P(Y_i = m \mid \mathbf{x}_i) = \frac{\exp \big( \eta_i^{(m,1)} \big)}{1 + \sum_{j = 2}^m \exp \big( \eta_i^{(j,1)} \big)}.
-\end{gathered}
-$$ {#eq-prob-multinomial}
-
-***Note: The equations above are Softmax functions. The Multinomial Logistic regression is theoretically equivalent to a one-layer neural network with a Softmax activation function, where we input $X$, output probability $p_{i,j}$, and minimize the cross-entropy loss function to train the neural network to learn parameters $\beta$.***
-
-***If we add all $m$ probabilities in @eq-prob-multinomial, the sum is equal to $1$ for the $i$th observation. This is particularly important when we want to use this model for making predictions in classification matters.***
-
-Let's set up a Multinomial Logistic regression model with `transport_mode` as the response with four classes: `Car`, `Public Transit`, `Bicycle`, and `Walking`, subject to the continuous regressors `commute_distance` and `age`, denoted as $x_{i,\texttt{distance}}$ and $x_{i,\texttt{age}}$ respectively, and binary regressors `has_car_available` and `weekend_commuter`, with the dummy variables of class `Yes` denoted as $Z_{i,\texttt{car}}$ and $Z_{i,\texttt{weekend}}$ respectively. We will use `Car` as the baseline level for `transport_mode`. The equation of each link function for this multinomial model is given below, such that each link function has its own intercept and a set of regression coefficients.
-
-$$
-\begin{align*}
-&\eta_i^{(\texttt{Public},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
-&= \beta_0^{(\texttt{Public},\texttt{Car})} + \beta_1^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Public},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}, \\[0.6em]
-&\eta_i^{(\texttt{Bike},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
-&= \beta_0^{(\texttt{Bike},\texttt{Car})} + \beta_1^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Bike},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}, \\[0.6em]
-&\eta_i^{(\texttt{Walk},\texttt{Car})} = \log\left[\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}\right] \\
-&= \beta_0^{(\texttt{Walk},\texttt{Car})} + \beta_1^{(\texttt{Walk},\texttt{Car})} x_{i, \texttt{distance}} + \beta_2^{(\texttt{Walk},\texttt{Car})} x_{i, \texttt{age}} + \beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}} + \beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}} .
-\end{align*}
-$$
-
-Taking exponential on both sides of the model equations gives the ratio of the probability of each category `Public Transit`, `Bicycle`, and `Walking` over the probability of the baseline level `Car`:
+Exponentiating both sides in @eq-link gives the odds of each transport mode against the baseline `Car` as a product of multiplicative factors, one per regressor:
 
 $$
-\begin{align*}
-&\frac{P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Public},\texttt{Car})}}\\
-&= e^{\beta_0^{(\texttt{Public},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Public},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Public},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Public},\texttt{Car})} Z_{i,\texttt{weekend}}}\\[12pt]
-&\frac{P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Bike},\texttt{Car})}}\\
-&= e^{\beta_0^{(\texttt{Bike},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Bike},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Bike},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Bike},\texttt{Car})} Z_{i,\texttt{weekend}}}\\[12pt]
-&\frac{P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})}{P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}})} = e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}\\
-&= e^{\beta_0^{(\texttt{Walk},\texttt{Car})}} \, e^{\beta_1^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{distance}}} \, e^{\beta_2^{(\texttt{Walk},\texttt{Car})} x_{i,\texttt{age}}} \, e^{\beta_3^{(\texttt{Walk},\texttt{Car})} Z_{i, \texttt{car}}} \, e^{\beta_4^{(\texttt{Walk},\texttt{Car})} Z_{i,\texttt{weekend}}}
-\end{align*}
+\frac{p_{i,j}}{p_{i,0}}
+=
+e^{\eta_{i,j}}
+=
+e^{\beta_{0,j}}\,
+e^{\beta_{1,j}x_{i,1}}\,
+e^{\beta_{2,j}x_{i,2}}\,
+e^{\beta_{3,j}x_{i,3}}\,
+e^{\beta_{4,j}x_{i,4}},
+\qquad j=1,2,3.
 $$
 
-Finally, the probabilities of $Y_i$ belonging to categories `Car`, `Public Transit`, `Bicycle`, and `Walking` respectively are given by the following expressions.
+Finally, applying @eq-prob-multinomial with $m=4$ gives the four probabilities.
+Writing $D=1+e^{\eta_{i,1}}+e^{\eta_{i,2}}+e^{\eta_{i,3}}$ for the common
+denominator,
 
 $$
-\begin{align*}
-P(Y_i = \texttt{Car} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{1}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
-P(Y_i = \texttt{Public} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Public},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
-P(Y_i = \texttt{Bike} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Bike},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}} \\
-P(Y_i = \texttt{Walk} \mid x_{i, \texttt{distance}}, x_{i, \texttt{age}}, Z_{i, \texttt{car}}, Z_{i,\texttt{weekend}}) &= \frac{e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}}{1 + e^{\eta_i^{(\texttt{Public},\texttt{Car})}} + e^{\eta_i^{(\texttt{Bike},\texttt{Car})}} + e^{\eta_i^{(\texttt{Walk},\texttt{Car})}}}
-\end{align*}
-$$ {#eq-probabilities}
+\begin{aligned}
+\Pr(Y_i=\texttt{Car}\mid\mathbf{x}_i) &= \frac{1}{D}, \\[0.4em]
+\Pr(Y_i=\texttt{Public\_Transit}\mid\mathbf{x}_i) &= \frac{e^{\eta_{i,1}}}{D}, \\[0.4em]
+\Pr(Y_i=\texttt{Bicycle}\mid\mathbf{x}_i) &= \frac{e^{\eta_{i,2}}}{D}, \\[0.4em]
+\Pr(Y_i=\texttt{Walking}\mid\mathbf{x}_i) &= \frac{e^{\eta_{i,3}}}{D}.
+\end{aligned}
+$${#eq-probabilities}
+
+Note that the observed response is always exactly one of the four transport modes, but
+the model-based probabilities generated by finite values of $\eta_{i,1}$,
+$\eta_{i,2}$ and $\eta_{i,3}$ lie strictly between $0$ and $1$. This distinction
+between an observed categorical outcome and its underlying conditional
+probabilities will remain important throughout the chapter.
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on the softmax functions!
+::::
+:::: {.Tip-container}
+The expressions in @eq-prob-multinomial are **softmax** functions. In the context of **machine learning**, Multinomial
+Logistic regression is therefore equivalent to a one-layer **neural network** with a
+softmax activation function: the regressors $\mathbf{x}_i$ are the input, the
+probabilities $p_{i,j}$ are the output, and minimizing the cross-entropy loss to learn the weights is the same optimisation problem as maximising the multinomial
+likelihood to estimate $\boldsymbol{\beta}_1,\dots,\boldsymbol{\beta}_{m-1}$.
+::::
+:::
 
 ### The Log-Likelihood Function
 
-A Multinomial Logistic regression model treats the categories in the response variable as nominal, which means that there is no inherent ranking or ordering among them; therefore, each category is compared directly against a single baseline category. Recall from @eq-prob-multinomial that this comparison gives us the category-specific probabilities in closed form,
+A Multinomial Logistic regression model treats the categories in the response variable as nominal, which means that there is no inherent order between them; therefore, each category is compared directly against a single baseline category. Recall from @eq-prob-multinomial that this comparison gives us the category-specific probabilities in closed form,
 
 $$
 p_{i,j} = P(Y_i = j \mid \mathbf{x}_i), \qquad j = 1, \ldots, m,
 $$
 
-where each non-baseline category $j$ enters through its own logit $\eta_i^{(j,1)}$ and the whole set is normalized by the softmax denominator, so that $\sum_{j=1}^m p_{i,j} = 1$. These probabilities are exactly what the likelihood is built from.
+where each non-baseline category $j$ enters through its own logit $\eta_i^{(j,1)}$ and the whole set is normalized by the softmax denominator, so that $\sum_{j=1}^m p_{i,j} = 1$. These conditional probabilities are exactly what the **likelihood** is built from.
 
-***Note: Changing the baseline category, e.g., switching from `Car` to `Public` would not change the estimated probability for each category for each individual.***
+The three equations in @eq-link share the same regressors and differ only in
+their regression coefficients; therefore, the systematic component can be expressed compactly in matrix notation.
 
-To estimate the model, we need a way to measure how well a given set of coefficients explains the observed data. The **likelihood function** does exactly this by expressing the probability of the data we actually observed as a function of the unknown coefficients, and finding the coefficient values that make this probability as large as possible.
-
-We first encode each individual's observed response category using indicator variables. Following the notation in @eq-multinomial and @eq-prob-multinomial, let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. Since each individual belongs to exactly one of the $m$ possible categories, the vector $\mathbf{y}_i = (y_{i,1}, y_{i,2}, \ldots, y_{i,m})$ contains exactly one entry equal to $1$, with all remaining entries equal to $0$. This representation is often called a one-hot encoding of the response category. The likelihood function for the Multinomial Logistic regression model is then
+Let
 
 $$
-\mathcal{L}(\boldsymbol{\beta}; \mathbf{y}) = \prod_{i=1}^n \prod_{j=1}^m p_{i,j}^{y_{i,j}},
+\mathbf{x}_i
+=
+\begin{bmatrix}
+1 \\ x_{i,1} \\ x_{i,2} \\ x_{i,3} \\ x_{i,4}
+\end{bmatrix}
+$$
+
+be the regressor vector for the $i$th observation, **including the leading $1$
+for the intercept**. Then, let
+
+$$
+\boldsymbol{\beta}_j
+=
+\begin{bmatrix}
+\beta_{0,j} \\ \beta_{1,j} \\ \beta_{2,j} \\ \beta_{3,j} \\ \beta_{4,j}
+\end{bmatrix},
+\qquad j = 1, 2, 3,
+$$
+
+be the vector of regression coefficients associated with category $j$. Each
+systematic component can then be written compactly as
+
+$$
+\eta_{i,j} = \mathbf{x}_i^\top \boldsymbol{\beta}_j,
+\qquad j = 1, 2, 3,
+$$
+
+where
+
+$$
+\mathbf{x}_i^\top \boldsymbol{\beta}_j
+=
+\beta_{0,j}
++
+\beta_{1,j}x_{i,1}
++
+\beta_{2,j}x_{i,2}
++
+\beta_{3,j}x_{i,3}
++
+\beta_{4,j}x_{i,4}.
+$$
+
+For the **full training sample** with $n$ observations, we collect the
+regressors into the design matrix
+
+$$
+\mathbf{X}
+=
+\begin{bmatrix}
+1 & x_{1,1} & x_{1,2} & x_{1,3} & x_{1,4} \\
+1 & x_{2,1} & x_{2,2} & x_{2,3} & x_{2,4} \\
+\vdots & \vdots & \vdots & \vdots & \vdots \\
+1 & x_{n,1} & x_{n,2} & x_{n,3} & x_{n,4}
+\end{bmatrix},
+$$
+
+whose $i$th row is $\mathbf{x}_i^\top$. Unlike the single-response case, the
+model has one coefficient vector per non-baseline category, so the coefficients
+are collected into the matrix
+
+$$
+\mathbf{B}
+=
+\begin{bmatrix}
+\boldsymbol{\beta}_1 & \boldsymbol{\beta}_2 & \boldsymbol{\beta}_3
+\end{bmatrix}
+=
+\begin{bmatrix}
+\beta_{0,1} & \beta_{0,2} & \beta_{0,3} \\
+\beta_{1,1} & \beta_{1,2} & \beta_{1,3} \\
+\beta_{2,1} & \beta_{2,2} & \beta_{2,3} \\
+\beta_{3,1} & \beta_{3,2} & \beta_{3,3} \\
+\beta_{4,1} & \beta_{4,2} & \beta_{4,3}
+\end{bmatrix},
+$$
+
+whose $j$th column contains the coefficients of category $j$. The matrix of
+**systematic scores** is then
+
+$$
+\boldsymbol{\eta} = \mathbf{X}\mathbf{B},
+$$
+
+an $n \times 3$ matrix whose $(i, j)$th entry is $\eta_{i,j}$, and whose $i$th
+row collects the three log-odds of observation $i$ against the baseline
+category `Car`.
+
+To estimate the model, we need a way to measure how well a given set of coefficients $\mathbf{B}$ explains the observed data. The **likelihood function** does exactly this by expressing the probability of the data we actually observed as a function of these unknown coefficients, and finding the values that make this likelihood function as large as possible.
+
+Following the notation in @eq-pmf, let $y_{i,j} = 1$ if the $i$-th individual belongs to category $j$, and let $y_{i,j} = 0$ otherwise. The likelihood function for the Multinomial Logistic regression model is then
+
+$$
+\mathcal{L}(\mathbf{B}; \mathbf{y}) = \prod_{i=1}^n \prod_{j=1}^m p_{i,j}^{y_{i,j}},
 $$ {#eq-likelihood-multinomial}
 
-where $n$ is the number of individuals in the sample, $m$ is the number of categories, and $p_{i,j}$ is the model-implied softmax probability that individual $i$ (with regressor values $x_{i,1}, \ldots, x_{i,K}$) falls in category $j$. The unknown parameters are collected in $\boldsymbol{\beta}$, the stack of all reference-category coefficients $\beta_k^{(j,1)}$ for $j = 2, \ldots, m$ and $k = 0, 1, \ldots, K$, such that it consists of an intercept and $K$ slopes for each of the $m-1$ non-baseline categories.
+where $n$ is the number of individuals in the sample, $m$ is the number of categories, and $p_{i,j}$ is the model-implied softmax probability that individual $i$ (with regressor values $x_{i,1}, \ldots, x_{i,k}$) falls in category $j$. The unknown parameters are collected in the matrix $\mathbf{B}$, which consists of an intercept and $k$ slopes for each of the $m-1$ non-baseline response categories.
 
-The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual; because of the indicator $y_{i,j}$ in the exponent, $\prod_{j=1}^m p_{i,j}^{y_{i,j}}$ collapses to just $p_{i,j}$ for the actual observed category of $i$th observation. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
+The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual; because of the indicator $y_{i,j}$ in the exponent, $\prod_{j=1}^m p_{i,j}^{y_{i,j}}$ is equal to just $p_{i,j}$ for the actual observed category of the $i$-th observation. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
 
 Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the **log-likelihood function**:
 
 $$
-\ell(\boldsymbol{\beta}; \mathbf{y}) = \sum_{i=1}^n \sum_{j=1}^m y_{i,j} \log p_{i,j}.
+\ell(\mathbf{B}; \mathbf{y}) = \sum_{i=1}^n \sum_{j=1}^m y_{i,j} \log p_{i,j}.
 $$ {#eq-log-likelihood-multinomial}
 
 Substituting the softmax probabilities from @eq-prob-multinomial and using the reference-category constraint $y_{i,1} = 1 - \sum_{j=2}^m y_{i,j}$, the log-likelihood can be written explicitly in terms of the coefficients as
 
 $$
-\ell(\boldsymbol{\beta}) = \sum_{i=1}^n \left[ \sum_{j=2}^m y_{i,j} \sum_{k=0}^K x_{i,k} \beta_k^{(j,1)} - \log\left( 1 + \sum_{j=2}^m e^{\sum_{k=0}^K x_{i,k} \beta_k^{(j,1)}} \right) \right],
+\ell(\mathbf{B}) = \sum_{i=1}^n \left[ \sum_{j=2}^m y_{i,j} \sum_{k=0}^K x_{i,k} \beta_{k,j} - \log\left( 1 + \sum_{j=2}^m e^{\sum_{k=0}^K x_{i,k} \beta_{k,j}} \right) \right],
 $$ {#eq-log-likelihoood}
 
 where $x_{i,0} = 1$ corresponds to the intercept in the linear model.
 
-Maximizing $\ell$ gives the estimates $\hat{\boldsymbol{\beta}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as is known as the **maximum-likelihood estimation**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
+Maximizing $\ell$ gives the estimate $\hat{\mathbf{B}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as is known as the **maximum-likelihood estimation**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
 
 ::: {.Tip}
 ::::{.Tip-header}
 Tip on the Newton–Raphson Method
 ::::
 ::::{.Tip-container}
-The parameters we ultimately estimate are the reference-category coefficients, collected into the stacked vector $\boldsymbol{\beta} \in \mathbb{R}^q$ with $q = (K+1)(m-1)$ (an intercept and $K$ slopes for each of the $m-1$ non-baseline categories). Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\beta}$ by iterating with the score function and Hessian matrix of the log-likelihood, in a compact matrix form known as multinomial iteratively reweighted least squares (IRLS).
+The parameters we ultimately estimate are the entries $\beta_{k,j}$ of $\mathbf{B}$. For the purposes of the iteration, these entries are collected into the stacked vector $\boldsymbol{\beta} \in \mathbb{R}^q$ with $q = (K+1)(m-1)$ (an intercept and $K$ slopes for each of the $m-1$ non-baseline categories). Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\beta}$ by iterating with the score function and Hessian matrix of the log-likelihood, in a compact matrix form known as multinomial iteratively reweighted least squares (IRLS).
 
 **Score function:** For category $j$ and regressor $k$, the corresponding component of the score vector $S(\boldsymbol{\beta}) \in \mathbb{R}^q$ (the first-order partial derivative of $\ell$) is
 
 $$
-\frac{\partial \ell(\boldsymbol{\beta})}{\partial \beta_k^{(j,1)}} = \sum_{i=1}^n \left( y_{i,j} - p_{i,j} \right) x_{i,k}.
+\frac{\partial \ell(\boldsymbol{\beta})}{\partial \beta_{k,j}} = \sum_{i=1}^n \left( y_{i,j} - p_{i,j} \right) x_{i,k}.
 $$
 
 Each component compares the observed indicator $y_{i,j}$ with the model-implied probability $p_{i,j}$, weighted by the regressor value $x_{i,k}$; at the maximum, these differences balance out so that the score is zero.
@@ -1286,7 +1673,7 @@ Each component compares the observed indicator $y_{i,j}$ with the model-implied 
 **Hessian matrix:** The Hessian $H(\boldsymbol{\beta}) \in \mathbb{R}^{q \times q}$ collects the second-order partial derivatives of $\ell$. For the row indexed by category $j$ and regressor $k$, and the column indexed by category $j'$ and regressor $k'$, its entry is
 
 $$
-\frac{\partial^2 \ell(\boldsymbol{\beta})}{\partial \beta_k^{(j,1)} \partial \beta_{k'}^{(j',1)}} =
+\frac{\partial^2 \ell(\boldsymbol{\beta})}{\partial \beta_{k,j} \partial \beta_{k',j'}} =
 \begin{cases}
 -\sum_{i=1}^n x_{i,k}\, p_{i,j}(1 - p_{i,j})\, x_{i,k'} & \text{if } j' = j, \\
 \phantom{-}\sum_{i=1}^n x_{i,k}\, p_{i,j}\, p_{i,j'}\, x_{i,k'} & \text{if } j' \neq j,
@@ -1305,7 +1692,7 @@ initialized at $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven startin
 
 The full Newton–Raphson/IRLS procedure is:
 
-1. Choose the baseline category and initialize $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (stacked over all $(j,k)$).
+1. Choose the baseline category and initialize $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (stacked over all $(k,j)$).
 2. Repeat until convergence:
    - Compute the logits $\eta_i^{(j,1)}$ and category probabilities $p_{i,j}$ for all individuals $i$ and categories $j$, and evaluate the log-likelihood $\ell(\boldsymbol{\beta}^{(t)})$.
    - Form the stacked score $S(\boldsymbol{\beta}^{(t)})$ and Hessian $H(\boldsymbol{\beta}^{(t)})$ using the expressions above.
@@ -1316,29 +1703,12 @@ The full Newton–Raphson/IRLS procedure is:
 
 ## Estimation {#sec-estimation}
 
-With the data modelling stage completed, we now move to estimation, where we fit the Multinomial Logistic regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each regressor contributes to the response variable, allowing us to measure their individual effects on primary mode of transport.
+The previous section established the Multinomial Logistic regression model mathematically. We will now fit the model to the training data using all four regressors (age, commute distance, car availability, and weekend commuter status), and obtain numerical estimates for their regression coefficients. These estimates quantify how much each regressor contributes to the systematic component of the model, allowing us to measure their individual effects on the conditional probability distribution of a commuter's primary mode of transport.
 
-The goal of estimation is to determine the coefficient estimates through **maximum likelihood estimation**, which gives the coefficients estimates for which the observed training data is the most probable under a **conditional Multinomial distribution** for `transport_mode`. This provides a mathematical framework for analyzing the commuting behaviors and primary modes of transport. 
+We will estimate the regression coefficients through **maximum likelihood estimation**, which gives the coefficient values for which the observed training data is the most compatible under a conditional Multinomial distribution for `transport_mode`. The fitted model serves two purposes. It lets us connect the mathematical framework from [Data Modelling](http://localhost:54321/book/14-multinomial-logistic.html#data-modelling) to an actual fitted model. Secondly it allows us to fit and inspect the model for stability and goodness of fit using the training data, while the testing data remains untouched. Following the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), the model fitted in this section is part of **model development** and is not yet the chapter's final inferential or final predictive evaluation.
+
 
 ### Fitting the Model
-
-We now turn to the question of how the parameters of the Multinomial Logistic regression model are estimated from data. We summarize the key estimation steps in mathematical terms below, working with one observation at a time before generalizing to the full sample.
-
-Recall that the model for a response $Y_i$ with $m$ categories and $K$ regressors is given by
-
-$$
-\begin{aligned}
-\log \left( \frac{P(Y_i = j \mid \mathbf{x}_i)}{P(Y_i = 1 \mid \mathbf{x}_i)} \right) &= \beta_{0}^{(j,1)}\\
-&\quad+\beta_{1}^{(j,1)}x_{i,1}\\
-&\quad+\beta_{2}^{(j,1)} x_{i,2}\\
-&\quad+ ... \\
-&\quad+ \beta_{k}^{(j,1)} x_{i,k},\,\,\,\,j=2,...,m
-\end{aligned}
-$$ {#eq-multinomial-model}
-
-where $\beta_{0}^{(2,1)}$, ..., $\beta_{0}^{(m,1)}$ are category-specific intercepts, and $\beta_{1}^{(k,1)}$, $\beta_{2}^{(j,1)}$, ..., $\beta_{k}^{(j,1)}$ are the slope coefficients corresponding to the $j$-th category of $Y$.
-
-The model therefore comprises $(m-1)\times (k+1)$ parameters: $m-1$ intercepts and $(m-1)\times k$ regression coefficients. 
 
 We now fit the Multinomial Logistic regression model on `train_set` using the `nnet` package in `R` and the `statsmodel` package in `Python`. 
 
@@ -2208,9 +2578,6 @@ test_set$transport_mode <- relevel(test_set$transport_mode, ref = "Car")
 # Fit Multinomial Logistic regression model on test set
 multinom_test <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = test_set)
 
-# Print the fitted model
-print(summary(multinom_test))
-
 # Significant coefficients only
 cat("\nSignificant coefficients (5% threshold):\n")
 
@@ -2779,7 +3146,7 @@ print(f"Macro F1-score: {f1:.3f}")
 
 On the test set, the model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. 
 
-The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $64.7\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. Among the seven `Bicycle` observations in the test set, six are misclassified as `Car` and one is misclassified as `Public_Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. 
+The `Car` and `Public Transit` classes are predicted most reliably with recalls of $82.9\%$ and $72.6\%$ respectively. On the other hand, the observations corresponding to minority classes (`Bicycle` and `Walking`) in the test set are all misclassified as `Car` or `Public Transit`. Among the seven `Bicycle` observations in the test set, six are misclassified as `Car` and one is misclassified as `Public_Transit`. For the two `Walking` observations in the test set, one is misclassified as `Car` and one is misclassified as `Public_Transit`. 
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -2993,7 +3360,7 @@ Age and weekend commuting status tell a more conditional story. On the original,
 
 Some estimates need a caveat rather than a substantive interpretation. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the test set model suffers from complete separation. In R, the `weekend_commuter` effect for `Bicycle` and several `Walking` coefficients are flagged as significant with implausibly large or near-zero odds ratios, standard errors of essentially zero, and extreme test statistics. In Python, `statsmodels` assigns the same terms enormous standard errors and $p$-values near 1, and reports that the fit did not fully converge. None of this is evidence about the true effects; the terms are simply not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
 
-As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to travel mode choice, rather than as a precise classifier for the least common commuting behaviours.
+As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to transport mode choice, rather than as a precise classifier for the least common commuting behaviours.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -3002,6 +3369,6 @@ Using the Results Responsibly
 ::::{.Tip-container}
 It is important to remember that this analysis is associational, not causal. The model does not prove that changing someone's commute distance or car access would, on its own, change how they travel; it shows that, in this dataset, these regressors are consistently linked to the mode people choose once other measured factors are accounted for.
 
-Nevertheless, the results provide a useful evidence-based starting point for discussion. They help identify which regressors are most closely linked to travel mode choice, and which associations, such as age and weekend commuting for the rarer categories, may only become visible with more balanced or more abundant data. For transportation planners, this kind of insight can help prioritize where infrastructure investment, such as bike lanes or improved transit access, is likely to shift commuting patterns the most.
+Nevertheless, the results provide a useful evidence-based starting point for discussion. They help identify which regressors are most closely linked to transport mode choice, and which associations, such as age and weekend commuting for the rarer categories, may only become visible with more balanced or more abundant data. For transportation planners, this kind of insight can help prioritize where infrastructure investment, such as bike lanes or improved transit access, is likely to shift commuting patterns the most.
 ::::
 :::
