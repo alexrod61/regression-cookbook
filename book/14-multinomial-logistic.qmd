@@ -1743,8 +1743,7 @@ multinom_table |>
   kable(
     digits = 3,
     col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value"),
-    align = c("l", "l", "c", "c", "c", "c"),
-    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+    align = c("l", "l", "c", "c", "c", "c")
   )
 ```
 
@@ -1827,8 +1826,7 @@ multinom_table |>
   kable(
     digits = 3,
     col.names = c("Category", "Term", "Estimate", "Standard error", "Wald statistic", "p-value"),
-    align = c("l", "l", "c", "c", "c", "c"),
-    caption = "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
+    align = c("l", "l", "c", "c", "c", "c")
   )
 ```
 
@@ -1904,7 +1902,7 @@ cat(
 
 :::
 
-The outputs in @tbl-multinom-fit-r and @tbl-multinom-fit-python report the estimated regression coefficient. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0}^{(j,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(j,1)}, \ldots, \hat{\beta}_{k}^{(j,1)}$ are reported, each with its standard error. Since `Car` was set as the baseline category, the output contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`. With $m = 4$ response categories and $k = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the number of rows in @tbl-multinom-fit-r and @tbl-multinom-fit-python.
+The outputs in @tbl-multinom-fit-r and @tbl-multinom-fit-python report the estimated regression coefficients. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0}^{(j,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(j,1)}, \ldots, \hat{\beta}_{k}^{(j,1)}$ are reported, each with its standard error. Since `Car` was set as the baseline category, the outputs contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`. With $m = 4$ response categories and $k = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the number of rows in @tbl-multinom-fit-r and @tbl-multinom-fit-python.
 
 The Multinomial Logisitc regression model fitted above with regressors $x_{i,\texttt{distance}}$, $x_{i,\texttt{age}}$, $x_{i,\texttt{car}}$, and $x_{i,\texttt{weekend}}$, can be written as
 
@@ -1925,7 +1923,7 @@ In Multinomial Logistic regression, we model the probability of each outcome cat
 1. Bias coefficients toward the majority class because the likelihood function is dominated by majority observations.
 2. Underestimate uncertainty for rare categories (small sample size → large variance).
 3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
-4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates (complete separation).
+4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates because of complete or quasi-complete separation.
 
 As a reminder, we just completed the estimation step of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow). For the **inferential inquiry**, we should not use the same dataset both to explore the model structure and to produce the final inferential claims. Recall that the train set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later in @sec-regressors after the model building workflow has been completed.
 
@@ -1986,8 +1984,7 @@ Under complete separation, the multinomial likelihood function can keep increasi
 
 - coefficient estimates may become extremely large;
 - standard errors based on the inverse Fisher information may become extremely large or unstable;
-- fitted probabilities can be pushed increasingly close to $0$ or $1$;
-- the Fisher-information matrix can become nearly singular; and
+- fitted probabilities can be pushed increasingly close to $0$ or $1$; and
 - ordinary Wald-type inference can become unreliable.
 
 Software often alerts us to the problem. In `R`, common warnings include messages such as
@@ -2066,22 +2063,29 @@ print(
 The fitted model converges, returns finite coefficients and standard errors, and produces fitted probabilities strictly inside the interval between $0$ and $1$. According to the plots in @sec-eda, there is overlap between the age range and the commute distance range among all four categories of transport mode: `Car`, `Public_Transit`, `Bicycle`, and `Walking`. Similarly, there exists at least one observation for each transport mode among commuters with and without a car available, and among weekend and non-weekend commuters, so no combination of a binary regressor level and a response category is empty in the train set. These checks provide **no obvious evidence of complete or quasi-complete separation in this fitted model.**
 
 ### Likelihood-Based Measures
+We will dig into some **likelihood-based** measures to assess goodness-of-fit of our model. 
 
 The **null deviance** measures how well the intercept-only model (no regressors, only a baseline log-odds for each non-reference category) fits the data:
 
+::: {.callout-note}
+## Null deviance
+
+The **null deviance** $D_{\text{null}}$ is the deviance of the intercept-only model, which contains one intercept per each non-baseline category and no regressors:
+
 $$
-D_{\text{null}} = -2\,\ell(\hat{\boldsymbol{\beta}}_{0,\text{null}}),
+D_{\text{null}} = -2\,\ell_{\text{null}},
 $$
 
-where $\hat{\boldsymbol{\beta}}_{0,\text{null}}$ are the category-specific intercepts estimated without any regressor.
+where $\ell_{\text{null}}$ is the maximized log-likelihood of that model. Because the null model assigns the same predicted category probabilities to every observation, $D_{\text{null}}$ serves as a baseline against which the residual deviance of the fitted model is compared.
+:::
 
-The **residual deviance** is the analogous quantity for the fitted model:
+The **residual deviance** is the analogous quantity for the fitted model, and it measures how well our model, with four regressors, fits the data:
 
 $$
 D_{\text{resid}} = -2\,\ell(\hat{\boldsymbol{\beta}}).
 $$
 
-A well-fitting model should have a substantially smaller residual deviance than the null deviance. The reduction $D_{\text{null}} - D_{\text{resid}}$ is the likelihood-ratio (LR) statistic, which under $H_0$ (all slope coefficients across all non-baseline categories are zero) follows a $\chi^2$ distribution with degrees of freedom equal to the number of slope parameters $k$:
+A well-fitting model will have a residual deviance substantially smaller than the null deviance. The difference between the two, $D_{\text{null}} - D_{\text{resid}}$, is the **likelihood-ratio (LR) statistic**. Under the null hypothesis $H_0$ that all slope coefficients are zero across every non-baseline category, this statistic follows a $\chi^2$ distribution with degrees of freedom equal to the number of slope parameters $k$:
 
 $$
 G^2 = D_{\text{null}} - D_{\text{resid}} = -2\bigl(\ell_{\text{null}} - \ell_{\text{fitted}}\bigr) \;\overset{H_0}{\sim}\; \chi^2(k).
@@ -2093,9 +2097,9 @@ $$
 R^2_{\text{McFadden}} = 1 - \frac{\ell(\hat{\boldsymbol{\beta}})}{\ell(\hat{\boldsymbol{\beta}}_{0,\text{null}})}.
 $$
 
-Unlike the usual R-squared in OLS regression, McFadden's pseudo-R-squared should not be interpreted as the proportion of variance explained. Instead, it measures improvement in log-likelihood relative to the null model. Its values are typically much smaller than regular R-squared values, and values around $0.2$–$0.4$ are often considered indicative of a good/decent model fit in discrete-response models.
+Unlike the usual R-squared in OLS regression, McFadden's pseudo-R-squared should not be interpreted as the proportion of variance explained; instead, it measures improvement in log-likelihood relative to the null model. Its values are typically much smaller than regular R-squared values, and values around $0.2$–$0.4$ are often considered indicative of a good/decent model fit in discrete-response models.
 
-**AIC** and **BIC** scores penalize the log-likelihood for model complexity:
+**AIC** and **BIC** scores penalize the log-likelihood value for model complexity, i.e. the number of regressors in the model:
 
 $$
 \text{AIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + 2p, \qquad \text{BIC} = -2\,\ell(\hat{\boldsymbol{\beta}}) + p\log n,
@@ -2103,7 +2107,7 @@ $$
 
 where $p$ is the total number of estimated parameters (the category-specific intercepts and slopes across all non-baseline categories) and $n$ is the sample size. Lower AIC and BIC scores indicate better fit, and they are most useful for comparing competing models.
 
-We compute all of these measures below.
+Let's compute all of these measures below in both `R` and `Python`.
 
 ::: {.panel-tabset}
 
@@ -2222,13 +2226,29 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status is correctly specified in comparison to the null (intercept-only) model. McFadden's $R^2$ is `r round(mcfadden_r2,4)`, which falls within the $0.2-0.4$ range commonly associated with a good fit for discrete-response models. This indicates that these four regressors together explain a substantial share of variability in `transport_mode` on the log-likelihood scale, consistent with their highly significant joint contribution. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the imbalanced training model, and they are useful for comparing a fitted model against other model specifications (eg. a nested model with fewer or more regressors).
+The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status is correctly specified in comparison to the null (intercept-only) model. McFadden's $R^2$ is `r round(mcfadden_r2,4)`, which falls within the $0.2-0.4$ range commonly associated with a good fit for discrete-response models. This indicates that these four regressors together explain a substantial share of variability in `transport_mode` on the log-likelihood scale, consistent with their highly significant joint contribution. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the model fitted in @sec-estimation, and they are useful for comparing a fitted model against other model specifications (eg. a nested model with fewer or more regressors).
 
 ### Classification-Based Measures
 
-While likelihood-based measures evaluate the model on the probability scale, classification-based measures assess how well the model assigns each observation to its predicted transport mode by taking the category with the highest predicted probability as the point prediction.
+Likelihood-based measures are functions of the maximized log-likelihood, which aggregates, on the log scale, the conditional probability the fitted model assigns to the category each observation in the training data was actually observed to take. These measures are informative because they depend on the full vector of fitted probabilities rather than only on which category attains the maximum, so that a correct prediction made with high confidence and one made with low confidence are not treated as equivalent. However, in **machine learning**, a model is often used to **predict** a single response category instead of reporting the predicted probabilities. **Classification-based measures** address this use case directly by collapsing each predicted probability distribution to a single point prediction, taken as the category receiving the highest predicted probability, and then assess how often that prediction matches the observed transport mode.
 
-Let's visualize and summarize goodness of fit for the train set. 
+This shift from probabilities to discrete labels changes what we are able to diagnose. An **overall accuracy** score rate tells us how frequently the model is wrong, but not where it goes wrong, and in a multi-category setting, these are separate questions. Two models with identical accuracy scores may misclassify categories in different ways. Separating the errors by the category predicted and the category observed is what makes this distinction visible, and the table that performs that separation is the **confusion matrix**.
+
+::: {.callout-note}
+## Confusion matrix
+
+For a response with $K$ categories, the **confusion matrix** is a $K \times K$ table that cross-tabulates the predicted category against the observed category. Writing $\hat{y}_i$ for the point prediction of observation $i$ and $y_i$ for its observed category, the entry in row $j$ and column $k$ is
+
+$$
+n_{j,k} = \sum_{i=1}^{n} \mathbb{1}\{\hat{y}_i = j,\; y_i = k\},
+$$
+
+which is the number of observations predicted as category $j$ whose true category is $k$. The diagonal entries $n_{k,k}$ count correct classifications, and every off-diagonal entry records a specific type of misclassification. This makes the table more informative than a single accuracy score because it not only shows how often the model is wrong, but also which categories it confuses with which.
+
+Note that the row and column convention is not universal. The `caret` implementation in R places predictions in the rows and observed values in the columns, as above, whereas `scikit-learn` in Python uses the opposite arrangement. Before interpreting the off-diagonal entries in a confusion matrix, one should confirm its orientation.
+:::
+
+Let's visualize the confusion matrix of our fitted model on training data by using `confusionMatrix` from `caret` in `R`, and `confusion_matrix` from `scikit-learn` in `Python`.
 
 ::: {.panel-tabset}
 
@@ -2286,7 +2306,7 @@ fig
 
 ```{r}
 #| label: fig-confusion-matrix-train-R
-#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the train set."
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes in the train set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -2320,7 +2340,7 @@ cm_df |>
 
 ```{python}
 #| label: fig-confusion-matrix-train-py
-#| fig-cap: "Confusion matrix of predicted versus actual transport modes on the train set."
+#| fig-cap: "Confusion matrix of predicted versus actual transport modes in the train set."
 #| echo: false
 #| message: false
 #| warning: false
@@ -2339,9 +2359,7 @@ fig
 
 :::
 
-You are encouraged to repeat these diagnostics on the balanced (upsampled) model to determine if balancing improves minority class recall without overly harming the overall calibration.
-
-Let's compute the performance metrics.
+Now, let's compute the performance metrics below.
 
 ::: {.panel-tabset}
 
