@@ -2065,7 +2065,7 @@ The fitted model converges, returns finite coefficients and standard errors, and
 ### Likelihood-Based Measures
 We will dig into some **likelihood-based** measures to assess goodness-of-fit of our model. 
 
-The **null deviance** measures how well the intercept-only model (no regressors, only a baseline log-odds for each non-reference category) fits the data:
+The **null deviance** measures how well the intercept-only model (no regressors, only a baseline log-odds for each non-reference category) fits the data.
 
 ::: {.callout-note}
 ## Null deviance
@@ -2226,13 +2226,13 @@ print(f"BIC:                {multinom_fit.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), providing statistical evidence that a model with age, commute distance, car availability, and weekend commuting status is correctly specified in comparison to the null (intercept-only) model. McFadden's $R^2$ is `r round(mcfadden_r2,4)`, which falls within the $0.2-0.4$ range commonly associated with a good fit for discrete-response models. This indicates that these four regressors together explain a substantial share of variability in `transport_mode` on the log-likelihood scale, consistent with their highly significant joint contribution. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the model fitted in @sec-estimation, and they are useful for comparing a fitted model against other model specifications (eg. a nested model with fewer or more regressors).
+The residual deviance is smaller than the null deviance by `r round(lr_stat,4)` units. This reduction is captured by the likelihood-ratio statistic $G^2=$ `r round(lr_stat,4)` on `r lr_df` degrees of freedom ($p < 0.001$), which provides sufficient evidence that a model with age, commute distance, car availability, and weekend commuting status is correctly specified in comparison to the null (intercept-only) model. McFadden's $R^2$ is `r round(mcfadden_r2,4)`, which falls within the $0.2-0.4$ range commonly associated with a good fit for discrete-response models. This indicates that these four regressors together explain a substantial share of variability in `transport_mode` on the log-likelihood scale, consistent with their highly significant joint contribution. The AIC and BIC scores of `r round(AIC(multinom_fit), 2)` and `r round(BIC(multinom_fit), 2)` respectively describe the model fitted in @sec-estimation, and they are useful for comparing a fitted model against other model specifications (eg. a nested model with fewer or more regressors).
 
 ### Classification-Based Measures
 
-Likelihood-based measures are functions of the maximized log-likelihood, which aggregates, on the log scale, the conditional probability the fitted model assigns to the category each observation in the training data was actually observed to take. These measures are informative because they depend on the full vector of fitted probabilities rather than only on which category attains the maximum, so that a correct prediction made with high confidence and one made with low confidence are not treated as equivalent. However, in **machine learning**, a model is often used to **predict** a single response category instead of reporting the predicted probabilities. **Classification-based measures** address this use case directly by collapsing each predicted probability distribution to a single point prediction, taken as the category receiving the highest predicted probability, and then assess how often that prediction matches the observed transport mode.
+Likelihood-based measures are functions of the maximized log-likelihood, which aggregates, on the log scale, the conditional probability the fitted model assigns to the category each observation in the training data was actually observed to take. These measures are informative because they depend on the full vector of fitted probabilities rather than only on which category attains the maximum, which means that a correct prediction made with high confidence and one made with low confidence are not treated as equivalent. However, in **machine learning**, a model is often used to **predict** a single response category instead of reporting the predicted probabilities. **Classification-based measures** address this use case directly by collapsing each predicted probability distribution to a single point prediction, taken as the category receiving the highest predicted probability, and then assess how often that prediction matches the observed transport mode.
 
-This shift from probabilities to discrete labels changes what we are able to diagnose. An **overall accuracy** score rate tells us how frequently the model is wrong, but not where it goes wrong, and in a multi-category setting, these are separate questions. Two models with identical accuracy scores may misclassify categories in different ways. Separating the errors by the category predicted and the category observed is what makes this distinction visible, and the table that performs that separation is the **confusion matrix**.
+This shift from probabilities to discrete labels changes what we are able to diagnose. An **overall accuracy** score rate tells us how frequently the model is wrong, but not where it goes wrong, and in a multi-category setting, these are separate questions. Two Multinomial Logistic regression models with identical accuracy scores may misclassify categories in different ways. Separating the errors by the category predicted and the category observed is what makes this distinction visible, and the table that performs that separation is the **confusion matrix**.
 
 ::: {.callout-note}
 ## Confusion matrix
@@ -2248,7 +2248,7 @@ which is the number of observations predicted as category $j$ whose true categor
 Note that the row and column convention is not universal. The `caret` implementation in R places predictions in the rows and observed values in the columns, as above, whereas `scikit-learn` in Python uses the opposite arrangement. Before interpreting the off-diagonal entries in a confusion matrix, one should confirm its orientation.
 :::
 
-Let's visualize the confusion matrix of our fitted model on training data by using `confusionMatrix` from `caret` in `R`, and `confusion_matrix` from `scikit-learn` in `Python`.
+Let's visualize the confusion matrix of our fitted model on train set by using `confusionMatrix` from `caret` in `R`, and `confusion_matrix` from `scikit-learn` in `Python`.
 
 ::: {.panel-tabset}
 
@@ -2441,41 +2441,101 @@ print(f"Macro F1-score: {f1:.3f}")
 
 :::
 
-On the train set, the model achieves an overall accuracy of about **`r 100.0*round(overall_accuracy, 3)`%**. On average, the model correctly identifies **`r 100.0*round(macro_recall, 3)`%** of instances for each transport mode, which means that the macro recall is **`r 100.0*round(macro_recall, 3)`%**. Macro recall is relatively low, which suggests that the model is biased towards the majority classes, even though the overall accuracy is decent. Macro F1 score is **`r 100.0*round(macro_f1, 3)`%**, which means the model has a moderate balance of precision and recall on average per class. Macro F1 is much higher than macro recall, and this can happen if precision is high for the majority classes, but recall for the minority classes is low.
+On the train set, the model achieves an overall accuracy of about **`r 100.0*round(overall_accuracy, 3)`%**. On average, the model correctly identifies **`r 100.0*round(macro_recall, 3)`%** of instances for each transport mode, which means that the macro recall is **`r 100.0*round(macro_recall, 3)`%**. Macro recall is relatively low, which suggests that the model is biased towards the majority classes, even though the overall accuracy is good. The **macro F1 score** is the unweighted mean of the per-class F1 scores, where the F1 score of class $k$ is the harmonic mean of that class's precision and recall,
 
-In summary, the model performs okay overall but is biased towards the dominant classes. It often fails to detect less frequent transport modes, which is why macro recall is low. Accuracy alone would overestimate the model’s effectiveness across all classes. For comparison, you are encouraged to explore the performance of the fitted model on the balanced sets. 
-
-## Inference {#sec-inference}
-
-After we finish estimating the coefficients, we look at how uncertain they are and whether they differ from zero. We get a variance estimate for each coefficient from the observed information matrix (the negative of the Hessian at the solution). Taking square roots of those variances gives standard errors. 
-Similar as in [Classical Poisson regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), each coefficient divided by its standard error gives a (asymptotically normal) **Wald Z statistic** to test if the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio—how the odds of choosing a category change for a one‑unit increase in the regressor, holding other variables fixed.
-
-We can determine whether a regressor is statistically associated with the logarithm of the odds through hypothesis testing for the parameters $\beta^{(u,v)}_j$ by link function. Define the Wald statistic $z^{(u,v)}_j$ as:
 $$
-z_j^{(u, v)} = \frac{\hat{\beta}_j^{(u, v)}}{\mbox{se}\left(\hat{\beta}_j^{(u, v)}\right)}
-$$ {#eq-wald-statistic}
-and we will test the following hypotheses: 
+F_{1,k} = \frac{2 \cdot \text{precision}_k \cdot \text{recall}_k}{\text{precision}_k + \text{recall}_k},
+\qquad
+\text{macro } F_1 = \frac{1}{K} \sum_{k=1}^{K} F_{1,k},
+$$
+
+so that each transport mode contributes equally regardless of how many observations it contains, and a class scores well only when the model identifies most of its members and is not overly liberal in assigning that label. The macro F1 score is **`r 100.0*round(macro_f1, 3)`%**, indicating a moderate balance of precision and recall on average across the four transport modes. As each per-class F1 score lies between that class's precision and recall, the macro F1 score exceeds the macro recall precisely to the extent that precision exceeds recall within some individual classes, so comparing the two values indicates the model's difficulty with the less frequent transport modes, which are `Bicycle` and `Walking`. For example, all true `Bicycle` observations in the train set are misclassified, while classifications for all true `Public_Transit` and `Car` observations are split between `Public_Transit` and `Car` without ever assigning `Bicycle` or `Walking` labels to these observations.
+
+In summary, the model performs well overall but it is biased towards the majority classes. It often fails to detect less frequent transport modes, which is why macro recall is relatively low. Overall accuracy alone would overestimate the model’s effectiveness in prediction across all four categories of transport mode. 
+
+::: {.Tip}
+::::{.Tip-header}
+Upsampling as a Remedy for Class Imbalance
+::::
+::::{.Tip-container}
+One common response to the behaviour described above is to rebalance the training set before fitting. **Upsampling** draws minority category observations with replacement until every category is represented equally, which can be done with `upSample()` from the `caret` package in `R` or with the resampling classes provided by the `imblearn` library in `Python`. The effect on the fitted model follows directly from the estimating equation for the intercepts. Since this equation forces the fitted probabilities of each category to average exactly its sample proportion in the data used for estimation, equalizing the category counts raises this average to $1/K$ for every category, assuming that there are $K$ categories in total. The minority categories therefore start from a far higher baseline fitted probability and are able to attain the maximum for a much wider range of regressor values, which typically increases their recall and allows categories that were never predicted at all to appear in the confusion matrix.
+
+Note that upsampling adds no new information because the replicated observations are copies of those already present in the dataset. More importantly, the fitted probabilities produced by a model estimated on a balanced training set can no longer estimate the conditional probabilities in the original population, so gains in recall for the minority categories are generally accompanied by losses in precision and by predicted probabilities that are no longer calibrated. Whether this trade-off is worthwhile depends on the cost of the two types of error in the application at hand.
+::::
+:::
+
+### Practical Model Adequacy
+
+Goodness of fit is not a competition to prove that a model is "*true*." As a reminder, every statistical model is a simplification of some data-generating process. At this stage, our practical question is:
+
+> **Is the Multinomial Logistic regression model with four regressors sufficiently stable, interpretable, and compatible with the training data to serve as a useful model for our inferential and predictive inquiries?**
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teaching-to-learn-wiki-3976301/).](img/board.png){width="500"}
+
+The diagnostics above address different parts of that question. Some assess whether the model can be estimated reliably, some examine agreement on the probability scale, and some examine agreement of categories with highest fitted probabilities in the regressor space. No single diagnostic should determine the conclusion by itself.
+
+@tbl-multinomial-logistic-practical-adequacy brings these pieces together.
+
+| **Diagnostic question** | **What we found in the training data** | **Implication for the model** |
+|:---:|:---:|:---:|
+| **Convergence and separation** | The MLE converged; the coefficient estimates and model-based standard errors are finite; the fitted probabilities remain strictly inside $(0,1)$; and there is no complete or quasi-complete separation. | There is no obvious evidence of complete or quasi-complete separation in this model. The fitted coefficients, standard errors, and fitted probability scores are therefore numerically interpretable. |
+| **Likelihood-based measures** | The likelihood-ratio statistic for the fitted model with four regressors is $G^2=$`r round(lr_stat, 4)` with $p<0.001$, and McFadden's $R^2$ is `r round(mcfadden_r2, 4)` | There is sufficient evidence that the model is correctly specified in comparison to the null model, and the four regressors together explain a substantial share of variance in `transport_mode` on the log-likelihood scale. |
+| **Classification-based measures** | The overall accuracy is `r 100.0*round(overall_accuracy, 3)`\%. The maco recall is `r 100.0*round(macro_recall, 3)`\%. The macro F1 score is `r 100.0*round(macro_f1, 3)`\%. | The overall accuracy and recall scores of the model are good, but it often fails to recall less frequent transport modes, such as `Bicycle` and `Walking`. As the global classification measures look good, we will use this model to predict on the held-out test set in @sec-results, and assess the predictive performance through these measures again. |
+
+Taken together, every diagnostic reported above is computed on the same observations used to obtain $\hat{\boldsymbol{\beta}}$, and in-sample measures are optimistic by construction, since the maximum likelihood estimates are chosen precisely to maximize compatibility with those observations. The goodness-of-fit checks therefore establish that the model is interpretable and compatible with the patterns observed in @sec-eda, but they do not guarantee that the model will perform comparably on data that it has not encountered. Predictive performance is a separate question, and it is necessary to use the untouched test data, which did not play any role in parameter estimation, to do a final assessment of the predictive performance.
+
+Accordingly, we will proceed to @sec-results, where we will fit the same model specification with all four regressors on the test data and use this independent fit to estimate coefficients, standard errors, confidence intervals, and carry out hypothesis tests to answer our **inferential inquiry** regarding the factors associated with primary mode of transport in the population of commuters. For the **predictive inquiry**, we will retain the coefficients estimates from the training data and evaluate the predictions they produce for the held-out testing data.
+
+::: {.Warning}
+::::{.Warning-header}
+The Golden Rule of Machine Learning
+::::
+::::{.Warning-container}
+The "golden rule" of predictive modelling is that the test set must play no role in estimation or model selection, so that the measures computed on it remain unbiased estimates of predictive performance on unseen data. The procedure described above uses the test set in two distinct roles: the estimation sample for the final inferential fit, and as the held-out sample for the predictive evaluation. It is worth being precise about what this does and does not compromise.
+
+The predictive measures themselves remain numerically untainted because the coefficients used to generate the test-set predictions are those estimated on the training data alone, and the separate inferential fit does not alter them. Once the test set estimates, standard errors, and hypothesis tests have been examined, any subsequent revision to the model specification would be informed by the test data, and the reported predictive measures would no longer be honest estimates of the out-of-sample classification performance. We therefore fix the specification before either fit is carried out, report both sets of results as they stand, and do not return to modify the model in light of what the test set reveals.
+::::
+:::
+
+## Results {#sec-results}
+
+### Wald Tests
+
+After we finish estimating the regression coefficients, we look at how uncertain they are and whether each coefficient differs significantly from zero or not. We get a variance estimate for each coefficient from the observed information matrix by taking the negative of the Hessian at the solution. Taking square roots of these variances gives standard errors.
+
+As in [Classical Poisson regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), each coefficient divided by its standard error gives an (asymptotically normal) **Wald Z statistic** to test if the true effect is zero. Using the same standard errors we build confidence intervals: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio, that is, how the odds of choosing a category change for a one-unit increase in the regressor, holding other variables fixed.
+
+We can determine whether a regressor is statistically associated with the logarithm of the odds through hypothesis testing for the parameters $\beta_j^{(u,v)}$ by link function. For the coefficient $\beta_j^{(u,v)}$, the coefficient-level two-sided Wald test is
+
 $$
 \begin{gather*}
-H_0: \beta_j^{(u, v)} = 0\\
-H_a: \beta_j^{(u, v)} \neq 0.
+H_0: \beta_j^{(u, v)} = 0, \\
+\text{versus} \\
+H_1: \beta_j^{(u, v)} \neq 0.
 \end{gather*}
 $$
-Provided that the sample size $n$ is large enough, $z_j$ has an approximately Standard Normal distribution under $H_0$.
 
-The corresponding $p$-values for each $\beta^{(u,v)}_j$ can be computed. The smaller the $p$-value, the stronger is the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level  (usually taken to be $\alpha=0.05$) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, $p$-values that are small enough indicate that the data provides evidence in favour of association (or causation in the case of an experimental study!) between the response variable and the $j$th regressor.
+The corresponding Wald statistic is
 
-Given a specified level of confidence where $\alpha$ is the significance level, we can construct approximate $(1-\alpha)\times 100\%$ confidence intervals for the corresponding true value of $\beta^{(u,v)}_j$:
 $$
-\begin{equation*}
-\hat{\beta}_j^{(u, v)} \pm z_{\alpha/2}\mbox{se} \left( \hat{\beta}_j^{(u, v)} \right),
-\end{equation*}
+z_j^{(u, v)} = \frac{\hat{\beta}_j^{(u, v)}}{\mbox{se}\left(\hat{\beta}_j^{(u, v)}\right)},
+$$ {#eq-wald-statistic}
+
+which, provided that the sample size $n$ is large enough, has an approximately Standard Normal distribution under $H_0$.
+
+The corresponding $p$-values for each $\beta_j^{(u,v)}$ can be computed. The smaller the $p$-value, the stronger is the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level (usually taken to be $\alpha = 0.05$) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, $p$-values that are small enough indicate that the data provides evidence in favour of association (or causation in the case of an experimental study!) between the response variable and the $j$th regressor.
+
+Given a specified level of confidence where $\alpha$ is the significance level, we can construct approximate $(1-\alpha) \times 100\%$ confidence intervals for the corresponding true value of $\beta_j^{(u,v)}$:
+
+$$
+\hat{\beta}_j^{(u, v)} \pm z_{\alpha/2} \, \mbox{se}\left( \hat{\beta}_j^{(u, v)} \right),
 $$ {#eq-ci}
+
 where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution.
 
-### Fitting the Model
+### Inferential Results
 
-Now we will fit the model on the test set using the `nnet` package in `R` or the `statsmodel` package in `Python`. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients at the $5\%$ significance level.
+Now we will refit the Multinomial Logistic regression model on the test set using the `nnet` package in `R` and the `statsmodel` package in `Python`. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients at the $5\%$ significance level.
 
 ::: {.panel-tabset}
 
@@ -2750,8 +2810,6 @@ Although the per-kilometre effect appears modest, it compounds over larger diffe
 
 The remaining rows of the significant coefficients table in the `R` output are artifacts of the quasi-complete separation discussed above and are therefore not interpreted.
 
-## Results
-
 The fitted model can be written as
 $$
 \log \left( \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}} + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}} + \hat{\beta}_{3}^{(k,\text{Car})}Z_{i,\texttt{car}} + \hat{\beta}_{4}^{(k,\text{Car})} Z_{i,\texttt{weekend}},
@@ -2799,7 +2857,7 @@ for (k in c(class_bike, class_pt, class_walk)) {
 
 The `` `r class_bike` `` and `` `r class_pt` `` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `` `r class_pt` `` equation are significant at the $5\%$ level. As discussed in @sec-inference, the `` `r class_walk` `` equation and the `weekend_commuterYes` term in the `` `r class_bike` `` equation suffer from quasi-complete separation; the resulting extreme coefficient magnitudes paired with astronomical standard errors drive the associated $z$-statistics toward zero and the $p$-values toward one, which is a symptom of a maximum likelihood estimate that does not exist rather than genuine null effects.
 
-### Prediction 
+### Prediction Results
 
 Now we will fit the Multinomial Logistic regression model on the train set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
 
@@ -3011,7 +3069,7 @@ predicted_labels = np.unique(y_pred_test)
 f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1-score: {f1:.3f}")
+print(f"Macro F1: {f1:.3f}")
 ```
 
 :::
@@ -3047,14 +3105,14 @@ predicted_labels = np.unique(y_pred_test)
 f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1-score: {f1:.3f}")
+print(f"Macro F1: {f1:.3f}")
 ```
 
 :::
 
 On the test set, the model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. 
 
-The `Car` and `Public Transit` classes are predicted most reliably with recalls of $76.1\%$ and $73.1\%$ respectively. On the other hand, the `Bicycle` observations in the test set are all misclassified as `Car`. For the give `Walking` observations in the test set, three are misclassified as `Car` and two of them are classified, which means that `Walking` has a recall of $40.0\%$.
+The `Car` and `Public Transit` classes are predicted most reliably with recalls of $76.1\%$ and $73.1\%$ respectively. On the other hand, the `Bicycle` observations in the test set are all misclassified as `Car`. For the give `Walking` observations in the test set, three are misclassified as `Car` and two of them are correctly classified, which means that `Walking` has a recall of $40.0\%$.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -3070,7 +3128,6 @@ $$
 where $n_j$ is the number of observations in category $j$ in the train set. Consequently, the fitted probabilities of each category average exactly its sample proportion in the train set, which is approximately $3.9\%$ for `Bicycle` and approximately $2.1\%$ for `Walking`. Since the classification rule assigns each observation to the category with the highest fitted probability, a minority category is predicted only when the regressors raise its fitted probability well above its small sample proportion, and the estimated slope coefficients do not produce a shift of that magnitude for any regressor values observed in the test set. `Bicycle` never attains the maximum fitted probability for the regressor values observed in the test set, due to which `Bicycle` is never predicted in the confusion matrix above.
 ::::
 :::
-
 
 ## Storytelling
 
