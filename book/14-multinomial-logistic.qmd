@@ -202,7 +202,7 @@ The following are the assumptions that we need to be aware of before fitting thi
 
 - The response or dependent variable should be **categorical** and **nominal** with more than two categories. 
 - There should be one or more independent variables that are continuous, ordinal or nominal (including dichotomous variables).
-- **Logit linearity assumption**: There is be a linear relationship between any continuous independent variables and the logit of the category-specific probabilities of the dependent variable. This assumption will be explained in @sec-data-modelling.
+- **Logit linearity assumption**: There is be a linear relationship between any continuous independent variables and the logit of the category-specific probabilities of the dependent variable. This assumption will be explained in detail in @sec-data-modelling.
 - **Independent observations**: The observations are independent, and the dependent variable consists of mutually exclusive and exhaustive categories (i.e. no individual belonging to two different categories).
 - **No Multicollinearity**: Multicollinearity occurs when you have two or more independent variables that are highly correlated with each other.
 - There should be no outliers, high leverage values or highly influential points.
@@ -247,7 +247,7 @@ In all these examples, the categories are mutually exclusive and
 exhaustive but carry no natural ordering. Imposing an order, as [Ordinal Logistic regression](https://alexrod61.github.io/regression-cookbook/book/15-ordinal-logistic.html) does, would assume a progression between categories
 that does not exist, whereas fitting a separate [Binary Logistic regression model](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html) for each
 pair of categories would discard information and could yield predicted
-probabilities that do not sum to one. Multinomial logistic regression
+probabilities that do not sum to one. Multinomial Logistic regression
 provides a principled framework that models all categories jointly
 against a common reference level.
 
@@ -344,12 +344,12 @@ Now that we’ve introduced our case study and dataset, it is time to follow the
 
 We will explore two primary questions based on this dataset.
 
-- How are an individual's age, commute distance, availability of car, and whether they commute on weekends or not, **associated** with their mode of transport?
+- How are an individual's age, commute distance, car availability, and whether they commute on weekends or not, **associated** with their mode of transport?
 - Can we accurately **predict** the transport mode of an individual based on their commuting behaviors and demographics including if they have a car, if they commute on weekends, their commute distance, and age?
 
 These questions correspond to two distinct **statistical objectives**:
 
-- **Inference:** Understand the relationship between regressors (`age`, `commute_distance`, `has_car_available` and `weekend_commuter`) and the probability of each category of the response variable `transport_mode`.
+- **Inference:** Understand the relationship between regressors (i.e. `age`, `commute_distance`, `has_car_available` and `weekend_commuter`) and the probability of each category of the response variable `transport_mode`.
 - **Prediction:** Develop a classification model that classifies individuals into their most probable mode of transport: `Bicycle`, `Car`, `Public Transit`, or `Walking` based on factors like age, commute distance, availability of a car, and whether the person commutes on weekends or not. 
 
 ## Data Collection and Wrangling
@@ -1337,9 +1337,11 @@ A commuter equally likely to choose mode $j$ or the baseline has log-odds of
 zero. Modes less likely than the baseline correspond to negative log-odds, while
 modes more likely than the baseline correspond to positive log-odds.
 
-::: {.callout-tip}
-## The Baseline Category is Arbitrary
-
+::: {.Tip}
+:::: {.Tip-header}
+The Baseline Category is Arbitrary
+::::
+:::: {.Tip-container}
 Although every equation is written against the same reference category, the model can be used to compare between any two non-reference categories. Subtracting one equation from another cancels the common denominator $p_{i,0}$, e.g. for categories $1$ and $2$,
 
 $$
@@ -1363,6 +1365,7 @@ $$
 $$
 
 The choice of baseline is therefore arbitrary and the model does not inherently incorporate any rank of the response categories.
+::::
 :::
 
 With some algebraic manipulation, the system can be solved for the
@@ -1927,7 +1930,7 @@ In Multinomial Logistic regression, we model the probability of each outcome cat
 
 As a reminder, we just completed the estimation step of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow). For the **inferential inquiry**, we should not use the same dataset both to explore the model structure and to produce the final inferential claims. Recall that the train set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later in @sec-regressors after the model building workflow has been completed.
 
-## Checking Goodness of Fit and Model Stability
+## Checking Goodness of Fit and Model Stability {#sec-goodness-of-fit}
 
 Now let's assess how well the fitted Multinomial Logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
 
@@ -2462,7 +2465,7 @@ $$
 
 so that each transport mode contributes equally regardless of how many observations it contains, and a class scores well only when the model identifies most of its members and is not overly liberal in assigning that label. The macro F1 score is **`r 100.0*round(macro_f1, 3)`%**, indicating a moderate balance of precision and recall on average across the four transport modes. As each per-class F1 score lies between that class's precision and recall, the macro F1 score exceeds the macro recall precisely to the extent that precision exceeds recall within some individual classes, so comparing the two values indicates the model's difficulty with the less frequent transport modes, which are `Bicycle` and `Walking`. For example, all true `Bicycle` observations in the train set are misclassified, while classifications for all true `Public_Transit` and `Car` observations are split between `Public_Transit` and `Car` without ever assigning `Bicycle` or `Walking` labels to these observations.
 
-In summary, the model performs well overall but it is biased towards the majority classes. It often fails to detect less frequent transport modes, which is why macro recall is relatively low. Overall accuracy alone would overestimate the model’s effectiveness in prediction across all four categories of transport mode. 
+In summary, the model performs well overall but it is biased towards the majority classes. It often fails to classify less frequent transport modes, which is why macro recall is relatively low. Overall accuracy alone would overestimate the model’s effectiveness in prediction across all four categories of transport mode. 
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -3303,7 +3306,7 @@ print(f"Macro F1: {f1_test:.3f}")
 
 :::
 
-Because the coefficient estimates used to produce these predictions come entirely from the training data, the measures computed on the held-out test set estimate the model's **out-of-sample** predictive performance, whereas the corresponding measures computed on the training data are in-sample and optimistic by construction. @tbl-train-test-metrics places the two sets of measures side by side.
+As the coefficient estimates used to produce these predictions come entirely from the training data, the measures computed on the held-out test set estimate the model's **out-of-sample** predictive performance, whereas the corresponding measures computed on the training data are in-sample measures. @tbl-train-test-metrics places the two sets of measures side by side.
 
 | **Measure** | **Training set** | **Testing set** |
 |:---|:---:|:---:|
@@ -3330,9 +3333,23 @@ where $n_j$ is the number of observations in category $j$ in the train set. Cons
 ::::
 :::
 
+
+::: {.Tip}
+::::{.Tip-header}
+Tip on Upsampling
+::::
+::::{.Tip-container}
+One common response to the behaviour described above is to rebalance the training set before fitting. **Upsampling** draws minority category observations with replacement until every category is represented equally, which can be done with `upSample()` from the `caret` package in `R` or with the resampling classes provided by the `imblearn` library in `Python`. The effect on the fitted model follows directly from the estimating equation for the intercepts. Since this equation forces the fitted probabilities of each category to average exactly its sample proportion in the data used for estimation, equalizing the category counts raises this average to $1/K$ for every category, assuming that there are $K$ categories in total. The minority categories therefore start from a far higher baseline fitted probability and are able to attain the maximum for a much wider range of regressor values, which typically increases their recall and allows categories that were never predicted at all to appear in the confusion matrix.
+
+Note that upsampling adds no new information because the replicated observations are copies of those already present in the dataset. More importantly, the fitted probabilities produced by a model estimated on a balanced training set can no longer estimate the conditional probabilities in the original population, so gains in recall for the minority categories are generally accompanied by losses in precision and by predicted probabilities that are no longer calibrated. Whether this trade-off is worthwhile depends on the cost of the two types of error in the application at hand.
+::::
+:::
+
 ## Storytelling
 
 The **storytelling stage** is where we translate the technical results of the Multinomial Logistic regression workflow into a message that is useful for an applied audience. Up to this point, we have defined the study design, wrangled the transport data, explored the response and regressors, fitted a Multinomial Logistic regression model, checked goodness of fit, and organized the inferential and predictive results.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-thread-needle-diy-sew-6230155/).](img/thread.png){width="350"}
 
 To complete the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. A useful analysis must explain **what the results mean for the people who asked the original question**, which features of the evidence are the strongest, where the remaining uncertainty lies, and how the model should—and should not—be used.
 
@@ -3340,21 +3357,32 @@ For this case study on understanding commuting behaviours, the Multinomial Logis
 
 ### Key Insights From the Model
 
-Car availability and commute distance are the two significant regressors in our model. Having access to a car is associated with lower odds of using public transit instead of driving; the corresponding effect for cycling or walking is not statistically significant, so car access alone does not appear to explain the choice to bike or walk in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. This matches the intuition that the car and public transit become the practical options once a commute gets long, while cycling remains attractive mainly over short distances.
+From the inferential point of view, our motivating question was:
 
-Age and weekend commuting status tell a more conditional story. On the original, imbalanced training data, neither regressor reaches statistical significance for most categories, largely because the sample contains too few cyclists and walkers to estimate their effects precisely. Once the minority classes are upsampled, both regressors become significant predictors of `Walking`, and age additionally becomes significant for `Bicycle`: older individuals and weekend commuters are more likely to walk than drive, once the class imbalance no longer masks the effect. This is a useful reminder that failing to reject $H_0$ is not the same as confirming $H_0$ because a lack of significance can potentially reflect insufficient data rather than a genuinely null effect for rare categories.
+> **How are an individual’s age, commute distance, car availability, and whether they commute on weekends or not, associated with their mode of transport?**
 
-Some estimates need a caveat rather than a substantive interpretation. The test set contains only one `Walking` observation and five `Bicycle` observations, none of the latter being weekend commuters, so the test set model suffers from complete separation. In R, the `weekend_commuter` effect for `Bicycle` and several `Walking` coefficients are flagged as significant with implausibly large or near-zero odds ratios, standard errors of essentially zero, and extreme test statistics. In Python, `statsmodels` assigns the same terms enormous standard errors and $p$-values near 1, and reports that the fit did not fully converge. None of this is evidence about the true effects; the terms are simply not identifiable from the available data. Analysts should flag this kind of estimate rather than interpret it, and should be cautious of near-zero or implausibly large odds ratios whenever a category is small.
-
-As a predictive tool, the model favours the categories it has seen the most of. The confusion matrices for both the training and test sets show noticeably stronger performance for `Car` and `Public Transit`, the two dominant categories, than for `Bicycle` and `Walking`. Upsampling helps the model learn the minority classes better during estimation, but it cannot manufacture additional information at prediction time, so macro-averaged recall and F1 remain modest even after balancing. The model is best used as a tool for understanding how commute distance, car availability, age, and weekend habits relate to transport mode choice, rather than as a precise classifier for the least common commuting behaviours.
+According to the likelihood-based measures in @sec-goodness-of-fit, the Multinomial Logistic regression model with four regressors is a good fit for our simulated dataset. Based on the results in @tbl-significant-regressors, car availability and commute distance are the two significant regressors in our model. Having access to a car is associated with lower odds of using public transit instead of driving; however, the corresponding effect for cycling or walking is not statistically significant, so car access alone does not appear to explain the choice to bike or walk in this dataset. Commute distance moves the odds of public transit and cycling in opposite directions relative to driving, such that each additional kilometre increases the odds of choosing public transit over the car, while decreasing the odds of cycling over the car. Similarly commute distance moves the odds of public transit and walking in opposite directions relative to driving. This matches the intuition that the car and public transit become the practical options once a commute gets very long, while walking and cycling remain attractive mainly over short commute distances.
 
 ::: {.Tip}
 ::::{.Tip-header}
 Using the Results Responsibly
 ::::
 ::::{.Tip-container}
-It is important to remember that this analysis is associational, not causal. The model does not prove that changing someone's commute distance or car access would, on its own, change how they travel; it shows that, in this dataset, these regressors are consistently linked to the mode people choose once other measured factors are accounted for.
+It is important to remember that this analysis is associational, and not causal. The model does not prove that changing someone's commute distance or car access would, on its own, change how they travel; it shows that, in this dataset, these regressors are consistently associated to the travel mode people choose once other measured factors are accounted for.
 
-Nevertheless, the results provide a useful evidence-based starting point for discussion. They help identify which regressors are most closely linked to transport mode choice, and which associations, such as age and weekend commuting for the rarer categories, may only become visible with more balanced or more abundant data. For transportation planners, this kind of insight can help prioritize where infrastructure investment, such as bike lanes or improved transit access, is likely to shift commuting patterns the most.
+Nevertheless, the results provide a useful evidence-based starting point for discussion. They help identify which regressors are most closely linked to transport mode choice, and which associations might only become visible with more balanced or more abundant data. For transportation planners, this kind of insight can help prioritize where infrastructure investment, such as bike lanes or improved transit access, is likely to shift commuting patterns the most.
 ::::
 :::
+
+On the other hand, age and weekend commuting status **are not significantly associated** at $\alpha=0.05$ with any primary mode of transport in the dataset. Note that we are not stating that we have proved that age and weekend commuting status are unrelated to the primary mode of transport; instead, our model does not provide sufficient evidence to conclude that age and weekend status have individual effects on the odds of choosing primary mode of transport. This is a useful reminder that failing to reject a null hypothesis is not equivalent to proving a null hypothesis because a lack of significance can potentially reflect insufficient data rather than a genuinely null effect in the population.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-lecture-lecturer-3976299/).](img/meeting.png){width="400"}
+
+From the predictive point of view, our motivating question was:
+
+> **Can we accurately predict the transport mode of an individual based on their commuting behaviors and demographics including if they have a car, if they commute on weekends, their commute distance, and age?**
+
+For the predictive branch of the data science workflow, we used the Multinomial Logistic regression model fitted on the **training data** to generate predictions for the **testing observations.** We then compared those predictions to the observed transport modes in the testing data.
+
+The classification-based metrics in @tbl-train-test-metrics show that the overall predictive performance of our model is good without any obvious evidence of underfitting or overfitting. The macro-level scores on the unseen testing data are similar to the macro-level scores on the training data, which was used for parameter estimation and goodness-of-fit checks. As a classification tool, the model favours the majority transport mode categories in the dataset. The confusion matrices for both the train and test sets show noticeably stronger predictive performance for `Car` and `Public Transit`, the two dominant categories, than for `Bicycle` and `Walking`. For example, whenever a true `Car` observation was misclassified, it was labelled as `Public Transit`, and whenever a true `Public Transit` observation was misclassified, it was labelled as `Car`. On the other side, `Bicycle` was not predicted at all in both train and test sets. As a point prediction retains only the category with the largest fitted probability, it discards the rest of the fitted distribution, and under the class imbalance described above, a category such as `Bicycle` may carry a non-negligible fitted probability for a given observation without ever attaining the maximum for any observation. The predicted probabilities should therefore be examined alongside the predicted categories, since they convey how confident the model is in a given classification, and whether a minority transport mode remains plausible for a particular commuter, even if it is not labelled as the category with the highest fitted probability. 
+This concludes both the **inferential** and the **predictive** branches of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow) for this case study!
