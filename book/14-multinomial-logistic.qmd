@@ -2234,9 +2234,11 @@ Likelihood-based measures are functions of the maximized log-likelihood, which a
 
 This shift from probabilities to discrete labels changes what we are able to diagnose. An **overall accuracy** score rate tells us how frequently the model is wrong, but not where it goes wrong, and in a multi-category setting, these are separate questions. Two Multinomial Logistic regression models with identical accuracy scores may misclassify categories in different ways. Separating the errors by the category predicted and the category observed is what makes this distinction visible, and the table that performs that separation is the **confusion matrix**.
 
-::: {.callout-note}
-## Confusion matrix
-
+::: {.Tip}
+:::: {.Tip-header}
+Tip on Confusion Matrix
+::::
+:::: {.Tip-container}
 For a response with $K$ categories, the **confusion matrix** is a $K \times K$ table that cross-tabulates the predicted category against the observed category. Writing $\hat{y}_i$ for the point prediction of observation $i$ and $y_i$ for its observed category, the entry in row $j$ and column $k$ is
 
 $$
@@ -2246,6 +2248,7 @@ $$
 which is the number of observations predicted as category $j$ whose true category is $k$. The diagonal entries $n_{k,k}$ count correct classifications, and every off-diagonal entry records a specific type of misclassification. This makes the table more informative than a single accuracy score because it not only shows how often the model is wrong, but also which categories it confuses with which.
 
 Note that the row and column convention is not universal. The `caret` implementation in R places predictions in the rows and observed values in the columns, as above, whereas `scikit-learn` in Python uses the opposite arrangement. Before interpreting the off-diagonal entries in a confusion matrix, one should confirm its orientation.
+::::
 :::
 
 Let's visualize the confusion matrix of our fitted model on train set by using `confusionMatrix` from `caret` in `R`, and `confusion_matrix` from `scikit-learn` in `Python`.
@@ -2256,7 +2259,7 @@ Let's visualize the confusion matrix of our fitted model on train set by using `
 
 ```{.r}
 y_pred <- predict(multinom_fit, newdata = train_set)
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+mode_levels <- c("Car", "Public_Transit", "Bicycle", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(train_set$transport_mode, levels = mode_levels))
 
@@ -2288,9 +2291,13 @@ cm_df |>
 y_pred = multinom_fit.predict(X_numeric).idxmax(axis=1)
 
 # Confusion matrix
-cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
+# Display order for the confusion matrix axes
+cm_order = ["Car", "Public_Transit", "Bicycle", "Walking"]
+order_codes = [list(y.cat.categories).index(c) for c in cm_order]
+
+cm = confusion_matrix(y.cat.codes, y_pred, labels=order_codes)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y.cat.categories)
+                              display_labels=cm_order)
 disp.plot(cmap="Blues")
 disp.ax_.set_title("Confusion Matrix (Train Set)")
 fig = disp.figure_
@@ -2311,7 +2318,7 @@ fig
 #| message: false
 #| warning: false
 y_pred <- predict(multinom_fit, newdata = train_set)
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+mode_levels <- c("Car", "Public_Transit", "Bicycle", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(train_set$transport_mode, levels = mode_levels))
 
@@ -2347,9 +2354,13 @@ cm_df |>
 y_pred = multinom_fit.predict(X_numeric).idxmax(axis=1)
 
 # Compute confusion matrix
-cm = confusion_matrix(y.cat.codes, y_pred, labels=range(len(y.cat.categories)))
+# Display order for the confusion matrix axes
+cm_order = ["Car", "Public_Transit", "Bicycle", "Walking"]
+order_codes = [list(y.cat.categories).index(c) for c in cm_order]
+
+cm = confusion_matrix(y.cat.codes, y_pred, labels=order_codes)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y.cat.categories)
+                              display_labels=cm_order)
 disp.plot(cmap="Blues")
 disp.ax_.set_title("Confusion Matrix (Train Set)")
 fig = disp.figure_
@@ -2464,7 +2475,7 @@ Note that upsampling adds no new information because the replicated observations
 ::::
 :::
 
-### Practical Model Adequacy
+### Practical Model Adequacy {#sec-practical-adequacy}
 
 Goodness of fit is not a competition to prove that a model is "*true*." As a reminder, every statistical model is a simplification of some data-generating process. At this stage, our practical question is:
 
@@ -2480,63 +2491,118 @@ The diagnostics above address different parts of that question. Some assess whet
 |:---:|:---:|:---:|
 | **Convergence and separation** | The MLE converged; the coefficient estimates and model-based standard errors are finite; the fitted probabilities remain strictly inside $(0,1)$; and there is no complete or quasi-complete separation. | There is no obvious evidence of complete or quasi-complete separation in this model. The fitted coefficients, standard errors, and fitted probability scores are therefore numerically interpretable. |
 | **Likelihood-based measures** | The likelihood-ratio statistic for the fitted model with four regressors is $G^2=$`r round(lr_stat, 4)` with $p<0.001$, and McFadden's $R^2$ is `r round(mcfadden_r2, 4)` | There is sufficient evidence that the model is correctly specified in comparison to the null model, and the four regressors together explain a substantial share of variance in `transport_mode` on the log-likelihood scale. |
-| **Classification-based measures** | The overall accuracy is `r 100.0*round(overall_accuracy, 3)`\%. The maco recall is `r 100.0*round(macro_recall, 3)`\%. The macro F1 score is `r 100.0*round(macro_f1, 3)`\%. | The overall accuracy and recall scores of the model are good, but it often fails to recall less frequent transport modes, such as `Bicycle` and `Walking`. As the global classification measures look good, we will use this model to predict on the held-out test set in @sec-results, and assess the predictive performance through these measures again. |
+| **Classification-based measures** | The overall accuracy is `r 100.0*round(overall_accuracy, 3)`\%. The maco recall is `r 100.0*round(macro_recall, 3)`\%. The macro F1 score is `r 100.0*round(macro_f1, 3)`\%. | The overall accuracy and recall scores of the model are good, but it often fails to recall less frequent categories, such as `Bicycle` and `Walking`. As the global classification measures look good, we will use this model to predict on the held-out test set in @sec-results, and assess the predictive performance through these measures again. |
 
-Taken together, every diagnostic reported above is computed on the same observations used to obtain $\hat{\boldsymbol{\beta}}$, and in-sample measures are optimistic by construction, since the maximum likelihood estimates are chosen precisely to maximize compatibility with those observations. The goodness-of-fit checks therefore establish that the model is interpretable and compatible with the patterns observed in @sec-eda, but they do not guarantee that the model will perform comparably on data that it has not encountered. Predictive performance is a separate question, and it is necessary to use the untouched test data, which did not play any role in parameter estimation, to do a final assessment of the predictive performance.
+Taken together, every diagnostic reported above is computed on the same observations used to obtain $\hat{\boldsymbol{\beta}}$, and in-sample measures are optimistic by construction, since the maximum likelihood estimates are chosen precisely to maximize compatibility with those observations. The goodness-of-fit checks therefore establish that the model is interpretable and compatible with the patterns observed in @sec-eda, but they do not guarantee that the model will perform comparably on data that it has not yet encountered. Predictive performance is a separate question, and it is necessary to use the untouched test data, which did not play any role in parameter estimation, to do a final assessment of the predictive performance.
 
-Accordingly, we will proceed to @sec-results, where we will fit the same model specification with all four regressors on the test data and use this independent fit to estimate coefficients, standard errors, confidence intervals, and carry out hypothesis tests to answer our **inferential inquiry** regarding the factors associated with primary mode of transport in the population of commuters. For the **predictive inquiry**, we will retain the coefficients estimates from the training data and evaluate the predictions they produce for the held-out testing data.
+Accordingly, we will proceed to @sec-results, where we will fit the same model specification with all four regressors on the test data and use this independent fit to estimate coefficients, standard errors, confidence intervals, and carry out hypothesis tests to answer our **inferential inquiry** regarding the factors associated with primary mode of transport in the population of commuters. For the **predictive inquiry**, we will retain the coefficients estimates from the training data and evaluate the predictions that they produce for the held-out testing data.
 
 ::: {.Heads-up}
 :::: {.Heads-up-header}
 Heads-up on the Golden Rule of Machine Learning
 ::::
 ::::{.Heads-up-container}
-The "golden rule" of predictive modelling is that the test set must play no role in estimation or model selection, so that the measures computed on it remain unbiased estimates of predictive performance on unseen data. The procedure described above uses the test set in two distinct roles: 
+The "golden rule" of predictive modelling is that the **test set** must play no role in estimation or model selection, so that the measures computed on it remain unbiased estimates of predictive performance on unseen data. The procedure described above uses the test set in two distinct roles: 
 
-- the estimation sample for the final inferential fit,
-- the held-out sample for the predictive evaluation.
+- the estimation sample for the final **inferential fit**,
+- the held-out sample for the **predictive evaluation**.
 
 The predictive measures themselves remain numerically untainted because the coefficients used to generate the test-set predictions are those estimated on the training data alone, and the separate inferential fit does not alter them. Once the test set estimates, standard errors, and hypothesis tests have been examined, any subsequent revision to the model specification would be informed by the test data, and the reported predictive measures would no longer be honest estimates of the out-of-sample classification performance. We therefore fix the specification before either fit is carried out, report both sets of results as they stand, and do not return to modify the model in light of what the test set reveals.
 ::::
 :::
 
-## Results {#sec-results}
+## Results and Statistical Interpretation {#sec-results}
 
 ### Wald Tests
 
 After we finish estimating the regression coefficients, we look at how uncertain they are and whether each coefficient differs significantly from zero or not. We get a variance estimate for each coefficient from the observed information matrix by taking the negative of the Hessian at the solution. Taking square roots of these variances gives standard errors.
 
-As in [Classical Poisson regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html), each coefficient divided by its standard error gives an asymptotically normal **Wald Z statistic** to test if the true effect is zero. Using the same standard errors, we build **confidence intervals**: estimate $\pm$ (critical value $\times$ standard error). To make results easier to interpret, we often exponentiate a coefficient (or its confidence limits) to get an odds ratio, that is, how the odds of choosing a category change for a one-unit increase in the regressor, holding other variables fixed.
-
-We can determine whether a regressor is statistically associated with the logarithm of the odds through hypothesis testing for the parameters $\beta_j^{(u,v)}$ by link function. For the coefficient $\beta_j^{(u,v)}$, the coefficient-level two-sided Wald test is
+We can determine whether a regressor is statistically associated with the logarithm of the odds relative to the reference category through hypothesis testing for the coefficients $\beta_{k,j}$, where $k$ denotes the corresponding regressor and $j$ denotes a non-baseline category compared against the baseline `Car`. For a coefficient $\beta_{k,j}$, a common two-sided Wald test is
 
 $$
 \begin{gather*}
-H_0: \beta_j^{(u, v)} = 0, \\
+H_0: \beta_{k,j} = 0, \\
 \text{versus} \\
-H_1: \beta_j^{(u, v)} \neq 0.
+H_1: \beta_{k,j} \neq 0.
 \end{gather*}
 $$
 
 The corresponding Wald statistic is
 
 $$
-z_j^{(u, v)} = \frac{\hat{\beta}_j^{(u, v)}}{\mbox{se}\left(\hat{\beta}_j^{(u, v)}\right)},
+z_{k,j} = \frac{\hat{\beta}_{k,j}-0}{\mbox{se}\left(\hat{\beta}_{k,j}\right)},
 $$ {#eq-wald-statistic}
 
 which, provided that the sample size $n$ is large enough, has an approximately Standard Normal distribution under $H_0$.
 
-The corresponding $p$-values for each $\beta_j^{(u,v)}$ can be computed. The smaller the $p$-value, the stronger is the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level (usually taken to be $\alpha = 0.05$) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, $p$-values that are small enough indicate that the data provides evidence in favour of association (or causation in the case of an experimental study!) between the response variable and the $j$th regressor.
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up on Wald tests and the exponentiated scale!
+::::
+:::: {.Heads-up-container}
+The Wald test is computed on the **logit scale**, where each coefficient is $\beta_{k,j}\in\mathbb{R}$. However, we often interpret the coefficient on the odds scale using $\exp(\beta_{k,j})$.
 
-Given a specified level of confidence where $\alpha$ is the significance level, we can construct approximate $(1-\alpha) \times 100\%$ confidence intervals for the corresponding true value of $\beta_j^{(u,v)}$:
+These are the same hypothesis written on two scales:
 
 $$
-\hat{\beta}_j^{(u, v)} \pm z_{\alpha/2} \, \mbox{se}\left( \hat{\beta}_j^{(u, v)} \right),
+H_0\text{: } \beta_{k,j} = 0
+$$
+
+is equivalent to
+
+$$
+H_0\text{: } \exp(\beta_{k,j}) = 1.
+$$
+
+So, for a continuous regressor, the Wald test asks whether the **multiplicative change** in odds with respect to the reference category for a one-unit increase is different from $1$. For a binary categorical regressors, it asks whether the odds ratio between the comparison category and the reference category is different from $1$.
+::::
+:::
+
+
+The corresponding $p$-values for each $\beta_{k,j}$ can be computed. The smaller the $p$-value, the stronger is the evidence against the null hypothesis $H_0$. As in the previous regression models, we would set a predetermined significance level (usually taken to be $\alpha = 0.05$) to infer if the $p$-value is small enough. If the $p$-value is smaller than the predetermined level $\alpha$, then you could claim that there is evidence to reject the null hypothesis. Hence, a $p$-value that is small enough indicates that the data provides evidence in favour of association between category $j$ and the baseline category `Car`, and the $k$th regressor.
+
+Given a specified level of confidence where $\alpha$ is the significance level, we can construct approximate $(1-\alpha) \times 100\%$ confidence intervals for the corresponding true value of $\beta_{k,j}$:
+
+$$
+\hat{\beta}_{k,j} \pm z_{\frac{1-\alpha}{2}} \, \mbox{se}\left( \hat{\beta}_{k,j} \right),
 $$ {#eq-ci}
 
-where $z_{\alpha/2}$ is the upper $\alpha/2$ quantile of the Standard Normal distribution.
+where $z_{\frac{1-\alpha}{2}}$ is the $\left(\frac{1-\alpha}{2}\right)$ quantile of the Standard Normal distribution. For example, for a $95\%$ confidence interval, we use $z_{0.975}$ in this equation for computing the endpoints of the confidence interval.
 
-### Inferential Results
+Exponentiating the endpoints gives an approximate 95% confidence interval for $\exp(\beta_{k,j})$:
+
+$$
+\begin{gather*}
+\Big[
+\exp
+\left(
+\hat{\beta}_{k,j}
+-
+z_{0.975}
+\operatorname{SE}(\hat{\beta}_{k,j})
+\right), \\
+\qquad \qquad \exp
+\left(
+\hat{\beta}_{k,j}
++
+z_{0.975}
+\operatorname{SE}(\hat{\beta}_{k,j})
+\right)
+\Big].
+\end{gather*}
+$$
+
+For each coefficient, the decision rule is:
+
+$$
+\text{Reject } H_0
+\text{ if }
+p\text{-value} < 0.05.
+$$
+
+Otherwise, we fail to reject $H_0$. In this context, rejecting $H_0\text{: } \beta_j=0$ means that the testing-set refit provides statistical evidence that the corresponding odds ratio differs from $1$, under the Multinomial Logistic regression model and its model-based standard errors.
+
+### Inferential Results {#sec-inference}
 
 Now we will refit the Multinomial Logistic regression model on the test set using the `nnet` package in `R` and the `statsmodel` package in `Python`. We will also compute the corresponding 95\% confidence intervals below and filter the statistically significant coefficients at the $5\%$ significance level.
 
@@ -2735,7 +2801,8 @@ cat(
 
 :::
 
-On the test set, commute distance and the availability of cars are significant predictors of choosing public transit over driving at a significance threshold of $5\%$. 
+The **decision column** in @tbl-multinom-test-fit-python shows that, at $\alpha=0.05$ significance level, the effect of `commute_distance` on the odds of choosing `Public_Transit` versus `Car`, `Bicycle` versus `Car`, and `Walking` versus `Car` are statistically significant. This result is consistent with what we observed in the stacked bar charts in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py. Similarly, at $\alpha=0.05$, there is statistical evidence that the odds of choosing `Public_Transit` versus `Car` among those with access to car differ from the same odds among those who do not have access to car. This is also consistent with what was observed during the EDA in @fig-eda-transport-mode-distribution-R.
+
 
 ### Regressors Associated with Transport Mode {#sec-regressors}
 
@@ -2799,84 +2866,174 @@ fmt_ci <- function(class, term_name, digits = 3) {
 }
 ```
 
-The Multinomial Logistic regression model fitted on the test set yields the estimated coefficients above. Note that the estimates and confidence limits in the table of significant coefficients are exponentiated, so that each entry is an odds ratio relative to the baseline category `Car`. A positive value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to higher values of regressor $j$ being associated with a higher odds of category $k$ relative to `Car`, whereas a negative value of $\hat{\beta}_j^{(k,\texttt{Car})}$ corresponds to lower odds of category $k$ relative to `Car` for higher values of regressor $j$. The significant regression coefficients belong to the `` `r class_pt` `` equation, and we will interpret them below.
-
-**Commute distance:** Commute distance is a significant predictor of choosing public transit over the car ($\text{OR} = `r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)`$, $z = `r fmt_num(get_stat(class_pt, "commute_distance", "statistic", coef_log), 2)`$, $p `r fmt_p(get_stat(class_pt, "commute_distance", "p.value"))`$, 95% CI: $`r fmt_ci(class_pt, "commute_distance", 2)`$). It has the following interpretation.
-
-> *Holding age, car availability, and weekend commuting status constant, each additional kilometre of one-way commute distance is associated with `r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)` times higher odds of choosing public transit over car.*
-
-Although the per-kilometre effect appears modest, it compounds over larger differences in commute length. For example, a commute that is $10$ kilometres longer multiplies the odds of choosing public transit over the car by approximately $`r fmt_num(get_stat(class_pt, "commute_distance", "estimate"), 2)`^{10} \approx `r fmt_num(get_stat(class_pt, "commute_distance", "estimate")^10, 1)`$, assuming that age, car availability, and weekend commuting status are held constant.
-
-**Car availability:** Car availability is a significant predictor of choosing public transit over the car ($\text{OR} = `r fmt_num(get_stat(class_pt, "has_car_availableYes", "estimate"))`$, $z = `r fmt_num(get_stat(class_pt, "has_car_availableYes", "statistic", coef_log), 2)`$, $p `r fmt_p(get_stat(class_pt, "has_car_availableYes", "p.value"))`$, 95% CI: $`r fmt_ci(class_pt, "has_car_availableYes")`$). It has the following interpretation.
-
-> *Holding commute distance, age, and weekend commuting status constant, individuals with a car available have `r fmt_num(get_stat(class_pt, "has_car_availableYes", "estimate"))` times the odds of choosing public transit over the car, relative to individuals without a car available. In other words, car availability is associated with a reduction of approximately `r fmt_num(100 * (1 - get_stat(class_pt, "has_car_availableYes", "estimate")), 1)`% in the odds of choosing public transit over car.*
-
-The remaining rows of the significant coefficients table in the `R` output are artifacts of the quasi-complete separation discussed above and are therefore not interpreted.
+The Multinomial Logistic regression model refitted on the test set provides the **final inferential summary** for this case study. Note that the inferential results should be stated **cautiously**. The model gives a coherent way to describe how the odds of each transport mode relative to `Car` change with commuter characteristics. 
 
 The fitted model can be written as
-$$
-\log \left( \frac{\Pr(Y_i = k)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0}^{(k,\text{Car})} + \hat{\beta}_{1}^{(k,\text{Car})} x_{i,\texttt{distance}} + \hat{\beta}_{2}^{(k,\text{Car})} x_{i,\texttt{age}} + \hat{\beta}_{3}^{(k,\text{Car})}Z_{i,\texttt{car}} + \hat{\beta}_{4}^{(k,\text{Car})} Z_{i,\texttt{weekend}},
-$$ {#eq-fitted-model}
-where $k$ is one of the non-baseline levels: `` `r class_bike` ``, `` `r class_pt` ``, or `` `r class_walk` ``, and the regressors are denoted as $x_{i,\texttt{distance}}, x_{i,\texttt{age}}, Z_{i,\texttt{car}},$ and $Z_{i,\texttt{weekend}}$.
 
-The estimated intercepts and slope coefficients of the Multinomial Logistic regression model fitted on the test set in @sec-inference are summarized in the three tables below. Every estimate is interpreted relative to the baseline category `Car`, and the $z$ statistics, $p$-values, odds ratios, and $95\%$ Wald confidence intervals are taken directly from the `R` output:
+$$
+\log \left( \frac{\Pr(Y_i = j)}{\Pr(Y_i = \text{Car})} \right) = \hat{\beta}_{0,j} + \hat{\beta}_{1,j} x_{i,\texttt{distance}} + \hat{\beta}_{2,j} x_{i,\texttt{age}} + \hat{\beta}_{3,j} x_{i,\texttt{car}} + \hat{\beta}_{4,j} x_{i,\texttt{weekend}},
+$$ {#eq-fitted-model}
+
+where $j$ is one of the non-baseline levels: `` `r class_bike` ``, `` `r class_pt` `` or `` `r class_walk` ``, and the regressors are denoted as $x_{i,\texttt{distance}}, x_{i,\texttt{age}}, x_{i,\texttt{car}},$ and $x_{i,\texttt{weekend}}$.
+
+Every effect below is reported on the **odds ratio** scale, obtained by exponentiating $\hat{\beta}_{k,j}$, so that each entry is multiplicative with respect to the baseline category `Car`. An odds ratio above $1$ corresponds to higher odds of category $j$ relative to `Car`, and an odds ratio below $1$ corresponds to lower odds. Only terms that are statistically significant at the $\alpha = 0.05$ level are reported. Intercepts are excluded, since they describe the baseline log-odds when every regressor is zero rather than an association between a regressor and transport mode.
 
 ```{r}
-#| label: multinom-coef-tables
+#| label: multinom-significant-regressors
 #| echo: false
 #| results: asis
 
-term_order <- c("(Intercept)", "commute_distance", "age",
-                "has_car_availableYes", "weekend_commuterYes")
-param_labels <- c("(intercept)", "`commute_distance`", "`age`",
-                  "`has_car_availableYes`", "`weekend_commuterYes`")
+alpha_level <- 0.05
 
-for (k in c(class_bike, class_pt, class_walk)) {
+# Display metadata for every non-intercept term. `unit` names the change being
+# described, `ref` supplies the comparison level for categorical terms, and
+# `type` records the measurement scale.
+term_meta <- list(
+  commute_distance = list(
+    label = "`commute_distance`",
+    bare  = "`commute_distance`",
+    type  = "Continuous",
+    unit  = "each additional kilometre of one-way commute distance",
+    ref   = NULL
+  ),
+  age = list(
+    label = "`age`",
+    bare  = "`age`",
+    type  = "Continuous",
+    unit  = "each additional year of age",
+    ref   = NULL
+  ),
+  has_car_availableYes = list(
+    label = "`has_car_available`",
+    bare  = "`has_car_available`",
+    type  = "Categorical",
+    unit  = "having a car available",
+    ref   = "relative to not having a car available"
+  ),
+  weekend_commuterYes = list(
+    label = "`weekend_commuter`",
+    bare  = "`weekend_commuter`",
+    type  = "Categorical",
+    unit  = "commuting on a weekend",
+    ref   = "relative to commuting on a weekday"
+  )
+)
 
-  # Escape underscores and spaces for use inside \text{ } in the parameter symbols
-  k_math <- gsub("[ _]", "\\\\_", k)
+# Fall back gracefully if the model is refitted with a term not listed above
+meta_for <- function(tm) {
+  if (!is.null(term_meta[[tm]])) return(term_meta[[tm]])
+  list(
+    label = paste0("`", tm, "`"),
+    bare  = paste0("`", tm, "`"),
+    type  = "Unclassified",
+    unit  = paste0("a one-unit increase in `", tm, "`"),
+    ref   = NULL
+  )
+}
 
-  cat("**`", k, "` versus `Car`:**\n\n", sep = "")
-  cat("| Parameter | Estimate | Std. Error | $z$ | $p$-value | OR | 95% CI |\n")
-  cat("|-----------|----------|------------|-----|-----------|-----|--------|\n")
+# "a", "a and b", "a, b and c"
+and_list <- function(x) {
+  if (length(x) <= 1) return(paste(x, collapse = ""))
+  paste0(paste(x[-length(x)], collapse = ", "), " and ", x[length(x)])
+}
 
-  for (i in seq_along(term_order)) {
-    tm <- term_order[i]
-    cat(sprintf(
-      "| $\\hat{\\beta}_{%d}^{(\\text{%s},\\,\\text{Car})}$ %s | $%s$ | $%s$ | $%s$ | $%s$ | $%s$ | $(%s)$ |\n",
-      i - 1L, k_math, param_labels[i],
-      fmt_num(get_stat(k, tm, "estimate",   coef_log)),
-      fmt_num(get_stat(k, tm, "std.error",  coef_log)),
-      fmt_num(get_stat(k, tm, "statistic",  coef_log), 2),
-      fmt_pval(get_stat(k, tm, "p.value",   coef_log)),
-      fmt_num(get_stat(k, tm, "estimate")),
-      fmt_ci(k, tm)
+# Significant, non-intercept terms, ordered by outcome class and then by term.
+# Significance is read from the Wald p-values on the log-odds scale.
+class_levels <- c(class_bike, class_pt, class_walk)
+sig <- coef_log[
+  coef_log$term != "(Intercept)" &
+    !is.na(coef_log$p.value) &
+    coef_log$p.value < alpha_level,
+  c("outcome_class", "term", "p.value")
+]
+sig <- sig[order(match(sig$outcome_class, class_levels),
+                 match(sig$term, names(term_meta))), ]
+
+# Interpretation of the exponentiated coefficient for one class-term pair
+interpret <- function(k, tm) {
+  or   <- get_stat(k, tm, "estimate")
+  meta <- meta_for(tm)
+  others_txt <- and_list(
+    vapply(setdiff(names(term_meta), tm),
+           function(o) meta_for(o)$bare, character(1))
+  )
+  if (is.na(or) || !is.finite(or) || or <= 0) {
+    return(paste0(
+      "Not interpretable on the odds-ratio scale. The estimate is an artifact ",
+      "of quasi-complete separation rather than a stable association."
     ))
   }
+  direction <- if (or >= 1) {
+    paste0(fmt_num(100 * (or - 1), 1), "% higher odds")
+  } else {
+    paste0(fmt_num(100 * (1 - or), 1), "% lower odds")
+  }
+  ref_txt <- if (is.null(meta$ref)) "" else paste0(", ", meta$ref)
+  sprintf(
+    paste0("Holding %s constant, %s is associated with %s times the odds of ",
+           "choosing `%s` over `Car`%s, that is %s."),
+    others_txt, meta$unit, fmt_num(or, 2), k, ref_txt, direction
+  )
+}
 
-  cat("\n")
+if (nrow(sig) == 0) {
+
+  cat("No regressor is statistically significant at the $\\alpha = ",
+      format(alpha_level), "$ level in this refit.\n\n", sep = "")
+
+} else {
+
+  # Narrative summary: for each significant term, the classes it is significant in
+  by_term <- split(as.character(sig$outcome_class), as.character(sig$term))
+  by_term <- by_term[order(match(names(by_term), names(term_meta)))]
+  phrases <- vapply(names(by_term), function(tm) {
+    ks <- by_term[[tm]]
+    paste0(meta_for(tm)$label, " in the ", and_list(paste0("`", ks, "`")),
+           if (length(ks) == 1) " equation" else " equations")
+  }, character(1))
+  phrases_txt <- if (length(phrases) == 1) {
+    phrases
+  } else {
+    paste0(paste(phrases[-length(phrases)], collapse = "; "),
+           "; and ", phrases[length(phrases)])
+  }
+
+  cat("At the $\\alpha = ", format(alpha_level),
+      "$ level, the statistically significant regressors are ", phrases_txt,
+      ". They are summarized in @tbl-significant-regressors.\n\n", sep = "")
+
+  cat("| Category | Term | Type | Interpretation |\n")
+  cat("|---|---|---|---|\n")
+  for (r in seq_len(nrow(sig))) {
+    k  <- as.character(sig$outcome_class[r])
+    tm <- as.character(sig$term[r])
+    cat(sprintf(
+      "| `%s` versus `Car` | %s | %s | %s |\n",
+      k, meta_for(tm)$label, meta_for(tm)$type, interpret(k, tm)
+    ))
+  }
+  cat("\n: Statistically significant regressors in the testing-set refit of the",
+      " Multinomial Logistic regression model.",
+      " {#tbl-significant-regressors}\n\n", sep = "")
 }
 ```
 
-The `` `r class_bike` `` and `` `r class_pt` `` blocks are estimated on adequate numbers of observations, and within these blocks, `commute_distance` and `has_car_availableYes` in the `` `r class_pt` `` equation are significant at the $5\%$ level. As discussed in @sec-inference, the `` `r class_walk` `` equation and the `weekend_commuterYes` term in the `` `r class_bike` `` equation suffer from quasi-complete separation; the resulting extreme coefficient magnitudes paired with astronomical standard errors drive the associated $z$-statistics toward zero and the $p$-values toward one, which is a symptom of a maximum likelihood estimate that does not exist rather than genuine null effects.
+Terms that do not appear above are not statistically significant at the $5\%$ level and are therefore not interpreted here. The complete set of estimates, standard errors, $z$ statistics, $p$-values, odds ratios and confidence intervals for every term, significant or not, is available in @tbl-multinom-test-fit-python.
 
-### Prediction Results
+### Predictive Results
 
-Now we will fit the Multinomial Logistic regression model on the train set, and predict on the held-out test set. The confusion matrix and performance metrics are reported below.
+For the predictive inquiry, we evaluate the model fitted on the training data by comparing its predictions with the observed response categories in the testing data. Let's recall from @sec-practical-adequacy that we retain the coefficient estimates from the training data instead of using the test set refit from @sec-inference, according to the Golden Rule of Machine Learning, to obtain unbiased classification-based measures from the test set. We will use the Multinomial Logistic regression fitted in @sec-estimation to predict on the held-out test set, and create confusion matrices in `R` and `Python` by using `confustionMatrix` from `caret` and `confusion_matrix` from `sklearn` respectively. 
 
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
-# Fit the model on the train set
-multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
-
 # Predict on the test set using the fitted model
 y_pred <- predict(multinom_fit, newdata = test_set)
 
-# Compute confusion matrix
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+# Create confusion matrix
+mode_levels <- c("Car", "Public_Transit", "Bicycle", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(test_set$transport_mode, levels = mode_levels))
 
@@ -2939,10 +3096,13 @@ for col in ['has_car_available', 'weekend_commuter']:
 y_pred_test = multinom_fit.predict(X_test_num).idxmax(axis=1)
 
 # Confusion matrix
-labels = y_test.cat.categories
-cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
+# Display order for the confusion matrix axes
+cm_order = ["Car", "Public_Transit", "Bicycle", "Walking"]
+order_codes = [list(y_test.cat.categories).index(c) for c in cm_order]
+
+cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=order_codes)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y_test.cat.categories)
+                              display_labels=cm_order)
 disp.plot(cmap="Blues")
 disp.ax_.set_title("Confusion Matrix (Test Set)")
 fig = disp.figure_
@@ -2966,7 +3126,7 @@ fig
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
 
 y_pred <- predict(multinom_fit, newdata = test_set)
-mode_levels <- c("Car", "Bicycle", "Public_Transit", "Walking")
+mode_levels <- c("Car", "Public_Transit", "Bicycle", "Walking")
 conf_matrix <- confusionMatrix(factor(y_pred, levels = mode_levels),
                               factor(test_set$transport_mode, levels = mode_levels))
 
@@ -3032,10 +3192,13 @@ for col in ['has_car_available', 'weekend_commuter']:
 y_pred_test = multinom_fit.predict(X_test_num).idxmax(axis=1)
 
 # Confusion matrix
-labels = y_test.cat.categories
-cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=range(len(labels)))
+# Display order for the confusion matrix axes
+cm_order = ["Car", "Public_Transit", "Bicycle", "Walking"]
+order_codes = [list(y_test.cat.categories).index(c) for c in cm_order]
+
+cm = confusion_matrix(y_test.cat.codes, y_pred_test, labels=order_codes)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                              display_labels=y_test.cat.categories)
+                              display_labels=cm_order)
 disp.plot(cmap="Blues")
 disp.ax_.set_title("Confusion Matrix (Test Set)")
 fig = disp.figure_
@@ -3045,34 +3208,61 @@ fig
 
 :::
 
+```{r}
+#| label: test-cm-inline
+#| echo: false
+#| message: false
+#| warning: false
+
+# Recall and precision for one response category, read from the test-set
+# confusion matrix produced above. In caret's `table`, rows index the predicted
+# category and columns index the true one, so a row sum is everything predicted
+# as that category and a column sum is everything that truly belongs to it.
+cm_recall <- function(cls) {
+  100 * conf_matrix$table[cls, cls] / sum(conf_matrix$table[, cls])
+}
+
+cm_precision <- function(cls) {
+  100 * conf_matrix$table[cls, cls] / sum(conf_matrix$table[cls, ])
+}
+
+# Percentages are reported to one decimal place
+fmt_pct <- function(x) sprintf("%.1f", x)
+```
+
+
+Let's use the confusion matrix in @fig-confusion-matrix-test-R to calculate the recall and precision of each `transport_mode` category. The `Car` and `Public_Transit` classes are predicted most reliably with recalls of $`r fmt_pct(cm_recall("Car"))`\%$ and $`r fmt_pct(cm_recall("Public_Transit"))`\%$ respectively. On the other hand, the true `Bicycle` observations in the test set are all misclassified as `Car`. For the five `Walking` observations in the test set, three are misclassified as `Car` and two of them are correctly classified, which means that `Walking` has a recall of $`r fmt_pct(cm_recall("Walking"))`\%$.
+
+The confusion matrix shows that the predictions are concentrated almost entirely on the two majority categories: `Car` and `Public_Transit`. `Car` is recovered for most of the commuters who actually chose it, so its recall is high, but its precision is relatively low, because a substantial number of commuters whose true transport mode is `Public_Transit` are predicted as `Car`. `Public_Transit` attains the highest precision (`r sprintf("%.1f%%", 100 * conf_matrix$table["Public_Transit", "Public_Transit"] / sum(conf_matrix$table["Public_Transit", ]))`) among the four categories, since a prediction of `Public_Transit` is usually correct, while its recall is somewhat lower than that of `Car` for the reason just given. `Bicycle` is never predicted at all, so its recall is zero and precision is undefined because the model assigns no observation to `Bicycle`. `Walking` is predicted for only a handful of commuters, and all of these predictions are correct, which yields perfect precision and low recall for `Walking`. Taken together, the pattern in the confusion matrix is characteristic of class imbalance in the dataset. It is worth noting that this behaviour is not a symptom of overfitting because the predictive pattern on the held-out test set closely resembles the pattern already visible on the training data in @fig-confusion-matrix-train-R and @fig-confusion-matrix-train-py.
+
 ::: {.panel-tabset}
 
 ## R Code
 
 ```{.r}
 # Compute the performance metrics
-overall_accuracy <- conf_matrix$overall['Accuracy']
-macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
-macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
-cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
-cat("Macro Recall:", round(macro_recall, 3), "\n")
-cat("Macro F1:", round(macro_f1, 3), "\n")
+overall_accuracy_test <- conf_matrix$overall['Accuracy']
+macro_recall_test <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
+macro_f1_test <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy_test, 3), "\n")
+cat("Macro Recall:", round(macro_recall_test, 3), "\n")
+cat("Macro F1:", round(macro_f1_test, 3), "\n")
 ```
 
 ## Python Code
 
 ```{.python}
 # Compute the performance metrics
-acc = accuracy_score(y_test.cat.codes, y_pred_test)
-recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
+acc_test = accuracy_score(y_test.cat.codes, y_pred_test)
+recall_test = recall_score(y_test.cat.codes, y_pred_test, average='macro')
 # Average F1 only over the classes the model actually predicts, so a
 # never-predicted class (undefined precision) is dropped rather than
 # counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
 predicted_labels = np.unique(y_pred_test)
-f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
-print(f"Overall Accuracy: {acc:.3f}")
-print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1: {f1:.3f}")
+f1_test = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
+print(f"Overall Accuracy: {acc_test:.3f}")
+print(f"Macro Recall: {recall_test:.3f}")
+print(f"Macro F1: {f1_test:.3f}")
 ```
 
 :::
@@ -3085,12 +3275,12 @@ print(f"Macro F1: {f1:.3f}")
 #| echo: false
 #| message: false
 #| warning: false
-overall_accuracy <- conf_matrix$overall['Accuracy']
-macro_recall <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
-macro_f1 <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
-cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
-cat("Macro Recall:", round(macro_recall, 3), "\n")
-cat("Macro F1:", round(macro_f1, 3), "\n")
+overall_accuracy_test <- conf_matrix$overall['Accuracy']
+macro_recall_test <- mean(conf_matrix$byClass[,"Recall"], na.rm = TRUE)
+macro_f1_test <- mean(conf_matrix$byClass[,"F1"], na.rm = TRUE)
+cat("Overall Accuracy:", round(overall_accuracy_test, 3), "\n")
+cat("Macro Recall:", round(macro_recall_test, 3), "\n")
+cat("Macro F1:", round(macro_f1_test, 3), "\n")
 ```
 
 ## Python Output
@@ -3099,27 +3289,35 @@ cat("Macro F1:", round(macro_f1, 3), "\n")
 #| echo: false
 #| message: false
 #| warning: false
-acc = accuracy_score(y_test.cat.codes, y_pred_test)
-recall = recall_score(y_test.cat.codes, y_pred_test, average='macro')
+acc_test = accuracy_score(y_test.cat.codes, y_pred_test)
+recall_test = recall_score(y_test.cat.codes, y_pred_test, average='macro')
 # Average F1 only over the classes the model actually predicts, so a
 # never-predicted class (undefined precision) is dropped rather than
 # counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
 predicted_labels = np.unique(y_pred_test)
-f1 = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
-print(f"Overall Accuracy: {acc:.3f}")
-print(f"Macro Recall: {recall:.3f}")
-print(f"Macro F1: {f1:.3f}")
+f1_test = f1_score(y_test.cat.codes, y_pred_test, labels=predicted_labels, average='macro')
+print(f"Overall Accuracy: {acc_test:.3f}")
+print(f"Macro Recall: {recall_test:.3f}")
+print(f"Macro F1: {f1_test:.3f}")
 ```
 
 :::
 
-On the test set, the model achieves an overall accuracy of **`r 100.0*round(overall_accuracy, 3)`%**, a macro recall of **`r 100.0*round(macro_recall, 3)`%**, and a macro F1 score of **`r 100.0*round(macro_f1, 3)`%**. 
+Because the coefficient estimates used to produce these predictions come entirely from the training data, the measures computed on the held-out test set estimate the model's **out-of-sample** predictive performance, whereas the corresponding measures computed on the training data are in-sample and optimistic by construction. @tbl-train-test-metrics places the two sets of measures side by side.
 
-The `Car` and `Public Transit` classes are predicted most reliably with recalls of $76.1\%$ and $73.1\%$ respectively. On the other hand, the `Bicycle` observations in the test set are all misclassified as `Car`. For the give `Walking` observations in the test set, three are misclassified as `Car` and two of them are correctly classified, which means that `Walking` has a recall of $40.0\%$.
+| **Measure** | **Training set** | **Testing set** |
+|:---|:---:|:---:|
+| Overall accuracy | `r 100.0*round(overall_accuracy, 3)`\% | `r 100.0*round(overall_accuracy_test, 3)`\% |
+| Macro recall | `r 100.0*round(macro_recall, 3)`\% | `r 100.0*round(macro_recall_test, 3)`\% |
+| Macro F1 score | `r 100.0*round(macro_f1, 3)`\% | `r 100.0*round(macro_f1_test, 3)`\% |
+
+: Classification-based measures of the Multinomial Logistic regression model, computed on the training data used for estimation and on the held-out test data. {#tbl-train-test-metrics}
+
+The three measures change very little between the two columns, and that comparison is the one that matters for the **predictive inquiry**. Since the coefficient estimates were obtained from the training data alone, a substantial deterioration from the training column to the testing column would be evidence of overfitting, and no such evidence is present. The model therefore generalizes to commuters that it has not encountered about as well as it describes the commuters it was fitted on. This is a statement about the stability of the model rather than about the quality of its predictions. Overall accuracy is dominated by the correct `Car` and `Public_Transit` predictions, which together account for the large majority of the test-set observations, whereas macro recall and the macro F1 score weight all four transport modes equally and are relatively lower. To conclude the predictive inquiry, our classification model distinguishes `Car` from `Public_Transit` at the accuracy reported in @tbl-train-test-metrics, but it does not effectively recover the true `Bicycle` or `Walking` commuters, so it should not be relied upon if the main goal is to predict either of those two transport modes.
 
 ::: {.Tip}
 ::::{.Tip-header}
-Class Imbalance and Prediction
+Tip on Class Imbalance and Prediction
 ::::
 ::::{.Tip-container}
 The low recall of `Walking` and `Bicycle` in the test set follows from the structure of the MLE solution under class imbalance. Differentiating the log-likelihood function in @eq-log-likelihood-multinomial with respect to the intercept $\beta_0^{(j,1)}$ of a non-baseline category $j$ and setting the partial derivative to zero yields the following equation:
@@ -3136,9 +3334,9 @@ where $n_j$ is the number of observations in category $j$ in the train set. Cons
 
 The **storytelling stage** is where we translate the technical results of the Multinomial Logistic regression workflow into a message that is useful for an applied audience. Up to this point, we have defined the study design, wrangled the transport data, explored the response and regressors, fitted a Multinomial Logistic regression model, checked goodness of fit, and organized the inferential and predictive results.
 
-To complete the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. This final stage, storytelling, is where statistical output is translated into insights that support real world decision making.
+To complete the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), let's step back from the coefficients, tests, and confusion matrices, and focus on how the results can be interpreted and applied in practice. A useful analysis must explain **what the results mean for the people who asked the original question**, which features of the evidence are the strongest, where the remaining uncertainty lies, and how the model should—and should not—be used.
 
-In this case study, the Multinomial Logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public Transit`, `Bicycle`, and `Walking`. We will distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
+For this case study on understanding commuting behaviours, the Multinomial Logistic regression model helps us understand how commute distance, age, car availability, and weekend commuting status relate to an individual's primary mode of transport, an outcome with four unordered categories: `Car`, `Public Transit`, `Bicycle`, and `Walking`. We will distill the key takeaways from the analysis and discuss what they imply for commuters, transportation planners, and policy makers.
 
 ### Key Insights From the Model
 
