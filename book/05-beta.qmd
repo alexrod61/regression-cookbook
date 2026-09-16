@@ -1045,7 +1045,7 @@ In contrast, Python’s `statsmodels.BetaModel` does not report a pseudo-$R^2$ b
 ::::
 :::
 
-### Precision Parameter
+### Precision Parameter {#sec-beta-precision-parameter}
 
 Unlike linear regression, Beta regression models not only the average response but also how much the observations vary around that average. This variability is summarized by the **precision parameter**, commonly denoted by $\phi$.
 
@@ -1077,7 +1077,7 @@ which matches the estimate reported by `betareg()`.
 
 A precision estimate of approximately 44 suggests that the observed grades are relatively tightly clustered around the values predicted by the model. In practice, the precision parameter is typically interpreted together with residual diagnostics rather than evaluated against a specific cutoff value.
 
-### Residual Diagnostics
+### Residual Diagnostics {#sec-beta-residual-diagnostics}
 
 As with other generalized linear models, residual diagnostics help us check whether a Beta regression model is capturing the main patterns in the data. In this section, we focus on Pearson residuals, which compare the observed values to the fitted mean values on a standardized scale.
 
@@ -1259,4 +1259,2699 @@ mindmap
           (Beta <br/>Outcome Y)
     Discrete <br/>Outcome Y
 ```
+:::
+
+## Practice Exercises {#sec-beta-exercises}
+
+The following practice exercises reinforce the main ideas from this chapter. They are designed to help you move between the **conceptual**, **computational**, and **interpretive** parts of Beta regression. Some questions focus on the model structure itself: the Beta random component, the logit link, the mean and precision parameterization, coefficient interpretation, and goodness-of-fit diagnostics. Others prepare you to think through applied modelling decisions for bounded proportion responses.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464611/).](img/exercises.png){width="550"}
+
+As you work through the problems, keep in mind that Beta regression is useful for continuous responses that live on the unit interval, but the main lesson of the chapter is not only how to fit the model. It is also how to prepare proportion data responsibly, check whether the fitted model is adequate, and communicate the results without overstating what an observational analysis can show.
+
+::: {.quiz}
+
+### Conceptual Questions {#sec-beta-exercises-conceptual}
+
+::: {.Question}
+::::{.Question-header}
+Question 5.1
+::::
+::::{.Question-container}
+**True or False**
+
+Beta regression is appropriate for any numerical response variable whose values are positive.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.1
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+Beta regression is designed for **continuous proportion responses** that lie strictly between zero and one:
+
+$$
+0 < Y_i < 1.
+$$
+
+A positive response can still be unsuitable for Beta regression. For example, response time, income, sales revenue, and waiting time are positive but not bounded above by one. Those outcomes require other modelling strategies, such as Gamma regression for many positive continuous responses.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.2
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+A website team records the conversion rate for each landing page, where each value is the proportion of visitors who made a purchase. Why might Beta regression be more appropriate than ordinary least squares for this response?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.2
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Beta regression is more appropriate because the response is a **proportion**. Conversion rates must stay between zero and one, while ordinary least squares can produce fitted values outside that range.
+
+Beta regression also allows the variability of the response to depend on the mean. This matters for proportion data because values near zero or one often have different variability than values near the middle of the unit interval.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.3
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Which response is most naturally suited to standard Beta regression?
+
+**A.** Whether a student passed a course.
+
+**B.** The number of assignments a student submitted late.
+
+**C.** A student's final grade after rescaling it to a value strictly between zero and one.
+
+**D.** The number of minutes a student spent studying.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.3
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** C.
+
+**Rationale:**
+
+Standard Beta regression is designed for continuous responses on the open unit interval. A rescaled grade proportion can be suitable if it satisfies
+
+$$
+0 < Y_i < 1.
+$$
+
+Option A is binary, Option B is a count, and Option D is a positive continuous duration.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.4
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+What makes the Beta distribution flexible enough to model proportion data with **different shapes**? Give examples of the kinds of shapes it can represent.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.4
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The Beta distribution can take many **different distributional shapes** depending on its two shape parameters, usually written $\alpha$ and $\beta$. It can be symmetric, skewed toward zero, skewed toward one, concentrated near the middle, or concentrated near the boundaries.
+
+This flexibility is useful because real proportion data do not all look alike. For example, one dataset may contain conversion rates mostly near zero, while another may contain student grade proportions mostly near the high end of the scale.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+x <- seq(0.001, 0.999, length.out = 500)
+
+plot(
+  x, dbeta(x, 0.5, 0.5),
+  type = "l",
+  ylim = c(0, 4),
+  xlab = "Proportion",
+  ylab = "Density",
+  main = "Different Beta distribution shapes"
+)
+
+lines(x, dbeta(x, 2, 2), col = "blue", lwd = 2)
+lines(x, dbeta(x, 2, 6), col = "red", lwd = 2)
+lines(x, dbeta(x, 6, 2), col = "darkgreen", lwd = 2)
+
+legend(
+  "top",
+  legend = c("Boundary-heavy", "Symmetric", "Skewed right", "Skewed left"),
+  col = c("black", "blue", "red", "darkgreen"),
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## **`Python`**
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import beta
+
+x = np.linspace(0.001, 0.999, 500)
+
+plt.figure()
+plt.plot(x, beta.pdf(x, 0.5, 0.5), label="Boundary-heavy")
+plt.plot(x, beta.pdf(x, 2, 2), label="Symmetric")
+plt.plot(x, beta.pdf(x, 2, 6), label="Skewed right")
+plt.plot(x, beta.pdf(x, 6, 2), label="Skewed left")
+plt.xlabel("Proportion")
+plt.ylabel("Density")
+plt.title("Different Beta distribution shapes")
+plt.legend()
+plt.show()
+```
+
+:::
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.5
+::::
+::::{.Question-container}
+**True or False**
+
+Standard Beta regression can directly model responses that are exactly equal to zero or exactly equal to one.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.5
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+The standard Beta distribution is defined on the **open** interval:
+
+$$
+0 < Y_i < 1.
+$$
+
+Exact zeros and ones are boundary values and need special attention. Depending on the problem, the analyst may need to transform the response, use a model that allows boundary values, or reconsider whether the response is being measured at the right level of detail.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.6
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+In the student-performance case study, final grades were originally recorded as percentages. What two checks should be made before using them as the response in a standard Beta regression model?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.6
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+First, the grades should be rescaled from percentages to proportions:
+
+$$
+Y_i = \frac{\text{Final Grade Percentage}_i}{100}.
+$$
+
+Second, the analyst should check that the rescaled values lie strictly between zero and one:
+
+$$
+0 < Y_i < 1.
+$$
+
+This boundary check matters because standard Beta regression cannot directly handle exact zeros or exact ones.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.7
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Let $Y_i$ denote a continuous proportion response for observation $i$, and let $\mathbf{x}_i$ denote the regressors for that observation. In the Beta regression parameterization
+
+$$
+Y_i \mid \mathbf{x}_i \sim \text{Beta}(\mu_i\phi,\ (1-\mu_i)\phi),
+$$
+
+where $\mu_i=\mathbb{E}(Y_i\mid \mathbf{x}_i)$ is the conditional mean proportion and $\phi>0$ is the precision parameter, what does a larger value of $\phi$ indicate?
+
+**A.** The response is no longer bounded between zero and one.
+
+**B.** The observations are more tightly concentrated around the mean proportion.
+
+**C.** The fitted mean proportion must equal zero.
+
+**D.** The response has become a count.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.7
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+The parameter $\phi$ is the **precision parameter**. Holding the mean $\mu_i$ fixed, the conditional variance is
+
+$$
+\operatorname{Var}(Y_i\mid \mathbf{x}_i)
+=
+\frac{\mu_i(1-\mu_i)}{1+\phi}.
+$$
+
+Thus, larger values of $\phi$ correspond to less variability around the conditional mean proportion. Smaller values of $\phi$ allow $Y_i$ to be more spread out around $\mu_i$.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.8
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Suppose a city records $Y_i$, the proportion of available bike-share docks that are occupied at station $i$ during the evening commute. Possible regressors include distance to the nearest train stop, number of nearby offices, rain status, and day-of-week indicators.
+
+Before fitting a Beta regression model, what else needs to be specified or checked?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.8
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Before fitting the model, the analyst should specify the response, regressors, random component, systematic component, and link function, and should check that the response values are strictly between zero and one.
+
+The response is
+
+$$
+Y_i
+=
+\text{proportion of occupied bike-share docks at station } i.
+$$
+
+The regressors might include distance to the nearest train stop, number of nearby offices, rain status, and day-of-week indicators.
+
+The **random component** is the Beta distribution for the response:
+
+$$
+Y_i \mid \mathbf{x}_i \sim \text{Beta}(\mu_i\phi,\ (1-\mu_i)\phi).
+$$
+
+The **systematic component** is the linear predictor:
+
+$$
+\eta_i
+=
+\beta_0 + \beta_1 x_{i1} + \cdots + \beta_k x_{ik}.
+$$
+
+The **link function** connects the mean proportion to the linear predictor. With the logit link,
+
+$$
+\text{logit}(\mu_i)
+=
+\log\left(\frac{\mu_i}{1-\mu_i}\right)
+=
+\eta_i.
+$$
+
+This setup also requires choosing how categorical regressors will be coded and confirming that no observed response values are exactly zero or exactly one.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.9
+::::
+::::{.Question-container}
+**True or False**
+
+Using a logit link in Beta regression helps ensure that the fitted mean proportion stays between zero and one.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.9
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** True.
+
+**Rationale:**
+
+The linear predictor $\eta_i$ can take any real value, but the inverse-logit transformation maps it back to the unit interval:
+
+$$
+\mu_i
+=
+\frac{\exp(\eta_i)}{1+\exp(\eta_i)}.
+$$
+
+This guarantees
+
+$$
+0 < \mu_i < 1.
+$$
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.10
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+In a Beta regression model for the proportion of recyclable material in a household's weekly trash stream, a coefficient of $\beta_j = 0$ means:
+
+**A.** The household's recycling proportion is zero.
+
+**B.** Holding the other regressors fixed, a one-unit increase in that regressor is associated with no change in the expected recycling proportion.
+
+**C.** The response is binary.
+
+**D.** The model has perfect goodness of fit.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.10
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+With the logit link, exponentiating a coefficient gives a multiplicative effect on
+
+$$
+\frac{\mu_i}{1-\mu_i}.
+$$
+
+Since
+
+$$
+\exp(0)=1,
+$$
+
+a coefficient of zero corresponds to no multiplicative change in the odds of the mean proportion, holding the other regressors fixed.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.11
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Suppose a Beta regression model for the proportion of mobile-app users who complete onboarding estimates a coefficient of $0.40$ for an indicator that a push reminder was sent, using no reminder as the reference category. How would you interpret $\exp(0.40)$?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.11
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The quantity $\exp(0.40)$ is approximately $1.49$. This means that, holding the other regressors fixed, app cohorts that received a push reminder are estimated to have about **1.49 times the odds of the mean onboarding-completion proportion** compared with cohorts that did not receive a reminder.
+
+This is not the odds that one individual user completes onboarding. The response is a continuous completion proportion for a cohort, so the odds refer to
+
+$$
+\frac{\mu_i}{1-\mu_i},
+$$
+
+where $\mu_i$ is the fitted mean onboarding-completion proportion.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.12
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+In a Beta regression model for the proportion of scheduled telehealth appointments completed by each clinic, what does it mean to interpret the weekend-availability coefficient while **holding other regressors fixed**?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.12
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+It means that the weekend-availability coefficient compares clinics that are the same with respect to the other regressors included in the model, such as patient volume, average appointment lead time, specialty mix, reminder system, and region, but differ in whether weekend appointments are available.
+
+This is a conditional model interpretation. It does not mean the dataset contains perfectly matched clinics, and it does not prove that adding weekend availability causes a change in completion rates.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.13
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+In @sec-beta-precision-parameter, the chapter introduces the Beta regression precision parameter, denoted by $\phi$. This parameter describes how tightly the response values cluster around the fitted mean $\mu_i$.
+
+R's `betareg()` reports $\hat{\phi}$ directly. Python's `statsmodels.BetaModel` reports the same precision quantity on the log scale. If Python reports a log-precision value of $3.78$, what value should be compared with R's $\hat{\phi}$?
+
+**A.** $3.78$
+
+**B.** $\log(3.78)$
+
+**C.** $\exp(3.78)$
+
+**D.** $1/3.78$
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.13
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** C.
+
+**Rationale:**
+
+If Python reports the precision parameter on the log scale, then the reported number is interpreted as
+
+$$
+\log(\hat{\phi}) = 3.78.
+$$
+
+To return to the precision scale, we exponentiate:
+
+$$
+\hat{\phi}=\exp(3.78).
+$$
+
+This is the value that should be compared with R's direct estimate of $\hat{\phi}$. The exponentiation matters because $\phi$ must be positive, while a log-scale parameter can range over the whole real line during model fitting.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.14
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Why is maximum likelihood estimation a natural fitting approach for Beta regression?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.14
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Beta regression specifies a full probability distribution for each response value:
+
+$$
+Y_i \sim \text{Beta}(\mu_i\phi,\ (1-\mu_i)\phi).
+$$
+
+Maximum likelihood estimation chooses the parameter values that make the observed proportions most likely under that assumed distribution. This is more natural than minimizing squared errors because Beta regression needs to account for both the bounded response scale and the mean-variance relationship implied by the Beta distribution.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.15
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+Which statement about AIC and BIC in Beta regression is most accurate?
+
+**A.** They are most useful for comparing fitted models for the same response.
+
+**B.** They prove that the fitted model is causal.
+
+**C.** They must always be positive.
+
+**D.** They replace the need to inspect residual diagnostics.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.15
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+AIC and BIC summarize a trade-off between model fit and model complexity. They are especially useful when comparing candidate models fitted to the same response variable. They do not establish causality, and they do not replace model diagnostics.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.16
+::::
+::::{.Question-container}
+**True or False**
+
+If a Beta regression model has a good log-likelihood and a reasonable AIC, then residual diagnostics are unnecessary.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.16
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+Overall fit statistics are useful, but they do not show every way a model can fail. Residual diagnostics can reveal patterns such as systematic underprediction, overprediction, unusual observations, or misspecification across parts of the fitted mean range.
+
+For Beta regression, Pearson residuals versus fitted means provide a useful graphical check of whether residuals are centered around zero without obvious structure.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.17
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+In the residual-diagnostics plot in @sec-beta-residual-diagnostics, observations appear in vertical bands. Why is this not automatically a warning sign?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.17
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Vertical banding can occur when the model includes categorical regressors. Observations with the same categorical pattern can have similar or identical fitted means, so their residuals line up vertically.
+
+The more important diagnostic question is whether the residuals are roughly centered around zero across the fitted mean range and whether there are clear patterns, strong asymmetry, or unusual observations that suggest lack of fit.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.18
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Why should the student-performance case study be interpreted as associational rather than causal?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.18
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The dataset is observational. Students were not randomly assigned to study times, tutoring status, sleep patterns, part-time work hours, or living arrangements.
+
+As a result, an estimated association does not prove that changing a regressor would cause a change in final grades. For example, higher study time may be related to motivation, course difficulty, prior preparation, or other variables not included in the model.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.19
+::::
+::::{.Question-container}
+**Multiple Choice**
+
+In a fitted Beta regression model for the proportion of hotel rooms occupied each night, suppose weekend-night status is statistically significant but lobby-renovation status is not. Which conclusion is most responsible?
+
+**A.** Lobby renovations have no effect for any hotel in any setting.
+
+**B.** The model provides evidence that weekend-night status is associated with mean room-occupancy proportion, while it does not provide strong evidence of an adjusted lobby-renovation association in this dataset.
+
+**C.** The model proves that weekends cause higher hotel occupancy.
+
+**D.** The fitted Beta regression model should be discarded automatically.
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.19
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+Statistical significance is evidence about the fitted model and dataset, not a universal truth. A nonsignificant lobby-renovation coefficient means the analysis does not provide strong evidence of an adjusted association for lobby renovation status in this dataset. It does not prove that renovations never matter.
+
+Similarly, a significant weekend-night coefficient supports an adjusted association, but the observational design prevents a direct causal conclusion.
+
+</details>
+::::
+:::
+
+::: {.Question}
+::::{.Question-header}
+Question 5.20
+::::
+::::{.Question-container}
+**Open-ended Question**
+
+Imagine you are summarizing the student-performance Beta regression for an academic advising office. What should a good statistical story include, beyond simply listing coefficient estimates and $p$-values?
+::::
+:::
+
+::: {.Answer}
+::::{.Answer-header}
+Answer 5.20
+::::
+::::{.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A good statistical story should identify the main practical message, explain the direction and size of the most important associations, and connect the findings to the advising office's decisions.
+
+For this case study, the story should emphasize that study time is the clearest adjusted association with final grade proportion in the fitted model. It should also explain that other lifestyle and support variables show weaker evidence after adjustment.
+
+Finally, the story should state the limits of the analysis. The data are observational, so the results should not be framed as causal proof. The model can help guide discussion about study routines and support planning, but it should not be used as the only basis for consequential decisions about individual students.
+
+</details>
+::::
+:::
+
+### Coding Questions {#sec-beta-exercises-coding}
+
+::: {.CodingCase}
+:::: {.CodingCase-header}
+Problem 1: Restaurant Table Occupancy
+::::
+:::: {.CodingCase-container}
+A restaurant group wants to understand **table occupancy** across its shifts. Each row in the dataset represents one restaurant shift and records the proportion of seats filled during that shift, together with information about timing, weather, patio availability, local events, reservations, staffing, and discounts.
+
+Occupancy rate is a natural setting for Beta regression because the response is **continuous**, **bounded**, and measured strictly between zero and one. A shift with occupancy rate $0.80$ means that, on average, 80% of available seats were filled during that shift. The response is not a count and it is not binary; it is a proportion.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-coffee-3702057/).](img/coffee.png){width="610"}
+
+The coding questions below ask you to investigate a practical occupancy-planning problem:
+
+1. Formulate the statistical questions.
+2. Define the Beta regression model mathematically.
+3. Understand and wrangle the variables.
+4. Split the data before EDA.
+5. Explore the training data for restaurant-specific patterns.
+6. Fit and compare Beta regression models for expected occupancy.
+7. Check whether the weather-by-patio relationship improves the model.
+8. Evaluate held-out point and probabilistic prediction.
+9. Communicate the findings in plain language.
+
+@tbl-beta-exercise-occupancy-variables summarizes the variables in this dataset.
+
+| Variable | Description |
+|:---:|:---:|
+| `occupancy_rate` | Proportion of seats filled during the shift. This is continuous and strictly between 0 and 1. |
+| `day_of_week` | Day of the week. |
+| `meal_period` | Meal period: `Brunch`, `Lunch`, or `Dinner`. |
+| `hour` | Approximate starting hour of the shift using a 24-hour clock. |
+| `week_of_year` | Week of the year, from 1 to 52. |
+| `weather` | Weather during the shift: `Clear`, `Cloudy`, `Rain`, or `Heat`. |
+| `temperature_f` | Outdoor temperature in degrees Fahrenheit. |
+| `patio_open` | Whether patio seating was open: `No` or `Yes`. |
+| `local_event` | Whether a nearby event occurred during the shift: `No` or `Yes`. |
+| `reservation_count` | Number of reservations recorded before the shift. |
+| `staff_count` | Number of staff scheduled for the shift. |
+| `discount_percent` | Discount percentage offered during the shift. |
+
+: Variables used in the restaurant-occupancy Beta regression exercise. {#tbl-beta-exercise-occupancy-variables .striped .hover}
+
+The response `occupancy_rate` records the proportion of seats filled during each shift. The regressors describe timing, demand conditions, weather, service capacity, and promotions. Because this dataset is simulated for practice, the exercise is mainly about learning the Beta regression workflow rather than making claims about a specific restaurant company.
+::::
+:::
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on libraries for this exercise!
+::::
+:::: {.Tip-container}
+The complete dependencies are listed:
+
+- `R`: [{readr}](https://readr.tidyverse.org), [{tidyverse}](https://www.tidyverse.org), [{ggplot2}](https://ggplot2.tidyverse.org), [{betareg}](https://cran.r-project.org/package=betareg), and [{reticulate}](https://rstudio.github.io/reticulate/).
+- `Python`: [{pandas}](https://pandas.pydata.org/), [{numpy}](https://numpy.org/), [{matplotlib}](https://matplotlib.org/), and [{statsmodels}](https://www.statsmodels.org/stable/index.html).
+::::
+:::
+
+#### Study Design
+
+Before touching the data, translate the restaurant group's operational goal into statistical questions. In this example, the restaurant is not only asking whether occupancy is high or low. It wants to understand which conditions fill seats, whether promotions and patio availability matter, and whether the model can help plan a future shift.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-action-bound-3704046/).](img/magnifying-glass-2.png){width="420"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.21 — Framing an Occupancy Inquiry
+::::
+:::: {.Question-container}
+Formulate an **inferential inquiry** that is specific to this restaurant occupancy dataset.
+
+Your question should mention at least two of the following restaurant conditions: discounts, reservations, patio availability, weather, local events, and meal period.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.21
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable inferential inquiry is:
+
+> **After accounting for timing and reservations, are larger discounts, patio-open shifts, and local events associated with higher expected table occupancy rate?**
+
+This is an inferential question because it asks which shift characteristics are associated with the expected occupancy rate. It is not asking for the exact occupancy of one future shift, and it should not be interpreted causally without a stronger study design.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.22 — A Planning Prediction
+::::
+:::: {.Question-container}
+Formulate a **predictive inquiry** that a manager could use before relying on this model for future shift planning.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.22
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable predictive inquiry is:
+
+> **Can a Beta regression model fitted on past shifts predict held-out occupancy rates better than an intercept-only baseline, both for expected occupancy and for the full predictive distribution?**
+
+This question is predictive because it asks whether the fitted model generalizes to shifts that were not used for EDA, model selection, or fitting. It also distinguishes point prediction of expected occupancy from probabilistic prediction using the full fitted Beta distribution.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.23 — Why a Beta Model Fits This Problem
+::::
+:::: {.Question-container}
+Explain why a Beta regression model is appropriate for `occupancy_rate`. Then define the **observational units**, **response variable**, and **random component** mathematically.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.23
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The observational units are **restaurant shifts**.
+
+For the $i$th shift, the response variable is
+
+$$
+Y_i
+=
+\text{occupancy rate during the shift}.
+$$
+
+The random component is
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\operatorname{Beta}(\mu_i \phi,\ (1-\mu_i)\phi),
+$$
+
+where $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ is the expected occupancy rate for the $i$th shift and $\phi > 0$ is the precision parameter. Under this parameterization,
+
+$$
+\operatorname{Var}(Y_i \mid \mathbf{x}_i)
+=
+\frac{\mu_i(1-\mu_i)}{1+\phi}.
+$$
+
+The systematic component will be specified after we examine the available regressors and baseline categories.
+
+Beta regression is appropriate because `occupancy_rate` is a continuous proportion. A value such as $0.72$ means 72% of seats were filled on average during the shift. The response is not binary, not a count, and not unbounded.
+
+</details>
+::::
+:::
+
+#### Data Understanding
+
+The dataset contains **one row per restaurant shift**. Refer to @tbl-beta-exercise-occupancy-variables. Before fitting a model, separate the variables into the parts of the restaurant operation they describe.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.24 — Sorting the Restaurant Variables
+::::
+:::: {.Question-container}
+Using the variables table, sort the variables into the following groups:
+
+1. the response variable;
+2. timing variables;
+3. demand signals;
+4. weather and seating variables;
+5. staffing and promotion variables; and
+6. categorical variables that will need indicator variables.
+
+Do **not** use software yet.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.24
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Response:**
+
+- `occupancy_rate`.
+
+**Timing variables:**
+
+- `hour`,
+- `week_of_year`,
+- `day_of_week`,
+- `meal_period`.
+
+**Demand signals:**
+
+- `reservation_count`,
+- `local_event`.
+
+**Weather and seating variables:**
+
+- `weather`,
+- `temperature_f`,
+- `patio_open`.
+
+**Staffing and promotion variables:**
+
+- `staff_count`,
+- `discount_percent`.
+
+**Categorical variables requiring indicator variables:**
+
+- `day_of_week`,
+- `meal_period`,
+- `weather`,
+- `patio_open`,
+- `local_event`.
+
+The categorical variables will require indicator variables once baseline categories are chosen.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.25 — Choosing Meaningful Baselines
+::::
+:::: {.Question-container}
+Choose baseline categories for the categorical regressors and explain what each baseline comparison will mean in this restaurant setting. Then assign notation to the response and the main continuous regressors.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.25
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+One reasonable baseline choice is:
+
+- `Monday` for `day_of_week`;
+- `Lunch` for `meal_period`;
+- `Clear` for `weather`;
+- `No` for `patio_open`;
+- `No` for `local_event`.
+
+With these baselines, coefficients compare other days to Monday shifts, brunch and dinner to lunch shifts, cloudy/rain/heat to clear weather, patio-open to patio-closed shifts, and local-event shifts to shifts without nearby events.
+
+| Variable | Notation |
+|:---:|:---:|
+| `occupancy_rate` | $Y_i$ |
+| `hour` | $x_{i,1}$ |
+| `week_of_year` | $x_{i,2}$ |
+| `temperature_f` | $x_{i,3}$ |
+| `reservation_count` | $x_{i,4}$ |
+| `staff_count` | $x_{i,5}$ |
+| `discount_percent` | $x_{i,6}$ |
+| `day_of_week` | Indicator regressors defined after selecting the baseline |
+| `meal_period` | Indicator regressors defined after selecting the baseline |
+| `weather` | Indicator regressors defined after selecting the baseline |
+| `patio_open` | Indicator regressor defined after selecting the baseline |
+| `local_event` | Indicator regressor defined after selecting the baseline |
+
+For later modelling, it may be useful to replace `reservation_count` by $\log(1+\text{reservation_count})$ because reservations are a demand signal that may show diminishing returns once the restaurant is already close to full.
+
+</details>
+::::
+:::
+
+#### Data Wrangling
+
+Before fitting a Beta regression model, verify that the variables have the appropriate storage types and coding. This exercise also creates two convenient modelling variables: `log_reservations`, which lets the reservation effect flatten out, and `discount_10`, which makes the discount coefficient easier to interpret per 10 percentage points.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-evaluation-measure-up-3976303/).](img/measurement.png){width="450"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.26 — Importing the Shift Records
+::::
+:::: {.Question-container}
+Load `problem-1-data.csv` and store it as `occupancy_raw`. Then:
+
+1. Display the first few observations.
+2. Report the number of observations and variables.
+3. Inspect the column names and storage types.
+4. Confirm that the data describe restaurant shifts rather than individual customers or individual tables.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.26
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(betareg)
+
+occupancy_data_path <- "./05-beta_files/simulations/problem-1-data.csv"
+if (!file.exists(occupancy_data_path)) {
+  occupancy_data_path <- "../docs/book/05-beta_files/simulations/problem-1-data.csv"
+}
+
+occupancy_raw <- read_csv(occupancy_data_path)
+
+head(occupancy_raw)
+dim(occupancy_raw)
+glimpse(occupancy_raw)
+```
+
+## **`Python`**
+
+```{python}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from statsmodels.othermod.betareg import BetaModel
+from pathlib import Path
+
+occupancy_data_path = Path("./05-beta_files/simulations/problem-1-data.csv")
+if not occupancy_data_path.exists():
+    occupancy_data_path = Path("../docs/book/05-beta_files/simulations/problem-1-data.csv")
+
+occupancy_raw = pd.read_csv(occupancy_data_path)
+
+print(occupancy_raw.head())
+print(occupancy_raw.shape)
+print(occupancy_raw.dtypes)
+```
+
+:::
+
+The imported dataset has one row per restaurant shift. The response is stored as a numeric proportion, continuous regressors are numeric, and categorical regressors are stored as character strings before their baseline order is made explicit.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.27 — Preparing the Analysis Table
+::::
+:::: {.Question-container}
+Using `occupancy_raw`:
+
+1. Count missing values in each variable.
+2. Drop rows with missing entries and store the result as `occupancy_data`.
+3. Verify that `occupancy_rate` is strictly between zero and one.
+4. Convert `day_of_week`, `meal_period`, `weather`, `patio_open`, and `local_event` to categorical variables using the baselines from **Question 5.25**.
+5. Create `log_reservations = log(1 + reservation_count)`.
+6. Create `discount_10 = discount_percent / 10`.
+7. Report the number of shifts in each categorical level.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.27
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_missing_summary <- occupancy_raw %>%
+  summarize(across(everything(), ~ sum(is.na(.x)))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "variable",
+    values_to = "missing_values"
+  )
+
+print(occupancy_missing_summary)
+
+day_levels <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+meal_levels <- c("Lunch", "Brunch", "Dinner")
+weather_levels <- c("Clear", "Cloudy", "Rain", "Heat")
+yes_no_levels <- c("No", "Yes")
+
+occupancy_data <- occupancy_raw %>%
+  drop_na() %>%
+  mutate(
+    day_of_week = factor(day_of_week, levels = day_levels),
+    meal_period = factor(meal_period, levels = meal_levels),
+    weather = factor(weather, levels = weather_levels),
+    patio_open = factor(patio_open, levels = yes_no_levels),
+    local_event = factor(local_event, levels = yes_no_levels),
+    log_reservations = log1p(reservation_count),
+    discount_10 = discount_percent / 10
+  )
+
+occupancy_response_check <- tibble(
+  quantity = c(
+    "Number of retained shifts",
+    "Minimum occupancy rate",
+    "Maximum occupancy rate",
+    "All rates are strictly between 0 and 1"
+  ),
+  value = c(
+    nrow(occupancy_data),
+    min(occupancy_data$occupancy_rate),
+    max(occupancy_data$occupancy_rate),
+    all(occupancy_data$occupancy_rate > 0 & occupancy_data$occupancy_rate < 1)
+  )
+)
+
+print(occupancy_response_check)
+table(occupancy_data$day_of_week)
+table(occupancy_data$meal_period)
+table(occupancy_data$weather)
+table(occupancy_data$patio_open)
+table(occupancy_data$local_event)
+```
+
+## **`Python`**
+
+```{python}
+occupancy_missing_summary = (
+    occupancy_raw
+    .isna()
+    .sum()
+    .rename("missing_values")
+    .rename_axis("variable")
+    .reset_index()
+)
+
+print(occupancy_missing_summary)
+
+day_levels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+meal_levels = ["Lunch", "Brunch", "Dinner"]
+weather_levels = ["Clear", "Cloudy", "Rain", "Heat"]
+yes_no_levels = ["No", "Yes"]
+
+occupancy_data = occupancy_raw.dropna().copy()
+occupancy_data["day_of_week"] = pd.Categorical(
+    occupancy_data["day_of_week"],
+    categories=day_levels
+)
+occupancy_data["meal_period"] = pd.Categorical(
+    occupancy_data["meal_period"],
+    categories=meal_levels
+)
+occupancy_data["weather"] = pd.Categorical(
+    occupancy_data["weather"],
+    categories=weather_levels
+)
+occupancy_data["patio_open"] = pd.Categorical(
+    occupancy_data["patio_open"],
+    categories=yes_no_levels
+)
+occupancy_data["local_event"] = pd.Categorical(
+    occupancy_data["local_event"],
+    categories=yes_no_levels
+)
+occupancy_data["log_reservations"] = np.log1p(occupancy_data["reservation_count"])
+occupancy_data["discount_10"] = occupancy_data["discount_percent"] / 10
+
+occupancy_response_check = pd.DataFrame({
+    "quantity": [
+        "Number of retained shifts",
+        "Minimum occupancy rate",
+        "Maximum occupancy rate",
+        "All rates are strictly between 0 and 1"
+    ],
+    "value": [
+        len(occupancy_data),
+        occupancy_data["occupancy_rate"].min(),
+        occupancy_data["occupancy_rate"].max(),
+        ((occupancy_data["occupancy_rate"] > 0) & (occupancy_data["occupancy_rate"] < 1)).all()
+    ]
+})
+
+print(occupancy_response_check)
+print(occupancy_data["day_of_week"].value_counts().reindex(day_levels))
+print(occupancy_data["meal_period"].value_counts().reindex(meal_levels))
+print(occupancy_data["weather"].value_counts().reindex(weather_levels))
+print(occupancy_data["patio_open"].value_counts().reindex(yes_no_levels))
+print(occupancy_data["local_event"].value_counts().reindex(yes_no_levels))
+```
+
+:::
+
+There are a small number of missing values in `weather` and `reservation_count`, so dropping incomplete rows is reasonable here. The retained response values are strictly between zero and one, which satisfies the basic support requirement for standard Beta regression. The variables `log_reservations` and `discount_10` will make the later model more directly connected to the restaurant story: reservations are allowed to show diminishing returns, and discount effects can be read per 10 percentage points.
+
+</details>
+::::
+:::
+
+#### Exploratory Data Analysis
+
+We now split the observations before making plots. The **training set** supports EDA, model fitting, and model diagnostics. The **testing set** remains untouched until the results stage, where it is used to check whether the occupancy model generalizes to shifts that did not guide the analysis.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-outlook-success-3704053/).](img/explore.png){width="400"}
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.28 — Holding Back Future Shifts
+::::
+:::: {.Question-container}
+Using `occupancy_data`:
+
+1. Create an 80/20 training/testing split in `R` using a seed of `123`.
+2. Report how many shifts are assigned to training and testing.
+3. Via [{reticulate}](https://rstudio.github.io/reticulate/), import the `R`-generated training and testing sets into `Python`.
+4. Explain why the patio, discount, and reservation patterns should be explored only in the training data.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.28
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+set.seed(123)
+
+occupancy_train_index <- sample(
+  seq_len(nrow(occupancy_data)),
+  size = floor(0.8 * nrow(occupancy_data))
+)
+
+occupancy_training_data <- occupancy_data[occupancy_train_index, ]
+occupancy_testing_data <- occupancy_data[-occupancy_train_index, ]
+
+occupancy_split_summary <- tibble(
+  split = c("Training", "Testing"),
+  rows = c(nrow(occupancy_training_data), nrow(occupancy_testing_data)),
+  proportion = rows / nrow(occupancy_data)
+)
+
+print(occupancy_split_summary)
+```
+
+## **`Python`**
+
+```{python}
+occupancy_training_data = r.occupancy_training_data.copy().reset_index(drop=True)
+occupancy_testing_data = r.occupancy_testing_data.copy().reset_index(drop=True)
+
+categorical_vars = [
+    "day_of_week",
+    "meal_period",
+    "weather",
+    "patio_open",
+    "local_event"
+]
+category_levels = {
+    "day_of_week": day_levels,
+    "meal_period": meal_levels,
+    "weather": weather_levels,
+    "patio_open": yes_no_levels,
+    "local_event": yes_no_levels
+}
+
+for occupancy_subset in [occupancy_training_data, occupancy_testing_data]:
+    for variable in categorical_vars:
+        occupancy_subset[variable] = pd.Categorical(
+            occupancy_subset[variable],
+            categories=category_levels[variable]
+        )
+
+occupancy_split_summary_py = pd.DataFrame({
+    "split": ["Training", "Testing"],
+    "rows": [len(occupancy_training_data), len(occupancy_testing_data)],
+    "proportion": [
+        len(occupancy_training_data) / len(occupancy_data),
+        len(occupancy_testing_data) / len(occupancy_data)
+    ]
+})
+
+print(occupancy_split_summary_py)
+```
+
+:::
+
+The training data should be used for all exploratory pattern-finding and model development. If the testing data are used to decide which restaurant patterns look important, then the later held-out evaluation is no longer a clean check of performance.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.29 — Looking for Ceiling Pressure in Occupancy
+::::
+:::: {.Question-container}
+Using only `occupancy_training_data`:
+
+1. Summarize the distribution of `occupancy_rate`.
+2. Plot a histogram of `occupancy_rate`.
+3. Report the share of training shifts with occupancy above 0.90.
+4. Explain why a response concentrated near high occupancy can still be compatible with Beta regression.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.29
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_response_summary <- tibble(
+  quantity = c(
+    "Number of training shifts",
+    "Minimum",
+    "Median",
+    "Mean",
+    "Sample variance",
+    "Maximum",
+    "Share above 0.90"
+  ),
+  value = c(
+    nrow(occupancy_training_data),
+    min(occupancy_training_data$occupancy_rate),
+    median(occupancy_training_data$occupancy_rate),
+    mean(occupancy_training_data$occupancy_rate),
+    var(occupancy_training_data$occupancy_rate),
+    max(occupancy_training_data$occupancy_rate),
+    mean(occupancy_training_data$occupancy_rate > 0.90)
+  )
+)
+
+print(occupancy_response_summary)
+
+ggplot(occupancy_training_data, aes(x = occupancy_rate)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  theme_minimal() +
+  labs(
+    x = "Occupancy rate",
+    y = "Number of shifts",
+    title = "Distribution of occupancy rate in the training data"
+  )
+```
+
+## **`Python`**
+
+```{python}
+occupancy_response = occupancy_training_data["occupancy_rate"]
+
+occupancy_response_summary_py = pd.DataFrame({
+    "quantity": [
+        "Number of training shifts",
+        "Minimum",
+        "Median",
+        "Mean",
+        "Sample variance",
+        "Maximum",
+        "Share above 0.90"
+    ],
+    "value": [
+        len(occupancy_response),
+        occupancy_response.min(),
+        occupancy_response.median(),
+        occupancy_response.mean(),
+        occupancy_response.var(ddof=1),
+        occupancy_response.max(),
+        (occupancy_response > 0.90).mean()
+    ]
+})
+
+print(occupancy_response_summary_py.round(3))
+
+plt.figure()
+plt.hist(occupancy_training_data["occupancy_rate"], bins=30)
+plt.xlabel("Occupancy rate")
+plt.ylabel("Number of shifts")
+plt.title("Distribution of occupancy rate in the training data")
+plt.show()
+```
+
+:::
+
+The response remains strictly between zero and one, with many shifts having fairly high occupancy. This is compatible with standard Beta regression because the response is a continuous proportion. The concentration near high occupancy is part of the modelling problem, not a reason to use a count or binary model.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.30 — Discounts, Patio Weather, and Reservation Demand
+::::
+:::: {.Question-container}
+Using only `occupancy_training_data`:
+
+1. Plot mean `occupancy_rate` by hour, separated by `meal_period`.
+2. Plot mean `occupancy_rate` by `discount_percent`.
+3. Plot `occupancy_rate` by `weather` and `patio_open`.
+4. Compute the patio lift within each weather category.
+5. Plot mean `occupancy_rate` across binned values of `reservation_count`, separated by `local_event`.
+6. For each plot, explain the visible pattern and why it matters for the restaurant modelling problem using a small table of findings.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.30
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_hour_summary <- occupancy_training_data %>%
+  mutate(hour_bin = floor(hour)) %>%
+  group_by(hour_bin, meal_period) %>%
+  summarize(mean_occupancy = mean(occupancy_rate), .groups = "drop")
+
+ggplot(
+  occupancy_hour_summary,
+  aes(x = hour_bin, y = mean_occupancy, color = meal_period, group = meal_period)
+) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  labs(x = "Hour of shift", y = "Mean occupancy rate", color = "Meal period")
+
+occupancy_discount_summary <- occupancy_training_data %>%
+  group_by(discount_percent) %>%
+  summarize(mean_occupancy = mean(occupancy_rate), .groups = "drop")
+
+ggplot(occupancy_training_data, aes(x = discount_percent, y = occupancy_rate)) +
+  geom_point(alpha = 0.25) +
+  geom_line(
+    data = occupancy_discount_summary,
+    aes(y = mean_occupancy),
+    color = "darkorange",
+    linewidth = 1.1
+  ) +
+  geom_point(
+    data = occupancy_discount_summary,
+    aes(y = mean_occupancy),
+    color = "darkorange",
+    size = 2
+  ) +
+  theme_minimal() +
+  labs(x = "Discount percent", y = "Occupancy rate")
+
+ggplot(occupancy_training_data, aes(x = weather, y = occupancy_rate, fill = patio_open)) +
+  geom_boxplot(alpha = 0.7) +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  labs(x = "Weather", y = "Occupancy rate", fill = "Patio open")
+
+occupancy_patio_lift <- occupancy_training_data %>%
+  group_by(weather, patio_open) %>%
+  summarize(mean_occupancy = mean(occupancy_rate), .groups = "drop") %>%
+  pivot_wider(names_from = patio_open, values_from = mean_occupancy) %>%
+  mutate(patio_lift = Yes - No) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+print(occupancy_patio_lift)
+
+occupancy_training_data %>%
+  mutate(reservation_bin = cut(reservation_count, breaks = seq(0, 90, by = 10))) %>%
+  group_by(reservation_bin, local_event) %>%
+  summarize(mean_occupancy = mean(occupancy_rate), .groups = "drop") %>%
+  ggplot(aes(x = reservation_bin, y = mean_occupancy, color = local_event, group = local_event)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top") +
+  labs(x = "Reservation count", y = "Mean occupancy rate", color = "Local event")
+
+occupancy_plot_findings <- tibble(
+  Plot = c(
+    "Hour and meal period",
+    "Discount percent",
+    "Weather and patio status",
+    "Reservation count and local events"
+  ),
+  Finding = c(
+    "Mean occupancy changes across the service day. Brunch and lunch shifts are concentrated earlier, while dinner shifts tend to operate at higher occupancy later in the day. This suggests that both hour and meal period should be included in the model.",
+    "Occupancy generally increases as discounts rise, with the largest discounts showing the highest mean occupancy. The pattern is not perfectly linear at every discount level, but it supports treating promotions as a demand signal.",
+    "Patio-open shifts usually have higher occupancy than patio-closed shifts, but the size of the gap changes by weather. Rain lowers occupancy overall, while clear or warmer conditions make patio seating more valuable.",
+    "Occupancy rises quickly at low to moderate reservation counts and then flattens as shifts approach capacity. Local-event shifts tend to sit above non-event shifts, suggesting extra demand beyond reservations alone."
+  )
+)
+
+print(occupancy_plot_findings)
+```
+
+## **`Python`**
+
+```{python}
+hour_means = (
+    occupancy_training_data
+    .assign(hour_bin=np.floor(occupancy_training_data["hour"]))
+    .groupby(["hour_bin", "meal_period"], observed=True)["occupancy_rate"]
+    .mean()
+    .reset_index()
+)
+
+plt.figure()
+for period in meal_levels:
+    period_means = hour_means.loc[hour_means["meal_period"] == period]
+    plt.plot(
+        period_means["hour_bin"],
+        period_means["occupancy_rate"],
+        marker="o",
+        label=period
+    )
+plt.xlabel("Hour of shift")
+plt.ylabel("Mean occupancy rate")
+plt.legend(title="Meal period", loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=3)
+plt.tight_layout()
+plt.show()
+
+discount_means = (
+    occupancy_training_data
+    .groupby("discount_percent", observed=True)["occupancy_rate"]
+    .mean()
+)
+
+plt.figure()
+plt.scatter(
+    occupancy_training_data["discount_percent"],
+    occupancy_training_data["occupancy_rate"],
+    alpha=0.25
+)
+plt.plot(discount_means.index, discount_means.values, marker="o")
+plt.xlabel("Discount percent")
+plt.ylabel("Occupancy rate")
+plt.show()
+
+weather_patio_groups = []
+weather_patio_labels = []
+for weather_level in weather_levels:
+    for patio_level in yes_no_levels:
+        values = occupancy_training_data.loc[
+            (occupancy_training_data["weather"] == weather_level)
+            & (occupancy_training_data["patio_open"] == patio_level),
+            "occupancy_rate"
+        ]
+        weather_patio_groups.append(values)
+        weather_patio_labels.append(f"{weather_level}\n{patio_level}")
+
+plt.figure(figsize=(10, 5))
+plt.boxplot(weather_patio_groups, tick_labels=weather_patio_labels)
+plt.xlabel("Weather and patio open")
+plt.ylabel("Occupancy rate")
+plt.show()
+
+weather_patio_means = pd.pivot_table(
+    occupancy_training_data,
+    values="occupancy_rate",
+    index="weather",
+    columns="patio_open",
+    aggfunc="mean",
+    observed=True
+).reindex(index=weather_levels, columns=yes_no_levels)
+weather_patio_means["patio_lift"] = (
+    weather_patio_means["Yes"] - weather_patio_means["No"]
+)
+print(weather_patio_means.round(3))
+
+reservation_bins = pd.cut(
+    occupancy_training_data["reservation_count"],
+    bins=np.arange(0, 91, 10)
+)
+reservation_means = pd.pivot_table(
+    occupancy_training_data,
+    values="occupancy_rate",
+    index=reservation_bins,
+    columns="local_event",
+    aggfunc="mean",
+    observed=True
+).reindex(columns=yes_no_levels)
+
+centers = [interval.mid for interval in reservation_means.index]
+
+plt.figure()
+for level in yes_no_levels:
+    plt.plot(centers, reservation_means[level], marker="o", label=level)
+plt.xlabel("Reservation count")
+plt.ylabel("Mean occupancy rate")
+plt.legend(title="Local event", loc="upper center", bbox_to_anchor=(0.5, 1.18), ncol=2)
+plt.tight_layout()
+plt.show()
+
+occupancy_plot_findings_py = pd.DataFrame({
+    "Plot": [
+        "Hour and meal period",
+        "Discount percent",
+        "Weather and patio status",
+        "Reservation count and local events"
+    ],
+    "Finding": [
+        "Mean occupancy changes across the service day. Brunch and lunch shifts are concentrated earlier, while dinner shifts tend to operate at higher occupancy later in the day. This suggests that both hour and meal period should be included in the model.",
+        "Occupancy generally increases as discounts rise, with the largest discounts showing the highest mean occupancy. The pattern is not perfectly linear at every discount level, but it supports treating promotions as a demand signal.",
+        "Patio-open shifts usually have higher occupancy than patio-closed shifts, but the size of the gap changes by weather. Rain lowers occupancy overall, while clear or warmer conditions make patio seating more valuable.",
+        "Occupancy rises quickly at low to moderate reservation counts and then flattens as shifts approach capacity. Local-event shifts tend to sit above non-event shifts, suggesting extra demand beyond reservations alone."
+    ]
+})
+
+print(occupancy_plot_findings_py)
+```
+
+:::
+
+The first plot points to service timing: occupancy is not constant across the day, and dinner shifts tend to be fuller than earlier service periods. The discount plot suggests that promotions are associated with higher occupancy, although this should be adjusted for other regressors before interpreting it as a modelled association. The weather and patio plot suggests that patio seating is helpful, but not equally helpful under every weather condition, which motivates checking an interaction later. The reservation plot shows demand increasing with reservations and then levelling off near capacity; local events appear to add demand beyond the reservation count alone. These are descriptive findings, not final model conclusions.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.31 — Turning EDA Into a Restaurant Model Plan
+::::
+:::: {.Question-container}
+Based on the training-set EDA, propose a model plan. Explain:
+
+1. why Beta regression remains a reasonable starting model;
+2. why `log_reservations` may be preferable to raw `reservation_count`;
+3. why a `weather` by `patio_open` interaction is worth checking;
+4. which other regressors should be included; and
+5. why the testing data should remain unused until the final evaluation.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.31
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+| EDA component | Main training-set finding | Consequence for the modelling workflow |
+|:---:|:---:|:---:|
+| Response distribution | Occupancy rate is continuous, bounded, and strictly between zero and one. | Beta regression with a logit link remains a reasonable starting model. |
+| Service timing | Occupancy differs by hour and meal period, with dinner shifts tending to run fuller. | Include `hour`, `meal_period`, `week_of_year`, and day-of-week controls. |
+| Reservations | Occupancy rises with reservations but appears to flatten. | Use `log_reservations` to allow diminishing returns. |
+| Discounts | Larger discounts correspond to higher mean occupancy. | Use `discount_10` so the coefficient is interpretable per 10 percentage points. |
+| Weather and patio | Patio-open shifts have higher occupancy, but the size of the gap depends on weather. | Compare an additive model with a model that includes `weather * patio_open`. |
+| Events | Local-event shifts tend to have higher occupancy. | Include `local_event` as a demand signal. |
+| Data split | The testing data have not been used for EDA. | Keep them untouched for held-out evaluation. |
+
+The EDA supports a Beta regression model with timing, demand, promotion, weather, seating, and staffing regressors. The most restaurant-specific modelling choice is to compare a model that treats weather and patio availability additively with one that lets the patio association differ by weather.
+
+</details>
+::::
+:::
+
+#### Beta Regression Modelling and Evaluation
+
+The EDA suggests several restaurant conditions that may help explain expected occupancy rate. We now use the training data to estimate Beta regression models with a logit link. The main comparison is whether patio availability should have the same association across all weather categories or whether the patio story changes depending on weather.
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.32 — Selecting an Occupancy Model
+::::
+:::: {.Question-container}
+Using only `occupancy_training_data`:
+
+1. Write the random component, systematic component, and logit-link formulation for a reduced additive Beta regression model.
+2. Write a full model that adds the `weather * patio_open` interaction.
+3. Explain why the two models are nested, then state $H_0$ and $H_1$ for a likelihood-ratio test of the interaction.
+4. Fit both models in `R` and `Python`, using the training data only.
+5. Carry out the likelihood-ratio test at the 5% significance level. Does the larger weather-by-patio model give a statistically supported improvement over the additive model?
+6. Report the fitted mean coefficients and exponentiated coefficients for the selected training model.
+
+**Follow-up — check the better model.** If the larger model improves fit, select it and repeat the training diagnostics using this model: check finite estimates and standard errors, the fitted occupancy range, Pearson residuals, and grouped calibration, following **Question 5.33**. Diagnostics from the additive model do not establish that the larger model fits adequately. Otherwise, retain the additive model and proceed with that model in **Question 5.33**. Keep the testing data untouched during this decision and these checks.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.32
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Let $Y_i$ be the occupancy rate for shift $i$, and let $\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i)$ be the expected occupancy rate for that shift. Use the notation table from **Question 5.25**. Because the fitted model uses the transformed reservation and discount variables, define
+
+$$
+\tilde{x}_{i,4} = \log(1 + x_{i,4}),
+\qquad
+\tilde{x}_{i,6} = \frac{x_{i,6}}{10}.
+$$
+
+The random component is
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\operatorname{Beta}(\mu_i \phi,\ (1-\mu_i)\phi),
+$$
+
+with logit link
+
+$$
+\begin{aligned}
+\operatorname{logit}(\mu_i) = \eta_i
+&= \beta_0
++ \beta_1 x_{i,1}
++ \beta_2 x_{i,2}
++ \beta_3 x_{i,3}
++ \beta_4 \tilde{x}_{i,4}
++ \beta_5 x_{i,5}
++ \beta_6 \tilde{x}_{i,6}
++ \boldsymbol{\gamma}^{\top}\mathbf{z}_i.
+\end{aligned}
+$$
+
+Here $\mathbf{z}_i$ contains the indicator regressors for the categorical variables listed in **Question 5.25**. The reference levels are Monday, lunch, clear weather, no patio, and no local event.
+
+This is the reduced model, denoted by $\mathcal{M}_0$. The full model, denoted by $\mathcal{M}_1$, keeps the same terms but adds the weather-by-patio interaction:
+
+$$
+\operatorname{logit}(\mu_i)
+=
+\eta_i^{(0)}
++
+\boldsymbol{\delta}^{\top}
+\left(
+\mathbf{w}_i \odot p_i
+\right),
+$$
+
+where $\eta_i^{(0)}$ is the additive linear predictor above, $\mathbf{w}_i$ contains the non-baseline weather indicators, $p_i$ is the patio-open indicator, and $\mathbf{w}_i \odot p_i$ contains their interaction terms.
+
+The reduced model is nested within the full model because setting every component of $\boldsymbol{\delta}$ equal to zero removes the interaction and returns the additive model. The likelihood-ratio test evaluates
+
+$$
+H_0:\boldsymbol{\delta}=\mathbf{0}
+\qquad
+\text{versus}
+\qquad
+H_1:\text{at least one component of }\boldsymbol{\delta}\text{ is nonzero}.
+$$
+
+The likelihood-ratio statistic is
+
+$$
+G^2
+=
+2
+\left[
+\ell(\widehat{\mathcal{M}}_1)
+-
+\ell(\widehat{\mathcal{M}}_0)
+\right],
+$$
+
+and is compared with a $\chi^2$ reference distribution whose degrees of freedom are the number of additional interaction coefficients in the full model.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_additive_formula <- occupancy_rate ~ hour + week_of_year +
+  temperature_f + log_reservations + staff_count + discount_10 +
+  day_of_week + meal_period + weather + patio_open + local_event
+
+occupancy_additive_beta_model <- betareg(
+  occupancy_additive_formula,
+  data = occupancy_training_data
+)
+
+occupancy_interaction_formula <- occupancy_rate ~ hour + week_of_year +
+  temperature_f + log_reservations + staff_count + discount_10 +
+  day_of_week + meal_period + weather * patio_open + local_event
+
+occupancy_interaction_beta_model <- betareg(
+  occupancy_interaction_formula,
+  data = occupancy_training_data
+)
+
+occupancy_additive_loglik <- logLik(occupancy_additive_beta_model)
+occupancy_interaction_loglik <- logLik(occupancy_interaction_beta_model)
+
+occupancy_weather_patio_lrt_statistic <- 2 * (
+  as.numeric(occupancy_interaction_loglik) -
+    as.numeric(occupancy_additive_loglik)
+)
+
+occupancy_weather_patio_lrt_df <- attr(occupancy_interaction_loglik, "df") -
+  attr(occupancy_additive_loglik, "df")
+
+occupancy_weather_patio_lrt_p_value <- pchisq(
+  occupancy_weather_patio_lrt_statistic,
+  df = occupancy_weather_patio_lrt_df,
+  lower.tail = FALSE
+)
+
+occupancy_weather_patio_lrt_summary <- tibble(
+  Comparison = "Additive model vs weather-by-patio model",
+  `LR statistic` = occupancy_weather_patio_lrt_statistic,
+  df = occupancy_weather_patio_lrt_df,
+  `p-value` = occupancy_weather_patio_lrt_p_value
+) %>%
+  mutate(
+    `LR statistic` = round(`LR statistic`, 4),
+    `p-value` = signif(`p-value`, 3)
+  )
+
+print(occupancy_weather_patio_lrt_summary)
+
+if (occupancy_weather_patio_lrt_p_value < 0.05) {
+  occupancy_selected_formula <- occupancy_interaction_formula
+  occupancy_selected_beta_model <- occupancy_interaction_beta_model
+  occupancy_selected_model_name <- "Weather-patio Beta"
+} else {
+  occupancy_selected_formula <- occupancy_additive_formula
+  occupancy_selected_beta_model <- occupancy_additive_beta_model
+  occupancy_selected_model_name <- "Additive Beta"
+}
+
+occupancy_selected_mean_coef <- coef(occupancy_selected_beta_model, model = "mean")
+
+occupancy_selected_coef_table <- tibble(
+  term = names(occupancy_selected_mean_coef),
+  estimate = occupancy_selected_mean_coef,
+  odds_multiplier = exp(estimate)
+) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+print(occupancy_selected_model_name)
+print(occupancy_selected_coef_table, n = Inf)
+```
+
+## **`Python`**
+
+```{python}
+model_vars = [
+    "hour",
+    "week_of_year",
+    "temperature_f",
+    "log_reservations",
+    "staff_count",
+    "discount_10",
+    "day_of_week",
+    "meal_period",
+    "weather",
+    "patio_open",
+    "local_event"
+]
+
+categorical_vars = [
+    "day_of_week",
+    "meal_period",
+    "weather",
+    "patio_open",
+    "local_event"
+]
+
+y = occupancy_training_data["occupancy_rate"].astype(float)
+
+X_raw = occupancy_training_data[model_vars]
+X_additive_encoded = pd.get_dummies(
+    X_raw,
+    columns=categorical_vars,
+    drop_first=True
+).astype(float)
+X_additive = sm.add_constant(X_additive_encoded, has_constant="add")
+
+occupancy_additive_beta_model = BetaModel(y, X_additive).fit()
+
+def add_weather_patio_interactions(encoded_data):
+    interaction_data = encoded_data.copy()
+    patio_col = "patio_open_Yes"
+    for weather_level in ["Cloudy", "Rain", "Heat"]:
+        weather_col = f"weather_{weather_level}"
+        if weather_col in interaction_data.columns and patio_col in interaction_data.columns:
+            interaction_data[f"{weather_col}:patio_open_Yes"] = (
+                interaction_data[weather_col] * interaction_data[patio_col]
+            )
+    return interaction_data
+
+X_interaction_encoded = add_weather_patio_interactions(X_additive_encoded)
+X_interaction = sm.add_constant(X_interaction_encoded, has_constant="add")
+
+occupancy_interaction_beta_model = BetaModel(y, X_interaction).fit()
+
+from scipy.stats import chi2
+
+occupancy_weather_patio_lrt_statistic_py = 2 * (
+    occupancy_interaction_beta_model.llf - occupancy_additive_beta_model.llf
+)
+occupancy_weather_patio_lrt_df_py = X_interaction.shape[1] - X_additive.shape[1]
+occupancy_weather_patio_lrt_p_value_py = chi2.sf(
+    occupancy_weather_patio_lrt_statistic_py,
+    occupancy_weather_patio_lrt_df_py
+)
+
+occupancy_weather_patio_lrt_summary_py = pd.DataFrame({
+    "Comparison": ["Additive model vs weather-by-patio model"],
+    "LR statistic": [occupancy_weather_patio_lrt_statistic_py],
+    "df": [occupancy_weather_patio_lrt_df_py],
+    "p-value": [occupancy_weather_patio_lrt_p_value_py]
+})
+
+print(occupancy_weather_patio_lrt_summary_py.to_string(
+    index=False,
+    formatters={"LR statistic": "{:.4f}".format, "p-value": "{:.3g}".format}
+))
+
+if occupancy_weather_patio_lrt_p_value_py < 0.05:
+    occupancy_selected_beta_model = occupancy_interaction_beta_model
+    occupancy_selected_X = X_interaction
+    occupancy_selected_X_encoded = X_interaction_encoded
+    occupancy_selected_model_name_py = "Weather-patio Beta"
+else:
+    occupancy_selected_beta_model = occupancy_additive_beta_model
+    occupancy_selected_X = X_additive
+    occupancy_selected_X_encoded = X_additive_encoded
+    occupancy_selected_model_name_py = "Additive Beta"
+
+selected_mean_terms = occupancy_selected_beta_model.params.index[
+    :occupancy_selected_X.shape[1]
+]
+
+occupancy_selected_coef_table_py = pd.DataFrame({
+    "term": selected_mean_terms,
+    "estimate": occupancy_selected_beta_model.params.loc[selected_mean_terms],
+    "odds_multiplier": np.exp(
+        occupancy_selected_beta_model.params.loc[selected_mean_terms]
+    )
+})
+
+print(occupancy_selected_model_name_py)
+print(occupancy_selected_coef_table_py.round(3))
+```
+
+:::
+
+For this training split, the likelihood-ratio statistic is approximately $34.5$ on $3$ degrees of freedom, with $p \approx 1.57 \times 10^{-7}$. Thus, the larger weather-by-patio model gives a statistically supported improvement over the additive model and is selected at the 5% level. If the test had not rejected $H_0$, we would have retained the additive model for parsimony.
+
+**Diagnostic follow-up.** Because the larger model is selected here, repeat the training checks using `occupancy_selected_beta_model`, which the code above assigns to the weather-by-patio fit. The code in **Answer 5.33** carries out these checks on the selected model: its estimates and standard errors are finite, fitted occupancy ranges from about $0.142$ to $0.990$, and the five calibration groups have observed and fitted mean occupancy within about $0.007$ of one another. Inspect the Pearson residual plot as well, including the largest absolute residual of about $3.66$, before accepting the model for the next stage; a significant likelihood-ratio test alone does not establish adequate fit. If the additive model were retained, the same code would check that model instead. Only after these training checks do we proceed to the frozen-specification testing analysis and held-out predictive evaluation.
+
+For the selected model, the exponentiated coefficients describe multiplicative changes in the odds of the expected occupancy proportion, $\mu_i/(1-\mu_i)$. Coefficients involving `weather` and `patio_open` should be interpreted relative to the baseline categories from **Question 5.25**, and interaction terms should be interpreted as modifications to the corresponding additive weather and patio comparisons.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.33 — Checking and Freezing the Selected Model
+::::
+:::: {.Question-container}
+Using the selected training model from **Question 5.32**:
+
+1. Verify that the selected model has finite coefficient estimates and model-based standard errors.
+2. Check the range of fitted mean occupancy values on the training data.
+3. Plot Pearson residuals against fitted mean occupancy values.
+4. Create a grouped training calibration check by splitting fitted values into five groups and comparing observed mean occupancy with fitted mean occupancy.
+5. Fit the frozen selected specification on `occupancy_testing_data` for coefficient-level inference. Report the mean coefficients, their exponentiated values, and 95% Wald confidence intervals for the exponentiated coefficients to support the inferential answer in **Question 5.35**.
+6. Explain what must not be changed after the testing outcomes have been examined.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.33
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_selected_se <- sqrt(diag(vcov(occupancy_selected_beta_model)))
+
+occupancy_selected_diag <- occupancy_training_data %>%
+  mutate(
+    fitted_occupancy = fitted(occupancy_selected_beta_model),
+    pearson_resid = residuals(occupancy_selected_beta_model, type = "pearson")
+  )
+
+occupancy_selected_check <- tibble(
+  Quantity = c(
+    "Selected training model",
+    "Finite mean coefficients",
+    "Finite model-based SEs",
+    "Minimum fitted occupancy",
+    "Maximum fitted occupancy",
+    "Largest absolute Pearson residual"
+  ),
+  Value = c(
+    occupancy_selected_model_name,
+    all(is.finite(coef(occupancy_selected_beta_model, model = "mean"))),
+    all(is.finite(occupancy_selected_se)),
+    round(min(occupancy_selected_diag$fitted_occupancy), 3),
+    round(max(occupancy_selected_diag$fitted_occupancy), 3),
+    round(max(abs(occupancy_selected_diag$pearson_resid)), 3)
+  )
+)
+
+print(occupancy_selected_check)
+
+ggplot(occupancy_selected_diag, aes(x = fitted_occupancy, y = pearson_resid)) +
+  geom_point(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  theme_minimal() +
+  labs(
+    x = "Fitted mean occupancy",
+    y = "Pearson residual",
+    title = occupancy_selected_model_name
+  )
+
+occupancy_selected_training_calibration <- occupancy_selected_diag %>%
+  mutate(calibration_group = ntile(fitted_occupancy, 5)) %>%
+  group_by(calibration_group) %>%
+  summarize(
+    Shifts = n(),
+    `Mean fitted occupancy` = mean(fitted_occupancy),
+    `Observed mean occupancy` = mean(occupancy_rate),
+    .groups = "drop"
+  )
+
+print(
+  occupancy_selected_training_calibration %>%
+    mutate(across(where(is.numeric), ~ round(.x, 3)))
+)
+
+ggplot(
+  occupancy_selected_training_calibration,
+  aes(x = `Mean fitted occupancy`, y = `Observed mean occupancy`)
+) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  geom_point(size = 2.5) +
+  geom_line() +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  theme_minimal() +
+  labs(x = "Mean fitted occupancy", y = "Observed mean occupancy")
+
+occupancy_selected_mean_coef <- coef(
+  occupancy_selected_beta_model,
+  model = "mean"
+)
+
+occupancy_weather_patio_terms <- tibble(
+  term = names(occupancy_selected_mean_coef),
+  estimate = occupancy_selected_mean_coef,
+  odds_multiplier = exp(estimate)
+) %>%
+  filter(str_detect(term, "weather|patio")) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+print(occupancy_weather_patio_terms)
+
+occupancy_testing_inference_beta_model <- betareg(
+  occupancy_selected_formula,
+  data = occupancy_testing_data
+)
+
+occupancy_testing_inference_mean_coef <- coef(
+  occupancy_testing_inference_beta_model,
+  model = "mean"
+)
+
+occupancy_testing_inference_se <- sqrt(
+  diag(vcov(occupancy_testing_inference_beta_model))
+)[names(occupancy_testing_inference_mean_coef)]
+
+occupancy_testing_inference_coef_table <- tibble(
+  term = names(occupancy_testing_inference_mean_coef),
+  estimate = occupancy_testing_inference_mean_coef,
+  odds_multiplier = exp(estimate),
+  odds_lower_95 = exp(estimate - qnorm(0.975) * occupancy_testing_inference_se),
+  odds_upper_95 = exp(estimate + qnorm(0.975) * occupancy_testing_inference_se)
+) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+print(occupancy_testing_inference_coef_table, n = Inf, width = Inf)
+```
+
+## **`Python`**
+
+```{python}
+occupancy_selected_diagnostics_py = occupancy_training_data.copy()
+occupancy_selected_diagnostics_py["fitted_occupancy"] = (
+    occupancy_selected_beta_model.fittedvalues
+)
+occupancy_selected_diagnostics_py["pearson_resid"] = (
+    occupancy_selected_beta_model.resid_pearson
+)
+
+occupancy_selected_check_py = pd.DataFrame({
+    "Quantity": [
+        "Selected training model",
+        "Finite coefficients",
+        "Finite model-based SEs",
+        "Minimum fitted occupancy",
+        "Maximum fitted occupancy",
+        "Largest absolute Pearson residual"
+    ],
+    "Value": [
+        occupancy_selected_model_name_py,
+        np.isfinite(occupancy_selected_beta_model.params).all(),
+        np.isfinite(occupancy_selected_beta_model.bse).all(),
+        round(occupancy_selected_diagnostics_py["fitted_occupancy"].min(), 3),
+        round(occupancy_selected_diagnostics_py["fitted_occupancy"].max(), 3),
+        round(occupancy_selected_diagnostics_py["pearson_resid"].abs().max(), 3)
+    ]
+})
+
+print(occupancy_selected_check_py)
+
+plt.figure()
+plt.scatter(
+    occupancy_selected_diagnostics_py["fitted_occupancy"],
+    occupancy_selected_diagnostics_py["pearson_resid"],
+    alpha=0.5
+)
+plt.axhline(0, color="red", linestyle="--")
+plt.xlabel("Fitted mean occupancy")
+plt.ylabel("Pearson residual")
+plt.title(occupancy_selected_model_name_py)
+plt.show()
+
+occupancy_selected_diagnostics_py["calibration_group"] = pd.qcut(
+    occupancy_selected_diagnostics_py["fitted_occupancy"].rank(method="first"),
+    q=5,
+    labels=False
+) + 1
+
+occupancy_selected_training_calibration_py = (
+    occupancy_selected_diagnostics_py
+    .groupby("calibration_group", observed=True)
+    .agg(
+        Shifts=("occupancy_rate", "size"),
+        Mean_fitted_occupancy=("fitted_occupancy", "mean"),
+        Observed_mean_occupancy=("occupancy_rate", "mean")
+    )
+    .reset_index()
+)
+
+print(occupancy_selected_training_calibration_py.round(3))
+
+plt.figure()
+plt.plot([0, 1], [0, 1], color="red", linestyle="--")
+plt.plot(
+    occupancy_selected_training_calibration_py["Mean_fitted_occupancy"],
+    occupancy_selected_training_calibration_py["Observed_mean_occupancy"],
+    marker="o"
+)
+plt.xlim(0, 1)
+plt.ylim(0, 1)
+plt.gca().set_aspect("equal", adjustable="box")
+plt.xlabel("Mean fitted occupancy")
+plt.ylabel("Observed mean occupancy")
+plt.show()
+
+selected_mean_terms = occupancy_selected_beta_model.params.index[
+    :occupancy_selected_X.shape[1]
+]
+occupancy_weather_patio_terms_py = pd.DataFrame({
+    "term": selected_mean_terms,
+    "estimate": occupancy_selected_beta_model.params.loc[selected_mean_terms],
+    "odds_multiplier": np.exp(
+        occupancy_selected_beta_model.params.loc[selected_mean_terms]
+    )
+})
+occupancy_weather_patio_terms_py = occupancy_weather_patio_terms_py[
+    occupancy_weather_patio_terms_py["term"].str.contains("weather|patio")
+]
+print(occupancy_weather_patio_terms_py.round(3))
+
+test_X_raw = occupancy_testing_data[model_vars]
+test_X_additive_encoded = pd.get_dummies(
+    test_X_raw,
+    columns=categorical_vars,
+    drop_first=True
+).astype(float)
+test_X_additive_encoded = test_X_additive_encoded.reindex(
+    columns=X_additive_encoded.columns,
+    fill_value=0
+)
+
+test_X_interaction_encoded = add_weather_patio_interactions(test_X_additive_encoded)
+test_X_interaction_encoded = test_X_interaction_encoded.reindex(
+    columns=X_interaction_encoded.columns,
+    fill_value=0
+)
+
+if occupancy_selected_model_name_py == "Weather-patio Beta":
+    test_X_selected_encoded = test_X_interaction_encoded
+else:
+    test_X_selected_encoded = test_X_additive_encoded
+
+test_X_selected = sm.add_constant(test_X_selected_encoded, has_constant="add")
+y_test = occupancy_testing_data["occupancy_rate"].astype(float)
+
+occupancy_testing_inference_beta_model = BetaModel(y_test, test_X_selected).fit()
+
+testing_mean_terms = occupancy_testing_inference_beta_model.params.index[
+    :test_X_selected.shape[1]
+]
+testing_mean_ci = occupancy_testing_inference_beta_model.conf_int().loc[
+    testing_mean_terms
+]
+occupancy_testing_inference_coef_table_py = pd.DataFrame({
+    "term": testing_mean_terms,
+    "estimate": occupancy_testing_inference_beta_model.params.loc[testing_mean_terms],
+    "odds_multiplier": np.exp(
+        occupancy_testing_inference_beta_model.params.loc[testing_mean_terms]
+    ),
+    "odds_lower_95": np.exp(testing_mean_ci.iloc[:, 0]),
+    "odds_upper_95": np.exp(testing_mean_ci.iloc[:, 1])
+})
+
+print(occupancy_testing_inference_coef_table_py.round(3).to_string(index=False))
+```
+
+:::
+
+The selected training model should have fitted mean occupancy values inside the unit interval, finite estimates, and no obvious residual pattern. The grouped calibration plot is an in-sample goodness-of-fit check: points close to the diagonal indicate that the fitted mean occupancy and observed mean occupancy agree reasonably well within fitted-value groups.
+
+Only after the training-stage selection and checks do we fit the frozen selected specification on the testing data for coefficient-level inference. The specification is fixed at this point: after looking at the testing outcomes, we should not add or remove regressors, change transformations, drop the weather-by-patio interaction, or alter reference categories. For the predictive evaluation in **Question 5.34**, we use the training-fitted selected model, not the testing-set refit.
+
+</details>
+::::
+:::
+
+#### Results
+
+The results stage now evaluates whether the final training-fitted model predicts held-out shifts well. This includes point prediction of the conditional mean and probabilistic prediction from the full fitted Beta distribution.
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.34 — Predictive Evaluation on Held-Out Shifts
+::::
+:::: {.Question-container}
+Using the training-fitted selected model from **Question 5.32** as the final predictive model:
+
+For this predictive evaluation, do not refit either model using the testing responses. The testing data should only be used to generate predictions and evaluate those predictions.
+
+1. Fit an intercept-only Beta regression baseline using only `occupancy_training_data`.
+2. For each testing observation, create a prediction table containing the observed response $y_i$, the predicted conditional mean $\hat{\mu}_i$, the predicted precision $\hat{\phi}_i$, and the fitted Beta shape parameters
+   $$
+   \hat{\alpha}_i = \hat{\mu}_i\hat{\phi}_i,
+   \qquad
+   \hat{\beta}_i = (1-\hat{\mu}_i)\hat{\phi}_i.
+   $$
+3. Compare point-prediction accuracy for the final model and baseline using
+   $$
+   \operatorname{MAE} = \frac{1}{n_{\text{test}}}\sum_i |y_i - \hat{\mu}_i|
+   $$
+   and
+   $$
+   \operatorname{RMSE} =
+   \sqrt{
+   \frac{1}{n_{\text{test}}}\sum_i (y_i - \hat{\mu}_i)^2
+   }.
+   $$
+4. Compare probabilistic prediction using mean negative log predictive density,
+   $$
+   \operatorname{NLPD}
+   =
+   -\frac{1}{n_{\text{test}}}
+   \sum_i \log\{f_i(y_i)\},
+   $$
+   where $f_i$ is the fitted Beta density for testing observation $i$.
+5. Construct 90% predictive intervals and report both empirical coverage and average interval width.
+6. Make a PIT histogram for the final model, where $u_i = F_i(y_i)$ and $F_i$ is the fitted Beta CDF.
+7. Briefly conclude whether the final model improves point prediction and probabilistic prediction over the baseline.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.34
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+For held-out observation $i$, $\hat{\mu}_i$ is the point prediction for expected occupancy. The fitted Beta distribution uses both $\hat{\mu}_i$ and $\hat{\phi}_i$, so the probabilistic evaluation checks more than the conditional mean. All metrics below are computed on the held-out testing shifts, using models fitted only on the training data.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+occupancy_baseline_beta_model <- betareg(
+  occupancy_rate ~ 1,
+  data = occupancy_training_data
+)
+
+evaluate_beta_prediction <- function(model, newdata, observed, model_name) {
+  mu_hat <- as.numeric(predict(model, newdata = newdata, type = "response"))
+  phi_hat <- as.numeric(predict(model, newdata = newdata, type = "precision"))
+
+  alpha_hat <- mu_hat * phi_hat
+  beta_hat <- (1 - mu_hat) * phi_hat
+
+  lower_90 <- qbeta(0.05, shape1 = alpha_hat, shape2 = beta_hat)
+  upper_90 <- qbeta(0.95, shape1 = alpha_hat, shape2 = beta_hat)
+  pit <- pbeta(observed, shape1 = alpha_hat, shape2 = beta_hat)
+
+  predictions <- tibble(
+    observed = observed,
+    mu_hat = mu_hat,
+    phi_hat = phi_hat,
+    alpha_hat = alpha_hat,
+    beta_hat = beta_hat,
+    lower_90 = lower_90,
+    upper_90 = upper_90,
+    PIT = pit
+  )
+
+  metrics <- tibble(
+    Model = model_name,
+    MAE = mean(abs(observed - mu_hat)),
+    RMSE = sqrt(mean((observed - mu_hat)^2)),
+    Mean_NLPD = -mean(dbeta(observed, shape1 = alpha_hat, shape2 = beta_hat, log = TRUE)),
+    Coverage_90 = mean(observed >= lower_90 & observed <= upper_90),
+    Average_Interval_Width = mean(upper_90 - lower_90)
+  )
+
+  list(metrics = metrics, predictions = predictions)
+}
+
+baseline_prediction_eval <- evaluate_beta_prediction(
+  occupancy_baseline_beta_model,
+  occupancy_testing_data,
+  occupancy_testing_data$occupancy_rate,
+  "Intercept-only Beta"
+)
+
+final_prediction_eval <- evaluate_beta_prediction(
+  occupancy_selected_beta_model,
+  occupancy_testing_data,
+  occupancy_testing_data$occupancy_rate,
+  occupancy_selected_model_name
+)
+
+occupancy_predictive_summary <- bind_rows(
+  baseline_prediction_eval$metrics,
+  final_prediction_eval$metrics
+) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+
+print(occupancy_predictive_summary)
+
+final_prediction_preview <- final_prediction_eval$predictions %>%
+  select(observed, mu_hat, phi_hat, alpha_hat, beta_hat, lower_90, upper_90, PIT) %>%
+  head() %>%
+  mutate(across(where(is.numeric), ~ round(.x, 4)))
+
+print(final_prediction_preview)
+
+ggplot(final_prediction_eval$predictions, aes(x = PIT)) +
+  geom_histogram(
+    breaks = seq(0, 1, by = 0.1),
+    fill = "gray70",
+    color = "white",
+    boundary = 0
+  ) +
+  theme_minimal() +
+  labs(
+    x = "PIT value",
+    y = "Testing shifts",
+    title = "Held-out PIT histogram for final Beta model"
+  )
+```
+
+## **`Python`**
+
+```{python}
+from scipy.stats import beta
+
+baseline_train_X = pd.DataFrame({
+    "const": np.ones(len(occupancy_training_data))
+})
+baseline_test_X = pd.DataFrame({
+    "const": np.ones(len(occupancy_testing_data))
+})
+
+occupancy_baseline_beta_model = BetaModel(y, baseline_train_X).fit()
+
+test_X_raw = occupancy_testing_data[model_vars]
+test_X_additive_encoded = pd.get_dummies(
+    test_X_raw,
+    columns=categorical_vars,
+    drop_first=True
+).astype(float)
+test_X_additive_encoded = test_X_additive_encoded.reindex(
+    columns=X_additive_encoded.columns,
+    fill_value=0
+)
+test_X_interaction_encoded = add_weather_patio_interactions(
+    test_X_additive_encoded
+)
+test_X_interaction_encoded = test_X_interaction_encoded.reindex(
+    columns=X_interaction_encoded.columns,
+    fill_value=0
+)
+test_X_interaction = sm.add_constant(test_X_interaction_encoded, has_constant="add")
+test_X_additive = sm.add_constant(test_X_additive_encoded, has_constant="add")
+
+if occupancy_selected_model_name_py == "Weather-patio Beta":
+    test_X_selected = test_X_interaction
+else:
+    test_X_selected = test_X_additive
+
+def evaluate_beta_prediction_py(model, exog, observed, model_name):
+    observed = np.asarray(observed, dtype=float)
+    mu_hat = np.asarray(model.predict(exog), dtype=float)
+    phi_hat = np.repeat(np.exp(model.params.iloc[-1]), len(observed))
+
+    if mu_hat.shape == () or len(mu_hat) != len(observed):
+        mu_hat = np.repeat(np.ravel(mu_hat)[0], len(observed))
+
+    alpha_hat = mu_hat * phi_hat
+    beta_hat = (1 - mu_hat) * phi_hat
+
+    lower_90 = beta.ppf(0.05, alpha_hat, beta_hat)
+    upper_90 = beta.ppf(0.95, alpha_hat, beta_hat)
+    pit = beta.cdf(observed, alpha_hat, beta_hat)
+
+    predictions = pd.DataFrame({
+        "observed": observed,
+        "mu_hat": mu_hat,
+        "phi_hat": phi_hat,
+        "alpha_hat": alpha_hat,
+        "beta_hat": beta_hat,
+        "lower_90": lower_90,
+        "upper_90": upper_90,
+        "PIT": pit
+    })
+
+    metrics = pd.DataFrame({
+        "Model": [model_name],
+        "MAE": [np.mean(np.abs(observed - mu_hat))],
+        "RMSE": [np.sqrt(np.mean((observed - mu_hat) ** 2))],
+        "Mean_NLPD": [-np.mean(beta.logpdf(observed, alpha_hat, beta_hat))],
+        "Coverage_90": [np.mean((observed >= lower_90) & (observed <= upper_90))],
+        "Average_Interval_Width": [np.mean(upper_90 - lower_90)]
+    })
+
+    return {"metrics": metrics, "predictions": predictions}
+
+y_test = occupancy_testing_data["occupancy_rate"].astype(float)
+
+baseline_prediction_eval_py = evaluate_beta_prediction_py(
+    occupancy_baseline_beta_model,
+    baseline_test_X,
+    y_test,
+    "Intercept-only Beta"
+)
+
+final_prediction_eval_py = evaluate_beta_prediction_py(
+    occupancy_selected_beta_model,
+    test_X_selected,
+    y_test,
+    occupancy_selected_model_name_py
+)
+
+occupancy_predictive_summary_py = pd.concat(
+    [
+        baseline_prediction_eval_py["metrics"],
+        final_prediction_eval_py["metrics"]
+    ],
+    ignore_index=True
+)
+
+print(occupancy_predictive_summary_py.round(4))
+
+print(final_prediction_eval_py["predictions"].head().round(4))
+
+plt.figure()
+plt.hist(
+    final_prediction_eval_py["predictions"]["PIT"],
+    bins=np.linspace(0, 1, 11),
+    edgecolor="white"
+)
+plt.xlabel("PIT value")
+plt.ylabel("Testing shifts")
+plt.title("Held-out PIT histogram for final Beta model")
+plt.show()
+```
+
+:::
+
+The final model should be judged against the intercept-only Beta baseline, not against the testing-set mean. Lower MAE and RMSE indicate better held-out point prediction of expected occupancy. Lower mean negative log predictive density indicates a better full predictive distribution because the model places more probability density near the occupancy rates that actually occurred. NLPD can be negative because Beta densities can be greater than 1, so the key comparison is still which model has the lower value on the same held-out response scale.
+
+The 90% predictive interval coverage should be interpreted together with average interval width. Coverage close to 0.90 is desirable, but very wide intervals can cover many observations while still being unhelpful for planning. The PIT histogram should look roughly uniform if the final model's predictive distributions are reasonably calibrated on the held-out shifts.
+
+</details>
+::::
+:::
+
+#### Storytelling
+
+The storytelling stage translates the technical results into a message that a restaurant operations team could use. The audience does not need every coefficient; it needs the main occupancy levers, the predictive-evaluation results, and the limits of the model.
+
+::: {.Question}
+:::: {.Question-header}
+Question 5.35 — Telling the Occupancy Planning Story
+::::
+:::: {.Question-container}
+Write a short storytelling summary for a restaurant operations team. Your summary should:
+
+1. lead with the main practical message;
+2. explicitly answer the inferential inquiry from **Question 5.21**: after accounting for timing and reservations, are larger discounts, patio-open shifts, and local events associated with higher expected occupancy? Use the fixed-specification testing-set estimates from **Question 5.33**, quantify at least two associations, and include a confidence interval for at least one; mention the reservation association and explain how the patio association depends on weather;
+3. explain whether the final training-fitted model improves held-out point and probabilistic prediction over the baseline, citing results from **Question 5.34** such as MAE or RMSE, mean NLPD, and predictive-interval coverage and width;
+4. describe one way the model could support staffing or promotion planning; and
+5. state one important limitation.
+
+Write in three to five sentences.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 5.35
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Use the testing-set refit in **Question 5.33** for the inferential statements and the frozen training fit evaluated in **Question 5.34** for prediction. The multipliers below refer to the odds of expected occupancy, $\mu/(1-\mu)$, holding other regressors fixed; they are not multipliers of occupancy itself. With an interaction, combine the patio coefficient with the relevant weather-by-patio coefficient: for example, the cloudy-weather patio multiplier is approximately $\exp(1.178 - 0.213) = 2.62$. The testing-set confidence intervals for the interaction multipliers include 1, so that refit does not give clear evidence of differences in the patio association across weather categories, despite the training-set selection result.
+
+A short storytelling summary could be:
+
+Reservations and shift conditions can help guide staffing: higher reservations are associated with higher expected occupancy, and, after accounting for timing, reservations, and other regressors, the testing-set fit also supports positive associations for discounts, local events, and patio availability. An extra 10 percentage points of discount is associated with about 1.77 times the odds of expected occupancy (95% confidence interval: 1.66 to 1.89), while local-event shifts have about 1.64 times the odds of shifts without events (95% confidence interval: 1.37 to 1.97). The estimated patio-open versus patio-closed multiplier varies with weather, from about 3.25 in clear weather to 2.62 in cloudy weather, although the testing data leave these weather differences uncertain. For held-out shifts, the training-fitted model reduces mean absolute error from about 17.6 to 6.1 occupancy percentage points and improves the full predictive distribution, with mean negative log predictive density falling from about $-0.35$ to $-1.28$. Its 90% predictive intervals average about 22.4 percentage points wide rather than the baseline's 66.1, but cover only 86.5% of testing shifts, so staffing plans should allow for forecast uncertainty, and these simulated observational associations do not establish that changing discounts or opening the patio causes higher occupancy.
+
+</details>
+::::
+:::
+
 :::
