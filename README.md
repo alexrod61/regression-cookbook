@@ -134,7 +134,7 @@ For questions or feedback, open an issue on [GitHub](https://github.com/alexrod6
 
 ## Collaborators
 
-We extend our warmest thanks to the collaborators whose insight and enthusiasm have strengthened every part of this project. We are especially grateful to **Olivia Liu**, **Michael Sekatchev**, and **Aviv Milner**, whose hard work on chapter drafts, code examples, pedagogical framing, and workflow structure has helped shape the Regression Cookbook into a more rigorous, accessible, and thoughtfully crafted resource.
+We extend our warmest thanks to our collaborators whose insight and enthusiasm have strengthened every part of this project. We are especially grateful to **Karan Bains**, **Lavanya Gupta**, **Olivia Liu**, **Aviv Milner**, **Héctor Palafox Prieto**, **Michael Sekatchev**, and **Shuyuan Wang** whose hard work on chapter drafts, code examples, pedagogical framing, and workflow structure has helped shape the Regression Cookbook into a more rigorous, accessible, and thoughtfully crafted resource.
 
 Your willingness to engage deeply with the material and provide constructive work has made this project richer than it could have been on its own. We are sincerely appreciative of the time, expertise, and encouragement each of you contributed. Thank you for helping build an OER that reflects both technical excellence and the collaborative spirit of the data-science and statistics community.
 
