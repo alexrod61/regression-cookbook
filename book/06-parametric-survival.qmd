@@ -155,19 +155,104 @@ The response of interest is a nonnegative random variable $T$, representing the 
 
 In an ideal world, we would observe the exact event time for every subject. In practice, observation is limited. A study has a finite duration, participants can drop out or be lost to follow-up, and some events simply have not happened yet when the data is collected. When a subject's follow-up ends before their event occurs, that observation is said to be **right censored**: we do not know the exact event time, but we do know it exceeds the time at which observation stopped.
 
-Because of censoring, each observation in a survival dataset carries two pieces of information:
+To make this more concrete, imagine a study tracking how long five machines operate before failing. Some machines fail during the observation period, while others are still operating when the study ends or their follow-up stops.
 
-- the **follow-up time** $t_i$, which is either the event time or the censoring time, and
+```{python}
+#| label: survival-censoring-timeline
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+
+machines = [
+    ("A", 4, 1),
+    ("B", 7, 0),
+    ("C", 6, 1),
+    ("D", 10, 0),
+    ("E", 9, 1),
+]
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+
+for i, (name, time, event) in enumerate(machines):
+    y = len(machines) - i
+
+    color = "tab:green" if event else "tab:orange"
+
+    ax.hlines(y, 0, time, color=color, linewidth=3)
+
+    if event:
+        ax.plot(time, y, marker="x", color=color,
+                markersize=10, markeredgewidth=2)
+    else:
+        ax.plot(time, y, marker="o", color=color,
+                markersize=9, markerfacecolor="white",
+                markeredgewidth=2)
+
+ax.plot([], [], marker="x", linestyle="None",
+        color="tab:green", label="Failure observed")
+ax.plot([], [], marker="o", linestyle="None",
+        color="tab:orange", markerfacecolor="white",
+        label="Right censored")
+
+ax.set_yticks(range(1, 6))
+ax.set_yticklabels(["E", "D", "C", "B", "A"])
+ax.set_xlabel("Follow-up time (months)")
+ax.set_ylabel("Machine")
+ax.set_title("Observed Machine Lifetimes and Right Censoring")
+
+ax.set_xlim(0, 11)
+ax.set_ylim(0.5, 5.5)
+ax.legend(frameon=False, loc="upper right")
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+In the figure above, Machines A, C, and E experienced failures at months 4, 6, and 9, respectively. Their exact failure times are known. Machines B and D, however, were right censored at months 7 and 10. This does not mean they failed at those times. It simply means we stopped observing them while they were still operating. Their actual failure times remain unknown.
+
+Because of censoring, we distinguish between a subject's true event time $T_i$ and their censoring time $C_i$. What we actually observe is the smaller of the two:
+
+$$
+t_i = \min(T_i, C_i)
+$$
+
+Each observation in a survival dataset therefore carries two pieces of information:
+
+- the **observed follow-up time** $t_i$, which is either the event time or the censoring time, and
 - an **event indicator** $\delta_i$, which equals 1 if the event was observed and 0 if the observation was censored.
 
+Mathematically, the event indicator can be written as
+
+$$
+\delta_i =
+\begin{cases}
+1 & \text{if } T_i \leq C_i \
+0 & \text{if } T_i > C_i
+\end{cases}
+$$
+
+For example, Machine A would have $t_i=4$ and $\delta_i=1$, since its failure was observed at month 4. Machine D would have $t_i=10$ and $\delta_i=0$, since it was still operating when the study ended at month 10.
+
+::: {.Tip}
+::::{.Tip-header}
+Censored Observations are NOT Missing Data
+:::
+::::{.Tip-container}
 It is worth emphasizing that censored observations are not missing data. A machine that ran for five years without failing tells us something real: its lifetime is greater than five years. A central goal of survival analysis is to extract exactly this partial information rather than discard it.
+:::
+:::
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up!
 ::::
 ::::{.Heads-up-container}
-Right censoring is not the only kind of censoring. An observation is **left censored** when the event is known to have occurred before observation began, and **interval censored** when the event is only known to have occurred between two time points. Right censoring is by far the most common situation in practice, and it is the case we focus on throughout this chapter.
+Right censoring is not the only kind of censoring. An observation is left censored when the event is known to have occurred before a particular observation time, but its exact timing is unknown. An observation is interval censored when the event is only known to have occurred between two time points. Right censoring is especially common in survival studies, and it is the case we focus on throughout this chapter.
 ::::
 :::
 
