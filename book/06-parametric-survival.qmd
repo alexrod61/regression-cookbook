@@ -280,31 +280,46 @@ $$
 S(t) = P(T > t) = 1 - F_T(t)
 $$
 
-where $F_T(t)$ is the cumulative distribution function (CDF) of the survival time $T$. In words, $S(t)$ answers the question: what fraction of subjects are still event-free at time $t$?
+where $F_T(t)$ is the cumulative distribution function (CDF) of the survival time $T$. In other words, $S(t)$ answers a simple question: what is the probability that a randomly selected subject will remain event-free beyond time $t$?
+
+For example, suppose we are studying the lifetimes of machine components. If $S(12)=0.8$, this means that a randomly selected component has an 80% probability of continuing to operate for more than 12 months. Equivalently, there is a 20% probability that the component will have failed by month 12.
 
 ::: {.Heads-up}
 ::::{.Heads-up-header}
 Heads-up on the properties of the cumulative distribution function!
 ::::
 ::::{.Heads-up-container}
-It is important to clarify that a **valid** CDF $F_Y(y)$ fulfils the following properties:
-
-a. $F_Y(y)$ must **never** be a decreasing function.
-b. Given that $F_Y(y) : \mathbb{R} \rightarrow [0, 1]$, it must **never** evaluate to be $< 0$ or $> 1$. The output of a CDF is a **cumulative probability**, hence the previous bounds.
-c. When $y \rightarrow -\infty$, it follows that $F_Y(y) \rightarrow 0$.
-d. When $y \rightarrow \infty$, it follows that $F_Y(y) \rightarrow 1$.
-
-Now, in the case of a CDF corresponding to a continuous random variable $Y$, there is an additional handy property that relates the CDF $F_Y(y)$ to the probability density function (PDF) $f_Y(y)$:
+Recall that the cumulative distribution function (CDF) gives the probability that a random variable takes a value less than or equal to a particular point:
 
 $$
-f_Y(y) = \frac{\mathrm{d}}{\mathrm{d}y} F_Y(y).
-$${#eq-cdf-to-pdf}
+F_T(t)=P(T\leq t)
+$$
 
-@eq-cdf-to-pdf indicates that the PDF of $Y$ can be obtained by taking the first derivative of the CDF with respect to $y$.
+In the context of survival analysis, this represents the probability that the event has already occurred by time $t$.
+
+The survival function looks at the exact opposite: the probability that the event has not yet occurred by time $t$. Since these two possibilities are mutually exclusive and cover all possible outcomes, their probabilities must add up to 1:
+
+$$
+F_T(t)+S(t)=1
+$$
+
+For example, if the probability of a machine failing within its first 12 months is 20%, then the probability of it surviving beyond 12 months must be 80%.
+
+This is why the survival function is simply the complement of the CDF:
+
+$$
+S(t)=1-F_T(t)
+$$
 ::::
 :::
 
-Because the survival function is simply one minus the CDF, its properties follow directly from the properties listed above. For a nonnegative survival time, $S(0) = 1$, since no one has experienced the event at the very start. The function can never increase, because subjects who have experienced the event cannot return to being event-free. And as time grows large, $S(t)$ approaches zero whenever the event eventually occurs for everyone.
+Because the survival function is one minus the CDF, several useful properties follow directly:
+
+- **It starts at 1**: For the continuous positive survival-time distributions considered here, $S(0)=1$, since the event has not occurred at time zero.
+- **It never increases**: As time passes, the probability of remaining event-free can only stay the same or decrease.
+- **It approaches 0**: If the event eventually occurs with probability 1, then $S(t)\rightarrow0$ as $t\rightarrow\infty$.
+
+The figure below illustrates survival functions from Exponential distributions with different rate parameters.
 
 ```{python}
 #| label: survival-curves
@@ -323,7 +338,16 @@ fig, ax = plt.subplots(figsize=(9, 5))
 
 for lam in rates:
     S = np.exp(-lam * t)
-    ax.plot(t, S, label=f"lambda = {lam}")
+    line, = ax.plot(t, S, label=rf"$\lambda = {lam}$")
+
+    ax.scatter(
+        1, np.exp(-lam),
+        color=line.get_color(),
+        s=50,
+        zorder=5
+    )
+
+ax.axvline(1, color="gray", linestyle="--", alpha=0.5)
 
 ax.set_title("Examples of Survival Functions (Exponential Distributions)")
 ax.set_xlabel("Time")
@@ -335,7 +359,13 @@ fig.tight_layout()
 fig
 ```
 
-The figure above shows survival functions from Exponential distributions with different rate parameters. All three curves start at one, decrease steadily, and approach zero, but they do so at different speeds. Larger rates correspond to events that tend to happen sooner, so their survival curves drop more quickly.
+All three curves begin at 1 and gradually approach 0, but they decline at different speeds. A larger rate parameter $\lambda$ corresponds to events occurring sooner, causing the survival probability to decrease more quickly.
+
+For example, at time $t=1$, the survival probabilities for $\lambda=0.5$, $\lambda=1$, and $\lambda=2$ are approximately 0.61, 0.37, and 0.14, respectively. This means that under the distribution with $\lambda=0.5$, approximately 61% of subjects are expected to survive beyond one time unit, compared with only 14% when $\lambda=2$.
+
+The key takeaway is that a survival curve describes how the probability of remaining event-free decreases over time. While different distributions and parameter values can produce different survival patterns, the interpretation remains the same: at any given time $t$, the height of the curve tells us the probability of surviving beyond that point.
+
+But survival probabilities only tell us how likely subjects are to remain event-free. What if we instead want to understand how quickly events are occurring among those who have survived so far? This brings us to another fundamental concept in survival analysis: the hazard function.
 
 ### The Hazard Function
 
