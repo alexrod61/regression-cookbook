@@ -367,44 +367,320 @@ The key takeaway is that a survival curve describes how the probability of remai
 
 But survival probabilities only tell us how likely subjects are to remain event-free. What if we instead want to understand how quickly events are occurring among those who have survived so far? This brings us to another fundamental concept in survival analysis: the hazard function.
 
+
 ### The Hazard Function
 
-While the survival function describes how many subjects remain event-free over time, the **hazard function** describes how quickly events are occurring among those still at risk. Formally, it is defined as
+In the previous section, we learned that the survival function $S(t)$ tells us the probability that a subject remains event-free beyond time $t$. For example, if $S(12)=0.8$, a randomly selected machine component has an 80% probability of continuing to operate beyond 12 months.
+
+But suppose we want to ask a slightly different question:
+
+> Among the machines that are still operating after 12 months, how quickly are failures occurring at that moment?
+
+This is where the **hazard function** comes in. While the survival function describes the probability of remaining event-free beyond a particular time, the hazard function describes the instantaneous event rate among subjects who have survived up to that time.
+
+For a continuous survival time, the hazard function is defined as
 
 $$
-h(t) = \frac{f(t)}{S(t)}
+h(t)=\frac{f_T(t)}{S(t)},
 $$
 
-where $f(t)$ is the density of the survival time. This ratio has a natural reading: it is the event density $f(t)$ rescaled by the fraction $S(t)$ still at risk, so it measures how concentrated events are *among those who have survived so far*. Intuitively, then, the hazard at time $t$ is the instantaneous rate at which the event occurs, given that the subject has survived up to time $t$. Among the machines still running at time $t$, the hazard tells us how rapidly failures are happening at that moment.
+where $f_T(t)$ is the probability density function (PDF) of the survival time and $S(t)$ is its survival function. The numerator describes the density of events around time $t$; dividing by $S(t)$ accounts for the subjects who are still at risk at that time. In this way, the hazard focuses on failures among those who have survived so far, rather than among all subjects initially observed.
 
-It is important to note that the hazard is a rate, not a probability. Its value can exceed one, and it is measured per unit of time. What makes the hazard so useful is its shape over time: a rising hazard describes processes where risk accumulates with age, such as mechanical wear, while a falling hazard describes processes where early failures dominate, such as defective units failing shortly after production.
+More precisely, the hazard is defined by
+
+$$
+h(t)=\lim_{\Delta t\to 0^+}
+\frac{P(t<T\leq t+\Delta t\mid T>t)}{\Delta t}.
+$$
+
+The expression inside the limit is the probability of an event during a short interval immediately after $t$, conditional on surviving beyond $t$, divided by the interval's length. As the interval becomes arbitrarily short, this becomes an instantaneous rate.
+
+To see why the population at risk matters, consider 100 machines at the start of a study. Suppose 80 are still operating at month 12, and 8 of those 80 fail during the following month. The observed proportion failing during that month among machines still at risk is $8/80=0.10$, or 10%. We divide by 80 rather than 100 because only those 80 machines were operating at the beginning of the interval.
+
+The following illustration shows the same idea. The 80 machines still operating at month 12 form the **risk set**; the 8 failures occur among those machines during the next month.
+
+```{python}
+#| label: fig-hazard-risk-set
+#| fig-cap: "Illustration of the population at risk: 80 of 100 machines remain operational at month 12, and 8 of those 80 fail during the following month."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+
+fig, ax = plt.subplots(figsize=(10, 4.6))
+
+n_total = 100
+n_at_risk = 80
+n_fail_next = 8
+n_cols = 20
+
+for i in range(n_total):
+    col = i % n_cols
+    row = i // n_cols
+    if i < n_fail_next:
+        color = "tab:orange"  # Fail during the next month
+    elif i < n_at_risk:
+        color = "tab:green"   # Still operating after next month
+    else:
+        color = "lightgray"   # Failed by month 12
+    ax.scatter(col, 4 - row, marker="s", s=190, color=color,
+               edgecolor="white", linewidth=0.6)
+
+ax.set_xlim(-0.8, 19.8)
+ax.set_ylim(-0.7, 4.8)
+ax.set_aspect("equal")
+ax.axis("off")
+ax.set_title("Which Machines Are at Risk at Month 12?")
+ax.legend(handles=[
+    Patch(facecolor="tab:green", label="72 operating after month 13"),
+    Patch(facecolor="tab:orange", label="8 fail during months 12–13"),
+    Patch(facecolor="lightgray", label="20 failed by month 12")
+], loc="upper center", bbox_to_anchor=(0.5, -0.05),
+          ncol=1, frameon=False)
+fig.text(0.5, 0.02,
+         "Failure proportion among machines at risk: 8 / 80 = 10%",
+         ha="center", fontsize=11)
+fig.subplots_adjust(bottom=0.28, top=0.86)
+fig
+```
+
+Importantly, this 10% is a probability over a one-month interval, not the instantaneous hazard at month 12. The hazard is a *rate*, not a probability: it is measured per unit of time and can exceed 1. For a sufficiently short interval $\Delta t$, the conditional probability of an event during that interval is approximately $h(t)\Delta t$, provided the hazard is well behaved near $t$.
+
+The difference between a survival probability and a hazard rate is especially clear for the **Exponential distribution**. Its survival function decreases over time, even though its hazard remains constant. The next figure shows both functions for the same Exponential distribution with rate $\lambda=0.3$ per time unit.
+
+```{python}
+#| label: fig-survival-vs-hazard
+#| fig-cap: "For an Exponential distribution, survival probability decreases over time while the instantaneous hazard remains constant."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 10, 500)
+lam = 0.3
+survival = np.exp(-lam * t)
+hazard = np.full_like(t, lam)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+axes[0].plot(t, survival, linewidth=2.5, color="tab:blue")
+axes[0].set_title("Survival Function")
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("Survival Probability, S(t)")
+axes[0].set_ylim(0, 1.05)
+
+axes[1].plot(t, hazard, linewidth=2.5, color="tab:orange")
+axes[1].set_title("Hazard Function")
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("Hazard Rate, h(t)")
+axes[1].set_ylim(0, 0.5)
+
+for ax in axes:
+    ax.set_xlim(0, 10)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.suptitle("Same Distribution, Different Views", fontsize=13)
+fig.tight_layout()
+fig
+```
+
+This is not a contradiction. Even with a constant instantaneous failure rate among the machines that remain operational, the probability that a machine survives all the way from the beginning to a later time continues to fall. A decreasing survival function does not imply an increasing hazard.
+
+The shape of the hazard function also tells us something about the underlying failure process. For example, a machine's hazard may increase as components wear out, decrease if defective units tend to fail early, or remain constant when the event rate does not depend on how long the machine has already operated. These three common patterns are illustrated below.
+
+```{python}
+#| label: fig-hazard-patterns
+#| fig-cap: "Three common hazard patterns: decreasing, constant, and increasing event rates among subjects still at risk."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0.1, 5, 500)
+
+# Valid illustrative hazards (Weibull for the decreasing and
+# increasing curves, Exponential for the constant curve).
+decreasing = 0.5 / np.sqrt(t)
+constant = np.full_like(t, 0.5)
+increasing = 0.25 * t
+
+fig, ax = plt.subplots(figsize=(9, 5))
+ax.plot(t, decreasing, linewidth=2.5,
+        label="Decreasing (early failures)")
+ax.plot(t, constant, linewidth=2.5,
+        label="Constant (unchanging event rate)")
+ax.plot(t, increasing, linewidth=2.5,
+        label="Increasing (wear and aging)")
+
+ax.set_title("Common Hazard Function Patterns")
+ax.set_xlabel("Time")
+ax.set_ylabel("Hazard Rate (per unit of time)")
+ax.set_xlim(0, 5)
+ax.set_ylim(bottom=0)
+ax.legend(frameon=False)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+These patterns are one reason parametric survival models are useful: different distributions allow us to represent different ways that event rates change with time. We will revisit these shapes when introducing specific survival-time distributions.
+
 
 ::: {.Tip}
-::::{.Tip-header}
+:::: {.Tip-header}
 One Distribution, Many Views
 ::::
-::::{.Tip-container}
-The density $f(t)$, the CDF $F(t)$, the survival function $S(t)$, and the hazard function $h(t)$ are four descriptions of the same distribution, and knowing any one of them determines all the others. The links are a short chain of calculus. Since $S(t) = 1 - F(t)$, differentiating gives the density,
+:::: {.Tip-container}
+
+So far, we have encountered several functions that describe event times: the **probability density function (PDF)**, the **cumulative distribution function (CDF)**, the **survival function**, and the **hazard function**.
+
+At first, these might seem like four entirely different concepts. But they are actually four ways of describing the same underlying distribution.
+
+Imagine we are studying how long machine components last. Each function answers a different question:
+
+| Function | What does it tell us? |
+|---|---|
+| PDF, $f_T(t)$ | Where are failure times most concentrated? |
+| CDF, $F_T(t)$ | What is the probability that a machine has failed by time $t$? |
+| Survival, $S(t)$ | What is the probability that a machine is still operating beyond time $t$? |
+| Hazard, $h(t)$ | Among machines still operating, how rapidly are failures occurring at time $t$? |
+
+Let's see how these different perspectives are connected.
+
+**1. The CDF and survival function are opposites**
+
+We have already seen that the CDF tells us the probability that an event has occurred by time $t$, while the survival function tells us the probability that it has not.
+
+For example, suppose that by month 5, 60% of machines are expected to have failed. That means the remaining 40% are expected to survive beyond month 5.
+
+Mathematically,
 
 $$
-f(t) = -\frac{d}{dt} S(t)
+S(t)=1-F_T(t).
 $$
 
-Dividing by $S(t)$ and recognizing the derivative of a logarithm turns the hazard definition into a compact form,
+The two probabilities always add up to 1. As the CDF increases, the survival function decreases.
+
+**2. The PDF tells us how quickly the survival probability is changing**
+
+Now imagine looking at a survival curve. At some points, the curve drops quickly; at others, it declines more slowly.
+
+A steep drop means that more probability is concentrated in failures occurring around that time. A flatter section means that relatively little probability is concentrated there. This is exactly what the PDF describes.
+
+For a differentiable survival function,
 
 $$
-h(t) = \frac{f(t)}{S(t)} = -\frac{d}{dt} \ln S(t)
+f_T(t)=-\frac{\mathrm{d}}{\mathrm{d}t}S(t).
 $$
 
-Finally, accumulating the hazard from the start up to time $t$ defines the **cumulative hazard** $H(t)$, and undoing the derivative above recovers the survival function,
+Don't worry too much about the calculus here. The derivative simply measures how quickly a function changes. The negative sign appears because survival probabilities decrease over time, while probability densities cannot be negative. In other words, the PDF describes the rate at which probability is leaving the survival curve, measured relative to the original population.
+
+**3. The hazard focuses on those who have survived**
+
+The PDF describes the density of failures in the original population. But what if we only care about machines that are still operating?
+
+That's where the hazard comes in:
 
 $$
-H(t) = \int_0^t h(u)\, du = -\ln S(t)
-\qquad\Longrightarrow\qquad
-S(t) = \exp\left(-H(t)\right)
+h(t)=\frac{f_T(t)}{S(t)}.
 $$
 
-So one can start from any of these functions and travel to the others by differentiating, dividing, or integrating. This last identity, $S(t) = \exp(-H(t))$, is used constantly in survival analysis, both in theory and in software.
+Dividing by the survival probability adjusts the event density to focus on machines that are still at risk.
+
+This also gives us another useful mathematical relationship:
+
+$$
+h(t)=-\frac{\mathrm{d}}{\mathrm{d}t}\ln S(t),
+$$
+
+where $S(t)>0$.
+
+The logarithm may look intimidating, but the intuition is simple: the hazard measures how quickly survival probability is declining relative to how much survival probability remains.
+
+**4. From hazard back to survival**
+
+Finally, suppose we know the hazard rate at every point in time. Can we work backward to find the survival probability?
+
+Yes! We first accumulate the hazard over time to obtain the **cumulative hazard function**, $H(t)$:
+
+$$
+H(t)=\int_0^t h(u)\,\mathrm{d}u.
+$$
+
+Integration simply means adding up contributions over a continuous interval. In this case, we are accumulating the instantaneous hazard rates from time 0 to time $t$.
+
+For the continuous positive survival-time distributions considered here, this gives
+
+$$
+H(t)=-\ln S(t).
+$$
+
+Rearranging, we obtain
+
+$$
+S(t)=\exp\left(-H(t)\right).
+$$
+
+```{python}
+#| label: fig-cumulative-hazard-survival
+#| fig-cap: "Relationship between cumulative hazard and survival probability for an Exponential distribution with constant hazard 0.2 per month."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 10, 500)
+lam = 0.2
+
+H = lam * t
+S = np.exp(-H)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+axes[0].plot(t, H, linewidth=2.5, color="tab:orange")
+axes[0].fill_between(t, H, alpha=0.15, color="tab:orange")
+axes[0].set_title("Cumulative Hazard")
+axes[0].set_xlabel("Time (months)")
+axes[0].set_ylabel("H(t)")
+axes[0].set_xlim(0, 10)
+axes[0].set_ylim(bottom=0)
+
+axes[1].plot(t, S, linewidth=2.5, color="tab:blue")
+axes[1].set_title("Survival Function")
+axes[1].set_xlabel("Time (months)")
+axes[1].set_ylabel("S(t)")
+axes[1].set_xlim(0, 10)
+axes[1].set_ylim(0, 1.05)
+
+for ax in axes:
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.suptitle(
+    "Accumulating Hazard Corresponds to Declining Survival",
+    fontsize=13
+)
+
+fig.tight_layout()
+fig
+```
+
+This identity tells us that the greater the accumulated hazard, the lower the probability of surviving beyond that time.
+
+The important takeaway is that these functions are not competing descriptions of survival data. They are mathematically connected ways of understanding the same event-time distribution, each emphasizing a different aspect of when events occur.
+
 ::::
 :::
 
