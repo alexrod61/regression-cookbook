@@ -744,86 +744,265 @@ The key takeaway is that the Exponential distribution assumes a constant hazard 
 
 ### The Weibull Distribution
 
-The Weibull distribution generalizes the Exponential by adding a shape parameter. With shape $k > 0$ and scale $\lambda > 0$, its survival function is
+The Exponential distribution assumes that the instantaneous event rate remains constant over time. But in many real-world situations, this assumption may be unrealistic. For example, mechanical components may become more likely to fail as they age, while components with manufacturing defects may fail early, leaving behind a more reliable group of survivors.
+
+The **Weibull distribution** extends the Exponential distribution by allowing the hazard rate to change over time. It introduces two parameters:
+
+- **Shape parameter ($k>0$):** Determines how the hazard changes over time.
+- **Scale parameter ($\eta>0$):** Determines the overall timescale of the distribution.
+
+Its survival function is
 
 $$
-S(t) = \exp\left(-\left(\frac{t}{\lambda}\right)^{k}\right)
+S(t)=\exp\left[-\left(\frac{t}{\eta}\right)^k\right],
 $$
 
 and its hazard function is
 
 $$
-h(t) = \frac{k}{\lambda} \left(\frac{t}{\lambda}\right)^{k-1}
+h(t)=\frac{k}{\eta}\left(\frac{t}{\eta}\right)^{k-1}.
 $$
 
-The shape parameter controls how risk evolves over time:
+#### Interpreting the Shape Parameter
 
-- When $k > 1$, the hazard increases with time, describing wear-out processes where risk grows with age.
-- When $k < 1$, the hazard decreases with time, describing settings where early failures dominate and survivors become more robust.
-- When $k = 1$, the hazard is constant and the Weibull distribution reduces exactly to the Exponential distribution.
+The shape parameter $k$ is particularly important because it determines whether the instantaneous event rate increases, decreases, or remains constant as time passes.
 
-A word of caution on notation is in order here. In the Weibull distribution, $\lambda$ is a **scale** parameter measured in units of time, so a *larger* $\lambda$ stretches survival times *out*. This is the opposite of the role $\lambda$ played in the Exponential distribution, where it was a **rate** and larger values made events happen *sooner*. The two are consistent at the boundary: setting $k = 1$ makes the Weibull hazard equal to $1/\lambda$, which is an Exponential distribution whose rate is the reciprocal of the Weibull scale. The symbol is the same by convention, but its meaning differs between the two distributions, so it is worth reading each formula on its own terms.
-
-This flexibility, combined with mathematical convenience, has made the Weibull distribution the workhorse of parametric survival analysis.
-
-### The Log-normal Distribution
-
-A survival time $T$ follows a Log-normal distribution when its logarithm follows a normal distribution. That is, $\log T$ is normally distributed with some mean $\mu$ and variance $\sigma^2$.
-
-The distinguishing feature of the Log-normal distribution is its hazard shape. Unlike the Exponential and Weibull hazards, which are monotone, the Log-normal hazard is non-monotonic: it starts low, rises to a peak, and then declines. This pattern suits processes where risk builds up initially and then fades for long-term survivors, a shape that monotone hazards simply cannot capture.
+- **When $k>1$:** The hazard increases over time. This is common in wear-out processes, where components become increasingly prone to failure as they age.
+- **When $k<1$:** The hazard decreases over time. This can describe situations where defective or more failure-prone components tend to fail early, leaving behind a more reliable surviving population.
+- **When $k=1$:** The hazard remains constant. In this case, the Weibull distribution reduces to the Exponential distribution.
 
 ```{python}
-#| label: hazard-shapes
+#| label: fig-weibull-shape
+#| fig-cap: "Effect of the Weibull shape parameter on the hazard function, holding the scale parameter constant at η = 2."
 #| echo: false
 #| message: false
 #| results: hide
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import weibull_min, lognorm
 
-t = np.linspace(0.01, 4, 500)
+t = np.linspace(0.1, 4, 500)
+eta = 2
 
 fig, ax = plt.subplots(figsize=(9, 5))
 
-# Exponential: constant hazard (equivalent to Weibull with k = 1)
-ax.plot(t, np.ones_like(t), label="Exponential (constant hazard)")
+for k, label in [
+    (0.5, "k = 0.5 (decreasing)"),
+    (1.0, "k = 1 (constant)"),
+    (2.0, "k = 2 (increasing)")
+]:
+    hazard = (k / eta) * (t / eta) ** (k - 1)
+    ax.plot(t, hazard, linewidth=2.5, label=label)
 
-# Weibull with decreasing hazard (k < 1)
-k = 0.75
-ax.plot(
-    t,
-    weibull_min.pdf(t, k) / weibull_min.sf(t, k),
-    label="Weibull, k = 0.75 (decreasing hazard)"
-)
-
-# Weibull with increasing hazard (k > 1)
-k = 1.5
-ax.plot(
-    t,
-    weibull_min.pdf(t, k) / weibull_min.sf(t, k),
-    label="Weibull, k = 1.5 (increasing hazard)"
-)
-
-# Log-normal: hazard rises and then falls
-s = 1.0
-ax.plot(
-    t,
-    lognorm.pdf(t, s) / lognorm.sf(t, s),
-    label="Log-normal (rises, then falls)"
-)
-
-ax.set_title("Hazard Function Shapes for Common Survival Distributions")
+ax.set_title("How the Weibull Shape Parameter Changes the Hazard")
 ax.set_xlabel("Time")
-ax.set_ylabel("Hazard h(t)")
-ax.set_ylim(0, 3.2)
+ax.set_ylabel("Hazard Rate")
+ax.set_xlim(0, 4)
+ax.set_ylim(bottom=0)
 ax.legend(frameon=False)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
 
 fig.tight_layout()
 fig
 ```
 
-The figure above compares the hazard shapes of the three families. The Exponential hazard is flat, the Weibull hazard rises or falls monotonically depending on its shape parameter, and the Log-normal hazard rises to a peak before declining. Choosing among these distributions is largely a question of which hazard shape is plausible for the process being studied, a point we return to when discussing model fit.
+For example, imagine monitoring a group of identical types of machine components over several years. If their hazard increases with age, a Weibull model with $k>1$ may be appropriate. On the other hand, if failures are concentrated shortly after installation and become less frequent among surviving components, a model with $k<1$ may better describe the process.
+
+Importantly, a decreasing hazard does not necessarily mean that individual machines become more reliable as they age. Rather, it means that the instantaneous failure rate among machines still operating decreases over time.
+
+#### Interpreting the Scale Parameter
+
+While the shape parameter controls *how* the hazard changes, the scale parameter $\eta$ controls the overall timescale of survival.
+
+A larger $\eta$ stretches the distribution toward longer survival times, while a smaller $\eta$ corresponds to shorter survival times, assuming the shape parameter remains fixed. One useful interpretation comes from substituting $t=\eta$ into the survival function:
+
+$$
+S(\eta)=\exp(-1)\approx0.368.
+$$
+
+This means that approximately 36.8% of subjects are expected to survive beyond time $\eta$, while approximately 63.2% are expected to have experienced the event by that time. For example, if $\eta=10$ months, approximately 36.8% of machine components are expected to remain operational beyond 10 months, regardless of the value of $k$.
+
+
+::: {.Tip}
+:::: {.Tip-header}
+Connecting the Weibull to the Exponential Distribution
+::::
+:::: {.Tip-container}
+
+The Exponential distribution is actually a special case of the Weibull distribution. When the Weibull shape parameter $k=1$, its survival function becomes
+
+$$
+S(t)=\exp\left(-\frac{t}{\eta}\right).
+$$
+
+Recall that the Exponential survival function is
+
+$$
+S(t)=e^{-\lambda t}.
+$$
+
+Comparing these two expressions, we can see that they are identical when
+
+$$
+\lambda=\frac{1}{\eta}.
+$$
+
+In other words, a Weibull distribution with $k=1$ is equivalent to an Exponential distribution, where the Exponential rate $\lambda$ is the reciprocal of the Weibull scale $\eta$.
+
+This also explains why the two parameters have opposite interpretations: a larger Exponential rate means shorter survival times, whereas a larger Weibull scale means longer survival times.
+
+::::
+:::
+
+Overall, the Weibull distribution offers greater flexibility than the Exponential distribution by allowing the hazard to increase, decrease, or remain constant over time. Combined with its relatively simple mathematical form, this flexibility makes the Weibull one of the most widely used distributions in parametric survival analysis.
+
+
+### The Log-normal Distribution
+
+So far, we have seen that the Exponential distribution assumes a constant hazard, while the Weibull distribution allows the hazard to increase or decrease over time. But what if the hazard first increases and then decreases?
+
+The **Log-normal distribution** provides another way to model survival times, particularly when the event rate does not follow a simple increasing or decreasing pattern.
+
+A survival time $T$ follows a Log-normal distribution when its natural logarithm follows a normal distribution. In other words,
+
+$$
+\ln T\sim N(\mu,\sigma^2),
+$$
+
+where:
+
+- **$\mu$** is the mean of the logarithm of survival time.
+- **$\sigma>0$** is the standard deviation of the logarithm of survival time.
+
+This means that while the logarithm of survival time follows a symmetric, bell-shaped distribution, the survival times themselves are **strictly positive and right-skewed**. Most events may occur within a relatively short period, while some subjects experience much longer survival times.
+
+The survival function of the Log-normal distribution is
+
+$$
+S(t)=1-\Phi\left(\frac{\ln t-\mu}{\sigma}\right),
+$$
+
+where $\Phi$ represents the cumulative distribution function (CDF) of the standard normal distribution.
+
+Although this formula looks more complicated than those of the Exponential and Weibull distributions, the underlying idea is familiar: it tells us the probability that a subject survives beyond time $t$.
+
+#### Interpreting the Parameters
+
+The parameter $\mu$ determines the location of the distribution on the logarithmic time scale. Increasing $\mu$ shifts survival times toward larger values.
+
+The parameter $\sigma$ controls the spread of log survival times. A larger $\sigma$ generally produces a wider distribution of survival times, including a more pronounced right tail.
+
+One particularly useful property is that the median survival time is
+
+$$
+t_{\text{median}}=e^\mu.
+$$
+
+For example, if $\mu=\ln(10)$, the median survival time is 10 months. This means that 50% of subjects are expected to experience the event by month 10, while the remaining 50% survive beyond that point.
+
+::: {.Tip}
+:::: {.Tip-header}
+A Hazard That Rises and Then Falls
+::::
+:::: {.Tip-container}
+
+What makes the Log-normal distribution especially interesting is the shape of its hazard function.
+
+Unlike the Exponential distribution, which has a constant hazard, or the Weibull distribution, whose hazard either increases, decreases, or remains constant, the Log-normal hazard initially increases, reaches a peak, and then decreases.
+
+For example, imagine studying the time until a particular type of machine component fails. The instantaneous failure rate might initially rise as components accumulate operating time, reach a peak, and then decline among those that remain operational for unusually long periods.
+
+A Log-normal distribution can represent this pattern, whereas the Exponential and Weibull distributions cannot.
+
+Importantly, a declining hazard does not mean that the survival probability begins increasing. The survival function continues to decrease over time; it is only the instantaneous event rate among surviving subjects that eventually declines.
+
+::::
+:::
+
+
+### Comparing the Three Distributions
+
+The following figure compares the survival and hazard functions of the Exponential, Weibull, and Log-normal distributions. Notice how different assumptions about event times lead to different survival curves and hazard patterns.
+
+```{python}
+#| label: fig-distribution-comparison
+#| fig-cap: "Comparison of survival functions (left) and hazard functions (right) for Exponential, Weibull, and Log-normal distributions. Parameter values are illustrative."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import expon, weibull_min, lognorm
+
+t = np.linspace(0.05, 10, 500)
+
+# Distribution parameters
+exp_rate = 0.3
+weibull_shape = 2.0
+weibull_scale = 4.0
+lognorm_mu = np.log(4)
+lognorm_sigma = 0.6
+
+# Exponential
+exp_survival = expon.sf(t, scale=1 / exp_rate)
+exp_hazard = np.full_like(t, exp_rate)
+
+# Weibull
+weibull_survival = weibull_min.sf(
+    t, c=weibull_shape, scale=weibull_scale
+)
+weibull_hazard = weibull_min.pdf(
+    t, c=weibull_shape, scale=weibull_scale
+) / weibull_survival
+
+# Log-normal
+lognorm_survival = lognorm.sf(
+    t, s=lognorm_sigma, scale=np.exp(lognorm_mu)
+)
+lognorm_hazard = lognorm.pdf(
+    t, s=lognorm_sigma, scale=np.exp(lognorm_mu)
+) / lognorm_survival
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
+
+distributions = [
+    ("Exponential", exp_survival, exp_hazard, "tab:blue"),
+    ("Weibull (k = 2)", weibull_survival, weibull_hazard, "tab:orange"),
+    ("Log-normal", lognorm_survival, lognorm_hazard, "tab:green"),
+]
+
+for name, survival, hazard, color in distributions:
+    axes[0].plot(t, survival, label=name, color=color, linewidth=2.5)
+    axes[1].plot(t, hazard, label=name, color=color, linewidth=2.5)
+
+axes[0].set_title("Survival Functions")
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("Survival Probability, S(t)")
+axes[0].set_ylim(0, 1.05)
+
+axes[1].set_title("Hazard Functions")
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("Hazard Rate, h(t)")
+axes[1].set_ylim(bottom=0)
+
+for ax in axes:
+    ax.set_xlim(0, 10)
+    ax.legend(frameon=False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+The figure illustrates an important distinction. Although all three distributions describe positive survival times, they imply different patterns of event occurrence. The Exponential assumes a constant hazard, the Weibull allows monotonically increasing or decreasing hazards, and the Log-normal allows a hazard that rises and then falls.
+
+Choosing an appropriate distribution therefore involves more than selecting a familiar mathematical formula. We need to consider whether its implied hazard pattern is plausible, how well it fits the observed data, and whether its assumptions are reasonable.
+
+So far, we have described survival times without accounting for differences between subjects. In practice, characteristics such as age, treatment, or operating conditions may influence how long subjects survive. In the next section, we will see how parametric survival regression incorporates these explanatory variables.
+
 
 ## The Parametric Survival Regression Model
 
