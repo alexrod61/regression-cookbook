@@ -1004,57 +1004,122 @@ Choosing an appropriate distribution therefore involves more than selecting a fa
 So far, we have described survival times without accounting for differences between subjects. In practice, characteristics such as age, treatment, or operating conditions may influence how long subjects survive. In the next section, we will see how parametric survival regression incorporates these explanatory variables.
 
 
+
 ## The Parametric Survival Regression Model
 
-So far we have described the distribution of survival times on its own. Regression enters the picture when we let that distribution depend on predictor variables, so that different subjects are described by different survival and hazard curves according to their characteristics. In principle we could make any of the distribution's parameters a function of the predictors; in practice, the most common and most interpretable way to do this is the **accelerated failure time (AFT)** model, which places a familiar linear model on the logarithm of the survival time.
+So far, we have explored survival times through their probability distributions, survival functions, and hazard functions. We have also seen how different distributions, such as the Exponential, Weibull, and Log-normal, can describe different patterns of events over time. However, these distributions alone do not explain why some subjects experience events earlier or later than others.
 
-For each observation $i$, the model takes the form
+For example, suppose we are studying the lifetimes of machine components. We might expect their survival times to depend on factors such as operating temperature, component type, or maintenance conditions. How can we incorporate these characteristics into our survival models? This is where parametric survival regression comes in. Instead of assuming that every subject follows exactly the same survival-time distribution, we allow the distribution to depend on explanatory variables, also known as predictors. One common and interpretable approach is the accelerated failure time (AFT) model, which describes how predictors stretch or shrink the time until an event occurs.
+
+### The Accelerated Failure Time (AFT) Model
+
+The AFT model places a familiar linear regression structure on the logarithm of survival time:
 
 $$
-\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma \varepsilon_i
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma \varepsilon_i.
 $$
 
-Here, $\beta_0$ is the intercept, the coefficients $\beta_1, ..., \beta_p$ describe the association between each predictor and log survival time, $\sigma$ is a scale parameter, and $\varepsilon_i$ is a random error term. The structure looks just like a linear regression for $\log T_i$, and that resemblance is exactly the point: the AFT model brings the familiar linear predictor into the survival setting.
+Here:
 
-The distribution assumed for the error term determines the distribution of the survival times themselves:
+- $T_i$ represents the survival time of subject $i$.
+- $\beta_0$ is the intercept.
+- $x_{i1},\ldots,x_{ip}$ are the predictor values for subject $i$.
+- $\beta_1,\ldots,\beta_p$ are the regression coefficients describing how the predictors are associated with log survival time.
+- $\sigma>0$ is a scale parameter controlling the spread of log survival times.
+- $\varepsilon_i$ is a random error term following a specified probability distribution.
 
-- When $\varepsilon_i$ follows a standard normal distribution, $T_i$ follows a Log-normal distribution.
-- When $\varepsilon_i$ follows a standard extreme value distribution (also known as the Gumbel distribution), $T_i$ follows a Weibull distribution.
-- In the Weibull case with $\sigma = 1$, the model reduces to Exponential survival times.
+At first glance, this equation looks very similar to an ordinary linear regression model. The key difference is that we are modeling log survival time, rather than survival time directly. Using the logarithm helps ensure that the modeled survival times remain positive. More importantly, it allows us to interpret the effects of predictors as multiplicative changes in survival time.
 
-You do not need to know the details of the extreme value distribution to use these models. The point is simply that each choice of error distribution corresponds to one of the survival-time distributions we met earlier, so choosing an error distribution and choosing a survival distribution are two sides of the same decision.
+The distribution of the error term determines which survival-time distribution the AFT model represents:
+
+- **Normal errors:** Produce a Log-normal survival model.
+- **Minimum-type extreme value errors:** Produce a Weibull survival model.
+- **Minimum-type extreme value errors with $\sigma=1$:** Produce an Exponential survival model.
+
+You do not need to understand the mathematical details of the extreme value distribution to use these models. The important idea is that choosing an error distribution determines the distribution of survival times, connecting the AFT regression model to the distributions we introduced earlier.
 
 ### Interpreting the Coefficients
 
-The AFT name comes from how the coefficients act on the time scale. Because the model is linear in $\log T_i$, exponentiating a coefficient yields a multiplicative effect on survival time itself. For a one-unit increase in predictor $x_j$, holding all other predictors constant, survival times are multiplied by the factor
+One of the most appealing features of the AFT model is that its coefficients have a relatively intuitive interpretation. Recall that the model is linear in log survival time:
 
 $$
-e^{\beta_j}
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma \varepsilon_i.
 $$
 
-This quantity is called a **time ratio** or **acceleration factor**, and it works as a simple multiplier on survival time. If $e^{\beta_j} = 2$, a one-unit increase in $x_j$ doubles survival time, so the median survival time is twice as large. If $e^{\beta_j} = 0.5$, survival times are cut in half. Predictors in an AFT model stretch or shrink the time scale, which is why the coefficients are easy to state in plain terms: they tell us how much longer or shorter, subjects tend to last.
+Because the response is expressed on a logarithmic scale, we can exponentiate a regression coefficient to interpret its effect on the original time scale:
 
-It is worth pausing on what a fitted model actually produces. Plugging a particular subject's predictor values into the linear predictor $\beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip}$ gives that subject their own survival-time distribution, and hence their own survival curve $S(t)$ and hazard curve $h(t)$. From that individual distribution we can read off concrete summaries, such as a predicted median survival time or the probability of surviving past a chosen horizon. In this way the abstract machinery of survival and hazard functions turns into a concrete, per-person answer once the model is estimated.
+$$
+\text{Time Ratio} = e^{\beta_j}.
+$$
+
+This quantity is called a **time ratio**, also known as an **acceleration factor**. It tells us how survival times change multiplicatively for a one-unit increase in predictor $x_j$, holding all other predictors constant. The interpretation depends on the value of the time ratio:
+
+- **$e^{\beta_j}>1$:** Survival times are stretched, indicating longer predicted times until the event.
+- **$e^{\beta_j}<1$:** Survival times are compressed, indicating shorter predicted times until the event.
+- **$e^{\beta_j}=1$:** The predictor has no effect on the survival-time distribution under the model.
+
+For example, suppose we fit an AFT model to machine-component lifetimes and obtain a time ratio of 2 for a particular maintenance treatment. This means that, according to the model, components receiving the treatment have survival times that are twice as long on the time scale as those without the treatment, holding other predictors constant. If the predicted median survival time for untreated components is 5 months, the predicted median for treated components would be 10 months. Conversely, a time ratio of 0.5 would indicate that the predicted median survival time is halved.
+
+Importantly, these are multiplicative shifts in the predicted survival-time distribution, not guarantees about exactly how long an individual subject will survive. This is what gives the AFT model its name: predictors can effectively *accelerate* or *decelerate* the passage of survival time.
+
+### From Regression Coefficients to Survival Predictions
+
+Although interpreting coefficients is useful, a fitted survival regression model can tell us much more than whether a predictor increases or decreases survival time. Once the model has been estimated, we can substitute a subject's predictor values into the linear predictor:
+
+$$
+\beta_0+\beta_1x_{i1}+\cdots+\beta_px_{ip}.
+$$
+
+Together with the assumed error distribution and its estimated parameters, this gives us a predicted survival-time distribution for that subject.
+
+From this distribution, we can obtain quantities such as:
+
+- **Predicted median survival time:** How long is the subject expected to survive before reaching a 50% probability of experiencing the event?
+- **Survival probability at a particular time:** What is the probability that the subject remains event-free beyond 12 months?
+- **Predicted survival curve:** How does the subject's probability of remaining event-free change over time?
+- **Predicted hazard curve:** How does the instantaneous event rate change over time for subjects with those characteristics?
+
+For example, rather than simply concluding that maintenance improves component longevity, a fitted model might estimate that a component receiving maintenance has a 75% probability of remaining operational beyond 12 months, compared with 50% for an otherwise similar component without maintenance. These are illustrative values, but they demonstrate how parametric survival regression turns an abstract statistical model into concrete predictions.
 
 ::: {.Tip}
-::::{.Tip-header}
+:::: {.Tip-header}
 Accelerated Failure Time vs. Proportional Hazards
 ::::
-::::{.Tip-container}
-The AFT formulation describes predictors as speeding up or slowing down the passage of time. An alternative viewpoint, called **proportional hazards**, describes predictors as multiplying the hazard function up or down. These are genuinely different assumptions: a given model may satisfy one, the other, both, or neither. For instance, the Log-normal AFT model does not have a proportional hazards interpretation.
+:::: {.Tip-container}
 
-The Weibull distribution, including its Exponential special case, is special in that it satisfies both: a Weibull AFT model can always be rewritten as a proportional hazards model, and vice versa. The proportional hazards viewpoint takes centre stage in the [next chapter](07-semiparametric-survival.qmd), where we study the Cox model.
+The AFT model describes predictors as stretching or shrinking survival time. An alternative approach, called the **proportional hazards (PH) model**, describes predictors as multiplying the hazard rate.
+
+The two approaches answer related questions, but they make different assumptions about how predictors affect survival.
+
+- **AFT models:** How much longer or shorter are predicted survival times?
+- **PH models:** How much higher or lower is the instantaneous event rate?
+
+These are not generally equivalent. For example, a Log-normal AFT model does not have a proportional hazards interpretation. However, the Weibull distribution, including its Exponential special case, has a useful property: it can be expressed in both AFT and proportional hazards forms.
+
+We will explore the proportional hazards approach in greater detail in the [next chapter](07-semiparametric-survival.qmd), where we introduce the Cox proportional hazards model.
+
 ::::
 :::
 
 ::: {.Heads-up}
-::::{.Heads-up-header}
+:::: {.Heads-up-header}
 Heads-up!
 ::::
-::::{.Heads-up-container}
-Unlike the [Gamma](04-gamma.qmd) and [Beta](05-beta.qmd) regression models from previous chapters, parametric survival regression is not a generalized linear model in the standard sense. The obstacle is censoring: the GLM framework assumes every response value is fully observed, while survival data mixes exact event times with partially observed ones. The AFT model is instead a linear model for log survival time, estimated by a version of maximum likelihood that is adapted to censored data, as we describe next.
+:::: {.Heads-up-container}
+
+Unlike the [Gamma](04-gamma.qmd) and [Beta](05-beta.qmd) regression models introduced in previous chapters, AFT survival regression is not generally fitted as a standard generalized linear model (GLM).
+
+Although its linear predictor resembles ordinary regression, the AFT model specifies a probability distribution for log survival time. In addition, survival datasets often contain censored observations, meaning that the exact event time is not known for every subject.
+
+As a result, we need estimation methods that can account for both observed event times and censored observations. One common approach is **maximum likelihood estimation (MLE)**, using a likelihood function specifically designed for survival data. We will see how this works when we fit our first model in the case study.
+
 ::::
 :::
+
+We now have the essential building blocks of parametric survival regression: a distribution for survival times, a regression equation connecting predictors to those times, and a way to interpret the resulting coefficients.
+
+In the next section, we will bring these ideas together through a practical case study. We will work with a dataset containing both observed events and censored observations, fit a parametric survival regression model, interpret its results, and evaluate how well it describes the data.
+
 
 ## Estimation
 
