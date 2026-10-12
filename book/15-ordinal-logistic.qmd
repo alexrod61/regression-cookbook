@@ -3577,3 +3577,3337 @@ It is important to remember that this analysis is associational, not causal. The
 Nevertheless, the results provide a useful evidence-based starting point for discussion. They help prioritize which factors are most closely linked to a student's inclination to apply to graduate school, and which factors play a smaller or less certain role. For academic advisors and graduate programs, this kind of insight can guide where limited outreach and mentoring resources are most likely to have impact.
 ::::
 :::
+
+## Practice Exercises {#sec-ordinal-logistic-exercises}
+
+The following exercises connect the **conceptual**, **computational**, and **interpretive** parts of ordinal logistic regression. You will distinguish ordered categories from numerical measurements, work with cumulative and category probabilities, interpret adjusted associations, and assess the assumptions and predictive performance of an ordinal model. The final conceptual question asks you to communicate numerical results to a non-technical audience.
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/children-teacher-rectangular-figures-7464611/).](img/exercises.png){width="550"}
+
+::: {.quiz}
+
+### Conceptual Questions {#sec-ordinal-logistic-exercises-conceptual}
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.1
+::::
+:::: {.Question-container}
+**Multiple Choice**
+
+A transit authority wants to relate passengers' experiences to journey characteristics. Which response is most naturally suited to ordinal logistic regression?
+
+**A.** The passenger's main transport mode: bus, train, bicycle, or car.
+
+**B.** The passenger's satisfaction: `Very dissatisfied` < `Dissatisfied` < `Satisfied` < `Very satisfied`.
+
+**C.** The number of transfers made during the journey.
+
+**D.** The journey duration in minutes.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.1
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** B.
+
+**Rationale:**
+
+Satisfaction has a meaningful category order without requiring equal distances between adjacent categories. Transport mode is nominal, the number of transfers is a count, and journey duration is a continuous measurement. An ordinal model is a reasonable starting point for satisfaction, although its assumptions still need to be assessed.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.2
+::::
+:::: {.Question-container}
+**True or False**
+
+If satisfaction categories are stored as the numbers $1,2,3,4$, moving from category $1$ to category $2$ necessarily represents the same increase in satisfaction as moving from category $3$ to category $4$. Explain your answer.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.2
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+The codes record **order**, not measured distances. The labels alone do not establish that adjacent changes have equal substantive meaning. Ordinal logistic regression models the probabilities of the ordered categories without treating the numeric codes as equally spaced measurements of satisfaction.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.3
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A library records users' confidence in finding information as `Low` < `Moderate` < `High`. An analyst proposes three approaches: OLS applied to the codes $1,2,3$, multinomial logistic regression, and proportional odds ordinal logistic regression.
+
+1. What interpretation does OLS impose on the response codes?
+2. What information does an unrestricted multinomial model leave unused?
+3. What additional restriction makes the proportional odds model more parsimonious, and what should happen if that restriction is not supported?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.3
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+1. OLS models the mean of the assigned scores, treating a one-unit change as comparable across the scale. That interpretation depends on the chosen scores and is not supplied by the category labels. It also does not directly model a probability distribution over the three categories.
+2. An unrestricted multinomial model can model these categories, but it treats them as nominal and does not use their ordering to structure the regressions. It generally estimates more slopes than the proportional odds model with the same regressors.
+3. The proportional odds model shares each regressor's slope across cumulative splits. If diagnostics challenge that restriction, consider a justified partial or fully non-proportional odds model and assess its fit and probability validity. A multinomial model is also a possible alternative; it is not mathematically invalid merely because the outcome is ordered.
+
+The response scale and the evidence about model adequacy should guide the choice.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.4
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A museum models visitor satisfaction as $Y=1,2,3,4$, corresponding to `Poor` < `Fair` < `Good` < `Excellent`. The regressors are waiting time in minutes, visit duration in hours, and ticket type with levels `Standard`, `Student`, and `Member`. Use `Standard` as the reference ticket type, with one indicator for each of the other two levels, and assume no interactions.
+
+1. List the cumulative splits modelled by a proportional odds model.
+2. How many thresholds and slope coefficients are estimated? Give the total parameter count.
+3. Explain why the thresholds must be ordered and why an additional freely estimated common intercept is unnecessary.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.4
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+There are $J-1=3$ cumulative splits:
+
+- `Poor` versus `Fair`, `Good`, or `Excellent`;
+- `Poor` or `Fair` versus `Good` or `Excellent`;
+- `Poor`, `Fair`, or `Good` versus `Excellent`.
+
+The model estimates **three thresholds** and **four shared slopes**: one each for waiting time, visit duration, the student indicator, and the member indicator. The total is $3+4=7$ parameters. The two ticket-type slopes compare their respective groups with `Standard`, holding the other regressors fixed.
+
+The ordered thresholds $\alpha_1<\alpha_2<\alpha_3$ ensure that cumulative probabilities increase with the cutoff and that differencing them produces non-negative category probabilities. They are not required to be equally spaced.
+
+Each threshold already supplies an intercept for its cumulative logit. If the model also contained a common intercept $b_0$, only the differences $\alpha_j-b_0$ would be identified: adding the same constant to every $\alpha_j$ and to $b_0$ would leave all predictions unchanged.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.5
+::::
+:::: {.Question-container}
+**True or False**
+
+Replacing the display codes $1,2,3,4$ by $10,20,40,80$ leaves an ordinal logistic model unchanged, provided the software still treats the response as the same four ordered categories and uses the same observations and regressors. Explain your answer.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.5
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** True.
+
+**Rationale:**
+
+An ordered categorical response contributes category membership and order, not the numerical gaps between its labels. A one-to-one relabelling that preserves that order therefore leaves the model and fitted probabilities unchanged. This requires explicitly preserving the category order in the software; alphabetical sorting, reversed levels, or treating the codes as a continuous response would change the analysis.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.6
+::::
+:::: {.Question-container}
+**Multiple Choice**
+
+For one visitor with specified regressor values, an ordinal model gives
+
+$$
+P(Y\le1)=0.15,\qquad P(Y\le2)=0.50,\qquad P(Y\le3)=0.85,
+$$
+
+where $Y$ has four ordered categories. What is the probability that this visitor is in **category 3 exactly**?
+
+**A.** $0.85$.
+
+**B.** $0.50$.
+
+**C.** $0.35$.
+
+**D.** $0.15$.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.6
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** C.
+
+**Rationale:**
+
+Cumulative probabilities include all lower categories. Subtracting removes the probability of categories 1 and 2:
+
+$$
+P(Y=3)=P(Y\le3)-P(Y\le2)=0.85-0.50=0.35.
+$$
+
+The complete category-probability vector is $(0.15,0.35,0.35,0.15)$. Its entries are non-negative and sum to one.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.7
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+For three independent survey respondents, the observed categories are $1$, $3$, and $4$. At one candidate set of ordinal-model parameters, the probabilities assigned to those respondents' **observed categories**, conditional on their respective regressors, are $0.20$, $0.30$, and $0.40$.
+
+1. Calculate their joint likelihood contribution and log-likelihood contribution using natural logarithms.
+2. Explain why we use the probability of each observed category rather than the probability of being at or below that category.
+3. What does maximum likelihood estimation optimize, and why should convergence be checked?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.7
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Independence allows the category probabilities to be multiplied:
+
+$$
+\mathcal{L}=0.20\times0.30\times0.40=0.024,
+\qquad
+\ell=\log(0.024)\approx-3.730.
+$$
+
+The data record exactly one category per respondent. A cumulative probability would include outcomes that were not observed; for a respondent in category 4, for example, $P(Y\le4)=1$ would provide no information about how much probability the model assigns to category 4 itself.
+
+Maximum likelihood estimation jointly chooses the thresholds and slopes to maximize the likelihood, or equivalently the log-likelihood, over valid parameter values. The solution generally requires numerical optimization. Convergence checks help establish whether the algorithm reached a stable solution; warnings, very large estimates, or an unstable estimated covariance matrix require investigation before interpreting coefficients or confidence intervals.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.8
+::::
+:::: {.Question-container}
+**Multiple Choice**
+
+Satisfaction is ordered from `Poor` to `Excellent`. Under the convention $\operatorname{logit}P(Y\le j\mid\mathbf{x})=\alpha_j-\boldsymbol{\beta}^{\top}\mathbf{x}$, the fitted coefficient for waiting time is $\hat\beta_{\text{wait}}=-0.40$ per ten minutes. Which interpretation is correct, holding other regressors fixed?
+
+**A.** Ten additional minutes increase the probability of every higher category by $40$ percentage points.
+
+**B.** Ten additional minutes multiply the odds of being above each cutoff by $e^{0.40}\approx1.49$.
+
+**C.** Ten additional minutes reduce the probability of `Excellent` by exactly $33\%$ for every visitor.
+
+**D.** Ten additional minutes multiply the odds of being above each cutoff by $e^{-0.40}\approx0.67$.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.8
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** D.
+
+**Rationale:**
+
+The above-cutoff odds are $P(Y>j\mid\mathbf{x})/P(Y\le j\mid\mathbf{x})$. Their ratio for a one-unit regressor increase is $e^\beta$, so ten additional minutes are associated with about **33% lower odds of being above each cutoff**. The corresponding at-or-below odds ratio is the reciprocal, $e^{0.40}\approx1.49$. Neither quantity is a fixed change in probability, and this adjusted association does not establish a causal effect of waiting time.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.9
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A proportional odds model relates information-search confidence (`Low` < `Moderate` < `High`) to workshop hours and prior library experience. The coefficient for workshop hours is $\hat\beta=0.08$ per hour, using the exercises' minus-sign convention.
+
+1. Compare the above-cutoff odds for two users who differ by five workshop hours but have the same prior experience.
+2. For the user with fewer hours, suppose $P(Y>\text{Moderate})=0.40$. Calculate this probability for the user with five more hours.
+3. Explain why the odds ratio should not be reported as a probability ratio.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.9
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+For a five-hour difference, the common above-cutoff odds ratio is
+
+$$
+\exp(5\times0.08)=\exp(0.40)\approx1.49.
+$$
+
+The user with more workshop hours has approximately **49% higher cumulative odds** of being above either cutoff, holding prior experience fixed.
+
+For the specified `Moderate` cutoff, the baseline odds are $0.40/0.60=2/3$. The new odds and probability are
+
+$$
+o_1=\frac{2}{3}e^{0.40}\approx0.995,
+\qquad
+p_1=\frac{o_1}{1+o_1}\approx0.499.
+$$
+
+Thus the fitted probability of `High` confidence rises from $40.0\%$ to about $49.9\%$, a change of **9.9 percentage points**. The probability ratio is approximately $0.499/0.400=1.25$, not $1.49$. Converting an odds ratio into a probability change requires the baseline probability.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.10
+::::
+:::: {.Question-container}
+**True or False**
+
+The proportional odds assumption means that a one-unit increase in a regressor produces the same change in $P(Y\le j\mid\mathbf{x})$ at every cutoff and for every individual. Explain your answer.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.10
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+The shared slope gives the same change in the **cumulative log-odds**, and hence the same cumulative odds ratio, across cutoffs. The logistic transformation is nonlinear, so probability changes depend on the cutoff and the individual's regressor values. Parallel lines on the cumulative-logit scale do not imply equally spaced curves or constant changes on the probability scale.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.11
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+Two analysts fit the same model with the same response order. Analyst A writes
+
+$$
+\operatorname{logit}P(Y\le j\mid x)=\alpha_j-\beta x
+\quad\text{and reports}\quad\hat\beta=0.60.
+$$
+
+Analyst B writes
+
+$$
+\operatorname{logit}P(Y\le j\mid x)=\alpha_j+\gamma x
+\quad\text{and reports}\quad\hat\gamma=-0.60.
+$$
+
+Are their fitted associations contradictory? Give the one-unit odds ratio for being **above** a cutoff and the one-unit odds ratio for being **at or below** it. Explain what should be checked before comparing coefficients across software.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.11
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The associations are the same because $\gamma=-\beta$. Both analysts subtract $0.60x$ from the threshold when constructing the lower cumulative logit.
+
+For a one-unit increase in $x$, the above-cutoff odds ratio is
+
+$$
+e^{\beta}=e^{-\gamma}=e^{0.60}\approx1.82,
+$$
+
+whereas the at-or-below odds ratio is
+
+$$
+e^{-\beta}=e^{\gamma}=e^{-0.60}\approx0.55.
+$$
+
+Both describe a shift toward higher categories. Before comparing software output, check the response order, which cumulative event is modelled, whether the slope is added or subtracted, the regressor units, and any reference-category coding. A change in sign convention alone is not a disagreement in fitted probabilities.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.12
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A four-category confidence model has thresholds $\alpha_1=-1$, $\alpha_2=0.5$, and $\alpha_3=2$, with a single slope $\beta=0.5$. For a person with $x=2$, use
+
+$$
+P(Y\le j\mid x)=\frac{1}{1+\exp\{-(\alpha_j-\beta x)\}}
+$$
+
+to calculate:
+
+1. The three cumulative probabilities.
+2. The probabilities of each of the four categories.
+3. The predicted category under the rule that selects the largest category probability. Does this classification imply that the chosen category has probability greater than $0.50$?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.12
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Here $\beta x=1$, so the cumulative logits are $-2$, $-0.5$, and $1$. Applying the logistic function gives
+
+$$
+P(Y\le1\mid x)\approx0.1192,\quad
+P(Y\le2\mid x)\approx0.3775,\quad
+P(Y\le3\mid x)\approx0.7311.
+$$
+
+The category probabilities are obtained from successive differences, with endpoint cumulative probabilities $0$ and $1$:
+
+| Category | Calculation | Probability |
+|---|---|---:|
+| 1 | $P(Y\le1\mid x)$ | $0.1192$ |
+| 2 | $P(Y\le2\mid x)-P(Y\le1\mid x)$ | $0.2583$ |
+| 3 | $P(Y\le3\mid x)-P(Y\le2\mid x)$ | $0.3535$ |
+| 4 | $1-P(Y\le3\mid x)$ | $0.2689$ |
+
+The probabilities are non-negative and sum to one before rounding. The predicted category is **3**, because its probability is the largest, even though that probability is only about $35.4\%$. Selecting the most probable category is not a claim of certainty or even of a majority probability. This decision rule treats all incorrect classifications as equally costly; a different application-specific loss may call for a different rule.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.13
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+An observational study models employees' confidence in using a new software system as `Low` < `Moderate` < `High`. Under the minus-sign convention, the estimated slope for years of relevant experience is $\hat\beta=0.40$, with standard error $0.15$, adjusting for training hours and job role. Assume the fitted model and the large-sample Wald approximation are adequate.
+
+1. Calculate the Wald statistic for $H_0:\beta=0$ and assess the two-sided test at the $5\%$ level using the critical value $1.96$.
+2. Construct a $95\%$ confidence interval for $\beta$ and transform it into an interval for the above-cutoff odds ratio.
+3. Interpret the result in context. Does it show that giving an employee an additional year of experience would cause their confidence to increase?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.13
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The Wald statistic is
+
+$$
+z=\frac{0.40}{0.15}\approx2.67.
+$$
+
+Since $|z|>1.96$, reject $H_0$ at the $5\%$ level. The two-sided p-value is approximately $0.008$.
+
+The coefficient interval is
+
+$$
+0.40\pm1.96(0.15)=[0.106,0.694].
+$$
+
+Exponentiating the estimate and both endpoints gives
+
+$$
+\widehat{\mathrm{OR}}=e^{0.40}\approx1.49,
+\qquad
+95\%\ \mathrm{CI}=[e^{0.106},e^{0.694}]\approx[1.11,2.00].
+$$
+
+Employees with one more year of relevant experience have an estimated **49% higher odds of being above either confidence cutoff**, holding training hours and job role fixed. The interval is compatible with an increase in those odds of approximately $11\%$ to $100\%$, so the magnitude remains uncertain even though the interval excludes one.
+
+This is an adjusted association from observational data, not evidence that changing experience alone would cause the reported change. It is also not a $49\%$ increase in the probability of `High` confidence.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.14
+::::
+:::: {.Question-container}
+**True or False**
+
+An omnibus Brant–Wald test gives $p=0.38$. This proves that proportional odds holds and that the model's probability predictions are well calibrated. Explain your answer.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.14
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** False.
+
+**Rationale:**
+
+The null hypothesis is that each regressor's slope is common across the cumulative splits. At the $5\%$ level, $p=0.38$ supplies insufficient evidence to reject that restriction; it does not prove the slopes are equal. The test may have limited power, particularly with sparse categories or a small sample.
+
+The test also does not establish calibration, the adequacy of the chosen functional forms, or independence of observations. Those concerns require their own evidence, including appropriate comparisons of predicted probabilities with observed outcomes.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.15
+::::
+:::: {.Question-container}
+**True or False**
+
+A company collects an ordered satisfaction rating from each employee every month. Treating these ratings as an ordered factor does not, by itself, justify the independent-observations assumption of the standard ordinal logistic model. Explain your answer and identify a suitable modelling consideration.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.15
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** True.
+
+**Rationale:**
+
+Ratings from the same employee may be correlated because they share personal characteristics and work circumstances. Correctly specifying the response order does not remove this dependence. Treating all rows as independent can give misleading uncertainty estimates.
+
+The analysis should account for repeated observations, for example through an ordinal model with an employee-level random effect or another suitable method for correlated ordinal data. Predictive validation should also reflect the target: evaluating predictions for new employees requires keeping their observations out of the training sample, while forecasting later ratings requires respecting time order.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.16
+::::
+:::: {.Question-container}
+**Multiple Choice**
+
+An ordinal fit returns a slope estimate of $18$, a standard error of $250$, and an optimizer convergence warning. The highest response category contains only three observations. What is the most defensible next step?
+
+**A.** Check sparse category/regressor combinations, possible separation, regressor scaling, and numerical convergence before interpreting the estimate.
+
+**B.** Report $e^{18}$ as a precise and very large association because the coefficient is positive.
+
+**C.** Conclude that the regressor is unimportant because the reported Wald statistic is small.
+
+**D.** Remove the three observations in the highest category solely to eliminate the warning.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.16
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** A.
+
+**Rationale:**
+
+The warning and large standard error suggest an unstable fit. Sparse data or separation at a cumulative split can make finite maximum likelihood estimates difficult to obtain; poor scaling can also create numerical problems. Inspect the data and fitting diagnostics before deciding how to address the issue.
+
+Neither the exponentiated estimate nor its Wald test is reliable evidence of a substantive association in this situation. Deleting a valid category solely to obtain convergence changes the question being answered. Any simplification of the model or regrouping of categories needs substantive justification, followed by a new assessment of the fit.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.17
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A training dataset records service confidence as `Low` < `Moderate` < `High` < `Very high`. The proposed regressors are workshop hours $h_i$ and years of experience $e_i$, with no interactions. Brant–Wald results give an omnibus p-value of $0.004$, a p-value of $0.002$ for workshop hours, and a p-value of $0.46$ for experience.
+
+1. Propose a partial proportional odds model and write its cumulative logits using the exercises' minus-sign convention. What would the workshop-hours coefficients mean?
+2. Count the parameters in the proportional, proposed partial proportional, and fully non-proportional models.
+3. On the same training observations, the proportional model has maximized log-likelihood $-410$ and the proposed partial model has maximized log-likelihood $-405$. Assume both fits are valid and converged and the usual likelihood-ratio approximation applies. State the null hypothesis, calculate the likelihood-ratio statistic and degrees of freedom, and compare with the $5\%$ critical value $5.99$.
+4. What should be checked before carrying the selected model forward?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.17
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The results motivate examining a model that frees the workshop-hours slope while retaining a shared experience slope:
+
+$$
+\operatorname{logit}P(Y_i\le j\mid h_i,e_i)
+=\alpha_j-\beta_{h,j}h_i-\beta_e e_i,
+\qquad j=1,2,3.
+$$
+
+For one additional workshop hour, $e^{\beta_{h,j}}$ is the above-cutoff odds ratio at cutoff $j$, holding experience fixed. These ratios may differ across the three cumulative comparisons. The experience p-value does not prove proportionality; a shared experience slope remains a working restriction to assess.
+
+| Model | Thresholds | Slopes | Total parameters |
+|---|---:|---:|---:|
+| Proportional odds | 3 | $1+1=2$ | 5 |
+| Partial proportional odds | 3 | $3+1=4$ | 7 |
+| Fully non-proportional odds | 3 | $3+3=6$ | 9 |
+
+The proportional model is nested in the partial model through
+
+$$
+H_0:\beta_{h,1}=\beta_{h,2}=\beta_{h,3},
+$$
+
+against an alternative in which at least one of these slopes differs. The likelihood-ratio statistic is
+
+$$
+G^2=2\{-405-(-410)\}=10,
+\qquad \mathrm{df}=7-5=2.
+$$
+
+Since $10>5.99$, the comparison supports relaxing this restriction at the stated level; the approximate p-value is $0.0067$. This is evidence for the proposed refinement, not a demonstration that the larger model is adequate in every respect. Because the same training data motivated the comparison, it belongs to model development rather than a fresh confirmatory test.
+
+Before proceeding, **repeat the relevant diagnostics for the selected partial model**: check convergence and uncertainty, investigate remaining proportionality restrictions and the linear form of continuous regressor terms, and assess fit and the validity of predicted category probabilities. In particular, check that cumulative probabilities remain ordered over the relevant regressor range. If those checks are satisfactory, freeze the specification before final inference and held-out predictive evaluation. If the larger model had not been supported, retaining the simpler model would still require an adequate diagnostic assessment.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.18
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+For a particular regressor profile, a non-proportional odds model returns
+
+$$
+P(Y\le1)=0.20,\qquad P(Y\le2)=0.70,\qquad P(Y\le3)=0.65
+$$
+
+for a four-category response. Each number is between zero and one.
+
+1. Are these valid cumulative probabilities? Calculate the implied category probabilities.
+2. Why are ordered intercepts alone insufficient to prevent this problem when slopes vary by cutoff?
+3. Is replacing any negative category probability by zero and rescaling the vector an adequate validation of the fitted model?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.18
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The implied category probabilities are
+
+$$
+(0.20,\ 0.70-0.20,\ 0.65-0.70,\ 1-0.65)
+=(0.20,0.50,-0.05,0.35).
+$$
+
+They are invalid because category 3 has negative probability. The event $Y\le2$ is contained in $Y\le3$, so its probability cannot be larger. Being individually between zero and one is not sufficient for a collection of cumulative probabilities to be valid.
+
+With shared slopes, ordered intercepts preserve the order of the cumulative logits at every regressor profile. With different slopes, those logits can cross as the regressors change, even if the intercepts are ordered.
+
+Clipping and rescaling may produce a numerical vector that sums to one, but it does not validate the fitted cumulative model or its likelihood-based inference. Investigate the specification and fitting procedure, and use a model that produces coherent probabilities over the intended prediction range. Extrapolation beyond the observed range needs particular attention.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.19
+::::
+:::: {.Question-container}
+**Multiple Choice**
+
+On a held-out sample, a four-category model classifies $72\%$ of observations correctly. A baseline that always predicts the most common **training** category achieves $70\%$ accuracy on that same sample. The fitted model correctly identifies only $10\%$ of the observations in the lowest category. Which conclusion is best supported?
+
+**A.** The model is highly useful because its accuracy is much higher than $25\%$.
+
+**B.** The model's probabilities must be well calibrated because its accuracy exceeds the baseline.
+
+**C.** The accuracy gain is two percentage points; usefulness also depends on performance by category, the seriousness of ordinal errors, and probability quality.
+
+**D.** Low recall in one category proves that the proportional odds assumption is false.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.19
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+**Correct answer:** C.
+
+**Rationale:**
+
+The observed improvement is $72\%-70\%=2$ percentage points, and the lowest category is usually missed. Accuracy alone can hide this weakness when categories are imbalanced. The ordered confusion matrix and recall for each category help show where errors occur, including whether predictions miss by one category or confuse the two extremes.
+
+If predicted probabilities matter, examine their quality as well, using measures such as log loss and calibration comparisons. The importance of the gain also depends on its uncertainty and the intended use. Neither good classification nor poor recall in one group is a direct test of proportional odds. Uniform random guessing is not the most informative baseline here because a simple training-derived rule already achieves $70\%$ accuracy.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.20
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A team intends to follow the book's split-sample workflow: model development on training data, a refit of the frozen specification on testing data for final coefficient inference, and held-out prediction using the training-fitted model.
+
+Instead, the team uses the testing data to decide which slopes should vary by cutoff. It then fits that selected model on the testing data and reports classification accuracy on those same observations as held-out performance.
+
+Identify the two main problems and describe the correct sequence. Does using the testing observations for both the planned inferential refit and the planned predictive evaluation make those two results independent replications?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.20
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+First, the testing data influenced model selection, so they no longer provide an untouched assessment of the selected specification. Second, predictions from a model fitted on those same testing responses are **in-sample predictions**, not held-out predictions.
+
+The intended sequence is:
+
+1. Split the observations before EDA and model development, using a split appropriate to the study design.
+2. Use training data to choose regressors, functional forms, and proportionality restrictions, and repeat diagnostics after supported refinements.
+3. Freeze the specification and evaluation choices. For the book's final coefficient inference, refit only that fixed specification on the testing sample; do not select again based on those results.
+4. For predictive evaluation, retain the **training-fitted coefficients** and predict testing outcomes from their regressors. Compare with the training-derived baseline using the planned measures.
+
+The inferential refit and predictive model share a specification but are different fitted objects. Since the two final analyses use the same testing observations, their results are not independent replications. Once a sample has been used for additional development, a new untouched evaluation sample or an appropriate validation design is needed for a fresh assessment.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.21
+::::
+:::: {.Question-container}
+**Open-ended Question**
+
+A library studies confidence in finding information, ordered as `Low` < `Moderate` < `High`. Its questions are: **How is workshop attendance associated with confidence, adjusting for prior library experience and education?** And **how well can those regressors predict a new user's confidence category?** The study is observational. The frozen model has passed the planned development checks, and the final results are:
+
+| Result | Value |
+|---|---|
+| Adjusted above-cutoff odds ratio per additional workshop session, from the final inferential refit | $1.50$, with $95\%$ CI $[1.15,1.96]$ |
+| Testing accuracy of the training-fitted model | $62\%$ |
+| Testing accuracy of the training-derived majority-category baseline | $50\%$ |
+| Testing recall for the `Low` confidence category | $28\%$ |
+
+Write a **four- to five-sentence briefing** for the library director. Explicitly answer both research questions, use numerical evidence and uncertainty, identify a predictive limitation, and suggest a proportionate use of the results. Avoid a causal claim or describing an odds ratio as a probability ratio.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.21
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+One possible five-sentence briefing is:
+
+> Users who attended one additional workshop session had an estimated 50% higher odds of being above either confidence cutoff, after accounting for prior library experience and education; the 95% confidence interval for that odds ratio was 1.15 to 1.96. Because this was an observational study, the association does not establish that attending another session would itself increase confidence. For new users in the held-out sample, the model predicted the exact confidence category correctly 62% of the time, compared with 50% for the simple baseline, an improvement of 12 percentage points. However, it identified only 28% of users who actually had low confidence, so it missed most of the group that might need additional help. The findings can inform further evaluation of workshop support, but direct assessment should accompany any use of the model to identify users needing assistance.
+
+This briefing separates evidence about association from evidence about prediction. It gives an adjusted magnitude and interval, compares prediction with a relevant baseline, and connects the weak recall to the practical decision without claiming that the model establishes causation or is ready for automatic allocation of support.
+
+</details>
+::::
+:::
+
+### Case Study {#sec-ordinal-logistic-exercises-case-study}
+
+::: {.CodingCase}
+:::: {.CodingCase-header}
+A Better Train Journey: Understanding Passenger Satisfaction
+::::
+:::: {.CodingCase-container}
+A regional rail operator wants to understand passengers' experiences and evaluate how well journey characteristics predict satisfaction. Its passenger-experience team is particularly interested in waiting time, crowding, and the availability of live arrival information. A lower chance of a very poor experience and a higher chance of an excellent experience are distinct practical goals.
+
+The dataset contains **1,800 simulated passenger journeys**, with one passenger surveyed after each separately sampled service run. Treat these observations as independent for this exercise. The response is an ordered rating:
+
+$$
+\texttt{Very dissatisfied}<\texttt{Dissatisfied}<\texttt{Satisfied}<\texttt{Very satisfied}.
+$$
+
+The labels define an order, not equal numerical distances. This is a synthetic observational-style exercise: its associations are not evidence of actual causal effects or service benefits for a real rail operator.
+
+| Variable | Meaning | Model role and coding |
+|:---|:---|:---|
+| `passenger_id` | Unique synthetic passenger identifier | Join/check observations; exclude from regressors |
+| `satisfaction` | Overall rating after the journey | Ordered response with the four levels above |
+| `wait_minutes` | Time waiting before boarding, 0–25 minutes | Continuous; not necessarily a delay relative to the timetable |
+| `crowding` | Crowding on the train: `Low`, `Moderate`, `High` | Two indicators; `Low` is the reference |
+| `arrival_information` | Live arrival information available: `No`, `Yes` | Binary indicator; `No` is the reference |
+| `journey_minutes` | Journey duration, 10–70 minutes, excluding the pre-boarding wait | Continuous, in minutes |
+
+: Variables in the simulated train-satisfaction study. {#tbl-ordinal-train-variables .striped .hover}
+
+The analysis file is [problem-1-data.csv](15-ordinal-logistic_files/simulations/problem-1-data.csv). The companion [split file](15-ordinal-logistic_files/simulations/problem-1-split.csv) assigns 900 IDs to training and 900 to testing, using an outcome-independent random split with seed 1516. **Use these assignments in both languages.** Do not create a second split or regenerate the data during the analysis.
+
+The workflow is: define the inquiries, verify and encode the data, explore training observations, fit a simple and an extended proportional-odds model, diagnose and refine the model, repeat checks, freeze the specification, and then produce separate inferential and predictive results. Finish with a quantitative briefing for the passenger-experience team.
+::::
+:::
+
+::: {.Tip}
+:::: {.Tip-header}
+Running the worked answers
+::::
+:::: {.Tip-container}
+Run the answers in order, with the working directory set to the book's `book` directory, as in the other chapter examples. The R solutions use `MASS`, `VGAM`, `brant`, `ggplot2`, and `knitr`; Python uses `numpy`, `pandas`, `scipy`, `statsmodels`, and `matplotlib`. The chapter's existing `reticulate` setup renders both languages and displays Python tables.
+
+All analysis functions are defined in the code blocks below, within this chapter. Run the setup block for your chosen language before the worked answers. The Python functions fit the cumulative-logit likelihood because the standard `OrderedModel` fits proportional odds only. The implementation exposes the likelihood, derivative, convergence checks, and expected-information standard errors; it rejects invalid probabilities rather than clipping them. The setup blocks define functions without reading data or fitting models.
+
+Use the saved response data for the analysis. The generator's known coefficients and probability curves are author references, not fitted results or diagnostic evidence.
+::::
+:::
+
+#### Functions Used by the Worked Answers
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-functions-r
+#| code-fold: true
+#| code-summary: "Show R analysis functions"
+#| message: false
+
+# Functions used by the Chapter 15 worked answers.
+# VGAM's default lower-cumulative logit has +gamma*x; beta=-gamma gives upper odds.
+train_display_table <- function(x) {
+  # Keep small p-values visible in both R tables and reticulate-converted Python tables.
+  # Explicit conversion also handles newer pandas classes with older reticulate.
+  if (inherits(x, 'python.builtin.object')) {
+    x <- x$to_dict(orient = 'list')
+    if (inherits(x, 'python.builtin.object')) x <- reticulate::py_to_r(x)
+  }
+  x <- as.data.frame(x)
+  for (column in intersect(names(x), c('p', 'p_value', 'probability')))
+    x[[column]] <- format.pval(x[[column]], digits = 3, eps = .001)
+  x
+}
+
+train_lr <- function(label, small, big) {
+  npar <- function(fit) {
+    if (inherits(fit, 'polr')) length(stats::coef(fit)) + length(fit$zeta)
+    else if (inherits(fit, 'vglm')) length(stats::coef(fit))
+    else stop('Expected a MASS::polr or VGAM::vglm fit.')
+  }
+  df <- npar(big) - npar(small)
+  statistic <- 2 * as.numeric(stats::logLik(big) - stats::logLik(small))
+  if (df <= 0 || statistic < -1e-7) stop('Check nesting and likelihood maximization.')
+  data.frame(comparison = label, statistic = statistic, df = df,
+             p = stats::pchisq(statistic, df, lower.tail = FALSE))
+}
+
+train_or_table <- function(fit) {
+  if (!inherits(fit, 'vglm')) stop('Expected a native VGAM::vglm fit.')
+  # Requires cumulative(reverse=FALSE): report slopes, not the cutpoints.
+  native <- stats::coef(fit)
+  keep <- !grepl('Intercept', names(native), fixed = TRUE)
+  beta <- -native[keep]
+  se <- sqrt(diag(stats::vcov(fit)))[keep]  # Native expected-information covariance.
+  data.frame(term = names(beta), estimate = unname(beta), se = unname(se),
+             z = unname(beta / se), p = unname(2 * stats::pnorm(-abs(beta / se))),
+             odds_ratio = unname(exp(beta)),
+             OR_lower = unname(exp(beta - stats::qnorm(.975) * se)),
+             OR_upper = unname(exp(beta + stats::qnorm(.975) * se)))
+}
+
+train_probability_check <- function(p) {
+  if (!is.matrix(p) || !is.numeric(p) || nrow(p) == 0L || ncol(p) != 4L)
+    stop('Expected a nonempty numeric probability matrix with four columns.')
+  if (any(!is.finite(p)) || any(p < 0) || any(p > 1) ||
+      any(abs(rowSums(p) - 1) > 1e-10))
+    stop('Invalid probabilities: investigate the fit; do not clip or rescale.')
+  invisible(TRUE)
+}
+
+train_fit_check <- function(fit, max_iterations = 200L) {
+  if (!inherits(fit, 'vglm')) stop('Expected a native VGAM::vglm fit.')
+  covariance <- stats::vcov(fit)
+  if (fit@iter >= max_iterations || any(!is.finite(stats::coef(fit))) ||
+      !is.finite(as.numeric(stats::logLik(fit))) ||
+      any(!is.finite(covariance)) || any(diag(covariance) <= 0))
+    stop('Investigate convergence, coefficients, and uncertainty before proceeding.')
+  train_probability_check(VGAM::predictvglm(fit, type = 'response'))
+  invisible(TRUE)
+}
+
+train_metrics <- function(name, p, y) {
+  train_probability_check(p)
+  if (length(y) != nrow(p) || anyNA(y) || any(!(y %in% 1:4)))
+    stop('y must contain one integer category code from 1 to 4 per row.')
+  predicted <- max.col(p, ties.method = 'first')
+  cm <- table(factor(y, levels = 1:4), factor(predicted, levels = 1:4))
+  correct <- diag(cm)
+  actual <- rowSums(cm)
+  assigned <- colSums(cm)
+  # Include all four categories. Undefined per-category recall/F1 is set to zero.
+  recall <- ifelse(actual > 0, correct / actual, 0)
+  f1 <- ifelse(actual + assigned > 0, 2 * correct / (actual + assigned), 0)
+  cumulative <- t(apply(p, 1, cumsum))[, 1:3, drop = FALSE]
+  observed <- outer(y, 1:3, '<=') * 1
+  data.frame(Model = name, Accuracy = mean(predicted == y),
+             MacroRecall = mean(recall), MacroF1 = mean(f1),
+             RankMAE = mean(abs(predicted - y)),
+             LogLoss = -mean(log(p[cbind(seq_along(y), y)])),
+             RPS = mean(rowMeans((cumulative - observed)^2)))
+}
+
+train_calibration <- function(p, y, bins = 5L) {
+  train_probability_check(p)
+  if (length(y) != nrow(p) || anyNA(y) || any(!(y %in% 1:4)))
+    stop('y must contain one integer category code from 1 to 4 per row.')
+  if (length(bins) != 1L || !is.finite(bins) || bins < 1 || bins != as.integer(bins))
+    stop('bins must be a positive integer.')
+  result <- lapply(1:3, function(j) {
+    predicted <- rowSums(p[, seq_len(j), drop = FALSE])
+    breaks <- unique(stats::quantile(predicted, seq(0, 1, length.out = bins + 1)))
+    group <- if (length(breaks) == 1L) rep(1L, length(y)) else
+      cut(predicted, breaks = breaks, include.lowest = TRUE, labels = FALSE)
+    rows <- lapply(sort(unique(group)), function(g) {
+      selected <- group == g
+      n <- sum(selected)
+      observed <- mean(y[selected] <= j)
+      data.frame(cutpoint = j, bin = g, n = n,
+                 predicted = mean(predicted[selected]), observed = observed,
+                 standard_error = sqrt(observed * (1 - observed) / n))
+    })
+    do.call(rbind, rows)
+  })
+  # Descriptive binomial SEs, not simultaneous bands or uncertainty in the fitted model.
+  do.call(rbind, result)
+}
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-functions-py
+#| code-fold: true
+#| code-summary: "Show Python analysis functions"
+#| message: false
+
+from dataclasses import dataclass
+import numpy as np
+import pandas as pd
+from scipy.optimize import minimize
+from scipy.special import expit
+from scipy.stats import chi2, norm
+import statsmodels.api as sm
+
+RAIL_LEVELS = ["Very dissatisfied", "Dissatisfied", "Satisfied", "Very satisfied"]
+
+
+def rail_design(data, quadratic=False):
+    """Explicit columns avoid reference-category and intercept ambiguities."""
+    x = pd.DataFrame({
+        "wait5": data["wait5"].to_numpy(),
+        "duration15": data["duration15"].to_numpy(),
+        "crowdingModerate": (data["crowding"] == "Moderate").to_numpy(float),
+        "crowdingHigh": (data["crowding"] == "High").to_numpy(float),
+        "arrival_informationYes": (data["arrival_information"] == "Yes").to_numpy(float),
+    }, index=data.index)
+    if quadratic:
+        x["wait5_squared"] = x["wait5"] ** 2
+        x["duration15_squared"] = x["duration15"] ** 2
+    return x
+
+
+def rail_probability_check(p):
+    p = np.asarray(p, dtype=float)
+    if (p.ndim != 2 or p.shape[1] != 4 or not np.isfinite(p).all()
+            or (p < 0).any() or (p > 1).any()
+            or not np.allclose(p.sum(axis=1), 1, atol=1e-10, rtol=0)):
+        raise ValueError("Invalid category probabilities; inspect the model.")
+    return p
+
+
+def rail_basis(x, free):
+    """Derivative of each cumulative logit with respect to free parameters."""
+    n = len(x)
+    blocks = [np.broadcast_to(np.eye(3), (n, 3, 3))]
+    names = [f"alpha:{j}" for j in range(1, 4)]
+    for name in x.columns:
+        values = -x[name].to_numpy(float)[:, None, None]
+        if name in free:
+            blocks.append(values * np.eye(3)[None, :, :])
+            names.extend(f"{name}:{j}" for j in range(1, 4))
+        else:
+            blocks.append(np.broadcast_to(values, (n, 3, 1)))
+            names.append(name)
+    return np.concatenate(blocks, axis=2), names
+
+
+@dataclass
+class RailCumulativeFit:
+    params: np.ndarray
+    covariance: np.ndarray
+    names: list
+    columns: list
+    free: tuple
+    loglik: float
+    score_max: float
+    iterations: int
+
+    def predict(self, x):
+        z, _ = rail_basis(x.loc[:, self.columns], self.free)
+        cumulative = expit(z @ self.params)
+        return rail_probability_check(np.diff(np.column_stack(
+            [np.zeros(len(x)), cumulative, np.ones(len(x))]), axis=1))
+
+
+def rail_fit_cumulative(x, y, free=(), start=None):
+    """Fit shared or cutoff-specific slopes by the ordinal likelihood.
+
+    y is coded 0,1,2,3. Pass an existing nested fit as start when extending
+    a model. Invalid trial probabilities are rejected during optimization.
+    """
+    y = np.asarray(y, dtype=int)
+    if len(y) != len(x) or set(np.unique(y)) != {0, 1, 2, 3}:
+        raise ValueError("The fitting sample must contain all four outcome categories.")
+    if not set(free).issubset(x.columns):
+        raise ValueError("Unknown non-proportional regressor.")
+    z, names = rail_basis(x, free)
+    theta = np.zeros(len(names))
+    cumulative_counts = np.bincount(y, minlength=4).cumsum()[:3] / len(y)
+    theta[:3] = np.log(cumulative_counts / (1 - cumulative_counts))
+    if start is not None:
+        old = dict(zip(start.names, start.params))
+        for k, name in enumerate(names):
+            theta[k] = old.get(name, old.get(name.split(":")[0], theta[k]))
+
+    def components(t):
+        f = expit(z @ t)
+        p = np.diff(np.column_stack([np.zeros(len(y)), f, np.ones(len(y))]), axis=1)
+        df = f[:, :, None] * (1 - f[:, :, None]) * z
+        dp = np.diff(np.concatenate([np.zeros((len(y), 1, len(t))), df,
+                                     np.zeros((len(y), 1, len(t)))], axis=1), axis=1)
+        return p, dp
+
+    def objective(t):
+        p, dp = components(t)
+        if (p <= 0).any() or not np.isfinite(p).all():
+            return 1e100, np.zeros_like(t)
+        observed = p[np.arange(len(y)), y]
+        score = dp[np.arange(len(y)), y] / observed[:, None]
+        return -np.log(observed).sum(), -score.sum(axis=0)
+
+    result = minimize(objective, theta, jac=True, method="BFGS",
+                      options={"gtol": 1e-6, "maxiter": 1500})
+    nll, gradient = objective(result.x)
+    # BFGS can stop on numerical precision after reaching a stationary point.
+    if not np.isfinite(nll) or nll >= 1e99 or np.max(np.abs(gradient)) > 1e-4:
+        raise RuntimeError(f"Fit did not converge: {result.message}")
+    p, dp = components(result.x)
+    rail_probability_check(p)
+    information = np.einsum("njk,njl,nj->kl", dp, dp, 1 / p)
+    if np.linalg.eigvalsh(information).min() <= 0:
+        raise RuntimeError("Fisher information is not positive definite.")
+    return RailCumulativeFit(result.x, np.linalg.inv(information), names,
+                         list(x.columns), tuple(free), -float(nll),
+                         float(np.max(np.abs(gradient))), int(result.nit))
+
+
+def rail_lr_test(label, small, big):
+    statistic = 2 * (big.loglik - small.loglik)
+    df = len(big.params) - len(small.params)
+    if df <= 0 or statistic < -1e-5:
+        raise ValueError("Check nesting and convergence before an LR comparison.")
+    return {"Comparison": label, "LR": statistic, "df": df,
+            "p_value": chi2.sf(statistic, df)}
+
+
+def rail_or_table(fit):
+    keep = np.array([not name.startswith("alpha:") for name in fit.names])
+    b = fit.params[keep]
+    se = np.sqrt(np.diag(fit.covariance))[keep]
+    return pd.DataFrame({"term": np.array(fit.names)[keep], "beta": b, "SE": se,
+                         "z": b / se, "p_value": 2 * norm.sf(np.abs(b / se)),
+                         "OR": np.exp(b), "lower95": np.exp(b - 1.96 * se),
+                         "upper95": np.exp(b + 1.96 * se)})
+
+
+def rail_brant_table(x, y):
+    """Brant-Wald checks using covariance across nested binary splits.
+
+    Separate binary responses for one person are dependent. Cross-covariance
+    uses P(Y>l) * [1-P(Y>m)] for m<l, as in R's brant implementation.
+    Cutpoint intercepts are nuisance parameters and are not tested for equality.
+    """
+    y = np.asarray(y, dtype=int)
+    X = sm.add_constant(x, has_constant="add").to_numpy(float)
+    models = [sm.GLM((y > j).astype(int), X, family=sm.families.Binomial()).fit()
+              for j in range(3)]
+    p = np.column_stack([m.fittedvalues for m in models])
+    inv = [np.linalg.inv(X.T @ ((p[:, j] * (1-p[:, j]))[:, None] * X)) for j in range(3)]
+    k = x.shape[1]
+    covariance = np.zeros((3*k, 3*k))
+    for j in range(3):
+        covariance[j*k:(j+1)*k, j*k:(j+1)*k] = inv[j][1:, 1:]
+        for l in range(j+1, 3):
+            cross = inv[j] @ (X.T @ ((p[:, l]*(1-p[:, j]))[:, None]*X)) @ inv[l]
+            covariance[j*k:(j+1)*k, l*k:(l+1)*k] = cross[1:, 1:]
+            covariance[l*k:(l+1)*k, j*k:(j+1)*k] = cross[1:, 1:].T
+    slopes = np.concatenate([m.params[1:] for m in models])
+    groups = {"Omnibus": list(range(k)), **{name: [j] for j, name in enumerate(x.columns)}}
+    rows = []
+    for name, columns in groups.items():
+        contrast = []
+        for j in [1, 2]:
+            for c in columns:
+                row = np.zeros(3*k); row[c] = 1; row[j*k+c] = -1
+                contrast.append(row)
+        D = np.array(contrast); difference = D @ slopes
+        statistic = difference @ np.linalg.solve(D @ covariance @ D.T, difference)
+        rows.append({"term": name, "Wald": statistic, "df": len(D),
+                     "p_value": chi2.sf(statistic, len(D))})
+    return pd.DataFrame(rows)
+
+
+def rail_metrics(name, p, y):
+    """y uses 0..3. RPS is the mean squared error over THREE cumulative cuts."""
+    p = rail_probability_check(p); y = np.asarray(y, dtype=int)
+    pred = p.argmax(axis=1)
+    cm = np.zeros((4, 4), dtype=int); np.add.at(cm, (y, pred), 1)
+    recall = np.divide(cm.diagonal(), cm.sum(1), out=np.zeros(4), where=cm.sum(1)>0)
+    precision = np.divide(cm.diagonal(), cm.sum(0), out=np.zeros(4), where=cm.sum(0)>0)
+    f1 = np.divide(2*precision*recall, precision+recall, out=np.zeros(4), where=(precision+recall)>0)
+    observed_cdf = (y[:, None] <= np.arange(3)).astype(float)
+    return {"Model": name, "Accuracy": np.mean(pred == y), "MacroRecall": recall.mean(),
+            "MacroF1": f1.mean(), "RankMAE": np.abs(pred-y).mean(),
+            "LogLoss": -np.log(p[np.arange(len(y)), y]).mean(),
+            "RPS": np.mean((p.cumsum(1)[:, :3]-observed_cdf)**2)}
+
+
+def rail_calibration(p, y, bins=5):
+    p = rail_probability_check(p); y = np.asarray(y, dtype=int)
+    rows = []
+    for j in range(3):
+        predicted = p[:, :j+1].sum(1)
+        frame = pd.DataFrame({"predicted": predicted, "observed": (y <= j).astype(float),
+                              "bin": pd.qcut(predicted, bins, duplicates="drop")})
+        grouped = frame.groupby("bin", observed=True).agg(
+            n=("observed", "size"), predicted=("predicted", "mean"), observed=("observed", "mean")
+        ).reset_index()
+        grouped["cutpoint"] = j+1
+        grouped["standard_error"] = np.sqrt(grouped.observed*(1-grouped.observed)/grouped.n)
+        rows.append(grouped)
+    return pd.concat(rows, ignore_index=True)
+```
+
+:::
+
+#### Study Design
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.22 — Inferential Inquiry
+::::
+:::: {.Question-container}
+Formulate an **inferential inquiry** for the rail operator. Identify meaningful comparisons for waiting time, crowding, and arrival-information availability. Explain why the inquiry concerns associations rather than causal effects.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.22
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable inquiry is:
+
+> **How are waiting time, crowding, arrival-information availability, and journey duration associated with passengers' satisfaction, after adjustment for the other measured journey characteristics?**
+
+Compare passengers with five minutes' difference in waiting time, compare `Moderate` and `High` crowding with `Low`, and compare information available with unavailable. For information, ask whether the association is the same for avoiding `Very dissatisfied`, being `Satisfied` or better, and reaching `Very satisfied`.
+
+The outcome is an ordered distribution, so report cumulative odds ratios and selected category probabilities. The study does not randomly assign service conditions; in this simulated observational-style analysis, an adjusted association does not establish what would happen if the operator intervened.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.23 — Predictive Inquiry
+::::
+:::: {.Question-container}
+Formulate a separate **predictive inquiry**. Define the prediction setting, explain when the regressors would be available, and identify an appropriate baseline.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.23
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+A suitable predictive inquiry is:
+
+> **For a new passenger journey with known waiting time, crowding, arrival-information availability, and journey duration, how accurately can the model predict the four satisfaction probabilities and the passenger's most likely rating?**
+
+Because realized waiting and journey duration are used, this is a prediction **after the journey, before observing the survey response**. It is not a forecast available before departure. A probability baseline uses the training-sample proportions of the four ratings; its category prediction is the most common training rating. Evaluate both methods on the same held-out journeys, using the same category order and metrics.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.24 — Observational Units and Probability Model
+::::
+:::: {.Question-container}
+Identify the observational unit and response. Write the conditional probability model, explain the independence assumption, and define how category probabilities are recovered from cumulative probabilities.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.24
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+One observation is one surveyed passenger on a separately sampled train service run. Code the response $Y_i=1,2,3,4$ in the stated order. Conditional on the regressors $\mathbf{x}_i$,
+
+$$
+P(Y_i=j\mid\mathbf{x}_i)=p_{i,j},\qquad
+p_{i,j}\ge0,\qquad \sum_{j=1}^{4}p_{i,j}=1.
+$$
+
+Equivalently, the one-hot response has a multinomial distribution with one trial and probabilities $(p_{i,1},\ldots,p_{i,4})$. Responses are assumed independent across observations; surveying several passengers on the same run or repeatedly surveying one passenger would require additional consideration of dependence.
+
+Let $C_{i,j}=P(Y_i\le j\mid\mathbf{x}_i)$ for $j=1,2,3$, with $C_{i,0}=0$ and $C_{i,4}=1$. Then
+
+$$
+p_{i,j}=C_{i,j}-C_{i,j-1}.
+$$
+
+The cumulative probabilities must increase with $j$. The likelihood uses the probability of each passenger's **observed category**, not merely the corresponding cumulative probability.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.25 — Regressor Coding and Notation
+::::
+:::: {.Question-container}
+Define scaled continuous regressors and indicators for this analysis. Use five-minute units for waiting time and fifteen-minute units for journey duration, centred at 10 and 35 minutes respectively. Explain why `passenger_id` is excluded and why crowding is not assigned a single numerical score.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.25
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Use the following fixed definitions in both languages:
+
+| Symbol | Working variable | Definition |
+|:---|:---|:---|
+| $w_i$ | `wait5` | $(\texttt{wait_minutes}_i-10)/5$ |
+| $d_i$ | `duration15` | $(\texttt{journey_minutes}_i-35)/15$ |
+| $m_i$ | `crowdingModerate` | 1 for `Moderate` crowding, 0 otherwise |
+| $h_i$ | `crowdingHigh` | 1 for `High` crowding, 0 otherwise |
+| $a_i$ | `arrival_informationYes` | 1 if information is available, 0 otherwise |
+
+: Notation and reference categories for the train case. {#tbl-ordinal-train-notation .striped .hover}
+
+`Low` crowding has $m_i=h_i=0$; no arrival information has $a_i=0$. Using two crowding indicators permits different changes from `Low` to `Moderate` and from `Moderate` to `High`. The identifier carries no substantive journey information. The fixed centring and scaling constants give interpretable comparisons without estimating transformations from testing data.
+
+</details>
+::::
+:::
+
+#### Data Understanding and Wrangling
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.26 — Importing and Checking the Data
+::::
+:::: {.Question-container}
+Import the saved data and split assignments. Check missing values, duplicate identifiers, agreement between IDs, category labels, and the documented ranges. Set the response order and reference levels explicitly, then create the scaled regressors. Are any cleaning exclusions necessary?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.26
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q26-r
+#| message: false
+
+rail_path <- "15-ordinal-logistic_files/simulations"
+rail_raw <- read.csv(file.path(rail_path, "problem-1-data.csv"))
+rail_split <- read.csv(file.path(rail_path, "problem-1-split.csv"))
+rail_levels <- c("Very dissatisfied", "Dissatisfied", "Satisfied", "Very satisfied")
+stopifnot(nrow(rail_raw) == 1800, !anyNA(rail_raw),
+          !anyDuplicated(rail_raw$passenger_id), !anyDuplicated(rail_split$passenger_id),
+          setequal(rail_raw$passenger_id, rail_split$passenger_id),
+          all(rail_split$sample %in% c("training", "testing")),
+          all(rail_raw$satisfaction %in% rail_levels),
+          all(rail_raw$crowding %in% c("Low", "Moderate", "High")),
+          all(rail_raw$arrival_information %in% c("No", "Yes")),
+          all(rail_raw$wait_minutes >= 0 & rail_raw$wait_minutes <= 25),
+          all(rail_raw$journey_minutes >= 10 & rail_raw$journey_minutes <= 70))
+rail_data <- rail_raw
+rail_data$satisfaction <- ordered(rail_data$satisfaction, levels = rail_levels)
+rail_data$crowding <- factor(rail_data$crowding, levels = c("Low", "Moderate", "High"))
+rail_data$arrival_information <- factor(rail_data$arrival_information, levels = c("No", "Yes"))
+rail_data$wait5 <- (rail_data$wait_minutes - 10) / 5
+rail_data$duration15 <- (rail_data$journey_minutes - 35) / 15
+rail_data$sample <- rail_split$sample[match(rail_data$passenger_id, rail_split$passenger_id)]
+stopifnot(!anyNA(rail_data))
+rail_integrity <- data.frame(rows = nrow(rail_data), missing_cells = sum(is.na(rail_data)),
+                             unique_ids = length(unique(rail_data$passenger_id)))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q26-r
+#| message: false
+#| tbl-cap: "Integrity checks for the saved train dataset."
+#| echo: false
+
+knitr::kable(train_display_table(rail_integrity), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q26-py
+#| message: false
+
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+rail_path = Path("15-ordinal-logistic_files/simulations")
+rail_raw = pd.read_csv(rail_path / "problem-1-data.csv")
+rail_split = pd.read_csv(rail_path / "problem-1-split.csv")
+rail_levels = RAIL_LEVELS
+assert len(rail_raw) == 1800 and not rail_raw.isna().any().any()
+assert rail_raw.passenger_id.is_unique and rail_split.passenger_id.is_unique
+assert set(rail_raw.passenger_id) == set(rail_split.passenger_id)
+assert rail_split["sample"].isin(["training", "testing"]).all()
+for column, levels in {"satisfaction": rail_levels, "crowding": ["Low", "Moderate", "High"],
+                       "arrival_information": ["No", "Yes"]}.items():
+    assert rail_raw[column].isin(levels).all()
+assert rail_raw.wait_minutes.between(0, 25).all()
+assert rail_raw.journey_minutes.between(10, 70).all()
+rail_data = rail_raw.merge(rail_split, on="passenger_id", validate="one_to_one", sort=False)
+rail_data["satisfaction"] = pd.Categorical(rail_data.satisfaction, categories=rail_levels, ordered=True)
+rail_data["crowding"] = pd.Categorical(rail_data.crowding, categories=["Low", "Moderate", "High"])
+rail_data["arrival_information"] = pd.Categorical(rail_data.arrival_information, categories=["No", "Yes"])
+rail_data["wait5"] = (rail_data.wait_minutes - 10) / 5
+rail_data["duration15"] = (rail_data.journey_minutes - 35) / 15
+assert not rail_data.isna().any().any()
+rail_integrity_py = pd.DataFrame({"rows": [len(rail_data)], "missing_cells": [rail_data.isna().sum().sum()],
+                                 "unique_ids": [rail_data.passenger_id.nunique()]})
+```
+
+```{r}
+#| label: tbl-ordinal-train-q26-py
+#| message: false
+#| tbl-cap: "Integrity checks for the saved train dataset."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_integrity_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+All 1,800 rows have unique identifiers, complete recorded values, valid labels, and values within the specified ranges. No exclusions or imputations are needed. These are data-integrity checks; do not explore testing response distributions or use them to choose a model. An unfamiliar label should trigger investigation rather than silently becoming a missing value during recoding.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.27 — A Common Training and Testing Split
+::::
+:::: {.Question-container}
+Use the saved assignments to construct the training and testing datasets. Verify their sizes, disjointness, and agreement across languages. Why is using the same numerical seed in R and Python insufficient to guarantee the same split?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.27
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q27-r
+#| message: false
+
+rail_train <- rail_data[rail_data$sample == "training", ]
+rail_test <- rail_data[rail_data$sample == "testing", ]
+stopifnot(nrow(rail_train) == 900, nrow(rail_test) == 900,
+          length(intersect(rail_train$passenger_id, rail_test$passenger_id)) == 0)
+rail_sizes <- data.frame(sample = c("Training", "Testing"), rows = c(nrow(rail_train), nrow(rail_test)))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q27-r
+#| message: false
+#| tbl-cap: "Shared analysis sample sizes."
+#| echo: false
+
+knitr::kable(train_display_table(rail_sizes), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q27-py
+#| message: false
+
+rail_train = rail_data.loc[rail_data["sample"] == "training"].copy()
+rail_test = rail_data.loc[rail_data["sample"] == "testing"].copy()
+assert len(rail_train) == len(rail_test) == 900
+assert set(rail_train.passenger_id).isdisjoint(rail_test.passenger_id)
+# When knitting the chapter, verify the actual row order against R as well.
+if "r" in globals():
+    assert rail_train.passenger_id.tolist() == list(r.rail_train["passenger_id"])
+    assert rail_test.passenger_id.tolist() == list(r.rail_test["passenger_id"])
+rail_sizes_py = pd.DataFrame({"sample": ["Training", "Testing"], "rows": [len(rail_train), len(rail_test)]})
+```
+
+```{r}
+#| label: tbl-ordinal-train-q27-py
+#| message: false
+#| tbl-cap: "Shared analysis sample sizes."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_sizes_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+Both languages use the same 900 training IDs and 900 testing IDs in the same order. Random-number generators and sampling algorithms can differ across languages, so equal seeds alone do not guarantee equal samples. The saved assignments remove that ambiguity. Reserve testing data for the final results stage; all EDA, comparisons, and diagnostic decisions below use `rail_train`.
+
+</details>
+::::
+:::
+
+#### Exploratory Data Analysis — Training Data Only
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.28 — The Ordered Response Distribution
+::::
+:::: {.Question-container}
+Tabulate the training response counts and percentages in their substantive order. Are any categories sparse? Which category defines the training-majority baseline, and why should a 25% guessing benchmark not replace it?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.28
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q28-r
+#| message: false
+
+rail_counts <- as.data.frame(table(rail_train$satisfaction))
+names(rail_counts) <- c("Rating", "Count")
+rail_counts$Percent <- 100 * rail_counts$Count / nrow(rail_train)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q28-r
+#| message: false
+#| tbl-cap: "Training satisfaction distribution."
+#| echo: false
+
+knitr::kable(train_display_table(rail_counts), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q28-py
+#| message: false
+
+rail_counts_py = rail_train.satisfaction.value_counts(sort=False).rename_axis("Rating").reset_index(name="Count")
+rail_counts_py["Percent"] = 100 * rail_counts_py.Count / len(rail_train)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q28-py
+#| message: false
+#| tbl-cap: "Training satisfaction distribution."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_counts_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The counts are 188, 248, 284, and 180. All four categories are well represented, and `Satisfied` is the most common, with `r sprintf("%.1f", rail_counts$Percent[3])`% of training responses. Its held-out baseline accuracy must still be calculated later; it need not equal the training proportion. Uniform random guessing ignores the unequal frequencies and is a less informative benchmark than this training-derived baseline.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.29 — Waiting Time and Satisfaction
+::::
+:::: {.Question-container}
+Group training waiting times into approximately equal-sized quintile groups and plot the response proportions. Describe the pattern and explain why the plot does not by itself establish the proportional-odds assumption or a causal effect.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.29
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-ordinal-train-q29-r
+#| message: false
+#| fig-cap: "Training satisfaction proportions across waiting-time groups."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_palette <- c("#B65B3A", "#E0AE66", "#66A7B5", "#275C7A")
+rail_breaks <- unique(quantile(rail_train$wait_minutes, seq(0, 1, .2)))
+rail_train$wait_group <- cut(rail_train$wait_minutes, breaks = rail_breaks, include.lowest = TRUE)
+rail_wait <- as.data.frame(prop.table(table(rail_train$wait_group, rail_train$satisfaction), 1))
+names(rail_wait) <- c("Wait_group", "Rating", "Share")
+ggplot2::ggplot(rail_wait, ggplot2::aes(Wait_group, Share, fill = Rating)) +
+  ggplot2::geom_col(position = ggplot2::position_stack(reverse = TRUE)) + ggplot2::scale_fill_manual(values = rail_palette) +
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ggplot2::labs(x = "Waiting time, minutes (training quintile groups)", y = "Share of passengers") +
+  ggplot2::theme_minimal(base_size = 12) + ggplot2::theme(legend.position = "bottom")
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-ordinal-train-q29-py
+#| message: false
+#| fig-cap: "Training satisfaction proportions across waiting-time groups."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_palette = ["#B65B3A", "#E0AE66", "#66A7B5", "#275C7A"]
+rail_train["wait_group"] = pd.qcut(rail_train.wait_minutes, 5)
+rail_wait_py = pd.crosstab(rail_train.wait_group, rail_train.satisfaction, normalize="index").reindex(columns=rail_levels)
+rail_ax = rail_wait_py.plot.bar(stacked=True, color=rail_palette, figsize=(9, 5), rot=0)
+rail_ax.set(xlabel="Waiting time, minutes (training quintile groups)", ylabel="Share of passengers")
+rail_ax.legend(title="Rating", loc="upper center", bbox_to_anchor=(.5, -.20), ncol=2)
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The `Very satisfied` share falls from about 33% in the shortest-wait group to about 7% in the longest-wait group, while `Very dissatisfied` rises from about 9% to 40%. This motivates including waiting time. These are unadjusted grouped proportions, so other journey characteristics can contribute to the pattern. Proportional odds concerns adjusted slopes on the cumulative-logit scale; neither this plot nor apparently smooth trends establish that restriction.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.30 — Crowding and Arrival Information
+::::
+:::: {.Question-container}
+Plot training satisfaction proportions by crowding and by arrival-information availability. Identify one comparison for each variable. Can the information plot show whether information availability has the same adjusted odds ratio at every cutoff?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.30
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-ordinal-train-q30-r
+#| message: false
+#| fig-cap: "Unadjusted training satisfaction proportions by categorical regressors."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_group_table <- function(variable, title) {
+  x <- as.data.frame(prop.table(table(rail_train[[variable]], rail_train$satisfaction), 1))
+  names(x) <- c("Group", "Rating", "Share")
+  x$Variable <- title
+  x
+}
+rail_groups <- rbind(rail_group_table("crowding", "Crowding"),
+                     rail_group_table("arrival_information", "Arrival information"))
+rail_groups$Variable <- factor(rail_groups$Variable, levels = c("Crowding", "Arrival information"))
+ggplot2::ggplot(rail_groups, ggplot2::aes(Group, Share, fill = Rating)) +
+  ggplot2::geom_col(position = ggplot2::position_stack(reverse = TRUE)) + ggplot2::facet_wrap(~Variable, scales = "free_x") +
+  ggplot2::scale_fill_manual(values = rail_palette) +
+  ggplot2::labs(x = NULL, y = "Share of passengers") + ggplot2::theme_minimal(base_size = 12) +
+  ggplot2::theme(legend.position = "bottom")
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-ordinal-train-q30-py
+#| message: false
+#| fig-cap: "Unadjusted training satisfaction proportions by categorical regressors."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_fig, rail_axes = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
+for ax, variable, levels, title in zip(rail_axes, ["crowding", "arrival_information"],
+        [["Low", "Moderate", "High"], ["No", "Yes"]], ["Crowding", "Arrival information"]):
+    props = pd.crosstab(rail_train[variable], rail_train.satisfaction, normalize="index").reindex(index=levels, columns=rail_levels)
+    props.plot.bar(stacked=True, color=rail_palette, ax=ax, rot=0, legend=False)
+    ax.set(title=title, xlabel="", ylabel="Share of passengers")
+rail_fig.legend(*rail_axes[0].get_legend_handles_labels(), loc="lower center", ncol=2)
+rail_fig.tight_layout(rect=(0, .15, 1, 1))
+plt.show()
+```
+
+:::
+
+The `Very satisfied` share is about 29% under low crowding and 12% under high crowding. With information available, about 14% are `Very dissatisfied`, compared with 30% when it is unavailable. The corresponding top-rating shares differ much less: about 22% and 18%.
+
+These patterns motivate adjusting for both variables and investigating whether information has a common cumulative odds ratio. They do not establish non-proportionality: unequal changes in raw category percentages can occur even under proportional odds, and the groups can differ in their other characteristics.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.31 — Journey Duration and an EDA Modelling Plan
+::::
+:::: {.Question-container}
+Summarize journey duration by training rating using medians and quartiles. Combine this with Questions 15.29–15.30 to propose an initial modelling sequence. Should a weak marginal pattern automatically exclude duration?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.31
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q31-r
+#| message: false
+
+rail_duration <- aggregate(journey_minutes ~ satisfaction, data = rail_train,
+                           FUN = function(x) c(median = median(x), Q1 = unname(quantile(x, .25)), Q3 = unname(quantile(x, .75))))
+rail_duration <- data.frame(Rating = rail_duration$satisfaction, rail_duration$journey_minutes)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q31-r
+#| message: false
+#| tbl-cap: "Training journey-duration summaries by rating."
+#| echo: false
+
+knitr::kable(train_display_table(rail_duration), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q31-py
+#| message: false
+
+rail_duration_py = rail_train.groupby("satisfaction", observed=False).journey_minutes.agg(
+    median="median", Q1=lambda x: x.quantile(.25), Q3=lambda x: x.quantile(.75)).reset_index()
+```
+
+```{r}
+#| label: tbl-ordinal-train-q31-py
+#| message: false
+#| tbl-cap: "Training journey-duration summaries by rating."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_duration_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The duration distributions overlap substantially, giving a weaker marginal signal than waiting time. Retain duration in the planned adjusted comparison: a weak marginal pattern does not settle whether it contributes conditionally on other regressors.
+
+Start with waiting time alone, then compare an extended proportional-odds model containing both continuous regressors, two crowding indicators, and information availability. Check proportionality before deciding whether to free any slopes. Later assess the selected model's probability validity, remaining slope restrictions, functional form, and descriptive calibration. EDA informs this sequence but does not dictate which comparisons must be significant.
+
+</details>
+::::
+:::
+
+#### Data Modelling and Training Diagnostics
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.32 — A Wait-Only Proportional-Odds Model
+::::
+:::: {.Question-container}
+Write and fit the wait-only proportional-odds model on training data. Report its slope and three thresholds, check convergence, and state what the slope's exponentiation means. How many parameters are estimated?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.32
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The model is
+
+$$
+\operatorname{logit}C_{i,j}=\alpha_j-\beta_w w_i,\qquad j=1,2,3,
+$$
+
+with three ordered thresholds and one shared slope: **four parameters**. A five-minute increase in waiting multiplies the above-cutoff odds by $e^{\beta_w}$ at each cutoff.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q32-r
+#| message: false
+
+rail_simple <- MASS::polr(satisfaction ~ wait5, data = rail_train, method = "logistic",
+                          Hess = TRUE, model = TRUE,
+                          control = list(maxit = 1000, reltol = 1e-10))
+stopifnot(rail_simple$convergence == 0)
+rail_simple_table <- data.frame(Term = c(names(coef(rail_simple)), names(rail_simple$zeta)),
+                                Estimate = c(coef(rail_simple), rail_simple$zeta))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q32-r
+#| message: false
+#| tbl-cap: "Wait-only training coefficients and thresholds."
+#| echo: false
+
+knitr::kable(train_display_table(rail_simple_table), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q32-py
+#| message: false
+
+rail_x = rail_design(rail_train)
+rail_y = rail_train.satisfaction.cat.codes.to_numpy()
+rail_simple = rail_fit_cumulative(rail_x[["wait5"]], rail_y)
+rail_simple_table_py = pd.DataFrame({"Term": rail_simple.names, "Estimate": rail_simple.params})
+```
+
+```{r}
+#| label: tbl-ordinal-train-q32-py
+#| message: false
+#| tbl-cap: "Wait-only training coefficients and thresholds."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_simple_table_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The estimated slope is `r sprintf("%.3f", coef(rail_simple)["wait5"])`, giving an above-cutoff odds ratio of `r sprintf("%.3f", exp(coef(rail_simple)["wait5"]))`. This is an unadjusted training-model association and is not yet the final inferential answer. The thresholds are intercepts for cumulative logits, not changes between measured satisfaction scores.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.33 — An Extended Model and a Nested Comparison
+::::
+:::: {.Question-container}
+Add journey duration, crowding, and arrival information to the training model. Write its equation, state the nested null hypothesis, calculate the likelihood-ratio statistic and degrees of freedom, and interpret the comparison at the 5% level. Does a significant improvement establish proportional odds?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.33
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The extended model is
+
+$$
+\operatorname{logit}C_{i,j}=\alpha_j-
+(\beta_w w_i+\beta_d d_i+\beta_m m_i+\beta_h h_i+\beta_a a_i).
+$$
+
+It has **eight parameters**: three thresholds and five shared slopes. The reduced model imposes $H_0:\beta_d=\beta_m=\beta_h=\beta_a=0$. Against the alternative that at least one is nonzero,
+
+$$
+G^2=2(\ell_{\mathrm{full}}-\ell_{\mathrm{simple}}),\qquad df=8-4=4.
+$$
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q33-r
+#| message: false
+
+rail_formula <- satisfaction ~ wait5 + duration15 + crowding + arrival_information
+rail_full <- MASS::polr(rail_formula, data = rail_train, method = "logistic",
+                        Hess = TRUE, model = TRUE,
+                        control = list(maxit = 1000, reltol = 1e-10))
+stopifnot(rail_full$convergence == 0)
+rail_extended_lr <- train_lr("Wait-only PO to full PO", rail_simple, rail_full)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q33-r
+#| message: false
+#| tbl-cap: "Training comparison of the wait-only and extended proportional-odds models."
+#| echo: false
+
+knitr::kable(train_display_table(rail_extended_lr), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q33-py
+#| message: false
+
+rail_full = rail_fit_cumulative(rail_x, rail_y, start=rail_simple)
+rail_extended_lr_py = pd.DataFrame([rail_lr_test("Wait-only PO to full PO", rail_simple, rail_full)])
+```
+
+```{r}
+#| label: tbl-ordinal-train-q33-py
+#| message: false
+#| tbl-cap: "Training comparison of the wait-only and extended proportional-odds models."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_extended_lr_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The statistic is approximately `r sprintf("%.3f", rail_extended_lr$statistic)`, with $p=$ `r formatC(rail_extended_lr$p, format="e", digits=2)`. The added regressors improve training fit jointly. That result supports the extension but does not establish the parallel-slope restriction or prove that every added coefficient contributes individually.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.34 — Checking Proportional Odds
+::::
+:::: {.Question-container}
+Apply the Brant–Wald diagnostic to each slope in the extended training model. State its null hypothesis. Which regressor most clearly challenges the shared-slope restriction, and why should non-significant diagnostic results for other slopes be interpreted cautiously?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.34
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+For each regressor $k$, test $H_0:\beta_{k,1}=\beta_{k,2}=\beta_{k,3}$ against at least one differing cutoff slope. Each displayed coefficient-level test has two degrees of freedom. The two crowding indicators are shown separately here; their remaining restrictions will also be checked jointly later.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q34-r
+#| message: false
+
+invisible(capture.output(rail_brant <- brant::brant(rail_full)))
+rail_brant_terms <- data.frame(Term = rownames(rail_brant)[-1], rail_brant[-1, ], row.names = NULL)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q34-r
+#| message: false
+#| tbl-cap: "Coefficient-level Brant–Wald diagnostics for the extended training model."
+#| echo: false
+
+knitr::kable(train_display_table(rail_brant_terms), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q34-py
+#| message: false
+
+rail_brant_terms_py = rail_brant_table(rail_x, rail_y).query("term != 'Omnibus'").reset_index(drop=True)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q34-py
+#| message: false
+#| tbl-cap: "Coefficient-level Brant–Wald diagnostics for the extended training model."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_brant_terms_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+Information availability supplies the clearest evidence against proportional odds: its p-value is about 0.00045. The other displayed p-values exceed 0.05, which supports considering shared slopes as working restrictions, not claiming they are proven equal. These exploratory diagnostics motivate a partial proportional-odds comparison on training data. The binary cumulative responses for a passenger are dependent, so the Python diagnostic function accounts for their cross-cutoff covariance rather than treating three independent fits as independent evidence.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.35 — A Partial Proportional-Odds Refinement
+::::
+:::: {.Question-container}
+Fit a model that allows only the arrival-information slope to vary across cutoffs. Write the model, count its parameters, and compare it with the full proportional-odds model. State the null hypothesis, reference distribution, and modelling decision. Explain the sign convention in the R output.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.35
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The proposed model is
+
+$$
+\operatorname{logit}C_{i,j}=\alpha_j-
+(\beta_w w_i+\beta_d d_i+\beta_m m_i+\beta_h h_i+\beta_{a,j}a_i),\qquad j=1,2,3.
+$$
+
+It has three thresholds, four shared slopes, and three information slopes: **ten parameters**. The null $\beta_{a,1}=\beta_{a,2}=\beta_{a,3}$ imposes two restrictions, so the usual nested likelihood-ratio reference is $\chi^2_2$.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q35-r
+#| message: false
+
+rail_ppo_family <- function() VGAM::cumulative(link = "logitlink", reverse = FALSE,
+    parallel = TRUE ~ -1 + wait5 + duration15 + crowding)
+rail_ppo <- VGAM::vglm(rail_formula, data = rail_train, family = rail_ppo_family(),
+                       control = VGAM::vglm.control(maxit = 200, epsilon = 1e-10))
+stopifnot(length(coef(rail_ppo)) == 10,
+          ncol(VGAM::constraints(rail_ppo)$wait5) == 1,
+          ncol(VGAM::constraints(rail_ppo)$arrival_informationYes) == 3)
+rail_ppo_lr <- train_lr("Full PO to information PPO", rail_full, rail_ppo)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q35-r
+#| message: false
+#| tbl-cap: "Training comparison supporting the information-specific refinement."
+#| echo: false
+
+knitr::kable(train_display_table(rail_ppo_lr), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q35-py
+#| message: false
+
+rail_ppo = rail_fit_cumulative(rail_x, rail_y,
+    free=("arrival_informationYes",), start=rail_full)
+assert len(rail_ppo.params) == 10
+rail_ppo_lr_py = pd.DataFrame([rail_lr_test("Full PO to information PPO", rail_full, rail_ppo)])
+```
+
+```{r}
+#| label: tbl-ordinal-train-q35-py
+#| message: false
+#| tbl-cap: "Training comparison supporting the information-specific refinement."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_ppo_lr_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The LR statistic is `r sprintf("%.3f", rail_ppo_lr$statistic)` and $p=$ `r formatC(rail_ppo_lr$p, format="e", digits=2)`, supporting the partial model at the stated level. Carry this candidate forward to **repeat diagnostics**; greater flexibility alone is not an adequacy check.
+
+With `reverse = FALSE`, native `VGAM` coefficients use $\alpha_j+\gamma^\top x_i$ for the lower cumulative logit. Thus $\beta=-\gamma$ for the chapter's above-cutoff interpretation. The R summary function negates slope estimates, leaves their standard errors unchanged, and then exponentiates. `parallel = TRUE ~ -1 + ...` shares only the listed slopes; the thresholds and information slopes remain free. The Python implementation uses the chapter's minus-sign convention directly.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.36 — Rechecking Numerical Stability and Probability Validity
+::::
+:::: {.Question-container}
+For the selected partial model, check finite estimates, finite positive uncertainty estimates, numerical convergence, and valid fitted probabilities. Evaluate probabilities across both information states and all crowding categories on a grid covering waiting times 0–25 minutes and journey durations 10–70 minutes. Why does a significant LR test not make these checks unnecessary?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.36
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q36-r
+#| message: false
+
+rail_grid <- expand.grid(wait5 = seq(-2, 3, length.out = 21),
+                        duration15 = seq(-25/15, 35/15, length.out = 21),
+                        crowding = c("Low", "Moderate", "High"),
+                        arrival_information = c("No", "Yes"))
+rail_grid$crowding <- factor(rail_grid$crowding, levels = levels(rail_train$crowding))
+rail_grid$arrival_information <- factor(rail_grid$arrival_information, levels = c("No", "Yes"))
+rail_p_train <- VGAM::predictvglm(rail_ppo, type = "response")
+rail_p_grid <- VGAM::predictvglm(rail_ppo, newdata = rail_grid, type = "response")
+train_probability_check(rail_p_train)
+train_probability_check(rail_p_grid)
+train_fit_check(rail_ppo)
+rail_numerical <- data.frame(Parameters = length(coef(rail_ppo)), Iterations = rail_ppo@iter,
+    Minimum_grid_probability = min(rail_p_grid), Maximum_sum_error = max(abs(rowSums(rail_p_grid)-1)))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q36-r
+#| message: false
+#| tbl-cap: "Numerical and probability-validity checks for the partial model."
+#| echo: false
+
+knitr::kable(train_display_table(rail_numerical), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q36-py
+#| message: false
+
+from itertools import product
+rail_grid = pd.DataFrame(product(np.linspace(-2, 3, 21), np.linspace(-25/15, 35/15, 21),
+    ["Low", "Moderate", "High"], ["No", "Yes"]),
+    columns=["wait5", "duration15", "crowding", "arrival_information"])
+rail_p_train = rail_ppo.predict(rail_x)
+rail_p_grid = rail_ppo.predict(rail_design(rail_grid))
+rail_numerical_py = pd.DataFrame({"Parameters": [len(rail_ppo.params)], "Iterations": [rail_ppo.iterations],
+    "Maximum_absolute_score": [rail_ppo.score_max], "Minimum_grid_probability": [rail_p_grid.min()],
+    "Maximum_sum_error": [np.abs(rail_p_grid.sum(1)-1).max()]})
+```
+
+```{r}
+#| label: tbl-ordinal-train-q36-py
+#| message: false
+#| tbl-cap: "Numerical and probability-validity checks for the partial model."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_numerical_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The fit is numerically stable, and all checked probabilities lie between zero and one and sum to one. The R checking function checks finite estimates and covariance, positive variances, and termination before the iteration limit; also inspect fitting warnings before accepting a fit. The Python fitting function checks the likelihood score and positive-definite expected information. Optimization iteration counts differ across algorithms and need not agree between languages.
+
+Here information is binary and the other slopes are shared. At each information state, ordered effective thresholds therefore preserve cumulative ordering as the continuous regressors change. For a more general non-proportional model, ordered intercepts alone would not suffice. Valid probabilities are necessary but do not establish calibration or substantive adequacy; neither a significant model comparison nor clipping invalid values can replace these checks.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.37 — Checking the Continuous Regressor Forms
+::::
+:::: {.Question-container}
+As a focused functional-form check, add shared quadratic terms for `wait5` and `duration15` to the partial model. State the null and calculate the LR comparison. Decide whether to retain these terms. Does non-rejection prove that every possible nonlinear specification is unnecessary?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.37
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Test $H_0:\beta_{w^2}=\beta_{d^2}=0$ against at least one nonzero quadratic coefficient. The alternative has twelve parameters, so the reference degrees of freedom are $12-10=2$. Information remains non-proportional in both models.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q37-r
+#| message: false
+
+rail_curve <- VGAM::vglm(update(rail_formula, . ~ . + I(wait5^2) + I(duration15^2)),
+    data = rail_train, etastart = VGAM::predictvglm(rail_ppo, type = "link"),
+    family = VGAM::cumulative(link = "logitlink", reverse = FALSE,
+       parallel = TRUE ~ -1 + wait5 + duration15 + crowding + I(wait5^2) + I(duration15^2)),
+    control = VGAM::vglm.control(maxit = 200, epsilon = 1e-10))
+train_fit_check(rail_curve)
+rail_curve_lr <- train_lr("PPO to PPO plus two quadratics", rail_ppo, rail_curve)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q37-r
+#| message: false
+#| tbl-cap: "Training check for shared quadratic continuous-regressor terms."
+#| echo: false
+
+knitr::kable(train_display_table(rail_curve_lr), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q37-py
+#| message: false
+
+rail_curve = rail_fit_cumulative(rail_design(rail_train, quadratic=True), rail_y,
+    free=("arrival_informationYes",), start=rail_ppo)
+rail_curve_lr_py = pd.DataFrame([rail_lr_test("PPO to PPO plus two quadratics", rail_ppo, rail_curve)])
+```
+
+```{r}
+#| label: tbl-ordinal-train-q37-py
+#| message: false
+#| tbl-cap: "Training check for shared quadratic continuous-regressor terms."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_curve_lr_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The statistic is `r sprintf("%.3f", rail_curve_lr$statistic)`, with $p=$ `r sprintf("%.3f", rail_curve_lr$p)`. Retain the simpler linear terms under this planned 5% comparison. This is a check of these two particular quadratic additions, not proof that every transformation or interaction is unnecessary. The decision is made on training data before final inference or prediction.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.38 — Rechecking the Remaining Proportionality Restrictions
+::::
+:::: {.Question-container}
+Compare the partial model with a model in which all five slopes vary across cutoffs. State precisely which restrictions this comparison tests, count the additional parameters, and interpret the training result. Check convergence and probability validity for the larger model before using the LR approximation.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.38
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The null retains equal cutoff slopes for waiting time, duration, and the two crowding indicators; information is already free. Releasing each of the four remaining slopes adds two parameters, giving $df=4\times2=8$. The fully non-proportional model has $3+3\times5=18$ parameters.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q38-r
+#| message: false
+
+rail_npo <- VGAM::vglm(rail_formula, data = rail_train,
+    family = VGAM::cumulative(link = "logitlink", reverse = FALSE, parallel = FALSE),
+    etastart = VGAM::predictvglm(rail_ppo, type = "link"),
+    control = VGAM::vglm.control(maxit = 200, epsilon = 1e-10))
+train_fit_check(rail_npo)
+train_probability_check(VGAM::predictvglm(rail_npo, newdata = rail_grid, type = "response"))
+rail_remaining_lr <- train_lr("PPO to fully non-proportional", rail_ppo, rail_npo)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q38-r
+#| message: false
+#| tbl-cap: "Training check of the partial model’s remaining shared slopes."
+#| echo: false
+
+knitr::kable(train_display_table(rail_remaining_lr), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q38-py
+#| message: false
+
+rail_npo = rail_fit_cumulative(rail_x, rail_y, free=tuple(rail_x.columns), start=rail_ppo)
+rail_probability_check(rail_npo.predict(rail_design(rail_grid)))
+rail_remaining_lr_py = pd.DataFrame([rail_lr_test("PPO to fully non-proportional", rail_ppo, rail_npo)])
+```
+
+```{r}
+#| label: tbl-ordinal-train-q38-py
+#| message: false
+#| tbl-cap: "Training check of the partial model’s remaining shared slopes."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_remaining_lr_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+Both fitted models are stable with valid checked probabilities. The LR statistic is `r sprintf("%.3f", rail_remaining_lr$statistic)` and $p=$ `r sprintf("%.3f", rail_remaining_lr$p)`. There is insufficient evidence to release the remaining restrictions at the stated level. This supports retaining the partial model for this workflow, while acknowledging diagnostic uncertainty. The earlier evidence against **fully** proportional odds is compatible with this result: that earlier restriction also required information to have one common slope.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.39 — Training Calibration and Freezing the Specification
+::::
+:::: {.Question-container}
+Group training predictions into quintiles separately for each cumulative event and compare average predicted with observed cumulative proportions. Explain the limitation of this apparent calibration check. Combine the evidence from Questions 15.35–15.38 to state exactly which specification and evaluation choices will be frozen before opening the testing results.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.39
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-ordinal-train-q39-r
+#| message: false
+#| fig-cap: "Apparent training calibration for the selected partial model; the dashed line is observed equals predicted."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_cal_train <- train_calibration(rail_p_train, as.integer(rail_train$satisfaction))
+ggplot2::ggplot(rail_cal_train, ggplot2::aes(predicted, observed)) +
+  ggplot2::geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  ggplot2::geom_point(size = 2, colour = "#275C7A") + ggplot2::geom_line(colour = "#275C7A") +
+  ggplot2::facet_wrap(~cutpoint, nrow = 1, labeller = ggplot2::label_both) +
+  ggplot2::coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  ggplot2::labs(x = "Mean predicted cumulative probability", y = "Observed cumulative proportion") +
+  ggplot2::theme_minimal(base_size = 11)
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-ordinal-train-q39-py
+#| message: false
+#| fig-cap: "Apparent training calibration for the selected partial model; the dashed line is observed equals predicted."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_cal_train_py = rail_calibration(rail_p_train, rail_y)
+rail_fig, rail_axes = plt.subplots(1, 3, figsize=(10, 4), sharex=True, sharey=True)
+for j, ax in enumerate(rail_axes, start=1):
+    cal = rail_cal_train_py.loc[rail_cal_train_py.cutpoint == j]
+    ax.plot([0, 1], [0, 1], "--", color="grey")
+    ax.plot(cal.predicted, cal.observed, "o-", color="#275C7A")
+    ax.set(title=f"P(Y <= {j})", xlim=(0, 1), ylim=(0, 1), xlabel="Mean predicted probability")
+rail_axes[0].set_ylabel("Observed cumulative proportion")
+rail_fig.tight_layout()
+plt.show()
+```
+
+:::
+
+The grouped curves offer a descriptive check of fit. Departures remain possible even when points are near the reference line, and apparent calibration is optimistic because these observations were used for fitting. This is not a formal omnibus goodness-of-fit test or a substitute for held-out assessment.
+
+The information refinement is supported; the planned quadratic and remaining-proportionality comparisons do not support further expansion. Together with numerical and probability checks, this is sufficient to carry the **ten-parameter information partial proportional-odds specification** forward in this teaching workflow. Retain `wait5`, `duration15`, both crowding indicators, and three information slopes, with the existing category order, references, and fixed scaling.
+
+Freeze the maximum-probability category rule (first category for an exact tie), the training-proportion baseline, accuracy, macro recall/F1, rank MAE, log loss, normalized ranked probability score, and cumulative calibration summaries. No test-set result will trigger another selection round. A diagnostic that had rejected this candidate would have required further training-stage investigation before freezing it.
+
+</details>
+::::
+:::
+
+#### Results — Final Inference and Held-Out Prediction
+
+The specification is now fixed. The **inferential** analysis refits it on `rail_test` to estimate adjusted associations. The **predictive** analysis retains `rail_ppo`, fitted on training data, and evaluates its predictions on `rail_test`. These are different fitted objects. Since both final analyses use the same testing observations, they are not independent replications, and neither authorizes revising the model and reusing this sample as untouched validation.
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.40 — Final Coefficient Inference
+::::
+:::: {.Question-container}
+Refit the frozen partial model on the testing sample for the inferential inquiry. Report all seven slope estimates, expected-information standard errors, Wald statistics, two-sided p-values, above-cutoff odds ratios, and approximate 95% confidence intervals. Keep the testing-fit object distinct from the training prediction model. What should happen if a coefficient is not significant here?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.40
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q40-r
+#| message: false
+
+rail_inference <- VGAM::vglm(rail_formula, data = rail_test, family = rail_ppo_family(),
+                            control = VGAM::vglm.control(maxit = 200, epsilon = 1e-10))
+train_fit_check(rail_inference)
+rail_effects <- train_or_table(rail_inference)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q40-r
+#| message: false
+#| tbl-cap: "Final inference from the testing-set refit of the frozen specification."
+#| echo: false
+
+knitr::kable(train_display_table(rail_effects), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q40-py
+#| message: false
+
+rail_x_test = rail_design(rail_test)
+rail_y_test = rail_test.satisfaction.cat.codes.to_numpy()
+rail_inference = rail_fit_cumulative(rail_x_test, rail_y_test,
+    free=("arrival_informationYes",), start=rail_ppo)
+rail_effects_py = rail_or_table(rail_inference)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q40-py
+#| message: false
+#| tbl-cap: "Final inference from the testing-set refit of the frozen specification."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_effects_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+For each slope, the Wald interval on the coefficient scale is $\hat\beta\pm1.96\,SE(\hat\beta)$; exponentiate its endpoints for the odds-ratio interval. Both implementations use expected Fisher information for comparable standard errors.
+
+Duration is not statistically distinguishable from zero in this inferential sample ($p\approx0.77$). It remains in the frozen model. Removing it after inspecting these results would restart model selection and change the interpretation of the reported inference. The absence of significance is not proof of no association.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.41 — Answering the Inferential Inquiry
+::::
+:::: {.Question-container}
+Use the final inferential estimates to answer Question 15.22 directly. Interpret waiting time, both crowding contrasts, and the three arrival-information contrasts with units, adjustment, and uncertainty. Explain why one common arrival-information odds ratio would obscure the substantive result.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.41
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Holding the other regressors fixed, five additional waiting minutes are associated with an above-cutoff odds ratio of approximately **0.523**, with 95% CI **[0.460, 0.596]**: about 48% lower cumulative odds of a higher rating. This is not a 48% decrease in satisfaction probability.
+
+Compared with low crowding, the adjusted odds ratios are approximately **0.447 [0.335, 0.595]** for moderate crowding and **0.248 [0.178, 0.345]** for high crowding. Both comparisons indicate lower satisfaction distributions, with uncertainty represented by their intervals.
+
+The information comparisons have different meanings:
+
+| Above-cutoff event | Information available versus unavailable: adjusted OR (95% CI) |
+|:---|:---|
+| Avoiding `Very dissatisfied` ($Y>1$) | **4.54 [3.15, 6.54]** |
+| Being `Satisfied` or `Very satisfied` ($Y>2$) | **1.61 [1.22, 2.13]** |
+| Being `Very satisfied` ($Y>3$) | **0.84 [0.60, 1.16]** |
+
+The association is strongest for avoiding the worst rating, is also supported for being satisfied or better, and is inconclusive for reaching the top rating. Do not interpret the last interval as evidence that information has no association, nor infer differences between coefficients merely by comparing which individual p-values are significant; the training model comparison supplied the evidence for relaxing proportionality.
+
+Journey duration's adjusted odds ratio per fifteen minutes is about **0.979 [0.845, 1.133]**, which remains uncertain in this sample. These are conditional associations in simulated data, not estimated causal benefits from changing rail services.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.42 — Predicted Probabilities for Specified Journeys
+::::
+:::: {.Question-container}
+Using the **training-fitted partial model**, predict all four category probabilities for a 35-minute journey with moderate crowding at waiting times of 5 and 15 minutes, both with and without arrival information. Describe what the comparisons add to an odds-ratio interpretation. Are these probabilities guaranteed outcomes or causal intervention estimates?
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.42
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q42-r
+#| message: false
+
+rail_profiles <- data.frame(wait5 = c(-1, -1, 1, 1), duration15 = 0,
+    crowding = factor(rep("Moderate", 4), levels = levels(rail_train$crowding)),
+    arrival_information = factor(c("No", "Yes", "No", "Yes"), levels = c("No", "Yes")))
+rail_profile_p <- VGAM::predictvglm(rail_ppo, newdata = rail_profiles, type = "response")
+train_probability_check(rail_profile_p)
+rail_profile_table <- data.frame(Wait_minutes = 10 + 5*rail_profiles$wait5,
+    Information = rail_profiles$arrival_information, round(rail_profile_p, 4), check.names = FALSE)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q42-r
+#| message: false
+#| tbl-cap: "Training-model probability predictions for four specified journey profiles."
+#| echo: false
+
+knitr::kable(train_display_table(rail_profile_table), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q42-py
+#| message: false
+
+rail_profiles = pd.DataFrame({"wait5": [-1., -1., 1., 1.], "duration15": [0.]*4,
+    "crowding": ["Moderate"]*4, "arrival_information": ["No", "Yes", "No", "Yes"]})
+rail_profile_p = rail_ppo.predict(rail_design(rail_profiles))
+rail_profile_table_py = pd.concat([
+    pd.DataFrame({"Wait_minutes": 10+5*rail_profiles.wait5, "Information": rail_profiles.arrival_information}),
+    pd.DataFrame(rail_profile_p, columns=rail_levels)], axis=1)
+```
+
+```{r}
+#| label: tbl-ordinal-train-q42-py
+#| message: false
+#| tbl-cap: "Training-model probability predictions for four specified journey profiles."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_profile_table_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+At a five-minute wait without information, the predicted probability of `Very dissatisfied` is `r sprintf("%.1f", 100*rail_profile_p[1,1])`%; with information it is `r sprintf("%.1f", 100*rail_profile_p[2,1])`%. At a fifteen-minute wait, the corresponding predictions are `r sprintf("%.1f", 100*rail_profile_p[3,1])`% and `r sprintf("%.1f", 100*rail_profile_p[4,1])`%. The probability difference depends on the regressor profile, even for a fixed cutoff odds ratio.
+
+These are fitted probability distributions with the other listed variables held fixed. They show uncertainty in individual outcomes through the distribution over categories; they do not include confidence intervals for the estimated probabilities. They are not guarantees or causal estimates of installing an information display.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.43 — Held-Out Performance Against a Baseline
+::::
+:::: {.Question-container}
+Predict testing observations using the frozen training fit, without refitting. Compare with the training-proportion baseline using accuracy, macro recall, macro F1, mean absolute category-rank error, log loss, and normalized ranked probability score. Define the probability scores and distinguish rank distances from measured satisfaction distances. Explicitly answer Question 15.23.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.43
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+Let $n_T$ be the number of testing observations and $\hat C_{i,j}=\sum_{k\le j}\hat p_{i,k}$. The probability scores are
+
+$$
+\operatorname{LogLoss}=-\frac{1}{n_T}\sum_i\log\hat p_{i,Y_i},\qquad
+\operatorname{RPS}=\frac{1}{3n_T}\sum_i\sum_{j=1}^{3}
+\{\hat C_{i,j}-\mathbb{1}(Y_i\le j)\}^2.
+$$
+
+Smaller is better for both. The $1/3$ normalization is used in both languages. Rank MAE counts how many ordered category boundaries a classification misses by; it assigns equal penalties per boundary for evaluation, without claiming equal psychological gaps between ratings. Macro recall and F1 weight all four categories equally; a never-predicted category receives F1 zero rather than being omitted.
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: lst-ordinal-train-q43-r
+#| message: false
+
+rail_p_test <- VGAM::predictvglm(rail_ppo, newdata = rail_test, type = "response")
+train_probability_check(rail_p_test)
+rail_baseline <- as.numeric(prop.table(table(rail_train$satisfaction)))
+rail_p_baseline <- matrix(rail_baseline, nrow = nrow(rail_test), ncol = 4, byrow = TRUE)
+rail_test_y <- as.integer(rail_test$satisfaction)
+rail_metrics <- rbind(train_metrics("Training-proportion baseline", rail_p_baseline, rail_test_y),
+                       train_metrics("Training-fitted partial PO", rail_p_test, rail_test_y))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q43-r
+#| message: false
+#| tbl-cap: "Held-out performance of the frozen training model and training-derived baseline."
+#| echo: false
+
+knitr::kable(train_display_table(rail_metrics), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: lst-ordinal-train-q43-py
+#| message: false
+
+rail_p_test = rail_ppo.predict(rail_x_test)
+rail_baseline = np.bincount(rail_y, minlength=4) / len(rail_y)
+rail_p_baseline = np.tile(rail_baseline, (len(rail_test), 1))
+rail_metrics_py = pd.DataFrame([
+    rail_metrics("Training-proportion baseline", rail_p_baseline, rail_y_test),
+    rail_metrics("Training-fitted partial PO", rail_p_test, rail_y_test)])
+```
+
+```{r}
+#| label: tbl-ordinal-train-q43-py
+#| message: false
+#| tbl-cap: "Held-out performance of the frozen training model and training-derived baseline."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_metrics_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+The model classifies `r sprintf("%.2f", 100*rail_metrics$Accuracy[2])`% correctly, compared with `r sprintf("%.2f", 100*rail_metrics$Accuracy[1])`% for the baseline, an improvement of **`r sprintf("%.1f", 100*diff(rail_metrics$Accuracy))` percentage points**. Log loss improves from `r sprintf("%.3f", rail_metrics$LogLoss[1])` to `r sprintf("%.3f", rail_metrics$LogLoss[2])`, and normalized RPS from `r sprintf("%.3f", rail_metrics$RPS[1])` to `r sprintf("%.3f", rail_metrics$RPS[2])`.
+
+These held-out comparisons show useful predictive information beyond the training category frequencies, but an exact-rating accuracy near 42% leaves substantial uncertainty. The observed performance differences are point estimates from one split, not population guarantees or independent replications across metrics. Inspect which categories are missed and the probability calibration before recommending a use.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.44 — Where the Classifier Makes Mistakes
+::::
+:::: {.Question-container}
+Display the testing confusion matrix with observed ratings in rows and predicted ratings in columns. Report recall for each category. Identify the weakest category, and explain why a moderate overall accuracy can coexist with poor performance for that category.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.44
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-ordinal-train-q44-r
+#| message: false
+#| fig-cap: "Held-out confusion matrix and recall for the training-fitted partial model."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_predicted <- max.col(rail_p_test, ties.method = "first")
+rail_cm <- table(Observed = factor(rail_test_y, levels = 1:4, labels = rail_levels),
+                 Predicted = factor(rail_predicted, levels = 1:4, labels = rail_levels))
+rail_recall <- data.frame(Rating = rail_levels, Observed_n = rowSums(rail_cm),
+                          Predicted_n = colSums(rail_cm), Recall = diag(rail_cm)/rowSums(rail_cm))
+rail_cm_plot <- as.data.frame(rail_cm)
+ggplot2::ggplot(rail_cm_plot, ggplot2::aes(Predicted, Observed, fill = Freq)) +
+  ggplot2::geom_tile() + ggplot2::geom_text(ggplot2::aes(label = Freq), colour = "black") +
+  ggplot2::scale_fill_gradient(low = "white", high = "#66A7B5") +
+  ggplot2::scale_y_discrete(limits = rev(rail_levels)) +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 20, hjust = 1))
+```
+
+```{r}
+#| label: tbl-ordinal-train-q44-r
+#| message: false
+#| tbl-cap: "Held-out confusion matrix and recall for the training-fitted partial model."
+#| echo: false
+
+knitr::kable(train_display_table(rail_recall), digits = 3, row.names = FALSE)
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-ordinal-train-q44-py
+#| message: false
+#| fig-cap: "Held-out confusion matrix and recall for the training-fitted partial model."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_predicted = rail_p_test.argmax(axis=1)
+rail_cm = np.zeros((4, 4), dtype=int)
+np.add.at(rail_cm, (rail_y_test, rail_predicted), 1)
+rail_recall_py = pd.DataFrame({"Rating": rail_levels, "Observed_n": rail_cm.sum(1),
+    "Predicted_n": rail_cm.sum(0), "Recall": rail_cm.diagonal()/rail_cm.sum(1)})
+rail_fig, rail_ax = plt.subplots(figsize=(8, 5))
+rail_ax.imshow(rail_cm, cmap="Blues")
+for i in range(4):
+    for j in range(4):
+        rail_ax.text(j, i, str(rail_cm[i,j]), ha="center", va="center",
+                     color="white" if rail_cm[i,j] > rail_cm.max()*.6 else "black")
+rail_ax.set_xticks(range(4), rail_levels, rotation=20, ha="right")
+rail_ax.set_yticks(range(4), rail_levels)
+rail_ax.set(xlabel="Predicted rating", ylabel="Observed rating")
+rail_fig.tight_layout()
+plt.show()
+```
+
+```{r}
+#| label: tbl-ordinal-train-q44-py
+#| message: false
+#| tbl-cap: "Held-out confusion matrix and recall for the training-fitted partial model."
+#| echo: false
+
+knitr::kable(train_display_table(py$rail_recall_py), digits = 3, row.names = FALSE)
+```
+
+:::
+
+Recall is about **52.3%, 36.8%, 57.0%, and 19.1%** in increasing category order. The top rating is the weakest: only **40 of 209** truly `Very satisfied` passengers are classified correctly, and the model assigns that label only **71 times**. It often predicts `Satisfied` instead.
+
+Maximum-probability classification compresses an entire probability distribution into one label. The model can improve aggregate probability scores and overall accuracy while failing to recover many members of a particular category. Report this limitation explicitly rather than describing every category as well predicted. The operational costs of missing an unhappy passenger and missing an exceptionally happy passenger also need not be equal.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.45 — Held-Out Probability Calibration
+::::
+:::: {.Question-container}
+Repeat the cumulative calibration summaries on testing observations using probabilities from the training fit. Plot observed versus predicted proportions in five groups per cutoff, with approximate binomial uncertainty bars. Identify a numerical discrepancy and explain why these results must not be used to recalibrate the model and then claim untouched performance on the same testing set.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.45
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+::: {.panel-tabset}
+
+## **`R`**
+
+```{r}
+#| label: fig-ordinal-train-q45-r
+#| message: false
+#| fig-cap: "Held-out cumulative calibration; bars are approximate binomial 95% intervals for grouped observed proportions."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_cal_test <- train_calibration(rail_p_test, rail_test_y)
+ggplot2::ggplot(rail_cal_test, ggplot2::aes(predicted, observed)) +
+  ggplot2::geom_abline(slope = 1, intercept = 0, linetype = 2, colour = "grey50") +
+  ggplot2::geom_errorbar(ggplot2::aes(ymin = pmax(0, observed - 1.96*standard_error),
+                                    ymax = pmin(1, observed + 1.96*standard_error)), width = .015) +
+  ggplot2::geom_point(size = 2, colour = "#275C7A") +
+  ggplot2::facet_wrap(~cutpoint, nrow = 1, labeller = ggplot2::label_both) +
+  ggplot2::coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+  ggplot2::labs(x = "Mean predicted cumulative probability", y = "Observed cumulative proportion") +
+  ggplot2::theme_minimal(base_size = 11)
+rail_calibration_example <- rail_cal_test[rail_cal_test$cutpoint == 3 & rail_cal_test$bin == 2, ]
+```
+
+## **`Python`**
+
+```{python}
+#| label: fig-ordinal-train-q45-py
+#| message: false
+#| fig-cap: "Held-out cumulative calibration; bars are approximate binomial 95% intervals for grouped observed proportions."
+#| fig-width: 9
+#| fig-height: 5
+
+rail_cal_test_py = rail_calibration(rail_p_test, rail_y_test)
+rail_fig, rail_axes = plt.subplots(1, 3, figsize=(10, 4), sharex=True, sharey=True)
+for j, ax in enumerate(rail_axes, start=1):
+    cal = rail_cal_test_py.loc[rail_cal_test_py.cutpoint == j]
+    ax.plot([0, 1], [0, 1], "--", color="grey")
+    lower = np.minimum(cal.observed, 1.96*cal.standard_error)
+    upper = np.minimum(1-cal.observed, 1.96*cal.standard_error)
+    ax.errorbar(cal.predicted, cal.observed, yerr=np.vstack([lower, upper]), fmt="o", color="#275C7A", capsize=3)
+    ax.set(title=f"P(Y <= {j})", xlim=(0, 1), ylim=(0, 1), xlabel="Mean predicted probability")
+rail_axes[0].set_ylabel("Observed cumulative proportion")
+rail_fig.tight_layout()
+plt.show()
+```
+
+:::
+
+Perfect calibration would place population averages on the diagonal. The finite-sample points and approximate bars provide a descriptive assessment, not simultaneous confidence bands or a full uncertainty analysis for the fitted model.
+
+For the second prediction group at cutoff 3, the mean predicted $P(Y\le3)$ is `r sprintf("%.3f", rail_calibration_example$predicted)`, whereas the observed fraction is `r sprintf("%.3f", rail_calibration_example$observed)`. Equivalently, `Very satisfied` is predicted with average probability about `r sprintf("%.1f", 100*(1-rail_calibration_example$predicted))`%, compared with an observed `r sprintf("%.1f", 100*(1-rail_calibration_example$observed))`%. Several cutoff-3 groups similarly understate the top-category frequency.
+
+The model improves the aggregate scores but does not achieve perfect probability calibration. This discrepancy is a limitation to report. Any subsequent recalibration or model change motivated by these testing outcomes would require a new evaluation sample or a separately designed validation procedure.
+
+</details>
+::::
+:::
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.46 — Putting Inference and Prediction Together
+::::
+:::: {.Question-container}
+Answer both original inquiries in one concise synthesis. Include an adjusted association with uncertainty, the varying information association, a held-out baseline comparison, and a limitation. Explain why statistical evidence for associations does not guarantee accurate individual classification.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.46
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+The inferential refit associates longer waits and greater crowding with lower satisfaction after adjustment. For example, the odds ratio per five additional waiting minutes is about 0.523, with 95% CI [0.460, 0.596]. Information availability is most strongly associated with avoiding the lowest rating (OR about 4.54), is also associated with being satisfied or better (OR about 1.61), and has an inconclusive association with reaching the highest rating (OR about 0.84; its interval includes one).
+
+For prediction, the frozen training model improves held-out accuracy from 27.7% to 41.7%, log loss from 1.386 to 1.269, and normalized RPS from 0.200 to 0.174. Nevertheless, top-category recall is only 19.1%, and calibration comparisons reveal underprediction of that category in several groups.
+
+Associations describe how conditional distributions vary across profiles. They do not eliminate overlap between those distributions or the variability in individual responses. A defensible conclusion is that the measured journey characteristics contain useful information, while the model remains limited for assigning individual ratings. The synthetic, observational-style design also prevents a causal claim about real service interventions.
+
+</details>
+::::
+:::
+
+```{r}
+#| label: lst-ordinal-train-story-values
+#| message: false
+#| echo: false
+
+rail_fmt_or <- function(term) {
+  row <- rail_effects[rail_effects$term == term, ]
+  sprintf("%.2f (95%% CI %.2f–%.2f)", row$odds_ratio, row$OR_lower, row$OR_upper)
+}
+rail_wait_reduction <- 100*(1-rail_effects$odds_ratio[rail_effects$term == "wait5"])
+```
+
+#### Storytelling
+
+::: {.Question}
+:::: {.Question-header}
+Question 15.47 — Briefing the Passenger-Experience Team
+::::
+:::: {.Question-container}
+Write a **six- to eight-sentence briefing** for the rail operator's passenger-experience team. Lead with the practical message, explicitly answer the inferential and predictive inquiries, include selected numerical findings and uncertainty, and explain a proportionate potential use. Address the top-category limitation and the scope of the synthetic observational evidence. Avoid listing every coefficient or presenting an odds ratio as a probability ratio.
+::::
+:::
+
+::: {.Answer}
+:::: {.Answer-header}
+Answer 15.47
+::::
+:::: {.Answer-container}
+<details>
+<summary><strong>Click here to reveal the answer!</strong></summary>
+
+One possible seven-sentence briefing is:
+
+> Longer waits and more crowded trains were associated with lower passenger satisfaction after adjustment for the other recorded journey characteristics. Each additional five minutes of waiting corresponded to approximately `r sprintf("%.0f", rail_wait_reduction)`% lower odds of being above any satisfaction cutoff, with an adjusted odds ratio of `r rail_fmt_or("wait5")`. Live arrival-information availability had its strongest association with avoiding a very dissatisfied rating, with an odds ratio of `r rail_fmt_or("arrival_informationYes:1")`; it also supported being satisfied or better, but its association with reaching very satisfied was inconclusive. For new journeys in the held-out sample, the model predicted the exact rating correctly `r sprintf("%.1f", 100*rail_metrics$Accuracy[2])`% of the time, versus `r sprintf("%.1f", 100*rail_metrics$Accuracy[1])`% for the simple baseline, and improved log loss from `r sprintf("%.3f", rail_metrics$LogLoss[1])` to `r sprintf("%.3f", rail_metrics$LogLoss[2])`. However, it correctly identified only `r sprintf("%.1f", 100*rail_recall$Recall[4])`% of very satisfied passengers, and several calibration groups underpredicted that rating. The results could guide hypotheses for further passenger research and service evaluation, while individual decisions would require additional evidence and validation. Because these are simulated observational-style data, they do not establish actual benefits from shortening waits, changing crowding, or installing information displays.
+
+The briefing selects evidence that answers the practical questions. It preserves the difference between adjusted association, held-out predictive improvement, imperfect classification, and causal claims. A proposed service change would require evidence beyond this teaching simulation.
+
+</details>
+::::
+:::
+
+:::
+
+<!-- Author-only dataset generation. Keep this chunk unevaluated so normal
+     renders use the saved data and split without replacing them. -->
+```{python}
+#| label: ordinal-train-data-generation
+#| eval: false
+#| include: false
+
+"""Generate the Chapter 15 practice-case data and author preview plots.
+
+Context
+-------
+A fictional transit authority surveys independent passengers after one journey
+each, on separately sampled service runs. The response is overall satisfaction:
+Very dissatisfied < Dissatisfied < Satisfied < Very satisfied. These labels have
+an order, not a measured numerical spacing. Everything is synthetic.
+
+The dataset supports a later investigation of associations with waiting time,
+crowding, arrival information, and journey duration, plus prediction for a new
+passenger. It is deliberately noisy: identical profiles can have different
+ratings. It does not establish real-world causal effects or policy benefits.
+
+Author-only source chunk: not evaluated or shown when rendering the chapter.
+To regenerate intentionally, run this chunk from the book directory. It writes
+problem-1-data.csv, problem-1-split.csv, metadata, and four PNGs into the
+Chapter 15 simulations directory, replacing those generated files.
+
+Variables
+---------
+passenger_id: unique synthetic row identifier; never a regressor.
+satisfaction: ordered response; levels are listed in SATISFACTION_LEVELS.
+wait_minutes: continuous waiting time, 0 to 25 minutes (recorded to 0.1 minute).
+crowding: Low / Moderate / High; use two indicators with Low as reference,
+    rather than assuming equally spaced numerical category effects.
+arrival_information: No / Yes; availability of live arrival information.
+journey_minutes: continuous journey duration, 10 to 70 minutes (to 0.1 minute).
+No missing values or artificial outliers are injected in this first dataset.
+
+Author's generating model (not extra student-data columns)
+--------------------------------------------------------
+For j = 1, 2, 3:
+    logit P(Y <= j | x) = alpha[j] - eta - b_info[j] * I(information == Yes)
+    eta = -0.70 * (wait_minutes - 10) / 5
+          -0.12 * (journey_minutes - 35) / 15
+          -0.50 * I(crowding == Moderate) - 1.10 * I(crowding == High)
+    alpha = [-1.35, -0.10, 1.10]; b_info = [1.30, 0.65, 0.10].
+
+Slopes use the chapter's minus-sign convention: exp(beta) multiplies odds of
+being ABOVE a cutoff. Waiting and crowding shift all cumulative logits equally;
+arrival information is deliberately non-proportional. It is associated mainly
+with avoiding the lowest rating, with much less change at the highest cutoff.
+Journey duration has a weaker association. Information availability also varies
+slightly with waiting and crowding, so raw group comparisons are not adjusted
+effects. Scaling constants are fixed, not estimated from the full sample.
+
+The effective thresholds are ordered both without and with information. Since
+the remaining slopes are shared, cumulative curves cannot cross anywhere in
+the regressor domain. Category probabilities are successive differences; they
+are never clipped or renormalized to conceal invalid probabilities. Predictors
+are rounded BEFORE generating outcomes so the recorded values define the model.
+
+Workflow
+--------
+An independent random stream produces an outcome-independent 50/50 split.
+problem-1-split.csv preserves IDs and assignments for matching R/Python samples.
+All observed-data plots and printed relationship summaries use training rows.
+The fourth plot shows known generating probabilities, not a fitted model or
+test-set result. Do not use those author curves as student diagnostic evidence.
+The script does not search seeds, fit models, or score testing outcomes. Future
+model choices belong on training data; diagnostics still need to be repeated
+after a supported refinement. No case-study questions are authored here.
+"""
+
+from pathlib import Path
+import argparse
+import json
+import os
+import platform
+import sys
+import tempfile
+
+import numpy as np
+import pandas as pd
+
+
+# Match the other chapters' headless option and use a writable plotting cache.
+CACHE_ROOT = Path(tempfile.gettempdir()) / "regression-cookbook-cache"
+CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(CACHE_ROOT / "matplotlib"))
+os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_ROOT))
+if "--no-show" in sys.argv:
+    os.environ["MPLBACKEND"] = "Agg"
+
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+
+
+SCRIPT_DIR = Path("15-ordinal-logistic_files/simulations")
+SEED = 1515
+N_PASSENGERS = 1800
+SATISFACTION_LEVELS = [
+    "Very dissatisfied", "Dissatisfied", "Satisfied", "Very satisfied"
+]
+CROWDING_LEVELS = ["Low", "Moderate", "High"]
+INFORMATION_LEVELS = ["No", "Yes"]
+COLORS = ["#B65B3A", "#E0AE66", "#66A7B5", "#275C7A"]
+THRESHOLDS = np.array([-1.35, -0.10, 1.10])
+INFORMATION_SLOPES = np.array([1.30, 0.65, 0.10])
+WAIT_SLOPE = -0.70
+DURATION_SLOPE = -0.12
+CROWDING_SLOPES = {"Low": 0.0, "Moderate": -0.50, "High": -1.10}
+
+
+def sigmoid(x):
+    """Logistic function; inputs here are bounded by the documented design."""
+    return 1.0 / (1.0 + np.exp(-x))
+
+
+def generating_probabilities(data):
+    """Return valid probabilities in the explicit satisfaction-level order."""
+    wait = data["wait_minutes"].to_numpy(dtype=float)
+    duration = data["journey_minutes"].to_numpy(dtype=float)
+    crowding = data["crowding"].astype(object).map(CROWDING_SLOPES).to_numpy(float)
+    information = (data["arrival_information"] == "Yes").to_numpy(dtype=float)
+    if not data["arrival_information"].isin(INFORMATION_LEVELS).all():
+        raise ValueError("Unrecognized arrival-information category.")
+    if not np.isfinite(np.column_stack([wait, duration, crowding])).all():
+        raise ValueError("Missing/non-finite regressor or unrecognized crowding category.")
+    if not ((wait >= 0) & (wait <= 25) & (duration >= 10) & (duration <= 70)).all():
+        raise ValueError("Regressors are outside the documented simulation range.")
+
+    eta = (WAIT_SLOPE * (wait - 10) / 5
+           + DURATION_SLOPE * (duration - 35) / 15 + crowding)
+    cumulative = sigmoid(
+        THRESHOLDS[None, :] - eta[:, None]
+        - information[:, None] * INFORMATION_SLOPES[None, :]
+    )
+    endpoints = np.column_stack([np.zeros(len(data)), cumulative, np.ones(len(data))])
+    probabilities = np.diff(endpoints, axis=1)
+    if (not np.isfinite(probabilities).all()
+            or (probabilities < 0).any()
+            or not np.allclose(probabilities.sum(axis=1), 1.0)):
+        raise ValueError("Invalid cumulative/category probabilities; inspect the model.")
+    return probabilities
+
+
+def make_dataset(n_passengers=N_PASSENGERS, seed=SEED):
+    """Simulate one independent categorical draw per passenger."""
+    if n_passengers < 20:
+        raise ValueError("Use at least 20 passengers; 1800 is the teaching default.")
+    rng = np.random.default_rng(seed)
+    wait = np.round(25 * rng.beta(2, 3, n_passengers), 1)
+    duration = np.round(rng.triangular(10, 30, 70, n_passengers), 1)
+    crowding = rng.choice(CROWDING_LEVELS, n_passengers, p=[0.32, 0.43, 0.25])
+    information_probability = sigmoid(
+        0.10 + 0.22 * (crowding == "High") - 0.02 * (wait - 10)
+    )
+    information = rng.binomial(1, information_probability)
+    data = pd.DataFrame({
+        "passenger_id": np.arange(1, n_passengers + 1),
+        "wait_minutes": wait,
+        "crowding": pd.Categorical(crowding, categories=CROWDING_LEVELS),
+        "arrival_information": pd.Categorical(
+            np.where(information == 1, "Yes", "No"), categories=INFORMATION_LEVELS
+        ),
+        "journey_minutes": duration,
+    })
+    probabilities = generating_probabilities(data)
+    cumulative = probabilities.cumsum(axis=1)[:, :-1]
+    category_codes = (rng.random(n_passengers)[:, None] > cumulative).sum(axis=1)
+    data.insert(1, "satisfaction", pd.Categorical.from_codes(
+        category_codes, categories=SATISFACTION_LEVELS, ordered=True
+    ))
+    return data
+
+
+def make_split(data, seed):
+    """Save a common split without stratifying or inspecting response values."""
+    assignments = np.full(len(data), "testing", dtype=object)
+    train_rows = np.random.default_rng(seed).permutation(len(data))[:len(data) // 2]
+    assignments[train_rows] = "training"
+    return pd.DataFrame({"passenger_id": data["passenger_id"], "sample": assignments})
+
+
+def configure_plots():
+    plt.rcParams.update({
+        "font.size": 12, "axes.titlesize": 15, "axes.labelsize": 12,
+        "legend.fontsize": 11, "axes.spines.top": False,
+        "axes.spines.right": False, "figure.facecolor": "white",
+        "axes.facecolor": "white", "savefig.dpi": 180,
+    })
+
+
+def finish_figure(fig, output_dir, name, caption):
+    fig.text(0.02, 0.015, caption, ha="left", va="bottom", fontsize=10, color="#555555")
+    fig.savefig(output_dir / name, bbox_inches="tight", facecolor="white")
+
+
+def category_counts(data, group, levels):
+    return pd.crosstab(data[group], data["satisfaction"], dropna=False).reindex(
+        index=levels, columns=SATISFACTION_LEVELS, fill_value=0
+    )
+
+
+def stacked_bars(ax, counts, labels):
+    totals = counts.sum(axis=1).to_numpy()
+    # Absent groups in small custom samples remain blank, never invented data.
+    proportions = counts.div(counts.sum(axis=1).replace(0, np.nan), axis=0)
+    bottom = np.zeros(len(counts))
+    x = np.arange(len(counts))
+    for level, color in zip(SATISFACTION_LEVELS, COLORS):
+        values = proportions[level].fillna(0).to_numpy()
+        ax.bar(x, values, bottom=bottom, color=color, label=level, width=0.7)
+        for i, value in enumerate(values):
+            if value >= 0.10:
+                ax.text(i, bottom[i] + value / 2, f"{value:.0%}", ha="center",
+                        va="center", color="white" if color in [COLORS[0], COLORS[3]] else "#172B36")
+        bottom += values
+    ax.set_xticks(x, [f"{label}\n(n={n})" for label, n in zip(labels, totals)])
+    ax.set_ylim(0, 1)
+    ax.yaxis.set_major_formatter(PercentFormatter(1))
+    ax.set_ylabel("Share of passengers")
+
+
+def plot_distribution(train, output_dir):
+    counts = train["satisfaction"].value_counts().reindex(SATISFACTION_LEVELS, fill_value=0)
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    ax.bar(np.arange(4), counts.to_numpy(), color=COLORS, width=0.7)
+    ax.set_xticks(np.arange(4), ["Very\ndissatisfied", "Dissatisfied", "Satisfied", "Very\nsatisfied"])
+    for i, count in enumerate(counts):
+        ax.text(i, count + max(counts.max() * 0.025, 1),
+                f"{count}\n({count / len(train):.1%})", ha="center", fontsize=11)
+    ax.set_ylim(0, max(counts.max() * 1.25, 1))
+    ax.set_ylabel("Number of passengers")
+    ax.set_title("Four ordered satisfaction ratings", loc="left", pad=18)
+    fig.tight_layout(rect=(0, 0.07, 1, 1))
+    finish_figure(fig, output_dir, "satisfaction_distribution.png",
+                  f"Simulated training sample only (n={len(train)}). Category gaps are not numerical distances.")
+
+
+def plot_wait_relationship(train, output_dir):
+    binned = train.copy()
+    binned["wait_group"] = pd.qcut(binned["wait_minutes"], q=5, duplicates="drop")
+    intervals = binned["wait_group"].cat.categories
+    counts = category_counts(binned, "wait_group", intervals)
+    # Show actual recorded limits, rather than the qcut boundary adjustment.
+    limits = binned.groupby("wait_group", observed=True)["wait_minutes"].agg(["min", "max"])
+    labels = [f"{row['min']:.1f}–{row['max']:.1f}" for _, row in limits.iterrows()]
+    fig, ax = plt.subplots(figsize=(10, 6))
+    stacked_bars(ax, counts, labels)
+    ax.set_title("Satisfaction across waiting-time groups", loc="left", pad=18)
+    ax.set_xlabel("Waiting time, minutes (approximately equal-sized groups)")
+    ax.legend(ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.20), frameon=False)
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    finish_figure(fig, output_dir, "satisfaction_by_wait.png",
+                  "Simulated training sample only. Raw proportions; other journey characteristics are not held fixed.")
+
+
+def plot_categorical_relationships(train, output_dir):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+    for ax, column, levels, title, xlabel in [
+        (axes[0], "crowding", CROWDING_LEVELS, "More crowded journeys", "Crowding"),
+        (axes[1], "arrival_information", INFORMATION_LEVELS,
+         "Live arrival information", "Information available"),
+    ]:
+        stacked_bars(ax, category_counts(train, column, levels), levels)
+        ax.set_title(title, loc="left", pad=18)
+        ax.set_xlabel(xlabel)
+    axes[1].set_ylabel("")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center",
+               bbox_to_anchor=(0.5, 0.075), ncol=4, frameon=False)
+    fig.tight_layout(rect=(0, 0.17, 1, 1))
+    finish_figure(fig, output_dir, "satisfaction_by_crowding_information.png",
+                  "Simulated training sample only. Group differences are unadjusted associations, not causal effects.")
+
+
+def plot_generating_relationships(output_dir):
+    wait = np.linspace(0, 25, 200)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True)
+    for ax, information in zip(axes, INFORMATION_LEVELS):
+        profiles = pd.DataFrame({
+            "wait_minutes": wait, "journey_minutes": 35.0,
+            "crowding": "Moderate", "arrival_information": information,
+        })
+        probabilities = generating_probabilities(profiles)
+        for j, (level, color) in enumerate(zip(SATISFACTION_LEVELS, COLORS)):
+            ax.plot(wait, probabilities[:, j], color=color, linewidth=2.5, label=level)
+        ax.set_title(f"Arrival information: {information}", loc="left", pad=12)
+        ax.set_xlabel("Waiting time, minutes")
+        ax.set_ylim(0, 1)
+        ax.set_xlim(0, 25)
+        ax.yaxis.set_major_formatter(PercentFormatter(1))
+    axes[0].set_ylabel("Generating category probability")
+    fig.suptitle("Author reference: the known simulation relationships", x=0.055, ha="left", fontsize=16)
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center",
+               bbox_to_anchor=(0.5, 0.105), ncol=4, frameon=False)
+    fig.tight_layout(rect=(0, 0.20, 1, 0.94))
+    odds_ratios = ", ".join(f"{value:.2f}" for value in np.exp(INFORMATION_SLOPES))
+    finish_figure(fig, output_dir, "generating_probability_curves.png",
+                  "Known mechanism, not estimated results. Moderate crowding; 35-minute journey.\n"
+                  f"Information's above-cutoff odds ratios: {odds_ratios} (lowest to highest cutoff).")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--rows", type=int, default=N_PASSENGERS)
+    parser.add_argument("--output-dir", type=Path, default=SCRIPT_DIR)
+    parser.add_argument("--no-show", action="store_true", help="Save plots without opening GUI windows.")
+    args = parser.parse_args(["--no-show"])
+    if args.seed < 0 or args.rows < 20:
+        parser.error("--seed must be non-negative and --rows must be at least 20.")
+    output_dir = args.output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    data = make_dataset(args.rows, args.seed)
+    split = make_split(data, args.seed + 1)
+    train = data.loc[split["sample"].eq("training")].copy()
+    data.to_csv(output_dir / "problem-1-data.csv", index=False)
+    split.to_csv(output_dir / "problem-1-split.csv", index=False)
+    metadata = {
+        "description": "Entirely synthetic transit satisfaction; one independent passenger per sampled service run.",
+        "rows": args.rows, "seed": args.seed, "split_seed": args.seed + 1,
+        "training_rows": len(train), "testing_rows": len(data) - len(train),
+        "response": "satisfaction", "response_order": SATISFACTION_LEVELS,
+        "categorical_levels": {"crowding": CROWDING_LEVELS, "arrival_information": INFORMATION_LEVELS},
+        "identifier_not_predictor": "passenger_id", "missing_values_injected": False,
+        "continuous_units": {"wait_minutes": "minutes", "journey_minutes": "minutes"},
+        "formula": "logit P(Y <= j | x) = alpha_j - eta - information_slope_j * I(information == Yes)",
+        "eta": "wait_slope * (wait_minutes - 10)/5 + duration_slope * (journey_minutes - 35)/15 + crowding_slope",
+        "thresholds": THRESHOLDS.tolist(), "information_slopes": INFORMATION_SLOPES.tolist(),
+        "wait_slope": WAIT_SLOPE, "duration_slope": DURATION_SLOPE,
+        "crowding_slopes": CROWDING_SLOPES,
+        "plot_samples": "Observed plots: training only. Generating curves: fixed hypothetical profiles.",
+        "versions": {"python": platform.python_version(), "numpy": np.__version__,
+                     "pandas": pd.__version__, "matplotlib": matplotlib.__version__},
+    }
+    (output_dir / "problem-1-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+
+    configure_plots()
+    plot_distribution(train, output_dir)
+    plot_wait_relationship(train, output_dir)
+    plot_categorical_relationships(train, output_dir)
+    plot_generating_relationships(output_dir)
+    print(f"Wrote {len(data)} synthetic rows and a {len(train)}/{len(data)-len(train)} split to {output_dir}")
+    print("\nTraining satisfaction counts:")
+    print(train["satisfaction"].value_counts().reindex(SATISFACTION_LEVELS, fill_value=0).to_string())
+    print("\nTraining proportions by arrival information:")
+    counts = category_counts(train, "arrival_information", INFORMATION_LEVELS)
+    print(counts.div(counts.sum(axis=1), axis=0).round(3).to_string())
+    print("\nSaved four plots. Generating curves show author-known probabilities, not fitted results.")
+    if args.no_show:
+        plt.close("all")
+    else:
+        plt.show()
+
+
+if __name__ == "__main__":
+    main()
+
+```

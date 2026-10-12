@@ -14,6 +14,10 @@ SOURCE_SUPPORT_DIRS = [
     (
         ROOT / "docs/book/14-multinomial-logistic_files/simulations",
         ROOT / "book/14-multinomial-logistic_files/simulations",
+    ),
+    (
+        ROOT / "docs/book/15-ordinal-logistic_files/simulations",
+        ROOT / "book/15-ordinal-logistic_files/simulations",
     )
 ]
 
