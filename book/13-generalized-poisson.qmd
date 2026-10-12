@@ -565,7 +565,7 @@ With the data wrangled, we move to **exploratory data analysis** (as shown in @f
 
 We use the same canonical split as @sec-classical-poisson — a 50/50 simple random split with seed 123 — so that the training observations analysed in this chapter are exactly those analysed in the Classical Poisson chapter:
 
-- @lst-generalized-poisson-data-splitting-r uses the [{rsample}](https://rsample.tidymodels.org/) package to split the wrangled `crabs` dataset into training and testing sets. The argument `prop = 0.5` requests that approximately half of the observations be assigned to the training set, with the rest assigned to the testing set. The sanity check prints the dimensions of both subsets and their observed proportion.
+- @lst-generalized-poisson-data-splitting-r uses the [{rsample}](https://rsample.tidymodels.org/) package to split the wrangled `crabs` dataset into training and testing sets. The argument `prop = 0.5` requests that approximately half of the observations be assigned to the training set, with the rest assigned to the testing set. The sanity checks print the dimensions of both subsets, their observed proportion, and a disjointness verification: because the wrangled data contain no exact duplicate rows, the stacked subsets are disjoint exactly when the number of distinct rows equals the full 173.
 - In `Python`, we do not re-split the data. Per the book's cross-language convention, the `R`-generated split is the canonical one, and the next listing shows how the `Python` analysis imports it.
 
 ::: {.panel-tabset}
@@ -596,6 +596,11 @@ cat("Training observations:", n_train,
     "(", round(100 * n_train / n_total, 1), "%)\n")
 cat("Testing observations:", n_test,
     "(", round(100 * n_test / n_total, 1), "%)\n")
+
+# Disjointness: no exact duplicate rows exist in crabs, so the two splits are
+# disjoint if and only if the stacked data still has 173 distinct rows
+cat("Distinct rows across both splits:",
+    nrow(dplyr::distinct(dplyr::bind_rows(training_data, testing_data))), "\n")
 ```
 
 :::
@@ -663,11 +668,17 @@ print(
     "Training + testing equals total:",
     len(training_data) + len(testing_data) == n_total_py,
 )
+# Disjointness: with no exact duplicate rows in the dataset, the splits are
+# disjoint if and only if the stacked data keeps every row distinct
+print(
+    "Distinct rows across both splits:",
+    len(pd.concat([training_data, testing_data]).drop_duplicates()),
+)
 ```
 
 :::
 
-From this point until the **Results** section, everything — EDA plots, candidate model fitting, and all goodness-of-fit checks — uses `training_data` only. The testing set stays untouched until the final inferential refit and the final held-out predictive evaluation.
+From this point until the **Results** section, everything — EDA plots, candidate model fitting, and all goodness-of-fit checks — uses `training_data` only. The testing set stays untouched until the final inferential refit and the final held-out predictive evaluation. At the end of model development, the selected specification is **frozen**: the response definition, the regressors and their reference categories, the log link, and the GP random component are all fixed before the testing outcomes are examined, so the testing data can never steer a modelling decision.
 
 ### Distribution of the Count Response {#sec-generalized-poisson-eda-response}
 
