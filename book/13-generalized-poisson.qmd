@@ -1295,7 +1295,29 @@ $$
 \qquad \lambda_i = (1 - \theta)\exp\big(\mathbf{x}_i^\top \boldsymbol{\beta}\big).
 $${#eq-generalized-poisson-loglik}
 
-Unlike ordinary least squares, and unlike the Poisson GLM of @sec-classical-poisson-glm whose coefficients admit an efficient iteratively reweighted least squares algorithm, this log-likelihood has no closed-form maximizer: the estimators $(\hat{\boldsymbol{\beta}}, \hat{\theta})$ are the numerical solution of the $(k + 2)$-dimensional score system. In practice, both of our toolchains maximize $\ell$ by iterative numerical optimization over $(\boldsymbol{\beta}, \theta)$ jointly.
+Unlike ordinary least squares, and unlike the Poisson GLM of @sec-classical-poisson-glm whose coefficients admit an efficient Iteratively Reweighted Least Squares algorithm, this log-likelihood has no closed-form maximizer: the estimators $(\hat{\boldsymbol{\beta}}, \hat{\theta})$ are the numerical solution of the $(k + 2)$-dimensional score system. Differentiating @eq-generalized-poisson-loglik gives the score equation of a representative coefficient $\beta_j$,
+
+$$
+\frac{\partial \ell}{\partial \beta_j}
+=
+\sum_{i=1}^{n} x_{i,j} \left[ 1 - \lambda_i + \frac{\lambda_i\,(y_i - 1)}{t_i} \right],
+\qquad
+t_i = \lambda_i + \theta\, y_i,
+$${#eq-generalized-poisson-score-beta}
+
+since $\partial \lambda_i / \partial \beta_j = \lambda_i x_{i,j}$ under the log link, and the score equation of the dispersion parameter,
+
+$$
+\frac{\partial \ell}{\partial \theta}
+=
+\sum_{i=1}^{n} \left\{
+\frac{y_i\,(y_i - 1)}{t_i} - y_i
+\;-\;
+\mu_i \left[ \frac{1}{\lambda_i} + \frac{y_i - 1}{t_i} - 1 \right]
+\right\},
+$${#eq-generalized-poisson-score-theta}
+
+where the bracketed second term enters through $\lambda_i = (1 - \theta)\mu_i$. In vector form the coefficient score is $\nabla_{\boldsymbol{\beta}} \ell = \mathbf{X}^\top \mathbf{s}$ with $s_i = 1 - \lambda_i + \lambda_i (y_i - 1) / t_i$ and $\mathbf{X}$ the design matrix whose rows are $\mathbf{x}_i^\top$. The score system $\nabla \ell = \mathbf{0}$ has no closed-form solution, so both toolchains maximize $\ell$ by iterative numerical optimization over $(\boldsymbol{\beta}, \theta)$ jointly — `VGAM` by Fisher scoring over its $(\log \mu, \text{log-log dispersion index})$ parameterization, and the `Python` class by BFGS over $(\boldsymbol{\beta}, z)$. Note the sanity check hiding in @eq-generalized-poisson-score-beta: at $\theta = 0$ (so $t_i = \lambda_i = \mu_i$), the coefficient score collapses to $\sum_i x_{i,j}(y_i - \mu_i)$, exactly the Poisson score of @sec-classical-poisson.
 
 Uncertainty quantification is standard likelihood machinery. The variance–covariance matrix of the estimates is approximated by the inverse of the information matrix evaluated at the maximum,
 
@@ -1330,6 +1352,19 @@ Heads-up on the Poisson-vs-GP comparison being regular!
 Because $\theta = 0$ lies **inside** the parameter space $(-1, 1)$ — not on its boundary — the Poisson model is nested in the GP model under ordinary regularity conditions. The classical $\chi^2_1$ asymptotics therefore apply to the likelihood-ratio test of $H_0: \theta = 0$ performed later in this chapter; no mixture-of-chi-squared correction is needed (contrast this with the zero-inflation probability boundary problem of @sec-zero-inflated-poisson).
 ::::
 :::
+
+Before the fitting code, @tbl-generalized-poisson-estimation-map collects the estimation objects of this section and where each one lives in the two software toolchains; the rest of the chapter refers back to these names.
+
+| Quantity | Symbol or formula | `R` object (`VGAM` fit) | `Python` object (`GeneralizedPoisson` fit) |
+|:---:|:---:|:---:|:---:|
+| Log-likelihood | $\ell(\boldsymbol{\beta}, \theta)$, @eq-generalized-poisson-loglik | `logLik(gp_fit_r)` | `gp_fit_py.llf` |
+| Score system | @eq-generalized-poisson-score-beta, @eq-generalized-poisson-score-theta | solved internally by `vglm()` | solved internally by BFGS |
+| Coefficient estimates | $\hat{\boldsymbol{\beta}}$ | `Estimate` column of `coef(summary())`, rows labelled `:1` | `gp_fit_py.params[:-1]` |
+| Dispersion estimate | $\hat{\theta}$ | decoded from the `(Intercept):2` row by delta method | logistic map of `params[-1]`, @eq-generalized-poisson-logistic-map |
+| Information matrix | $\mathcal{I}(\hat{\boldsymbol{\beta}}, \hat{\theta})$, @eq-generalized-poisson-se | expected (Fisher) information | observed information (negative Hessian) |
+| Standard errors | $\operatorname{SE}(\hat{\beta}_j) = \sqrt{[\mathcal{I}^{-1}]_{jj}}$ | `Std. Error` column of `coef(summary())` | `gp_fit_py.bse` |
+
+: Conceptual map between the estimation quantities of the Generalized Poisson model and their software counterparts. {#tbl-generalized-poisson-estimation-map .striped .hover}
 
 ### Fitting Machinery in R and Python {#sec-generalized-poisson-fitting-machinery}
 
@@ -3107,7 +3142,7 @@ This chapter presented **Generalized Poisson (GP) regression** as the book's ans
 
 The model itself has three parts (@sec-generalized-poisson-data-modelling): a **random component** $Y_i \mid \mathbf{x}_i \sim \operatorname{GPO}(\lambda_i, \theta)$ with mean $\mu_i = \lambda_i/(1-\theta)$ and variance $\mu_i / (1-\theta)^2$; the **systematic component** $\eta_i = \mathbf{x}_i^\top \boldsymbol{\beta}$; and the **log link** $\log \mu_i = \eta_i$, which ties the rate-like parameter to the regressors through $\lambda_i = (1-\theta)\exp(\eta_i)$. The dispersion parameter $\theta \in (-1, 1)$ carries the meaning: $\theta = 0$ nests the Classical Poisson model as an *interior* point, $\theta > 0$ inflates the variance above the mean, and $\theta < 0$ compresses it below the mean. The Chapter 13 distributional summary in @sec-generalized-poisson-distribution collects the distribution's properties independently of any regression.
 
-Estimation is **joint maximum likelihood** in $(\boldsymbol{\beta}, \theta)$ — there is no iteratively reweighted least squares shortcut as in a classical GLM — and uncertainty comes from the inverse information matrix, with the expected-versus-observed information difference explaining small `R`/`Python` discrepancies (@sec-generalized-poisson-estimation). In `R`, {VGAM}'s `vglm()` with `genpoisson1(zero = "dispind")` fits the model and we decoded its dispersion row back into $\theta$; in `Python`, the chapter's own `GenericLikelihoodModel` subclass maximizes the log-likelihood directly, with the logistic map keeping $\theta$ in $(-1, 1)$.
+Estimation is **joint maximum likelihood** in $(\boldsymbol{\beta}, \theta)$ — there is no Iteratively Reweighted Least Squares shortcut as in a classical GLM — and uncertainty comes from the inverse information matrix, with the expected-versus-observed information difference explaining small `R`/`Python` discrepancies (@sec-generalized-poisson-estimation). In `R`, {VGAM}'s `vglm()` with `genpoisson1(zero = "dispind")` fits the model and we decoded its dispersion row back into $\theta$; in `Python`, the chapter's own `GenericLikelihoodModel` subclass maximizes the log-likelihood directly, with the logistic map keeping $\theta$ in $(-1, 1)$.
 
 Goodness of fit ran as a full training-stage audit (@sec-generalized-poisson-gof): the likelihood-ratio test of $\theta = 0$ (classical $\chi^2_1$ applies because $0$ is interior), the Pearson statistic standardized by the GP variance function, the observed-versus-fitted comparison, the residual deviance with its small-counts approximation caveat, and the GP zero-count check $\sum_i \exp(-\hat\lambda_i)$ — the check that flagged the remaining zero surplus as the feature a dispersion parameter cannot repair on its own.
 
@@ -3228,7 +3263,7 @@ Question 13.4
 ::::{.Question-container}
 **Open-ended Question**
 
-Why is the estimation of a Generalized Poisson regression not an ordinary iteratively reweighted least squares problem like the Poisson GLM of @sec-classical-poisson?
+Why is the estimation of a Generalized Poisson regression not an ordinary Iteratively Reweighted Least Squares problem like the Poisson GLM of @sec-classical-poisson?
 ::::
 :::
 
