@@ -87,6 +87,11 @@ plotnine <- import("plotnine")
 
 options(htmlwidgets.TOJSON_ARGS = list(na = 'string'))
 
+# Display-only formatting: threshold notation for tiny p-values
+format_pvals <- function(p, threshold = 1e-4) {
+  ifelse(p < threshold, "< 0.0001", sprintf("%.4f", p))
+}
+
 print_as_dt <- function(x){
   DT::datatable(x,
                 rownames = FALSE,
@@ -123,6 +128,11 @@ def scrollable_table_html(data, **kwargs):
         )
         + '</div>'
     )
+
+
+def format_pvals(pvals, threshold=1e-4):
+    # Display-only formatting: threshold notation for tiny p-values
+    return ["< 0.0001" if p < threshold else f"{p:.4f}" for p in pvals]
 ```
 
 ::: {.LO}
@@ -1546,7 +1556,9 @@ gp_simple_summary_py["z value"] = (
 gp_simple_summary_py["Pr(>|z|)"] = (
     2 * (1 - norm.cdf(gp_simple_summary_py["z value"].abs()))
 )
-gp_simple_summary_py_html = scrollable_table_html(gp_simple_summary_py)
+gp_simple_summary_py_disp = gp_simple_summary_py.round(4)
+gp_simple_summary_py_disp["Pr(>|z|)"] = format_pvals(gp_simple_summary_py["Pr(>|z|)"])
+gp_simple_summary_py_html = scrollable_table_html(gp_simple_summary_py_disp)
 ```
 
 ::: {.panel-tabset}
@@ -1558,7 +1570,9 @@ gp_simple_summary_py_html = scrollable_table_html(gp_simple_summary_py)
 #| label: tbl-generalized-poisson-simple-model-r
 #| tbl-cap: "Coefficient estimates, standard errors, and Wald statistics for the simple Generalized Poisson model (R; expected-information standard errors)."
 #| message: false
-print_as_dt(gp_simple_summary_r)
+gp_simple_summary_r |>
+  mutate(`Pr(>|z|)` = format_pvals(`Pr(>|z|)`)) |>
+  kable(digits = 4)
 ```
 
 ## **`Python` Output**
@@ -1794,7 +1808,7 @@ gof_numbers_py_html = scrollable_table_html(gof_numbers_py)
 #| label: tbl-generalized-poisson-gof-numbers-r
 #| tbl-cap: "Goodness-of-fit headline numbers for the simple Generalized Poisson model (training data), with the same-split Poisson contrasts."
 #| message: false
-print_as_dt(gof_numbers_r)
+kable(gof_numbers_r)
 ```
 
 ## **`Python` Output**
@@ -2139,7 +2153,9 @@ theta_row = pd.DataFrame(
     }
 )
 gp_ext_summary_py = pd.concat([gp_ext_summary_py, theta_row], ignore_index=True)
-gp_ext_summary_py_html = scrollable_table_html(gp_ext_summary_py)
+gp_ext_summary_py_disp = gp_ext_summary_py.round(4)
+gp_ext_summary_py_disp["Pr(>|z|)"] = format_pvals(gp_ext_summary_py["Pr(>|z|)"])
+gp_ext_summary_py_html = scrollable_table_html(gp_ext_summary_py_disp)
 ```
 
 ::: {.panel-tabset}
@@ -2151,7 +2167,9 @@ gp_ext_summary_py_html = scrollable_table_html(gp_ext_summary_py)
 #| label: tbl-generalized-poisson-extended-fit-r
 #| tbl-cap: "Coefficient estimates for the extended Generalized Poisson model (training data; R, expected-information standard errors)."
 #| message: false
-print_as_dt(gp_ext_summary_r)
+gp_ext_summary_r |>
+  mutate(`Pr(>|z|)` = format_pvals(`Pr(>|z|)`)) |>
+  kable(digits = 4)
 ```
 
 ## **`Python` Output**
@@ -2425,7 +2443,12 @@ se_compare_r <- tibble(
 #| label: tbl-generalized-poisson-se-comparison-r
 #| tbl-cap: "Generalized Poisson versus Poisson inferential comparisons on the extended specification (training data; R expected-information standard errors)."
 #| message: false
-print_as_dt(se_compare_r)
+se_compare_r |>
+  mutate(
+    `GP p-value` = format_pvals(`GP p-value`),
+    `Poisson p-value` = format_pvals(`Poisson p-value`)
+  ) |>
+  kable(digits = 4)
 ```
 
 ```{python}
@@ -2452,7 +2475,10 @@ se_compare_py["GP p-value"] = 2 * (1 - stats.norm.cdf(
 se_compare_py["Poisson p-value"] = 2 * (1 - stats.norm.cdf(
     (se_compare_py["Poisson estimate"] / se_compare_py["Poisson SE"]).abs()
 ))
-se_compare_py_html = scrollable_table_html(se_compare_py)
+se_compare_py_disp = se_compare_py.round(4)
+se_compare_py_disp["GP p-value"] = format_pvals(se_compare_py["GP p-value"])
+se_compare_py_disp["Poisson p-value"] = format_pvals(se_compare_py["Poisson p-value"])
+se_compare_py_html = scrollable_table_html(se_compare_py_disp)
 ```
 
 ```{r}
@@ -2622,7 +2648,7 @@ gp_test_predictions_r |>
     `Predicted expected count` = predicted_expected_count,
     `GP predictive zero probability` = predictive_prob_zero
   ) |>
-  print_as_dt()
+  kable()
 ```
 
 :::
@@ -2836,7 +2862,9 @@ theta_row_test = pd.DataFrame(
     }
 )
 gp_test_summary_py = pd.concat([gp_test_summary_py, theta_row_test], ignore_index=True)
-gp_test_summary_py_html = scrollable_table_html(gp_test_summary_py)
+gp_test_summary_py_disp = gp_test_summary_py.round(4)
+gp_test_summary_py_disp["Pr(>|z|)"] = format_pvals(gp_test_summary_py["Pr(>|z|)"])
+gp_test_summary_py_html = scrollable_table_html(gp_test_summary_py_disp)
 ```
 
 ::: {.panel-tabset}
@@ -2848,7 +2876,9 @@ gp_test_summary_py_html = scrollable_table_html(gp_test_summary_py)
 #| label: tbl-generalized-poisson-test-refit-r
 #| tbl-cap: "Testing-set refit of the extended Generalized Poisson model: log-scale estimates with Wald statistics and expected-count ratios with 95% confidence intervals (R)."
 #| message: false
-print_as_dt(gp_test_summary_r)
+gp_test_summary_r |>
+  mutate(`Pr(>|z|)` = format_pvals(`Pr(>|z|)`)) |>
+  kable(digits = 4)
 ```
 
 ## **`Python` Output**
@@ -2954,7 +2984,7 @@ gp_prediction_metrics_table_r <- round(rbind(
 #| message: false
 gp_prediction_metrics_table_r |>
   as_tibble(rownames = "Model") |>
-  print_as_dt()
+  kable()
 ```
 
 :::
