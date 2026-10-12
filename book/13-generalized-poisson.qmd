@@ -2007,15 +2007,15 @@ plt.show()
 
 | **Check** | **GP model result** | **Same-split Poisson result** | **Verdict** |
 |:---|:---|:---|:---|
-| Mean structure (observed vs fitted) | Correlation 0.38; scatter fans out with the fitted mean | Same mean trend available | Adequate as a width-only mean function; more regressors are assessable next |
-| Dispersion test, $H_0: \theta = 0$ | LRT $= 80.48$, df $1$, $p = 2.9\times 10^{-19}$ | — | Strongly reject: the dispersion parameter is necessary |
-| Pearson $\chi^2$ / df | 62.35 / 83 $= 0.75$; upper $p = 0.956$ | 252.70 / 84 $= 3.01$ | GP variance function adequate; Poisson's was three times too small |
-| Residual deviance / df | 121.11 / 83 $= 1.46$ (nominal $p = 0.004$; approximation caveated) | 266.58 / 84 $= 3.17$ | GP halves the deviance; residual elevation partly artefactual at small counts |
-| Zero-count check | 34 observed vs 27.4 expected | 34 observed vs 9.0 expected | GP recovers most of the zero shortfall; a surplus of about 7 zeros remains |
+| Mean structure (observed vs fitted) | Correlation `r round(cor(y_train_vec, mu_hat), 2)`; scatter fans out with the fitted mean | Same mean trend available | Adequate as a width-only mean function; more regressors are assessable next |
+| Dispersion test, $H_0: \theta = 0$ | LRT $= `r round(lr_theta, 2)`$, df $1$, $p = `r formatC(p_lr_theta, format = "e", digits = 1)`$ | — | Strongly reject: the dispersion parameter is necessary |
+| Pearson $\chi^2$ / df | `r round(pearson_chisq, 2)` / `r df_gof` $= `r round(pearson_chisq / df_gof, 2)`$; upper $p = `r round(p_pearson, 3)`$ | `r round(pearson_poisson, 2)` / `r df_gof + 1` $= `r round(pearson_poisson / (df_gof + 1), 2)`$ | GP variance function adequate; Poisson's was three times too small |
+| Residual deviance / df | `r round(residual_deviance, 2)` / `r df_gof` $= `r round(residual_deviance / df_gof, 2)`$ (nominal $p = `r round(p_deviance, 3)`$; approximation caveated) | `r round(deviance(gp_poisson_r), 2)` / `r df_gof + 1` $= `r round(deviance(gp_poisson_r) / (df_gof + 1), 2)`$ | GP halves the deviance; residual elevation partly artefactual at small counts |
+| Zero-count check | `r observed_zeros` observed vs `r round(expected_zeros_gp, 1)` expected | `r observed_zeros` observed vs `r round(expected_zeros_poisson, 1)` expected | GP recovers most of the zero shortfall; a surplus of about `r observed_zeros - round(expected_zeros_gp)` zeros remains |
 
 : Training-stage adequacy summary for the simple width-only Generalized Poisson model, contrasted with the same-split Classical Poisson fit. {#tbl-generalized-poisson-gof-summary .striped .hover}
 
-**Decision.** The simple Generalized Poisson model repairs the two headline failures of the classical Poisson fit: the conditional variance is no longer three times too small, and the expected zero count is now at least of the right order of magnitude. Two cautions survive: a modest zero surplus (34 observed vs 27.4 expected) and the fingerprint that width alone is a thin mean model. Both motivate the next step of the workflow — adding the remaining phenotypic regressors, with the extended specification chosen to match @sec-classical-poisson-additional-regressors so that the comparison between the two chapters remains clean.
+**Decision.** The simple Generalized Poisson model repairs the two headline failures of the classical Poisson fit: the conditional variance is no longer three times too small, and the expected zero count is now at least of the right order of magnitude. Two cautions survive: a modest zero surplus (`r observed_zeros` observed vs `r round(expected_zeros_gp, 1)` expected) and the fingerprint that width alone is a thin mean model. Both motivate the next step of the workflow — adding the remaining phenotypic regressors, with the extended specification chosen to match @sec-classical-poisson-additional-regressors so that the comparison between the two chapters remains clean.
 
 ## Extending the Model with Additional Regressors {#sec-generalized-poisson-extended-model}
 
@@ -2395,15 +2395,15 @@ p_ext_obs_fitted_py.show()
 
 | **Check** | **Simple GP model** | **Extended GP model** | **Reading** |
 |:---|:---|:---|:---|
-| Pearson $\chi^2$ / df | 62.35 / 83 = 0.75 ($p = 0.956$) | 68.40 / 77 = 0.89 ($p = 0.748$) | GP variance function adequate in both |
-| Residual deviance / df | 121.11 / 83 = 1.46 | 116.19 / 77 = 1.51 | Slight absolute drop; ratios moved by small-count approximation, not real deterioration |
-| Expected zeros (vs 34 observed) | 27.4 | 27.8 | Zero surplus barely moves — it is not a regressor-deficiency artefact |
-| $\hat\theta$; variance ratio | 0.516; 4.27 | 0.492; 3.88 | Overdispersion survives all regressors |
-| $\theta = 0$ LRT | 80.48, $p = 2.9\times 10^{-19}$ | 70.41, $p = 4.8\times 10^{-17}$ | Dispersion parameter necessary in both |
+| Pearson $\chi^2$ / df | `r round(pearson_chisq, 2)` / `r df_gof` = `r round(pearson_chisq / df_gof, 2)` ($p = `r round(p_pearson, 3)`$) | `r round(pearson_ext, 2)` / `r df_gof_ext` = `r round(pearson_ext / df_gof_ext, 2)` ($p = `r round(p_pearson_ext, 3)`$) | GP variance function adequate in both |
+| Residual deviance / df | `r round(residual_deviance, 2)` / `r df_gof` = `r round(residual_deviance / df_gof, 2)` | `r round(residual_deviance_ext, 2)` / `r df_gof_ext` = `r round(residual_deviance_ext / df_gof_ext, 2)` | Slight absolute drop; ratios moved by small-count approximation, not real deterioration |
+| Expected zeros (vs `r observed_zeros` observed) | `r round(expected_zeros_gp, 1)` | `r round(expected_zeros_ext, 1)` | Zero surplus barely moves — it is not a regressor-deficiency artefact |
+| $\hat\theta$; variance ratio | `r round(theta_hat, 3)`; `r round(1 / (1 - theta_hat)^2, 2)` | `r round(theta_hat_ext, 3)`; `r round(1 / (1 - theta_hat_ext)^2, 2)` | Overdispersion survives all regressors |
+| $\theta = 0$ LRT | `r round(lr_theta, 2)`, $p = `r formatC(p_lr_theta, format = "e", digits = 1)`$ | `r round(lr_theta_ext, 2)`, $p = `r formatC(p_theta_ext, format = "e", digits = 1)`$ | Dispersion parameter necessary in both |
 
 : Simple-versus-extended goodness-of-fit summary for the Generalized Poisson model (training data). {#tbl-generalized-poisson-extended-gof-summary .striped .hover}
 
-The picture is consistent with the simple model's audit: the GP variance function remains adequate (Pearson ratio 0.89), the expected zero count creeps closer to the observed 34 but a surplus of about six remains, and $\hat\theta$ hardly budges. Whatever creates the extra zeros, it is not the omission of these regressors.
+The picture is consistent with the simple model's audit: the GP variance function remains adequate (Pearson ratio `r round(pearson_ext / df_gof_ext, 2)`), the expected zero count creeps closer to the observed `r observed_zeros` but a surplus of about `r observed_zeros - round(expected_zeros_ext)` remains, and $\hat\theta$ hardly budges. Whatever creates the extra zeros, it is not the omission of these regressors.
 
 ### The Inferential Payoff: Calibrated Standard Errors {#sec-generalized-poisson-se-comparison}
 
