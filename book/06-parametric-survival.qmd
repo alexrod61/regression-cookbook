@@ -1181,6 +1181,393 @@ Using parametric survival regression, we will estimate how these characteristics
 
 In the next section, we will clarify our study design and begin applying the data science workflow to this problem.
 
+## Study Design
+
+Knowing what we want to learn, the next step is to be clear about the type of question we are asking.
+
+This is an inferential task. We are interested in understanding how patient characteristics, such as age, patient group, baseline health measurements, and existing medical conditions, are associated with the time until a heart attack. Rather than building a model optimized for predicting exactly when an individual patient might experience a heart attack, our primary goal is to identify which factors are associated with longer or shorter survival times and interpret the magnitude and direction of those relationships.
+
+An important consideration is that not every patient experiences a heart attack during the observation period. Some patients are right-censored, meaning we know they remained event-free until their last recorded follow-up, but we do not know their eventual event time. Our analysis must account for these incomplete observations rather than treating them as patients who will never experience a heart attack.
+
+We will treat this as an observational study, meaning that the relationships we identify should be interpreted as associations rather than causal effects. For example, if patients in Group A tend to experience longer times until a heart attack than those in Group B, this does not necessarily mean that group membership itself causes the difference. Other factors, including unmeasured health characteristics or differences in medical care, may contribute to the observed relationship.
+
+
+## Data Collection and Wrangling
+
+With our research question and study design established, the next step is to ensure that our data is suitable for survival analysis. Although the dataset is already provided, it is still useful to consider how this type of data might be collected and what preparation is required before fitting a model.
+
+Unlike conventional regression, survival analysis requires us to consider not only the observed outcome, but also whether the event actually occurred during the observation period. This distinction makes data preparation especially important.
+
+### Data Collection
+
+For a study examining time until a heart attack, data like this could reasonably be collected from several sources:
+
+- **Patient Records:** Demographic information, such as age, and existing medical conditions may be obtained from electronic health records. These provide information about patients' characteristics at the beginning of the study.
+
+- **Baseline Health Assessments:** Measurements such as our `baseline_marker` may be collected during an initial clinical assessment. These measurements allow us to investigate whether a patient's health status is associated with subsequent event times.
+
+- **Follow-up Records:** Patients may be monitored over time to record whether and when a heart attack occurs. Follow-up may end because the study concludes, a patient is lost to follow-up, or another censoring event occurs.
+
+Each source introduces potential limitations. Clinical records may contain missing or inconsistently recorded information, while follow-up periods may differ across patients. In particular, survival analysis requires us to think carefully about censoring. Patients who have not experienced a heart attack during their recorded follow-up still provide valuable information, but their exact eventual event times remain unknown.
+
+For our case study, we will use a simulated dataset designed to illustrate these features. Although the data is artificial, the preparation steps reflect those commonly encountered in real survival studies.
+
+### Data Wrangling
+
+Once the data has been collected, we need to prepare it for modeling. Even a relatively simple survival dataset requires several checks to ensure that its variables are represented correctly.
+
+For parametric survival regression, data wrangling typically involves:
+
+- Verifying that observed survival times are positive and measured consistently.
+- Confirming that the event indicator correctly distinguishes observed events from censored observations.
+- Checking for missing values, duplicate records, and other inconsistencies.
+- Preparing categorical predictors for regression.
+- Creating a modeling dataset containing the relevant predictors, follow-up times, and event indicators.
+
+Let's walk through these steps using our heart attack dataset, demonstrating each step in both R and Python.
+
+#### 1. Preparing and Validating the Survival Outcome
+
+Unlike Beta regression, where we modeled a single continuous response variable, survival regression requires two variables to describe the observed outcome:
+
+- `time`: The observed follow-up time, ending at either a heart attack or censoring.
+- `heart attacks`: An indicator of whether a heart attack was observed.
+
+Together, these variables tell us both how long each patient was observed and whether the event occurred. We begin by loading the dataset and inspecting the variables.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Inspect the first few observations
+head(data)
+
+# Inspect variable types
+str(data)
+```
+
+## Python Code
+
+```{python}
+print(data.head())
+
+# Inspect variable types
+print(data.dtypes)
+```
+
+:::
+
+For convenience, we will rename the event indicator from `heart attacks` to `event`. This makes it easier to reference in our code and emphasizes its role in survival analysis.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+names(data)[names(data) == "heart attacks"] <- "event"
+
+# Summary of observed follow-up times
+summary(data$time)
+
+# Count observed events and censored observations
+table(data$event)
+```
+
+## Python Code
+
+```{python}
+data = data.rename(columns={"heart attacks": "event"})
+
+# Summary of observed follow-up times
+print(data["time"].describe())
+
+# Count observed events and censored observations
+print(data["event"].value_counts(dropna=False))
+```
+
+:::
+
+Recall that, for this dataset, we assume the event indicator is coded as follows:
+
+| Event Indicator | Interpretation |
+|---|---|
+| `1` | A heart attack was observed at the recorded time. |
+| `0` | The observation was right-censored at the recorded time. |
+
+We can now examine how many patients experienced a heart attack and how many were censored.
+
+::: {.Tip}
+::::{.Tip-header}
+Proportion not Probability
+::::
+::::{.Tip-container}
+The proportion of observed events is useful for understanding the dataset, although it should not be interpreted as the overall probability of experiencing a heart attack. Patients may have different follow-up durations, and some event times are censored.
+::::
+:::
+
+Next, we verify that the survival outcomes have valid values. For the continuous survival-time distributions considered in this chapter, observed times should be strictly positive. The event indicator should contain only zeros and ones.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Check for non-positive survival times
+sum(data$time <= 0, na.rm = TRUE)
+
+# Check for invalid event indicators
+sum(
+  !(data$event %in% c(0, 1)) & !is.na(data$event)
+)
+
+# Check for missing survival outcomes
+colSums(is.na(data[c("time", "event")]))
+```
+
+## Python Code
+
+```{python}
+# Check for non-positive survival times
+print((data["time"] <= 0).sum())
+
+# Check for invalid event indicators
+print(
+    (~data["event"].isin([0, 1]) &
+     data["event"].notna()).sum()
+)
+
+# Check for missing survival outcomes
+print(data[["time", "event"]].isna().sum())
+```
+
+:::
+
+If these checks reveal invalid values, we should investigate them before proceeding. For example, a negative follow-up time would indicate a data error, while an unexpected event indicator such as `2` might suggest inconsistent coding. The data looks valid here though.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up!
+::::
+:::: {.Heads-up-container}
+
+Importantly, as a reminder, censored observations are not invalid observations. A patient with `event = 0` still contributes information about their survival time and should not be removed simply because the event was not observed.
+
+Removing censored observations would exclude censored patients and could substantially bias the analysis toward shorter survival times. Instead, survival models use the event indicator to distinguish between patients whose event times are known and those whose event times are only partially observed. We will see how these two types of observations contribute differently to the likelihood function when fitting our model.
+
+::::
+:::
+
+#### 2. Checking for Missing Values and Inconsistencies
+
+Before preparing the predictors, we should check whether any observations contain missing or inconsistent information. Missing values can affect model fitting, especially when they occur in important predictors or in the survival outcome itself. We begin by counting missing values in each column.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Count missing values in each column
+colSums(is.na(data))
+
+# Check for duplicated patient identifiers
+sum(duplicated(data$id))
+
+# Examine the categorical group variable
+table(data$group, useNA = "ifany")
+```
+
+## Python Code
+
+```{python}
+# Count missing values in each column
+print(data.isna().sum())
+
+# Check for duplicated patient identifiers
+print(data["id"].duplicated().sum())
+
+# Examine the categorical group variable
+print(data["group"].value_counts(dropna=False))
+```
+
+:::
+
+Great! No missing values! We should also inspect the numerical predictors for potentially implausible values. For example, age should not be negative, and the number of comorbidities should be a non-negative whole number.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Summarize numerical predictors
+summary(
+  data[c("age", "baseline_marker", "comorbidity_count")]
+)
+
+# Check for invalid ages
+sum(data$age < 0, na.rm = TRUE)
+
+# Check for invalid comorbidity counts
+sum(
+  data$comorbidity_count < 0 |
+  data$comorbidity_count != floor(data$comorbidity_count),
+  na.rm = TRUE
+)
+```
+
+## Python Code
+
+```{python}
+# Summarize numerical predictors
+print(
+    data[
+        ["age", "baseline_marker", "comorbidity_count"]
+    ].describe()
+)
+
+# Check for invalid ages
+print((data["age"] < 0).sum())
+
+# Check for invalid comorbidity counts
+print(
+    (
+        (data["comorbidity_count"] < 0) |
+        (data["comorbidity_count"] % 1 != 0)
+    ).sum()
+)
+```
+
+:::
+
+These checks help identify values that may require further investigation. However, we should avoid automatically removing unusual observations simply because they are extreme. A particularly high baseline measurement, for example, might be clinically meaningful rather than erroneous.
+
+If missing or invalid values are identified, the appropriate treatment depends on their cause and extent. Possible approaches include correcting data-entry errors, reviewing the original records, or applying suitable missing-data methods. For now, it appears that the toy dataset that we're dealing with is clean. We will proceed under the assumption that any issues identified by these checks have been reviewed and resolved.
+
+#### 3. Encoding Categorical Variables
+
+Our dataset contains one categorical predictor, `group`, which identifies whether a patient belongs to Group A or Group B. Regression models require categorical predictors to be represented appropriately. Since `group` has two categories, we can use a binary indicator with Group A as the reference category. The resulting variable, `group_B`, takes the value:
+
+- `0` for patients in Group A.
+- `1` for patients in Group B.
+
+This allows us to interpret the coefficient for `group_B` as the difference between Group B and Group A, holding other predictors constant.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Convert group into a categorical factor
+data$group <- factor(
+  data$group,
+  levels = c("A", "B")
+)
+
+# Examine the reference category
+levels(data$group)
+
+# Create an indicator for Group B
+data$group_B <- as.integer(data$group == "B")
+
+head(data[c("group", "group_B")])
+```
+
+## Python Code
+
+```{python}
+import pandas as pd
+
+# Define Group A as the reference category
+data["group"] = pd.Categorical(
+    data["group"],
+    categories=["A", "B"]
+)
+
+# Create an indicator for Group B
+data["group_B"] = (
+    data["group"] == "B"
+).astype(int)
+
+print(data[["group", "group_B"]].head())
+```
+
+:::
+
+With this encoding, a coefficient associated with `group_B` will describe how survival times differ between patients in Group B and those in Group A. Because we are using an AFT model, exponentiating this coefficient will give us a time ratio, rather than a difference in the probability of experiencing a heart attack. We will return to this interpretation when examining our fitted regression model.
+
+#### 4. Preparing the Final Modeling Dataset
+
+Now that we have validated our survival outcomes and prepared the categorical predictor, we can assemble the dataset that will be used for regression. Our model will include the following predictors:
+
+- `age`
+- `group_B`
+- `baseline_marker`
+- `comorbidity_count`
+
+The response will be represented by `time` and `event`. We will exclude `id` from the model because it is simply a unique patient identifier, rather than a characteristic that we expect to explain survival time.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Select the variables needed for modeling
+model_data <- data[
+  c(
+    "time",
+    "event",
+    "age",
+    "group_B",
+    "baseline_marker",
+    "comorbidity_count"
+  )
+]
+
+# Confirm that all required values are present
+stopifnot(!anyNA(model_data))
+
+# Confirm valid survival outcomes
+stopifnot(all(model_data$time > 0))
+stopifnot(all(model_data$event %in% c(0, 1)))
+
+# Inspect the final dataset
+head(model_data)
+str(model_data)
+```
+
+## Python Code
+
+```{python}
+# Select the variables needed for modeling
+model_data = data[
+    [
+        "time",
+        "event",
+        "age",
+        "group_B",
+        "baseline_marker",
+        "comorbidity_count"
+    ]
+].copy()
+
+# Confirm that all required values are present
+assert not model_data.isna().any().any()
+
+# Confirm valid survival outcomes
+assert (model_data["time"] > 0).all()
+assert model_data["event"].isin([0, 1]).all()
+
+# Inspect the final dataset
+print(model_data.head())
+print(model_data.dtypes)
+```
+
+:::
+
+The final modeling dataset now contains the variables required for parametric survival regression. Notice that we have not transformed the observed survival times by taking their logarithms. Although the AFT model is formulated in terms of log survival time, the survival regression software handles this transformation internally while accounting for censored observations. Similarly, we have retained both observed events and censored observations. This ensures that the model can make use of all available follow-up information.
+
+With the data prepared, we can now move on to exploratory data analysis, where we will examine the distribution of follow-up times, the frequency of observed events, and the relationships between patient characteristics and survival outcomes.
+
 
 ## Estimation
 
