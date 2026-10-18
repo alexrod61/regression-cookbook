@@ -47,6 +47,7 @@ py_require("pyreadr")
 py_require("scikit-learn")
 py_require("seaborn")
 py_require("scipy")
+py_require("lifelines")
 
 pandas <- import("pandas")
 numpy <- import("numpy")
@@ -56,6 +57,7 @@ pyreadr <- import("pyreadr")
 sklearn <- import("sklearn")
 seaborn <- import("seaborn")
 scipy <- import("scipy")
+lifelines <- import("lifelines")
 
 # Load data in R
 data <- parametric_survival
@@ -1567,6 +1569,623 @@ print(model_data.dtypes)
 The final modeling dataset now contains the variables required for parametric survival regression. Notice that we have not transformed the observed survival times by taking their logarithms. Although the AFT model is formulated in terms of log survival time, the survival regression software handles this transformation internally while accounting for censored observations. Similarly, we have retained both observed events and censored observations. This ensures that the model can make use of all available follow-up information.
 
 With the data prepared, we can now move on to exploratory data analysis, where we will examine the distribution of follow-up times, the frequency of observed events, and the relationships between patient characteristics and survival outcomes.
+
+
+## Exploratory Data Analysis (EDA)
+
+With our data prepared, we can now explore its main characteristics before fitting a regression model. As in previous chapters, the goal of exploratory data analysis (EDA) is to identify patterns, understand the variables, and develop expectations about the relationships we may find.
+
+For survival data, however, we need to pay particular attention to censoring. Since not every patient's heart attack time is observed, we cannot treat recorded follow-up times as if they were all exact event times. We will begin by examining follow-up times and censoring, then explore the overall survival pattern, the distributions of our predictors, and potential differences in survival across patient groups.
+
+### Understanding Follow-up Times and Censoring
+
+We begin by examining how many patients experienced a heart attack during follow-up and how many were censored. This gives us an initial sense of how much event-time information is available for our analysis.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-event-summary-r
+
+event_counts <- table(
+  factor(
+    model_data$event,
+    levels = c(0, 1),
+    labels = c("Censored", "Heart Attack")
+  )
+)
+
+event_summary <- data.frame(
+  Outcome = names(event_counts),
+  Count = as.integer(event_counts),
+  Percentage = round(
+    100 * as.integer(event_counts) / nrow(model_data),
+    1
+  )
+)
+
+print(event_summary)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-event-summary-python
+
+event_summary = (
+    model_data["event"]
+    .map({0: "Censored", 1: "Heart Attack"})
+    .value_counts()
+    .reindex(["Censored", "Heart Attack"], fill_value=0)
+)
+
+event_summary = pd.DataFrame({
+    "Count": event_summary,
+    "Percentage": (
+        event_summary / len(model_data) * 100
+    ).round(1)
+})
+
+print(event_summary)
+```
+
+:::
+
+Next, we visualize the distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations.
+
+::: {.panel-tabset}
+
+## R Code
+
+
+```{r}
+#| label: eda-followup-hist-r
+#| fig-cap: "Distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations."
+
+# Create common histogram bins
+breaks <- pretty(model_data$time, n = 12)
+
+# Count observations in each bin by event status
+heart_attacks <- hist(
+  model_data$time[model_data$event == 1],
+  breaks = breaks,
+  plot = FALSE
+)$counts
+
+censored <- hist(
+  model_data$time[model_data$event == 0],
+  breaks = breaks,
+  plot = FALSE
+)$counts
+
+# Combine counts into a matrix
+counts <- rbind(
+  "Heart Attack" = heart_attacks,
+  "Censored" = censored
+)
+
+# Plot stacked bars
+barplot(
+  counts,
+  beside = FALSE,
+  col = c("steelblue", "lightgray"),
+  border = "white",
+  main = "Distribution of Observed Follow-up Times",
+  xlab = "Follow-up Time",
+  ylab = "Number of Patients",
+  names.arg = head(breaks, -1),
+  space = 0,
+  legend.text = TRUE,
+  args.legend = list(
+    x = "topright",
+    bty = "n"
+  )
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-followup-hist-python
+#| fig-cap: "Distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations."
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+
+bins = np.histogram_bin_edges(
+    model_data["time"],
+    bins=12
+)
+
+ax.hist(
+    [
+        model_data.loc[model_data["event"] == 1, "time"],
+        model_data.loc[model_data["event"] == 0, "time"]
+    ],
+    bins=bins,
+    stacked=True,
+    label=["Heart Attack", "Censored"],
+    color=["steelblue", "lightgray"],
+    edgecolor="white"
+)
+
+ax.set_title("Distribution of Observed Follow-up Times")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Number of Patients")
+ax.legend(frameon=False)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The histogram shows that follow-up times are spread across the observation period, with many concentrated around the middle. A substantial proportion of observations are censored, particularly at longer follow-up times.
+
+Importantly, this histogram represents observed follow-up times rather than the distribution of actual heart attack times. For patients who experienced a heart attack (blue), the recorded time corresponds to the event. For censored patients (gray), we only know that they remained event-free until their recorded follow-up time. Consequently, the histogram alone cannot tell us how the probability of remaining free from a heart attack changes over time. For that, we need a method that accounts for censoring.
+
+### Exploring Survival Patterns with Kaplan–Meier
+
+To explore survival probabilities, we can use the **Kaplan–Meier estimator**, a nonparametric method that estimates the survival function without assuming a particular probability distribution for event times.
+
+The idea is straightforward: the estimated survival probability decreases whenever a heart attack occurs, based on the number of patients still at risk. Censored patients contribute information until their last observed follow-up time, but censoring itself does not cause the survival probability to decrease. Let's estimate the overall Kaplan–Meier survival curve.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-overall-r
+#| fig-cap: "Kaplan–Meier estimate of heart attack-free survival, with a 95% confidence interval."
+
+library(survival)
+
+km_fit <- survfit(
+  Surv(time, event) ~ 1,
+  data = model_data
+)
+
+plot(
+  km_fit,
+  conf.int = TRUE,
+  mark.time = TRUE,
+  col = "steelblue",
+  lwd = 2,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Kaplan-Meier Survival Curve",
+  ylim = c(0, 1)
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-overall-python
+#| fig-cap: "Kaplan–Meier estimate of heart attack-free survival, with a 95% confidence interval."
+#| echo: false
+#| message: false
+#| results: hide
+
+from lifelines import KaplanMeierFitter
+import matplotlib.pyplot as plt
+
+kmf = KaplanMeierFitter()
+
+kmf.fit(
+    durations=model_data["time"],
+    event_observed=model_data["event"],
+    label="Overall Survival"
+)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+kmf.plot_survival_function(
+    ax=ax,
+    ci_show=True,
+    show_censors=True,
+    color="steelblue"
+)
+
+ax.set_title("Kaplan-Meier Survival Curve")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+Unlike the smooth theoretical survival functions introduced earlier, the Kaplan–Meier curve has a step-like appearance. Each downward step corresponds to one or more observed heart attacks, while small marks indicate censored observations. The curve shows how the estimated probability of remaining free from a heart attack changes throughout follow-up. Its confidence interval also illustrates the uncertainty surrounding these estimates, which may become greater as fewer patients remain at risk. Because Kaplan–Meier does not require us to assume an Exponential, Weibull, or Log-normal distribution, it provides a useful reference for evaluating the parametric survival models we will fit later.
+
+
+### Exploring the Predictor Variables
+
+Now that we have examined the survival outcome, let's turn our attention to the patient characteristics that may help explain differences in survival time. Our dataset includes three numerical predictors, age, baseline marker, and comorbidity count, and one categorical predictor, patient group.
+
+
+#### Numerical Predictors
+
+We begin by visualizing the distributions of our numerical predictors.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-predictors-r
+
+par(mfrow = c(1, 3))
+
+hist(
+  model_data$age,
+  main = "Age",
+  xlab = "Age",
+  col = "lightgray",
+  border = "white"
+)
+
+hist(
+  model_data$baseline_marker,
+  main = "Baseline Marker",
+  xlab = "Marker Value",
+  col = "lightgray",
+  border = "white"
+)
+
+barplot(
+  table(model_data$comorbidity_count),
+  main = "Comorbidity Count",
+  xlab = "Number of Comorbidities",
+  ylab = "Number of Patients",
+  col = "lightgray",
+  border = "white"
+)
+
+par(mfrow = c(1, 1))
+```
+
+## Python Code
+
+```{python}
+#| label: eda-predictors-python
+#| fig-cap: "Distributions of age, baseline marker, and number of comorbidities."
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+axes[0].hist(
+    model_data["age"],
+    bins=12,
+    color="lightgray",
+    edgecolor="white"
+)
+axes[0].set_title("Age")
+axes[0].set_xlabel("Age")
+axes[0].set_ylabel("Number of Patients")
+
+axes[1].hist(
+    model_data["baseline_marker"],
+    bins=12,
+    color="lightgray",
+    edgecolor="white"
+)
+axes[1].set_title("Baseline Marker")
+axes[1].set_xlabel("Marker Value")
+
+counts = model_data["comorbidity_count"].value_counts().sort_index()
+
+axes[2].bar(
+    counts.index.astype(str),
+    counts.values,
+    color="lightgray"
+)
+axes[2].set_title("Comorbidity Count")
+axes[2].set_xlabel("Number of Comorbidities")
+
+for ax in axes:
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+Both age and baseline marker appear approximately bell-shaped, without substantial skewness or obvious extreme outliers. Most patients are between 50 and 70 years old, while baseline marker values are concentrated around 10–12. Comorbidity count follows a different pattern, as we would expect from a discrete count variable. Most patients have between zero and two existing conditions, with relatively few having three.
+
+Overall, these distributions do not reveal any obvious issues requiring additional preprocessing. However, the shape of a predictor's distribution does not by itself tell us whether it is associated with survival time, nor does AFT regression require predictors to be normally distributed.
+
+#### Categorical Predictor
+
+Next, we examine how patients are distributed between Groups A and B.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-group-r
+
+barplot(
+  table(data$group),
+  main = "Patient Group",
+  xlab = "Group",
+  ylab = "Number of Patients",
+  col = "lightgray",
+  border = "white"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-group-python
+#| fig-cap: "Number of patients in Groups A and B."
+#| echo: false
+#| message: false
+#| results: hide
+
+fig, ax = plt.subplots(figsize=(6, 4))
+
+counts = data["group"].value_counts().reindex(["A", "B"])
+
+ax.bar(
+    counts.index,
+    counts.values,
+    color="lightgray"
+)
+
+ax.set_title("Patient Group")
+ax.set_xlabel("Group")
+ax.set_ylabel("Number of Patients")
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The bar chart shows that Groups A and B are evenly represented, with approximately 500 patients in each group. This gives us reasonably balanced sample sizes for comparing their survival experiences. However, similar group sizes do not necessarily imply similar health characteristics or event rates. To investigate whether the groups differ in their observed survival patterns, we can return to the Kaplan–Meier estimator.
+
+### Comparing Survival Across Patient Groups
+
+One of our research questions is whether patients in Groups A and B experience different times until a heart attack. We can explore this by estimating a separate Kaplan–Meier survival curve for each group.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-groups-r
+#| fig-cap: "Kaplan–Meier survival curves comparing patients in Groups A and B."
+
+library(survival)
+
+km_groups <- survfit(
+  Surv(time, event) ~ group,
+  data = data
+)
+
+plot(
+  km_groups,
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  conf.int = FALSE,
+  mark.time = TRUE,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Survival by Patient Group",
+  ylim = c(0, 1)
+)
+
+legend(
+  "topright",
+  legend = c("Group A", "Group B"),
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-groups-python
+#| fig-cap: "Kaplan–Meier survival curves comparing patients in Groups A and B."
+#| echo: false
+#| message: false
+#| results: hide
+
+from lifelines import KaplanMeierFitter
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for group, color in [
+    ("A", "steelblue"),
+    ("B", "darkorange")
+]:
+    subset = data[data["group"] == group]
+
+    kmf_group = KaplanMeierFitter()
+
+    kmf_group.fit(
+        durations=subset["time"],
+        event_observed=subset["event"],
+        label=f"Group {group}"
+    )
+
+    kmf_group.plot_survival_function(
+        ax=ax,
+        ci_show=False,
+        show_censors=True,
+        color=color
+    )
+
+ax.set_title("Survival by Patient Group")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The curves reveal a noticeable difference between the two groups. Although both begin with survival probabilities close to one, they gradually separate as follow-up progresses. Group B maintains a higher estimated survival probability than Group A, with the difference becoming particularly pronounced later in the observation period. Near the end of follow-up, approximately 70% of patients in Group B are estimated to remain free from a heart attack, compared with around 40% in Group A.
+
+This suggests that patients in Group B tend to experience longer times until a heart attack. Whether this difference remains after accounting for other patient characteristics is something we will investigate through regression.
+
+### Exploring Survival Across Age Groups
+
+Patient group is not the only characteristic that may be associated with survival time. We are also interested in whether age plays a role. Since age is continuous, one simple exploratory approach is to divide patients into two groups based on the median age and compare their Kaplan–Meier curves.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-age-r
+
+median_age <- median(data$age, na.rm = TRUE)
+
+data$age_group <- ifelse(
+  data$age <= median_age,
+  "Younger Half",
+  "Older Half"
+)
+
+data$age_group <- factor(
+  data$age_group,
+  levels = c("Younger Half", "Older Half")
+)
+
+km_age <- survfit(
+  Surv(time, event) ~ age_group,
+  data = data
+)
+
+plot(
+  km_age,
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  conf.int = FALSE,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Survival by Age Group"
+)
+
+legend(
+  "topright",
+  legend = levels(data$age_group),
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-age-python
+#| fig-cap: "Exploratory comparison of survival curves for patients below or above the median age."
+#| echo: false
+#| message: false
+#| results: hide
+
+median_age = data["age"].median()
+
+data["age_group"] = np.where(
+    data["age"] <= median_age,
+    "Younger Half",
+    "Older Half"
+)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for group, color in [
+    ("Younger Half", "steelblue"),
+    ("Older Half", "darkorange")
+]:
+    subset = data[data["age_group"] == group]
+
+    kmf_age = KaplanMeierFitter()
+
+    kmf_age.fit(
+        durations=subset["time"],
+        event_observed=subset["event"],
+        label=group
+    )
+
+    kmf_age.plot_survival_function(
+        ax=ax,
+        ci_show=False,
+        color=color
+    )
+
+ax.set_title("Survival by Age Group")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The curves suggest a noticeable relationship between age and survival. Younger patients have higher estimated probabilities of remaining free from a heart attack, with the difference becoming more pronounced over time. Near the end of follow-up, approximately 70% of patients in the younger half are estimated to remain event-free, compared with around 40% in the older half. These patterns suggest that older age may be associated with shorter times until a heart attack.
+
+::: {.Tip}
+:::: {.Tip-header}
+Exploring Continuous Predictors Without Losing Information
+::::
+:::: {.Tip-container}
+
+Dividing a continuous predictor into categories can make exploratory comparisons easier to visualize, but it also discards information. For example, two patients with nearly identical ages may be placed into different groups simply because they fall on opposite sides of the median.
+
+We use this grouping only for exploratory purposes. When fitting our AFT regression model, we will retain age as a continuous predictor, allowing us to estimate how survival time changes with each additional year of age. Similarly, we will retain the original numerical values of baseline marker and comorbidity count rather than categorizing them solely for visualization.
+
+::::
+:::
+
+### What Have We Learned from EDA?
+
+Our exploratory analysis has revealed several useful patterns. A substantial proportion of patients were censored, reinforcing the importance of using methods that account for incomplete event times. The Kaplan–Meier estimator allowed us to explore survival probabilities without assuming a particular survival-time distribution.
+
+We also observed two notable associations: Group B appears to have longer heart attack-free survival than Group A, while younger patients appear to have longer survival than older patients. However, these comparisons are unadjusted. Differences between groups may reflect other patient characteristics, and the patterns we observe do not establish causal relationships. Furthermore, we have not yet examined how all predictors relate to survival time simultaneously.
+
+In the next step, Data Modelling, we will move beyond these exploratory comparisons and develop a parametric survival regression model. We will consider which survival-time distribution is appropriate, specify the AFT regression equation, estimate its parameters while accounting for censoring, and interpret the resulting coefficients as time ratios. This will allow us to investigate how multiple patient characteristics are associated with time until a heart attack.
 
 
 ## Estimation
