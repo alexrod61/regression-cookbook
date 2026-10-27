@@ -709,14 +709,22 @@ data.isna().sum()
 ```
 :::
 
-#### Encoding Categorical Variables
 
-For regression analysis, we need to convert categorical variables into numerical representations. In R, binary variables like `Has_Job`, `Drinks_Alcohol`, `Financially_Dependent`, `Cooks_at_Home`, `Living_Situation`, and `Housing_Type` should be transformed into factors so that the model correctly interprets them as categorical data rather than continuous numbers. For example:
+#### 2. Encoding Categorical Variables
+
+Before fitting the regression model, we need to make sure that categorical variables are represented appropriately. Variables such as `Has_Job`, `Drinks_Alcohol`, `Financially_Dependent`, and `Cooks_at_Home` have two categories, while `Living_Situation` and `Housing_Type` contain more than two categories.
+
+In `R`, we represent these variables as factors. In `Python`, we convert them to the categorical data type. When the regression model is fitted, the software will use these categorical variables to create the necessary indicator variables and compare each category with a reference category.
+
+For this analysis, the reference categories are `No` for the binary variables, `Family` for `Living_Situation`, and `Rent` for `Housing_Type`.
+
+The ordinal variables `Year_of_Study` and `Goes_Out_Spends_Money` are left in their numerical form in this analysis. We will discuss this modelling choice in more detail when we interpret the fitted regression model.
+
 
 ::: {.panel-tabset}
 ## **`R` Code**
 ```{r}
-# Convert binary categorical variables to factors
+# Convert categorical variables to factors
 data <- data |>
   mutate(
     Has_Job = factor(Has_Job, levels = c(0,1), labels = c("No", "Yes")),
@@ -730,85 +738,103 @@ data <- data |>
 
 ## **`Python` Code**
 ```{python}
-# Convert binary columns to categorical dtype
+# Convert categorical variables to categorical dtype
 cols_to_convert = ["Has_Job", "Drinks_Alcohol", "Financially_Dependent", "Cooks_at_Home", "Living_Situation", "Housing_Type"]
 data[cols_to_convert] = data[cols_to_convert].astype("category")
 ```
 :::
 
-#### Detecting and Handling Outliers
+#### 3. Examining Potential Outliers
 
-Outliers in continuous variables like `Monthly_Earnings` and `Net_Money` can distort the regression analysis by skewing results. We use the **Interquartile Range (IQR)** method to identify these extreme values. Specifically, any observation falling below 1.5 times the IQR below the first quartile (Q1) or above 1.5 times the IQR above the third quartile (Q3) is flagged as an outlier. These outliers are then treated as missing values and removed:
+Continuous variables such as `Monthly_Earnings` and `Net_Money` may contain observations that are unusually large or small compared with the rest of the data. Because unusual observations can have a substantial influence on an OLS regression model, they should be examined carefully rather than automatically removed.
+
+One common exploratory approach is the **Interquartile Range (IQR)** rule, which flags observations that fall below $Q_1 - 1.5 \times IQR$ or above $Q_3 + 1.5 \times IQR$ as potential outliers. Importantly, being flagged by this rule does not necessarily mean that an observation is incorrect or should be excluded from the analysis.
 
 ::: {.panel-tabset}
 ## **`R` Code**
+
 ```{r}
-# Using IQR method to filter out extreme values in continuous variables
-remove_outliers <- function(x) {
+# Function to identify potential outliers using the IQR rule
+identify_outliers <- function(x) {
   Q1 <- quantile(x, 0.25, na.rm = TRUE)
   Q3 <- quantile(x, 0.75, na.rm = TRUE)
-  IQR <- Q3 - Q1
-  x[x < (Q1 - 1.5 * IQR) | x > (Q3 + 1.5 * IQR)] <- NA
-  return(x)
+  IQR_value <- Q3 - Q1
+
+  x < (Q1 - 1.5 * IQR_value) | x > (Q3 + 1.5 * IQR_value)
 }
 
-data <- data |>
-  mutate(across(c(Monthly_Earnings, Net_Money), remove_outliers))
+# Count potential outliers in Monthly_Earnings
+sum(identify_outliers(data$Monthly_Earnings))
 
-# Remove rows with newly introduced NAs due to outlier handling
-data <- na.omit(data)
+# Count potential outliers in Net_Money
+sum(identify_outliers(data$Net_Money))
 ```
 
 ## **`Python` Code**
+
 ```{python}
-# Define the IQR outlier-removal function
-def remove_outliers(series):
+# Function to identify potential outliers using the IQR rule
+def identify_outliers(series):
     Q1 = series.quantile(0.25)
     Q3 = series.quantile(0.75)
     IQR = Q3 - Q1
-    return series.where((series >= Q1 - 1.5 * IQR) & (series <= Q3 + 1.5 * IQR))
 
-# Apply to specific continuous columns
-data["Monthly_Earnings"] = remove_outliers(data["Monthly_Earnings"])
-data["Net_Money"] = remove_outliers(data["Net_Money"])
+    return (series < Q1 - 1.5 * IQR) | (series > Q3 + 1.5 * IQR)
 
-# Drop rows with any newly introduced NAs (from outliers)
-data = data.dropna()
+# Count potential outliers in Monthly_Earnings
+identify_outliers(data["Monthly_Earnings"]).sum()
+
+# Count potential outliers in Net_Money
+identify_outliers(data["Net_Money"]).sum()
 ```
 :::
 
-#### Splitting the Data for Model Training
+#### 4. A Note on Data Splitting
 
-To ensure that our OLS model generalizes well to unseen data, we split the dataset into training and testing subsets. The training set is used to estimate the model parameters, and the testing set is used to evaluate the model’s performance. This split is typically done in an 80/20 ratio, as shown below:
+Whether a dataset should be divided into training and testing sets depends on the goal of the analysis and how the data will be used.
+
+In this case study, we are interested in both **inference** and **prediction**, so we will divide the data into separate training and testing sets.
+
+For the **inferential** analysis, the training data will be used for exploratory analysis, model development, and diagnostic checks. The testing data will then be used for the final inferential analysis, allowing us to examine the regression coefficients, standard errors, confidence intervals, and hypothesis tests on observations that were not used during the earlier stages of model development.
+
+For the **predictive** analysis, the OLS model will be fitted using the training data and then used to generate predictions for the testing data. The testing data will therefore provide an independent set of observations for evaluating how well the fitted model predicts `Net_Money`.
+
+Using separate training and testing sets helps us keep the model-development stage distinct from the final inferential and predictive evaluations.
 
 ::: {.panel-tabset}
 ## **`R` Code**
 ```{r}
-# Splitting the dataset by row order: first 80% for training, last 20% for testing
-n <- nrow(data)
-split_index <- floor(0.8 * n)
-train_data <- data[1:split_index, ]
-test_data <- data[(split_index + 1):n, ]
+library(rsample)
+
+# Seed for reproducibility
+set.seed(123)
+
+# Randomly split the data into 80% training and 20% testing
+data_splitting <- initial_split(data, prop = 0.8)
+
+# Create training and testing datasets
+train_data <- training(data_splitting)
+test_data <- testing(data_splitting)
 ```
+
 
 ## **`Python` Code**
 ```{python}
-# Splitting the dataset by row order: first 80% for training, last 20% for testing
-n = len(data)
-split_index = int(0.8 * n)
-train_data = data.iloc[:split_index]
-test_data = data.iloc[split_index:]
+# Import the R-generated training and testing datasets
+train_data = r.train_data
+test_data = r.test_data
 ```
 :::
 
-Although random sampling is generally preferred, since it helps ensure the training and testing sets are representative of the overall dataset, we deliberately split the data by row index here to produce consistent results across `R` and `Python`. This allows for reproducible comparisons between implementations in both languages.
+The data are randomly divided into training and testing sets using a fixed seed for reproducibility. To ensure that the `R` and `Python` analyses use exactly the same observations, the split is generated in `R` and the resulting training and testing datasets are imported into the `Python` environment. This follows the workflow introduced in Chapter 1.
 
-By following these steps, checking for missing values, encoding categorical variables, handling outliers, and splitting the data, we ensure that our dataset is clean, well-organized, and ready for regression analysis using OLS.
+At this stage, we have checked for missing values, encoded the categorical variables, examined potential outliers, and created the training and testing datasets. The data are now ready for exploratory analysis and subsequent OLS modelling.
 
-It is important to note, however, that these are just a few of the many techniques available during the data wrangling stage. Depending on the dataset and the specific goals of your analysis, you might also consider additional strategies such as feature scaling, normalization, advanced feature engineering, handling duplicate records, or addressing imbalanced data. Each of these techniques comes with its own set of solutions, and the optimal approach will depend on the unique challenges and objectives of your case.
+These steps represent some of the most common data-wrangling tasks, but the exact preparation required will depend on the dataset and the goals of the analysis. Other datasets may require additional steps, such as addressing duplicate observations, transforming variables, or reconsidering how particular variables should be represented in the model.
 
 
 ## Exploratory Data Analysis (EDA)
+
 
 Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. This stage, known as Exploratory Data Analysis (EDA), helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions.
 
