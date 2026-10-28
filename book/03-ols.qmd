@@ -814,7 +814,7 @@ data_splitting <- initial_split(data, prop = 0.8)
 
 # Create training and testing datasets
 train_data <- training(data_splitting)
-test_data <- testing(data_splitting)
+test_data  <- testing(data_splitting)
 ```
 
 
@@ -835,36 +835,48 @@ These steps represent some of the most common data-wrangling tasks, but the exac
 
 ## Exploratory Data Analysis (EDA)
 
+Before fitting the regression model, it is important to have a good understanding of the variables in the dataset and the relationships among them. This stage, known as **Exploratory Data Analysis (EDA)**, allows us to summarize and visualize the data. This step is important since it allows us to identify important patterns, examine unusual observations, and notice potential issues that may affect our modelling decisions.
 
-Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. This stage, known as Exploratory Data Analysis (EDA), helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions.
+EDA can also provide an initial intuition of whether some modelling assumptions may be reasonable although the main OLS assumptions will be assessed more formally after the model has been fitted. We will review them later in this chapter.
 
 ### Classifying Variables
 
-The first step in EDA is to classify variables according to their types. This classification guides the selection of appropriate visualization techniques and modelling strategies. In our toy dataset, we categorize variables as follows:
+An important part of EDA is identifying the type and role of each variable. This helps determine which summaries and visualizations are appropriate and how the variables should be represented in the regression model.
 
-- `Net_Money` serves as the response variable, representing a continuous outcome constrained by realistic income and expenses.
+In our toy dataset:
 
-The regressors include a mix of binary, categorical, ordinal, and continuous variables.
+- `Net_Money` is the **continuous response variable**.
 
-- Binary variables, such as `Has_Job` and `Drinks_Alcohol`, take on only two values and need to be encoded for modelling.
-- Categorical variables, like `Living_Situation` and `Housing_Type`, represent qualitative distinctions between different student groups.
-- Some predictors, like `Year_of_Study` and `Goes_Out_Spends_Money`, follow an ordinal structure, meaning they have a meaningful ranking but no consistent numerical spacing.
-- Finally, `Monthly_Allowance` and `Monthly_Earnings` are continuous variables, requiring attention to their distributions and potential outliers.
+The regressors include a mixture of binary, categorical, ordinal, and continuous variables:
 
-By classifying variables correctly at the outset, we ensure that they are analyzed and interpreted appropriately throughout the modelling process.
+- **Binary regressors**, such as `Has_Job` and `Drinks_Alcohol`, contain two categories.
+
+- **Categorical regressors**, such as `Living_Situation` and `Housing_Type`, represent different groups without a natural numerical ordering.
+
+- **Ordinal regressors**, such as `Year_of_Study` and `Goes_Out_Spends_Money`, have categories with a meaningful ordering. As discussed earlier, we retain their numerical representation in this analysis.
+
+- **Continuous regressors**, such as `Monthly_Allowance` and `Monthly_Earnings`, can take a range of numerical values and are useful to examine through summaries and graphical displays.
+
+Understanding the type of each variable helps us choose appropriate exploratory tools and interpret the variables correctly when we fit the OLS model.
 
 ### Visualizing Variable Distributions
 
-Once variables are classified, the next step is to explore their distributions. Understanding how variables are distributed is crucial for identifying potential issues such as skewness, outliers, or missing values. We employ different visualizations depending on the variable type:
+Once the variables have been classified, the next step is to examine their distributions. Exploring individual variables helps us understand characteristics such as their range, center, spread, shape, and the presence of any unusual observations. Different graphical and numerical summaries are useful depending on the type of variable.
 
-#### Continuous Variables
 
-We begin by examining continuous variables, which are best visualized using histograms and boxplots.
+#### Response Variable: `Net_Money`
 
-##### Histograms
+We begin by examining the distribution of the response variable, `Net_Money`. Because `Net_Money` is continuous, graphical summaries such as histograms and boxplots are useful for understanding its overall shape, centre, spread, and the presence of potentially unusual observations.
 
-Histograms display the frequency distribution of a continuous variable. They allow us to assess the overall shape, central tendency, and spread of the data. For example, the histogram of `Net_Money` helps us determine if the variable follows a roughly normal distribution or if it is skewed. A normal distribution often appears bell-shaped, while skewness can indicate that the data might benefit from transformations (like logarithmic transformations) to meet the assumptions of regression analysis. In our case, the histogram below shows that `Net_Money` appears roughly normal.
+We examine the distribution of `Net_Money` using the training data, since the exploratory analysis is part of the model-development stage.
 
+##### Histogram
+
+A histogram provides a visual summary of the distribution of a continuous variable by grouping observations into intervals and displaying the number of observations that belongs to each interval. It can help us examine the overall shape, center, and spread of the response variable.
+
+The histogram below shows the distribution of `Net_Money` in the training data. The distribution appears reasonably symmetric, with most observations concentrated near the center and fewer observations toward the extremes. 
+
+At this stage, we are simply describing the distribution of the response variable. The Normality assumption for OLS concerns the model errors rather than the marginal distribution of `Net_Money`, and we will assess this assumption later using model diagnostics.
 
 ::: {.panel-tabset}
 
@@ -1019,9 +1031,13 @@ plt.show()
 :::
 
 
-##### Boxplots
+##### Boxplot
 
-Boxplots provide a concise summary of a variable’s distribution by displaying its quartiles and highlighting potential outliers. Outliers are typically defined as data points that fall below $Q1 - 1.5 * IQR$ or above $Q3 + 1.5 * IQR$, where $Q1$ and $Q3$ are the first and third quartiles (the 25th and 75th percentiles of data), and $IQR = Q3 - Q1$ is the interquartile range. The boxplot below visualizes`Net_Money` and helps us quickly assess if there are any extreme values that might skew the analysis. In this case, the boxplot suggests that there are no significant outliers according to the IQR method (the method commonly used by ggplot to identify outliers).
+A boxplot provides a compact summary of a continuous variable by displaying its median, quartiles, and overall spread. It can also help identify potentially unusual observations.
+
+As discussed during data wrangling, observations below $Q_1 - 1.5 \times IQR$ or above $Q_3 + 1.5 \times IQR$ are commonly flagged as potential outliers, where $IQR = Q_3 - Q_1$. These observations are not necessarily errors and should not automatically be removed.
+
+The boxplot below provides another view of the distribution of `Net_Money` in the training data. In this case, the plot does not indicate any observations beyond the usual $1.5 \times IQR$ thresholds.
 
 
 ::: {.panel-tabset}
@@ -1131,13 +1147,14 @@ plt.show()
 
 :::
 
-By visualizing the distribution of `Net_Money` with these plots, we gain valuable insights into its behavior. This understanding not only informs whether transformations are needed but also prepares us for deeper analysis as we move forward with regression modelling.
+By examining the histogram and boxplot together, we obtain an initial understanding of the distribution, spread, and potential unusual values of `Net_Money`. These exploratory summaries describe the response variable before we begin examining the distributions of the regressors and their relationships with `Net_Money`.
 
-#### Categorical and Ordinal Variables
 
-Categorical variables require a different approach from continuous ones because they represent distinct groups rather than numerical values. For these variables, bar charts are very effective. They display the frequency of each category, helping us understand the distribution of qualitative attributes.
+#### Categorical and Ordinal Regressors
 
-For example, consider the variable `Living_Situation`. The bar chart below shows how many students fall into each category. From the chart, we can see that category 1 is more heavily represented, while categories 2 and 3 have roughly similar counts. This insight can be critical—if a category is underrepresented, you might need to consider grouping it with similar categories or applying techniques such as one-hot encoding to ensure that each category contributes appropriately to the model.
+Categorical and ordinal regressors are examined differently from continuous variables because their values represent distinct groups or ordered levels rather than measurements on a continuous scale. Bar charts are useful for displaying the number of observations in each category and for identifying categories that are much more or less common than others.
+
+As an example, we examine the distribution of `Living_Situation`, a categorical regressor with three levels: `Family`, `Shared`, and `Alone`. The bar chart below shows the number of students in each category in the training data.
 
 
 ::: {.panel-tabset}
@@ -1231,16 +1248,199 @@ plt.show()
 
 :::
 
+Ordinal regressors, such as `Year_of_Study` and `Goes_Out_Spends_Money` also have distinct levels, but these levels have a meaningful ordering. Bar charts can be used to examine how observations are distributed across these ordered values. As discussed earlier, we retain these variables in numerical form for the current analysis which assumes that a one-unit increase has a consistent interpretation in the regression model.
 
-For ordinal variables (which have a natural order but not a fixed numerical interval), you might still use bar charts to show the ranking or frequency of each level. Additionally, understanding these distributions can help you decide whether to treat them as categorical variables or convert them into numeric scores for analysis.
 
-#### Exploring Relationships Between Variables
+#### Numerical Regressors
 
-Beyond examining individual variables, it is crucial to explore how they interact with one another, especially the regressors and the response variable. Understanding these relationships helps identify which regressors might be influential in the model and whether any issues, like multicollinearity, could affect regression estimates.
+For numerical regressors, descriptive statistics provide a useful complement to graphical exploration. Measures such as the mean, median, minimum, maximum, and quartiles help summarize the centre, spread, and range of the observed values.
 
-##### Correlation Matrices
+For example, comparing the mean and median of Monthly_Earnings can provide an initial indication of whether its distribution is symmetric or skewed. Large differences between these summaries may motivate a closer examination of the variable's distribution and potentially unusual observations.
 
-For continuous variables, correlation matrices provide a numerical summary of how strongly pairs of variables are related. High correlations between predictors might signal multicollinearity, which can distort model estimates. For demonstration, consider the correlation matrix computed for `Net_Money`, `Monthly_Allowance`, and `Monthly_Earnings`:
+::: {.panel-tabset}
+## **`R` Code**
+```{r}
+# Summary statistics for numerical variables
+summary(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")])
+```
+
+## **`Python` Code**
+```{python}
+# Summary statistics for numerical variables
+print(
+train_data[["Net_Money", "Monthly_Allowance", "Monthly_Earnings"]].describe()
+)
+```
+:::
+
+
+### Visualizing Regressor Relationships with the Response
+
+After examining the distributions of individual variables, we next explore how the regressors are related to the response variable, `Net_Money`. These exploratory relationships can help us identify patterns that may be useful when specifying the regression model, such as possible linear trends or differences in the response across groups.
+
+These relationships are examined using the training data. At this stage, the results are descriptive and should not be interpreted as adjusted regression effects, since each visualization considers only a small number of variables at a time.
+
+
+#### Continuous Regressors vs. Response
+
+For continuous regressors, we can examine their relationships with `Net_Money` using graphical and numerical summaries. Scatterplots allow us to visualize the form and direction of these relationships, while correlations provide a numerical summary of the strength and direction of linear association.
+
+##### Scatterplots
+
+Scatterplots are useful for examining the relationship between two continuous variables. For example, plotting `Monthly_Allowance` against `Net_Money` allows us to examine whether students with higher monthly allowances tend to have higher or lower values of `Net_Money`.
+
+In the scatterplot below, we observe a slight positive relationship between `Monthly_Allowance` and `Net_Money`, although there is considerable variability around the fitted line. This suggests that `Monthly_Allowance` alone does not explain all of the variation in `Net_Money`.
+
+Scatterplots can also help identify possible nonlinear patterns or unusual observations that may warrant further investigation. However, this is a bivariate relationship and does not account for the other regressors that will be included in the multiple regression model.
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+scatterplot_allowance_vs_net_money <- ggplot(
+  train_data,
+  aes(x = as.numeric(Monthly_Allowance), y = as.numeric(Net_Money))
+) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    x = "\n Monthly Allowance (CAD)",
+    y = "Net Money (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    xlim = c(0, 1100),
+    ylim = c(-1800, 2000)
+  ) +
+  scale_y_continuous(
+    labels = label_dollar(),
+    breaks = seq(-1500, 2000, by = 500)
+  ) +
+  scale_x_continuous(
+    labels = label_dollar(),
+    breaks = seq(0, 2000, by = 500)
+  )
+
+scatterplot_allowance_vs_net_money
+```
+
+## **`Python` Code**
+
+``` {.python}
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Scatter plot with regression line
+plt.figure(figsize=(6, 4))
+sns.regplot(
+    data=train_data,
+    x="Monthly_Allowance",
+    y="Net_Money",
+    scatter_kws={"color": "blue", "s": 10},  # s = point size
+    line_kws={"color": "red", "linewidth": 2}
+)
+plt.title("")
+plt.xlabel("Monthly Allowance")
+plt.ylabel("Net Money")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+  
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: fig-scatter-plot-allowance-net-money-r
+#| fig-cap: "Scatter plot of monthly allowance versus net money via training set (solid red line indicates a simple linear regression fitting)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+scatterplot_allowance_vs_net_money <- ggplot(
+  train_data,
+  aes(x = as.numeric(Monthly_Allowance), y = as.numeric(Net_Money))
+) +
+  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    x = "\n Monthly Allowance (CAD)",
+    y = "Net Money (CAD)\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5),
+    strip.text = element_text(size = 20)
+  ) +
+  coord_cartesian(
+    xlim = c(0, 1100),
+    ylim = c(-1800, 2000)
+  ) +
+  scale_y_continuous(
+    labels = label_dollar(),
+    breaks = seq(-1500, 2000, by = 500)
+  ) +
+  scale_x_continuous(
+    labels = label_dollar(),
+    breaks = seq(0, 2000, by = 500)
+  )
+
+scatterplot_allowance_vs_net_money
+```
+
+## **`Python` Output**
+
+```{python}
+#| label: fig-scatter-plot-allowance-net-money-python
+#| fig-cap: "Scatter plot of monthly allowance versus net money via training set (solid red line indicates a simple linear regression fitting)."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Scatter plot with regression line
+plt.figure(figsize=(6, 4))
+sns.regplot(
+    data=train_data,
+    x="Monthly_Allowance",
+    y="Net_Money",
+    scatter_kws={"color": "#0073C2FF", "s": 2},  # s = point size
+    line_kws={"color": "red", "linewidth": 2}
+)
+plt.title("")
+plt.xlabel("Monthly Allowance")
+plt.ylabel("Net Money")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+
+##### Correlation Matrix
+
+For continuous variables, a correlation matrix provides a numerical summary of the strength and direction of the linear relationship between pairs of variables. Correlations between the response and continuous regressors can help describe their bivariate relationships, while high correlations among regressors may indicate potential multicollinearity.
+
+For illustration, we examine the correlations among `Net_Money`, `Monthly_Allowance`, and `Monthly_Earnings`.
 
 
 ::: {.panel-tabset}
@@ -1423,160 +1623,15 @@ plt.show()
 ```
 :::
   
-In the output, we observe a strong positive correlation (corr = 0.757) between `Monthly_Earnings` and `Net_Money`. This result is intuitive. Higher earnings typically lead to more money left at the end of the month, resulting in a higher `Net_Money`.
-
-#### Scatterplots
-
-Scatter plots visually depict the relationship between two continuous variables. For example, plotting `Monthly_Allowance` against `Net_Money` helps us assess whether students with higher allowances tend to have higher or lower net savings. In the scatter plot below, a slightly positive trend is visible. However, the points are quite scattered, indicating that while there may be a relationship, it is not overwhelmingly strong. Such visual insights might prompt further investigation, perhaps considering polynomial transformations or interaction terms if nonlinearity is suspected.
-
-
-
-::: {.panel-tabset}
-
-## **`R` Code**
-
-``` {.r}
-scatterplot_allowance_vs_net_money <- ggplot(
-  train_data,
-  aes(x = as.numeric(Monthly_Allowance), y = as.numeric(Net_Money))
-) +
-  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
-  geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(
-    x = "\n Monthly Allowance (CAD)",
-    y = "Net Money (CAD)\n"
-  ) +
-  theme_bw() +
-  theme(
-    axis.text = element_text(size = 15.5),
-    axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 20, vjust = 0.5),
-    strip.text = element_text(size = 20)
-  ) +
-  coord_cartesian(
-    xlim = c(0, 1100),
-    ylim = c(-1800, 2000)
-  ) +
-  scale_y_continuous(
-    labels = label_dollar(),
-    breaks = seq(-1500, 2000, by = 500)
-  ) +
-  scale_x_continuous(
-    labels = label_dollar(),
-    breaks = seq(0, 2000, by = 500)
-  )
-
-scatterplot_allowance_vs_net_money
-```
-
-## **`Python` Code**
-
-``` {.python}
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Scatter plot with regression line
-plt.figure(figsize=(6, 4))
-sns.regplot(
-    data=train_data,
-    x="Monthly_Allowance",
-    y="Net_Money",
-    scatter_kws={"color": "blue", "s": 10},  # s = point size
-    line_kws={"color": "red", "linewidth": 2}
-)
-plt.title("")
-plt.xlabel("Monthly Allowance")
-plt.ylabel("Net Money")
-plt.tight_layout()
-plt.show()
-```
-
-:::
-
   
-::: {.panel-tabset}
-
-## **`R` Output**
-
-```{r}
-#| label: fig-scatter-plot-allowance-net-money-r
-#| fig-cap: "Scatter plot of monthly allowance versus net money via training set (solid red line indicates a simple linear regression fitting)."
-#| warning: false
-#| echo: false
-#| message: false
-#| fig.height: 8
-#| fig.width: 14
-
-scatterplot_allowance_vs_net_money <- ggplot(
-  train_data,
-  aes(x = as.numeric(Monthly_Allowance), y = as.numeric(Net_Money))
-) +
-  geom_point(alpha = 0.55, color = "#0073C2FF", size = 2) +
-  geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(
-    x = "\n Monthly Allowance (CAD)",
-    y = "Net Money (CAD)\n"
-  ) +
-  theme_bw() +
-  theme(
-    axis.text = element_text(size = 15.5),
-    axis.title.x = element_text(size = 20),
-    axis.title.y = element_text(size = 20, vjust = 0.5),
-    strip.text = element_text(size = 20)
-  ) +
-  coord_cartesian(
-    xlim = c(0, 1100),
-    ylim = c(-1800, 2000)
-  ) +
-  scale_y_continuous(
-    labels = label_dollar(),
-    breaks = seq(-1500, 2000, by = 500)
-  ) +
-  scale_x_continuous(
-    labels = label_dollar(),
-    breaks = seq(0, 2000, by = 500)
-  )
-
-scatterplot_allowance_vs_net_money
-```
-
-## **`Python` Output**
-
-```{python}
-#| label: fig-scatter-plot-allowance-net-money-python
-#| fig-cap: "Scatter plot of monthly allowance versus net money via training set (solid red line indicates a simple linear regression fitting)."
-#| warning: false
-#| echo: false
-#| message: false
-#| fig.height: 8
-#| fig.width: 14
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Scatter plot with regression line
-plt.figure(figsize=(6, 4))
-sns.regplot(
-    data=train_data,
-    x="Monthly_Allowance",
-    y="Net_Money",
-    scatter_kws={"color": "#0073C2FF", "s": 2},  # s = point size
-    line_kws={"color": "red", "linewidth": 2}
-)
-plt.title("")
-plt.xlabel("Monthly Allowance")
-plt.ylabel("Net Money")
-plt.tight_layout()
-plt.show()
-```
-
-:::
+The correlation matrix shows a strong positive correlation ($r = 0.76$) between `Monthly_Earnings` and `Net_Money` in the training data. This indicates that students with higher monthly earnings tend to have higher values of `Net_Money`. However, this is a bivariate association and does not account for the other regressors included in the model.
   
 
-##### Boxplots for Categorical Variables
+##### Side-by-Side Boxplots
 
-For categorical predictors, boxplots are an excellent tool to compare the distribution of the response variable across different groups. For instance, examining how Net_Money varies by `Living_Situation` can reveal whether students in different living arrangements experience different financial outcomes. In the boxplot below, the distributions of `Net_Money` across categories of `Living_Situation` appear quite similar. This similarity may suggest that `Living_Situation` has little impact on Net_Money in our dataset.
+For categorical regressors, side-by-side boxplots are useful for comparing the distribution of the response variable across groups. For example, examining `Net_Money` across the levels of `Living_Situation` allows us to compare the centre, spread, and overall distribution of the response among students with different living arrangements.
 
+In the boxplot below, the distributions of `Net_Money` across the `Living_Situation` categories appear fairly similar. This suggests that the bivariate association between `Living_Situation` and `Net_Money` may be relatively weak. However, this comparison does not account for the other regressors that will be included in the multiple regression model.
 
 
 ::: {.panel-tabset}
@@ -1717,33 +1772,16 @@ plt.show()
 
 :::
   
-#### Summary Statistics
-
-In addition to visual exploration, descriptive statistics provide a numerical summary of the dataset that is especially useful for beginners. Summary statistics give you a snapshot of the central tendency and spread of your data, helping you quickly grasp its overall characteristics.
-
-For instance, if you notice that the mean of `Monthly_Earning` is significantly higher than its median, it might suggest that a few high values (or outliers) are skewing the data. 
-
-::: {.panel-tabset}
-## **`R` Code**
-```{r}
-# Summary statistics for numerical variables
-summary(train_data[, c("Net_Money", "Monthly_Allowance", "Monthly_Earnings")])
-```
-
-## **`Python` Code**
-```{python}
-# Summary statistics for numerical variables
-print(
-train_data[["Net_Money", "Monthly_Allowance", "Monthly_Earnings"]].describe()
-)
-```
-:::
 
 ### Key Takeaways from EDA
 
-Conducting Exploratory Data Analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For instance, a strong correlation between two variables, like `Monthly_Earnings` and `Net_Money`, signals that earnings are likely a key driver of net savings. At the same time, observing differences in distributions or spotting similar patterns across groups in boxplots can inform us about the impact of categorical factors like `Living_Situation`.
+The exploratory analysis provides an initial picture of the patterns in the training data before we fit the multiple regression model. The distribution of `Net_Money` is reasonably centred around zero, although the boxplot identifies a high observation that may warrant further investigation during model diagnostics.
 
-It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modelling strategy. With this foundation, we are better prepared to build a robust Ordinary Least Squares (OLS) regression model on data that has been carefully examined and understood.
+The exploratory relationships also differ across regressors. `Monthly_Earnings` has a strong positive bivariate association with `Net_Money`, while `Monthly_Allowance` shows a weaker but still positive relationship. In contrast, `Monthly_Allowance` and `Monthly_Earnings` are essentially uncorrelated in the training data. For `Living_Situation`, the distributions of `Net_Money` overlap considerably across groups, although some differences in their centres are visible.
+
+These patterns are descriptive and should not be interpreted as adjusted regression effects. Each exploratory comparison considers only a small number of variables at a time and does not account for the other regressors. In the next stage, we therefore fit a multiple linear regression model that includes the selected financial, demographic, and behavioural regressors simultaneously. This allows us to examine the association between each regressor and `Net_Money` while holding the other regressors fixed.
+
+The EDA results alone are not used to remove regressors or make formal inferential conclusions. After fitting the OLS model, we will examine regression diagnostics to assess the model assumptions and investigate whether unusual or influential observations require further attention.
 
 
 ## Data Modeling
