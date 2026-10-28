@@ -3828,37 +3828,49 @@ A detailed treatment of robust regression is beyond the scope of this book but r
 
 ## Results
 
-After assessing the goodness of fit and checking the main OLS assumptions, we now evaluate the fitted model from two perspectives: **inference** and **prediction.** First, we examine the estimated regression coefficients, standard errors, and hypothesis tests to identify which student characteristics are meaningfully associated with `Net_Money`. This inferential analysis helps us interpret the direction, magnitude, and uncertainty of the associations between the regressors and student financial balance. Second, we use the trained model to generate predictions for the test data and examine how well the model performs on observations that were not used during training. 
+After assessing the goodness of fit and checking the main OLS assumptions, we now evaluate the model from two perspectives: **inference** and **prediction**. For the inferential analysis, we apply the model structure developed and assessed using the training data to the protected test data and examine the estimated regression coefficients, standard errors, confidence intervals, and hypothesis tests. This allows us to identify which student characteristics show statistical evidence of association with `Net_Money` and to assess the direction, magnitude, and uncertainty of those associations.
 
-Together, these inferential and predictive results help us understand two things: which variables are associated with differences in `Net_Money` and how well the model predicts student financial balance.
+For the predictive analysis, we retain the model fitted on the training data and use it to generate predictions for observations in the test data. We then evaluate how accurately the model predicts `Net_Money` for observations that were not used to fit the model.
+
+Together, these inferential and predictive results help us answer two complementary questions: which student characteristics are associated with differences in `Net_Money`, and how well does the fitted model predict student financial balance for new observations?
 
 
 ### Inferential Analysis
 
-To address our inferential question, we fit the OLS model on the **test data** and examine the estimated regression coefficients. The goal is to identify which student characteristics are associated with `Net_Money`, while holding the other regressors fixed. For each coefficient, we consider the estimated effect size, standard error, test statistic, p-value, and confidence interval.
+To address our inferential question, we fit the pre-specified OLS model to the **test data**, which contains 200 observations. We then examine the estimated regression coefficients, standard errors, confidence intervals, and hypothesis tests to determine which student characteristics show statistical evidence of association with `Net_Money`, while holding the other regressors fixed.
 
-For each regressor, we test whether its population regression coefficient is equal to zero after accounting for the other regressors in the model. For the $j$th coefficient, the hypothesis test is
+For each regression coefficient, we test whether there is evidence that the corresponding regressor is associated with the conditional mean of `Net_Money`, after accounting for the other regressors in the model. For the $j$th regression coefficient, we test
 
 $$
-\begin{gather*}
-H_0\text{: } \beta_j = 0; \\
-H_1\text{: } \beta_j \neq 0.
-\end{gather*}
+H_0: \beta_j = 0,
 $$
 
+against
 
-The null hypothesis states that the $j$-th regressor is not associated with the response variable after holding the other regressors fixed. The alternative hypothesis states that the $j$-th regressor is associated with the response variable after holding the other regressors fixed.
+$$
+H_1: \beta_j \neq 0.
+$$
 
-The test statistic for this coefficient-level test is
+Under $H_0$, the $j$th regressor does not contribute a linear association with the conditional mean of `Net_Money` after holding the other regressors fixed. Under $H_1$, there is evidence of an association.
+
+The test statistic for the $j$th regression coefficient is
 
 $$
 t_j =
-\frac{\hat{\beta}_j - 0}{SE(\hat{\beta}_j)},
+\frac{\hat{\beta}_j}{SE(\hat{\beta}_j)},
 $${#eq-beta-t-statistic}
 
-where $\hat{\beta}_j$ is the estimated regression coefficient and $SE(\hat{\beta}_j)$ is its standard error. Under the null hypothesis, this statistic follows a $t$-distribution with $n - (k + 1) = n - k - 1$ degrees of freedom, where $n$ is the sample size and $k$ is the number of regressors in the model.
+where $\hat{\beta}_j$ is the estimated regression coefficient and $SE(\hat{\beta}_j)$ is its estimated standard error.
 
-We can compute the p-value using the statistic in @eq-beta-t-statistic. Note that a small p-value provides evidence against the null hypothesis. In this chapter, we use a significance level of $\alpha = 0.05$. Therefore, if the p-value is less than 0.05, we reject $H_0$ and conclude that there is statistical evidence that the regressor is associated with `Net_Money`, holding the other regressors fixed.
+Under the null hypothesis $H_0: \beta_j = 0$, this statistic follows a $t$-distribution with $n-k-1$ degrees of freedom, where $n$ is the sample size and $k$ is the number of regressors in the model excluding the intercept.
+
+The p-value measures the strength of the evidence against the null hypothesis. A small p-value indicates that the observed test statistic would be unlikely if $H_0$ were true. In this chapter, we use a significance level of
+
+$$
+\alpha = 0.05.
+$$
+
+If the p-value is less than 0.05, we reject $H_0$ and conclude that there is statistical evidence that the corresponding regressor is associated with the conditional mean of `Net_Money`, holding the other regressors fixed. If the p-value is greater than or equal to 0.05, we fail to reject $H_0$.
 
 
 ::: {.panel-tabset}
@@ -3925,7 +3937,9 @@ print(testing_OLS_tidy.to_string(index=False))
 
 :::
 
-To help organize the coefficient-level results, @tbl-net-money-inferential-results summarizes the inferential evidence for each model term. For each term, the table reports the estimated coefficient, its standard error, the corresponding (t)-statistic, the associated (p)-value, the 95% confidence interval, and the resulting decision at the significance level (\alpha = 0.05).
+
+To help organize the coefficient-level results, @tbl-net-money-inferential-results summarizes the inferential evidence for each model term. For each term, the table reports the estimated coefficient, its standard error, the corresponding $t$-statistic, the associated $p$-value, the 95% confidence interval, and the decision based on a significance level of $\alpha = 0.05$.
+
 
 ```{r}
 #| label: tbl-net-money-inferential-results
@@ -3934,7 +3948,7 @@ To help organize the coefficient-level results, @tbl-net-money-inferential-resul
 #| message: false
 #| warning: false
 
-net_money_inferential_results <- tidy(testing_OLS_model, conf.int = TRUE) |>
+net_money_inferential_results <- tidy(testing_OLS_model, conf.int = TRUE, conf.level = 0.95) |>
   transmute(
     Term = case_when(
       term == "(Intercept)" ~ "Intercept",
@@ -3976,15 +3990,22 @@ knitr::kable(net_money_inferential_results, align = "c")
 ```
 
 
-The coefficient-level tests in @tbl-net-money-inferential-results identify which regressors show statistical evidence of association with `Net_Money`. To support the next step of interpretation, @tbl-net-money-significant-coefs-ci reports the estimated coefficients and 95% confidence intervals for the statistically significant regressors only. These intervals help quantify a plausible range of values for each association under the fitted model.
+The coefficient-level tests in @tbl-net-money-inferential-results identify which regressors show statistical evidence of association with `Net_Money`. To support the next step of interpretation, @tbl-net-money-significant-coefs-ci reports the estimated coefficients and 95% confidence intervals for the statistically significant regressors only. These intervals provide a range of plausible values for the corresponding population regression coefficients under the fitted model.
 
 For the $j$th regression coefficient, a 95% confidence interval is computed as
 
 $$
-\hat{\beta}_j \pm t_{\alpha/2, \, n - k - 1} \times SE(\hat{\beta}_j),
+\hat{\beta}_j
+\pm
+t_{0.975,\,n-k-1}
+\, SE(\hat{\beta}_j),
 $${#eq-beta-confidence-interval}
 
-For numeric regressors, the coefficient represents the estimated change in `Net_Money` associated with a one-unit increase in the regressor, holding the other variables fixed. For categorical regressors, the coefficient represents the estimated difference in `Net_Money` relative to the baseline category. In both cases, confidence intervals that do not include zero are consistent with statistical significance at the level (\alpha = 0.05).
+where $\hat{\beta}_j$ is the estimated regression coefficient, $SE(\hat{\beta}_j)$ is its estimated standard error, and $t_{0.975,\,n-k-1}$ is the 97.5th percentile of a $t$-distribution with $n-k-1$ degrees of freedom.
+
+For numeric regressors, the estimated coefficient represents the estimated change in the conditional mean of `Net_Money` associated with a one-unit increase in the regressor, holding the other regressors fixed. For categorical regressors, the estimated coefficient represents the estimated difference in the conditional mean of `Net_Money` relative to the reference category, holding the other regressors fixed.
+
+At a significance level of $\alpha = 0.05$, a 95% confidence interval that does not include zero corresponds to rejecting $H_0: \beta_j = 0$ in the two-sided coefficient test.
 
 ```{r}
 #| label: tbl-net-money-significant-coefs-ci
@@ -4026,54 +4047,59 @@ knitr::kable(net_money_significant_ci_results, align = "c")
 
 #### Insights from Regression Coefficients
 
-The results suggest that several regressors are meaningfully associated with `Net_Money`. To make the coefficient interpretations easier to compare, @tbl-net-money-coefficient-interpretations summarizes the estimated associations, confidence intervals, and plain-language interpretations for each regressor.
+The coefficient estimates describe the direction and magnitude of the associations between the regressors and the conditional mean of `Net_Money`, while holding the other regressors fixed. @tbl-net-money-coefficient-interpretations summarizes the estimated coefficients and their interpretations in the context of the student financial data.
 
-| **Regressor** | **Estimate** | **95% CI** | **Interpretation** |
-|--------------|-------------:|------------|--------------------|
-| `Year_of_Study` | -89.4 | (-113.0, -65.5) | Holding the other variables fixed, moving up by one academic year is associated with an estimated decrease of about 89.4 CAD in predicted financial balance. |
-| `Financially_Dependent` | -511.4 | (-563.8, -458.9) | Financially dependent students are estimated to have about 511 CAD lower `Net_Money` than students who are not financially dependent, holding the other variables fixed. |
-| `Monthly_Allowance` | 1.44 | (1.28, 1.61) | Each additional dollar of monthly allowance is associated with an estimated increase of 1.44 CAD in predicted financial balance, holding the other variables fixed. |
-| `Monthly_Earnings` | 0.98 | (0.85, 1.11) | Each additional dollar of monthly earnings is associated with an estimated increase of 0.98 CAD in predicted financial balance, holding the other variables fixed. |
-| `Cooks_at_Home` | -119.6 | (-173.9, -65.4) | Students who cook at home are estimated to have about 120 CAD lower `Net_Money` than students who do not cook at home, holding the other variables fixed. |
-| `Goes_Out_Spends_Money` | -55.4 | (-68.4, -42.5) | A one-unit increase in this spending-related variable is associated with an estimated decrease of about 55.4 CAD in predicted financial balance. |
-| `Drinks_Alcohol` | -142.6 | (-196.9, -88.3) | Students who drink alcohol are estimated to have about 143 CAD lower `Net_Money` than students who do not drink alcohol, holding the other variables fixed. |
-| `Living_Situation`: Shared vs Family | 103.5 | (39.3, 167.7) | Compared with students living with family, students in shared housing are estimated to have about 103 CAD higher `Net_Money`, holding the other variables fixed. |
-| `Living_Situation`: Alone vs Family | 198.5 | (134.3, 262.6) | Compared with students living with family, students living alone are estimated to have about 198 CAD higher `Net_Money`, holding the other variables fixed. |
-| `Housing_Type`: Own vs Rent | -168.1 | (-228.9, -107.2) | Compared with students living in rented housing, students living in owned housing are estimated to have about 168 CAD lower `Net_Money`, holding the other variables fixed. |
-| `Housing_Type`: Dormitory vs Rent | 126.7 | (58.0, 195.5) | Compared with students living in rented housing, students living in dormitory housing are estimated to have about 127 CAD higher `Net_Money`, holding the other variables fixed. |
-| `Has_Job` | 93.7 | (-49.4, 236.9) | Students who have a job are estimated to have about 94 CAD higher `Net_Money` than students without a job, but the confidence interval includes zero and the p-value is 0.20. Therefore, there is not strong evidence of association after accounting for monthly earnings and the other regressors. |
+| **Regressor** | **Estimate** | **Interpretation** |
+|--------------|-------------:|--------------------|
+| `Has_Job`: Yes vs No | 142.00 | Holding the other regressors fixed, students who have a job are estimated to have about 142 CAD higher mean `Net_Money` than students who do not have a job. However, this coefficient is not statistically significant at $\alpha = 0.05$ ($p = 0.08$), so there is insufficient evidence of an association after accounting for the other regressors. |
+| `Year_of_Study` | -100.00 | Holding the other regressors fixed, a one-year increase in year of study is associated with an estimated decrease of about 100 CAD in mean `Net_Money`. |
+| `Financially_Dependent`: Yes vs No | -486.00 | Holding the other regressors fixed, financially dependent students are estimated to have about 486 CAD lower mean `Net_Money` than students who are not financially dependent. |
+| `Monthly_Allowance` | 1.51 | Holding the other regressors fixed, each additional dollar of monthly allowance is associated with an estimated increase of 1.51 CAD in mean `Net_Money`. |
+| `Cooks_at_Home`: Yes vs No | -90.60 | Holding the other regressors fixed, students who cook at home are estimated to have about 90.6 CAD lower mean `Net_Money` than students who do not cook at home. |
+| `Goes_Out_Spends_Money` | -36.40 | Holding the other regressors fixed, a one-unit increase on the spending-frequency scale is associated with an estimated decrease of about 36.4 CAD in mean `Net_Money`. |
+| `Drinks_Alcohol`: Yes vs No | -182.00 | Holding the other regressors fixed, students who drink alcohol are estimated to have about 182 CAD lower mean `Net_Money` than students who do not drink alcohol. |
+| `Monthly_Earnings` | 0.90 | Holding the other regressors fixed, each additional dollar of monthly earnings is associated with an estimated increase of 0.90 CAD in mean `Net_Money`. |
+| `Living_Situation`: Shared vs Family | 129.00 | Holding the other regressors fixed, students living in shared housing are estimated to have about 129 CAD higher mean `Net_Money` than students living with family. |
+| `Living_Situation`: Alone vs Family | 213.00 | Holding the other regressors fixed, students living alone are estimated to have about 213 CAD higher mean `Net_Money` than students living with family. |
+| `Housing_Type`: Own vs Rent | -129.00 | Holding the other regressors fixed, students living in owned housing are estimated to have about 129 CAD lower mean `Net_Money` than students living in rented housing. |
+| `Housing_Type`: Dormitory vs Rent | 151.00 | Holding the other regressors fixed, students living in dormitory housing are estimated to have about 151 CAD higher mean `Net_Money` than students living in rented housing. |
 
 : Coefficient interpretations for the OLS model fitted on the test data. {#tbl-net-money-coefficient-interpretations}
 
-Overall, the inferential results suggest that financial dependence, monthly allowance, monthly earnings, year of study, spending behavior, alcohol consumption, cooking at home, living situation, and housing type are associated with students’ financial balance. The only regressor that does not show strong evidence of association in this fitted model is `Has_Job`. These results should be interpreted as associations rather than causal effects, since the model is fitted to observational data.
+With the exception of `Has_Job`, all regressors in the fitted model show statistical evidence of association with the conditional mean of `Net_Money` at the 5% significance level. The estimated associations vary in both direction and magnitude, with financial resources such as monthly allowance and monthly earnings showing positive associations, while financial dependence and several spending-related characteristics show negative associations.
+
+One important reminder and note to keep in mind is that these results describe **associations rather than causal effects**. Because the data are observational, the estimated coefficients should not be interpreted as evidence that changing one of these characteristics would necessarily cause a corresponding change in `Net_Money`.
+
 
 ### Predictive Analysis
 
-After examining which regressors are associated with `Net_Money`, we now assess the predictive performance of the model. The goal of this part of the analysis is to evaluate how well the trained model predicts financial balance for observations in the test data. To do this, we compare the observed values of `Net_Money` with the predicted values produced by the model and summarize the prediction error using appropriate performance metrics.
+After completing the inferential analysis, we now evaluate how well the model predicts `Net_Money` for observations that were not used to fit the model. For this purpose, we use the OLS model fitted on the **training data** and apply it directly to the **test data** without refitting the model. This provides an out-of-sample assessment of predictive performance.
 
-In R, we use the `predict()` function to apply the trained OLS model to the test set. In Python, we use the `predict()` method from the `statsmodels` library in Python after ensuring the test data is properly formatted.
+In `R` and `Python`, we use the fitted training model to generate predictions for the test data. Because the model was fitted using a formula interface, the same model specification is applied directly to the test observations without refitting the regression coefficients.
+
 
 ::: {.panel-tabset}
 ## **`R` Code**
 ```{r}
-# Generate predictions on the test set
-y_pred <- predict(ols_model, newdata=test_data)
+#| lst-label: lst-ols-predictions-test-r
+#| lst-cap: "Code to generate OLS predictions for the test data using the model fitted on the training data."
+#| message: false
+
+# Generate predictions on the test data using the model fitted on the training data
+y_pred <- predict(
+  ols_model,
+  newdata = test_data
+)
 ```
 
 ## **`Python` Code**
 ```{python}
-import statsmodels.api as sm
+#| lst-label: lst-ols-predictions-test-py
+#| lst-cap: "Code to generate OLS predictions for the test data using the model fitted on the training data."
+#| message: false
 
-# Prepare the test data: add constant term to match training
-X_test = test_data[[
-    "Has_Job", "Financially_Dependent", "Year_of_Study",
-    "Goes_Out_Spends_Money", "Drinks_Alcohol", "Monthly_Allowance",
-    "Monthly_Earnings", "Living_Situation", "Housing_Type", "Cooks_at_Home"
-]]
-X_test = sm.add_constant(X_test)  # Add intercept term
-
-# Generate predictions
-y_pred = ols_model.predict(X_test)
+# Generate predictions on the test data using the model fitted on the training data
+y_pred = ols_model.predict(test_data)
 ```
 :::
 
@@ -4081,106 +4107,134 @@ Once predictions are generated, we evaluate their accuracy using common regressi
 
 #### Performance Metrics
 
-Model accuracy is assessed using four standard performance metrics: Mean Absolute Error (MAE), Mean Squared Error (MSE), Root Mean Squared Error (RMSE), and R-squared ($R^2$). These metrics compare the observed response values with the predicted response values from the fitted model.
+Model predictive performance is assessed on the **test data** using four common regression metrics: Mean Absolute Error (MAE), Mean Squared Error (MSE), Root Mean Squared Error (RMSE), and R-squared ($R^2$). These metrics compare the observed `Net_Money` values in the test data with the predictions generated by the model fitted on the training data.
 
-For observation $i$, let $y_i$ be the observed value of `Net_Money` and let $\hat{y}_i$ be the predicted value from the model. The prediction error for observation $i$ is
+For observation $i$ in the test data, let $y_i$ denote the observed value of `Net_Money` and let $\hat{y}_i$ denote the prediction generated by the model fitted on the training data. The prediction error for observation $i$ is
 
 $$
 e_i = y_i - \hat{y}_i.
 $$
 
-- The **Mean Absolute Error** (MAE) measures the average absolute prediction error:
+A positive prediction error indicates that the model underpredicts `Net_Money`, while a negative prediction error indicates that the model overpredicts it.
+
+Let $n_{\text{test}}$ denote the number of observations in the test data:
+
+- The **Mean Absolute Error (MAE)** measures the average absolute prediction error:
 
 $$
 \text{MAE}
-= \frac{1}{n}
-\sum_{i=1}^{n}
-|e_i| = 
-\frac{1}{n}
-\sum_{i=1}^{n}
+=
+\frac{1}{n_{\text{test}}}
+\sum_{i=1}^{n_{\text{test}}}
 |y_i - \hat{y}_i|.
 $$
 
-MAE is measured in the same units as the response variable. In this case, it represents the average absolute prediction error in CAD. A lower MAE indicates better predictive accuracy.
+MAE is measured in the same units as the response variable. In this case, it represents the average absolute difference, in CAD, between the observed and predicted values of `Net_Money`. Smaller values indicate better predictive performance.
 
-- The **Mean Squared Error** (MSE) measures the average squared prediction error:
+- The **Mean Squared Error (MSE)** measures the average squared prediction error:
 
 $$
 \text{MSE}
-= \frac{1}{n}
-\sum_{i=1}^{n}
-e_i^2 = 
-\frac{1}{n}
-\sum_{i=1}^{n}
+=
+\frac{1}{n_{\text{test}}}
+\sum_{i=1}^{n_{\text{test}}}
 (y_i - \hat{y}_i)^2.
 $$
 
-Because the errors are squared, MSE penalizes larger prediction errors more heavily than smaller errors. A lower MSE indicates better predictive accuracy, but its units are squared CAD, which can make it harder to interpret directly.
+Because prediction errors are squared, MSE gives greater weight to larger errors. Smaller values indicate better predictive performance. However, MSE is expressed in squared CAD, which makes it less directly interpretable than MAE or RMSE.
 
-- The **Root Mean Squared Error** (RMSE) is the square root of MSE:
+- The **Root Mean Squared Error (RMSE)** is the square root of MSE:
 
 $$
 \text{RMSE}
-= \sqrt{
-\frac{1}{n}
-\sum_{i=1}^{n}
-e_i^2
-} = 
+=
 \sqrt{
-\frac{1}{n}
-\sum_{i=1}^{n}
+\frac{1}{n_{\text{test}}}
+\sum_{i=1}^{n_{\text{test}}}
 (y_i - \hat{y}_i)^2
 }.
 $$
 
-RMSE is also measured in the same units as the response variable. Like MSE, it gives more weight to large errors, but it is easier to interpret because it is expressed in CAD.
+RMSE is expressed in the same units as `Net_Money`, making it easier to interpret than MSE. Like MSE, RMSE gives greater weight to larger prediction errors. Smaller values indicate better predictive performance.
 
-- The **R-squared** statistic measures the proportion of variation in the response variable that is explained by the model as shown in @eq-r-squared. An $R^2$ value close to 1 indicates that the model explains a large proportion of the variation in `Net_Money`, while a value close to 0 indicates that the model explains little of the variation.
+- The **test-set R-squared** ($R^2$) compares the model's prediction error with a baseline that predicts the mean response in the test data:
 
-Together, these metrics provide complementary views of model performance. MAE is easy to interpret as an average prediction error, MSE and RMSE place more emphasis on larger errors, and $R^2$ summarizes how much variation in the response is explained by the model.
+$$
+R^2_{\text{test}}
+=
+1 -
+\frac{
+\sum_{i=1}^{n_{\text{test}}}(y_i-\hat{y}_i)^2
+}{
+\sum_{i=1}^{n_{\text{test}}}(y_i-\bar{y}_{\text{test}})^2
+},
+$$
+
+where $\bar{y}_{\text{test}}$ is the mean of the observed `Net_Money` values in the test data. Values closer to 1 indicate better predictive performance. A value of 0 indicates that the model performs no better than predicting the test-set mean, while a negative value indicates that the model performs worse than this baseline.
+
+Together, these metrics provide complementary measures of predictive performance. MAE summarizes the typical absolute prediction error, MSE and RMSE place greater emphasis on larger errors, and test-set $R^2$ evaluates predictive performance relative to a simple mean-based baseline.
 
 These metrics can be computed as follows:
 
 ::: {.panel-tabset}
 ## **`R` Code**
 ```{r}
-# Extract response variable from test data
+#| lst-label: lst-ols-predictive-metrics-r
+#| lst-cap: "Code to evaluate predictive performance of the OLS model on the test data."
+#| message: false
+
+# Extract observed test responses
 y_test <- test_data$Net_Money
 
-# Calculate metrics in R
+# Calculate predictive performance metrics
 mae <- mean(abs(y_test - y_pred))
 mse <- mean((y_test - y_pred)^2)
 rmse <- sqrt(mse)
-r2 <- summary(ols_model)$r.squared
 
-cat(sprintf("MAE: %.2f, MSE: %.2f, RMSE: %.2f, R-squared: %.2f", mae, mse, rmse, r2))
+# Calculate test-set R-squared
+r2_test <- 1 - sum((y_test - y_pred)^2) /
+  sum((y_test - mean(y_test))^2)
+
+cat(sprintf(
+  "MAE: %.2f\nMSE: %.2f\nRMSE: %.2f\nTest R-squared: %.4f\n",
+  mae, mse, rmse, r2_test
+))
 ```
 
 ## **`Python` Code**
 ```{python}
+#| lst-label: lst-ols-predictive-metrics-py
+#| lst-cap: "Code to evaluate predictive performance of the OLS model on the test data."
+#| message: false
+
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import numpy as np
 
-# Extract the true values
+# Extract observed test responses
 y_test = test_data["Net_Money"]
 
-# Calculate metrics
+# Calculate predictive performance metrics
 mae = mean_absolute_error(y_test, y_pred)
 mse = mean_squared_error(y_test, y_pred)
 rmse = np.sqrt(mse)
-r2 = r2_score(y_test, y_pred)
 
-# Print results
-print(f"MAE: {mae:.2f}, MSE: {mse:.2f}, RMSE: {rmse:.2f}, R-squared: {r2:.2f}")
+# Calculate test-set R-squared
+r2_test = r2_score(y_test, y_pred)
+
+print(f"MAE: {mae:.2f}")
+print(f"MSE: {mse:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(f"Test R-squared: {r2_test:.4f}")
 ```
 :::
 
-If the RMSE is significantly larger than the MAE, it suggests that the model is highly sensitive to large prediction errors, meaning that certain extreme values are having a disproportionate impact on the model’s performance. Similarly, a low R-squared value may indicate that important predictors are missing from the model or that the relationship is more complex than a simple linear pattern can capture.
+Comparing MAE and RMSE can provide additional information about the distribution of prediction errors. Because RMSE gives greater weight to larger errors, an RMSE that is noticeably larger than the MAE may indicate that some relatively large prediction errors are present. Test-set $R^2$, in contrast, evaluates the model's predictive performance relative to predicting the mean of the test responses.
 
-In this case, the model’s performance metrics are encouraging. With a MAE of 175.48, the model’s predictions deviate from actual values by about $175 on average. The RMSE of 212.84, which is not drastically higher than the MAE, suggests that large errors are present but not excessively dominant. An R-squared value of 0.89 confirms that the model explains a substantial portion of the variance in `Net_Money`, indicating strong predictive performance and a solid overall model fit.
+For this model, the MAE is 168.96 CAD, meaning that the predicted `Net_Money` values differ from the observed values by about 169 CAD on average. The RMSE is 207.46 CAD. Its somewhat larger value compared with the MAE indicates that larger prediction errors contribute more strongly to the RMSE, although the difference between the two measures is not extreme.
 
+The test-set $R^2$ is 0.9043, indicating that the predictions from the training-fitted model account for approximately 90.4% of the variation in `Net_Money` in the test data relative to the test-set mean baseline. Taken together, these metrics indicate strong out-of-sample predictive performance for this dataset.
 
-The next predictive quantity we consider is the model-based prediction for a single student profile corresponding to our motivating question. In @tbl-net-money-new-student-prediction, we report the point prediction together with a 95% confidence interval for the expected mean `Net_Money` at that student profile and a 95% prediction interval for the `Net_Money` of a new individual student with those same characteristics. The following tip box provides more context about the difference between these two intervals.
+The next predictive quantity we consider is the model-based prediction for a single student profile corresponding to our motivating question. Using the model fitted on the training data, @tbl-net-money-new-student-prediction reports the point prediction together with a 95% confidence interval for the expected mean `Net_Money` for students with this profile and a 95% prediction interval for the `Net_Money` of a new individual student with the same characteristics. The following Tip provides more context about the difference between these two intervals.
 
 
 ::: {.Tip}
@@ -4189,26 +4243,35 @@ Confidence Interval versus Prediction Interval
 ::::
 ::::{.Tip-container}
 
-The 95% confidence interval describes uncertainty about the **expected mean** `Net_Money` for students with the same profile. In other words, it estimates the average financial balance for students who share these characteristics.
+A **95% confidence interval for the expected mean response** describes uncertainty about the mean `Net_Money` for students with a particular set of characteristics. In other words, it provides an interval estimate for the average financial balance among students who share the same regressor values.
 
-The 95% prediction interval describes uncertainty about the `Net_Money` value for **one new individual student** with the same profile. This interval is usually wider because it includes both uncertainty about the estimated mean and the natural student-to-student variability around that mean.
+A **95% prediction interval** describes uncertainty about the `Net_Money` value for **one new individual student** with those same characteristics. A prediction interval is wider because it accounts for both uncertainty in estimating the conditional mean and the additional variability of individual observations around that mean.
 
-For a new profile with regressor vector $\mathbf{x}_0$, the confidence interval for the expected mean response has the form
-
-$$
-\hat{y}_0 \pm t_{\alpha/2, \, n-p-1} \, SE(\hat{y}_0),
-$$
-
-where $\hat{y}_0$ is the predicted mean response for the profile, and $SE(\hat{y}_0)$ is the standard error of the estimated mean prediction.
-
-The prediction interval for a new individual response has the form
+For a new student profile with regressor vector $\mathbf{x}_0$, a 95% confidence interval for the expected mean response has the form
 
 $$
-\hat{y}_0 \pm t_{\alpha/2, \, n-p-1}
-\sqrt{\widehat{\sigma}^2 + SE(\hat{y}_0)^2}.
+\hat{y}_0
+\pm
+t_{0.975,\,n-k-1}
+\,SE(\hat{y}_0),
 $$
 
-The additional $\widehat{\sigma}^2$ term accounts for the variability of individual observations around the regression line. This is why prediction intervals are wider than confidence intervals.
+where $\hat{y}_0$ is the estimated conditional mean response for the new profile and $SE(\hat{y}_0)$ is the standard error associated with estimating that mean response.
+
+A 95% prediction interval for a new individual response has the form
+
+$$
+\hat{y}_0
+\pm
+t_{0.975,\,n-k-1}
+\sqrt{
+\widehat{\sigma}^2
++
+SE(\hat{y}_0)^2
+}.
+$$
+
+The additional $\widehat{\sigma}^2$ term represents the unexplained variability of individual observations around the regression model. This additional source of uncertainty is why prediction intervals are generally wider than confidence intervals for the expected mean response.
 
 ::::
 :::
@@ -4296,21 +4359,21 @@ new_student_predictive_summary_vertical |>
 
 # Define the new student profile
 new_student_profile <- tibble::tibble(
-  Has_Job = factor("Yes", levels = levels(test_data$Has_Job)),
+  Has_Job = factor("Yes", levels = levels(train_data$Has_Job)),
   Year_of_Study = 3,
-  Financially_Dependent = factor("No", levels = levels(test_data$Financially_Dependent)),
+  Financially_Dependent = factor("No", levels = levels(train_data$Financially_Dependent)),
   Monthly_Allowance = 800,
-  Cooks_at_Home = factor("Yes", levels = levels(test_data$Cooks_at_Home)),
+  Cooks_at_Home = factor("Yes", levels = levels(train_data$Cooks_at_Home)),
   Goes_Out_Spends_Money = 3,
-  Drinks_Alcohol = factor("No", levels = levels(test_data$Drinks_Alcohol)),
+  Drinks_Alcohol = factor("No", levels = levels(train_data$Drinks_Alcohol)),
   Monthly_Earnings = 1200,
-  Living_Situation = factor("Shared", levels = levels(test_data$Living_Situation)),
-  Housing_Type = factor("Rent", levels = levels(test_data$Housing_Type))
+  Living_Situation = factor("Shared", levels = levels(train_data$Living_Situation)),
+  Housing_Type = factor("Rent", levels = levels(train_data$Housing_Type))
 )
 
 # Confidence interval for the expected mean Net Money
 mean_prediction <- predict(
-  testing_OLS_model,
+  ols_model,
   newdata = new_student_profile,
   interval = "confidence",
   level = 0.95
@@ -4318,7 +4381,7 @@ mean_prediction <- predict(
 
 # Prediction interval for a new individual student's Net Money
 individual_prediction <- predict(
-  testing_OLS_model,
+  ols_model,
   newdata = new_student_profile,
   interval = "prediction",
   level = 0.95
@@ -4357,8 +4420,11 @@ new_student_predictive_summary_vertical |>
 
 :::
 
+For the selected student profile (`Has_Job = Yes`, `Year_of_Study = 3`, `Financially_Dependent = No`, `Monthly_Allowance = 800`, `Cooks_at_Home = Yes`, `Goes_Out_Spends_Money = 3`, `Drinks_Alcohol = No`, `Monthly_Earnings = 1200`, `Living_Situation = Shared`, and `Housing_Type = Rent`), the model fitted on the training data predicts a `Net_Money` value of approximately 1,548.34 CAD.
 
-For the selected student profile (`Has_Job = Yes`, `Year_of_Study = 3`, `Financially_Dependent = No`, `Monthly_Allowance = 800`, `Cooks_at_Home = Yes`, `Goes_Out_Spends_Money = 3`, `Drinks_Alcohol = No`, `Monthly_Earnings = 1200`, `Living_Situation = Shared`, and `Housing_Type = Rent`), the fitted model predicts a `Net_Money` value of approximately 1,601.79 CAD. The 95% confidence interval for the expected mean `Net_Money` is from 1,492.79 CAD to 1,710.79 CAD, which means that the model estimates the average financial balance for students with this same profile to be in this range. The 95% prediction interval is wider, ranging from 1,221.12 CAD to 1,982.46 CAD. This wider interval reflects the additional uncertainty involved in predicting the `Net_Money` value for one new individual student, rather than the average value for students with the same characteristics.
+The 95% confidence interval for the expected mean `Net_Money` ranges from 1,495.16 CAD to 1,601.52 CAD. This interval describes uncertainty about the mean financial balance for students with this same profile.
+
+The 95% prediction interval for one new individual student is wider, ranging from 1,156.44 CAD to 1,940.25 CAD. This wider interval reflects both uncertainty in estimating the conditional mean and the additional student-to-student variability around that mean.
 
 
 ## Storytelling
