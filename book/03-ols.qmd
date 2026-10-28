@@ -1784,84 +1784,175 @@ These patterns are descriptive and should not be interpreted as adjusted regress
 The EDA results alone are not used to remove regressors or make formal inferential conclusions. After fitting the OLS model, we will examine regression diagnostics to assess the model assumptions and investigate whether unusual or influential observations require further attention.
 
 
-## Data Modeling
+## Data Modelling
 
-After completing the exploratory data analysis, the next step is to develop a statistical model that describes the relationship between the response variable and one or more regressors. In this chapter, we focus on ordinary least squares (OLS) regression, one of the most widely used modeling approaches in statistics, data science, economics, and machine learning.
+After completing the exploratory data analysis, the next step is to develop a statistical model that describes the relationship between the response variable and one or more regressors. In this chapter, we focus on ordinary least squares (OLS) regression, one of the most widely used modelling approaches in statistics, data science, economics, and machine learning.
 
-The primary goal of regression modeling is to understand how changes in regressors are associated with changes in a response variable. Depending on the application, regression models may be used for inference, prediction, or both. In some settings, analysts are primarily interested in interpreting the estimated coefficients and understanding the relationships between variables. In other situations, the primary objective is accurate prediction of future or unseen observations.
+Regression models may be used for inference, prediction, or both. In inferential settings, the focus is on estimating and interpreting the relationships between regressors and the response variable. In predictive settings, the primary goal is to accurately predict the response for new or unseen observations.
 
-Building a regression model is not simply a matter of applying functions in `R` or `Python` to a dataset. Data modeling is a process that involves selecting appropriate variables, deciding how those variables should be represented mathematically, fitting the model, evaluating model assumptions, and refining the model when necessary. Insights obtained during exploratory data analysis often play an important role in guiding these decisions.
+Building a regression model involves more than simply applying functions in `R` or `Python`. It requires deciding which variables to include, determining how they should be represented in the model, fitting the model, evaluating its assumptions, and refining it when necessary. Insights obtained during exploratory data analysis can help guide these decisions.
 
-In practice, regressors may also require preprocessing including converting categorical variables into dummy variables, transforming skewed variables using logarithms, creating interaction terms, or adding polynomial terms to capture nonlinear relationships. These preprocessing decisions can substantially affect both the interpretability and predictive performance of the final model.
+Depending on the problem, regressors may also require additional modelling choices, such as creating indicator variables for categorical regressors, applying transformations, or including polynomial or interaction terms.
 
-In the following sections, we introduce the mathematical formulation of ordinary least squares regression in the context of this example dataset, discuss how regression coefficients are estimated, and show how to fit and interpret regression models in R using the `lm()` function.
+In the following sections, we introduce the OLS model for this case study, describe how its regression coefficients are estimated, and show how to fit and interpret the model in both `R` and `Python`.
 
 ### Choosing a Suitable Regression Model
 
-The choice of regression model depends on the patterns identified in EDA and the objectives of our analysis. Regression techniques vary in complexity, with some handling simple linear relationships and others accounting for more nuanced effects. Below are common approaches:
+The choice of regression model depends on the characteristics of the response variable, the relationships observed during EDA, and the goals of the analysis. Different regression approaches are suitable for different types of relationships and modelling objectives. Some common approaches include:
 
-| Technique | What the technique is | References |
+| Technique | Description | References |
 |---|---|---|
-| **Simple Linear Regression** | Models the relationship between one regressor and a continuous response variable. This approach is useful when the goal is to examine whether a single dominant factor explains variation in financial balance. | @montgomery2012 |
-| **Multiple Linear Regression** | Extends simple linear regression by including two or more regressors. This allows the model to account for several financial, demographic, or behavioural factors simultaneously. | @montgomery2012 |
-| **Polynomial Regression** | Extends linear regression by adding polynomial terms, such as squared or cubics of regressors to capture curved relationships between regressors and the response variable. | @montgomery2012 |
-| **Log-Linear Models** | Transform skewed distributions to improve interpretability and meet regression assumptions. | @montgomery2012 |
-| **Regularized Regression (Ridge and Lasso)** | Adds penalty terms to the regression coefficients to shrink estimates. **Ridge** regression is useful for handling multicollinearity, while **Lasso** can also perform variable selection by shrinking some coefficients to zero. | @hastie2009 |
+| **Simple Linear Regression** | Models the relationship between a continuous response variable and a single regressor. | @montgomery2012 |
+| **Multiple Linear Regression** | Extends simple linear regression by including two or more regressors, allowing us to examine the association between each regressor and the response while holding the other regressors fixed. | @montgomery2012 |
+| **Polynomial Regression** | Extends linear regression by including polynomial terms, such as squared or cubic terms, to represent nonlinear relationships between regressors and the response variable. | @montgomery2012 |
+| **Log-Linear Models** | Use a logarithmic transformation of the response and/or regressors when such a transformation is appropriate for the relationship being modelled or for interpretation. | @montgomery2012 |
+| **Regularized Regression (Ridge and Lasso)** | Adds penalty terms to the regression coefficients. Ridge regression shrinks coefficient estimates, while Lasso can also shrink some coefficient estimates to zero and therefore perform variable selection. | @hastie2009 |
 
-Given that our goal is to examine how multiple factors-such as income, expenses, and living arrangements affect students’ financial balance, we select **Multiple Linear Regression**. This method allows us to quantify the influence of each regressor while controlling for confounding effects.
+In this case study, `Net_Money` is a continuous response variable, and we are interested in examining its relationship with several financial, demographic, and behavioural regressors simultaneously. We therefore use **multiple linear regression fitted using OLS**. This approach allows us to estimate the association between each regressor and `Net_Money` while holding the other regressors in the model fixed.
+
 
 ### Defining the Regression Model
 
-Once we select OLS regression, we define the response variable and the set of regressors used to explain variation in the response and write the regression equation. Suppose we observe data from $n$ students. Let $Y_i$ represent the continuous financial balance (`Net_Money`) in CAD for the $i$-th student, where $i = 1, 2, \ldots, n$.
+After selecting multiple linear regression fitted using OLS, we now specify the model mathematically. Suppose we observe $n$ independent students, indexed by $i = 1, \ldots, n$. Let $Y_i$ denote the value of `Net_Money` for the $i$-th student, and let $\mathbf{x}_i$ represent the collection of regressors observed for that student.
 
-For the observed regressors, we define the following:
+For each observation, we define the conditional mean of the response as
 
-- $x_{i,1}$ is the binary variable `Has_Job`, where
+$$
+\mu_i = \mathbb{E}(Y_i \mid \mathbf{x}_i).
+$${#eq-ols-case-conditional-mean}
 
-  $$
-  x_{i,1} =
-  \begin{cases}
-  1 & \text{if the student has a job},\\
-  0 & \text{otherwise}.
-  \end{cases}
-  $$
+In a multiple linear regression model, this conditional mean is represented as a linear combination of the regressors:
 
-- $x_{i,2}$ is the ordinal variable `Year_of_Study`, representing the current academic year of the $i$-th student.
+$$
+\mu_i
+=
+\beta_0
++
+\beta_1 x_{i,1}
++
+\beta_2 x_{i,2}
++
+\cdots
++
+\beta_k x_{i,k}.
+$${#eq-ols-general-mean}
 
-- $x_{i,3}$ is the binary variable `Financially_Dependent`, where
-  $$
-  x_{i,3} =
-  \begin{cases}
-  1 & \text{if the student is financially dependent},\\
-  0 & \text{otherwise}.
-  \end{cases}
-  $$
+Equivalently, using the linear predictor $\eta_i$ definition,
 
-- $x_{i,4}$ is the continuous monthly allowance in CAD (`Monthly_Allowance`) received by the $i$-th student.
+$$
+\eta_i
+=
+\beta_0
++
+\sum_{j=1}^{k}\beta_j x_{i,j},
+$$
 
-- $x_{i,5}$ is the binary variable `Cooks_at_Home`, where
-  $$
-  x_{i,5} =
-  \begin{cases}
-  1 & \text{if the student cooks at home regularly},\\
-  0 & \text{otherwise}.
-  \end{cases}
-  $$
+and for ordinary linear regression we use the **identity link**,
 
-- $x_{i,6}$ is the ordinal variable `Goes_Out_Spends_Money`, measuring how frequently the $i$-th student goes out and spends money on a scale from $1$ `(rarely)` to $5$ `(very often)`.
+$$
+\mu_i = \eta_i.
+$${#eq-ols-case-identity-link}
 
-- $x_{i,7}$ is the binary variable `Drinks_Alcohol`, where
-  $$
-  x_{i,7} =
-  \begin{cases}
-  1 & \text{if the student drinks alcohol},\\
-  0 & \text{otherwise}.
-  \end{cases}
-  $$
+The observed response will generally differ from its conditional mean. We represent this unexplained variation using an error term $\epsilon_i$:
 
-- $x_{i,8}$ is the continuous monthly earnings in CAD (`Monthly_Earnings`) for the $i$-th student.
+$$
+Y_i = \mu_i + \epsilon_i.
+$${#eq-ols-case-error-form}
 
-To mathematically represent the categorical variable `Living_Situation`, we use binary dummy variables. The levels are *Family*, *Shared*, and *Alone* where *Family* is selected as the baseline category. Then we define
+Combining these expressions gives the general multiple linear regression model
+
+$$
+Y_i
+=
+\beta_0
++
+\sum_{j=1}^{k}\beta_j x_{i,j}
++
+\epsilon_i.
+$${#eq-ols-general-multiple-model}
+
+For the classical linear model, we assume that the errors have conditional mean zero and constant variance,
+
+$$
+\mathbb{E}(\epsilon_i \mid \mathbf{x}_i) = 0,
+\qquad
+\operatorname{Var}(\epsilon_i \mid \mathbf{x}_i) = \sigma^2.
+$$
+
+When we additionally assume Normally distributed errors, the model can be written equivalently as
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\mathcal{N}(\mu_i,\sigma^2),
+$${#eq-ols-normal-model}
+
+where
+
+$$
+\mu_i
+=
+\beta_0
++
+\sum_{j=1}^{k}\beta_j x_{i,j}.
+$$
+
+This Normal formulation will become particularly useful in the **Estimation** section, where we will show how the likelihood of the model is connected to the ordinary least-squares criterion.
+
+
+For this case study, the regressors are defined as follows:
+
+- $x_{i,1}$ represents `Has_Job`, coded as
+
+$$
+x_{i,1} =
+\begin{cases}
+1 & \text{if the student has a job},\\
+0 & \text{otherwise}.
+\end{cases}
+$$
+
+- $x_{i,2}$ represents `Year_of_Study`. This ordinal variable is retained in numerical form, so a one-unit increase corresponds to moving from one year of study to the next.
+
+- $x_{i,3}$ represents `Financially_Dependent`, coded as
+
+$$
+x_{i,3} =
+\begin{cases}
+1 & \text{if the student is financially dependent},\\
+0 & \text{otherwise}.
+\end{cases}
+$$
+
+- $x_{i,4}$ represents `Monthly_Allowance`, measured in Canadian dollars.
+
+- $x_{i,5}$ represents `Cooks_at_Home`, coded as
+
+$$
+x_{i,5} =
+\begin{cases}
+1 & \text{if the student cooks at home regularly},\\
+0 & \text{otherwise}.
+\end{cases}
+$$
+
+- $x_{i,6}$ represents `Goes_Out_Spends_Money`, an ordinal variable measured on a scale from $1$ (`rarely`) to $5$ (`very often`). As with `Year_of_Study`, this variable is retained in numerical form in the model.
+
+- $x_{i,7}$ represents `Drinks_Alcohol`, coded as
+
+$$
+x_{i,7} =
+\begin{cases}
+1 & \text{if the student drinks alcohol},\\
+0 & \text{otherwise}.
+\end{cases}
+$$
+
+- $x_{i,8}$ represents `Monthly_Earnings`, measured in Canadian dollars.
+
+The categorical regressors `Living_Situation` and `Housing_Type` require indicator variables because each contains more than two categories.
+
+For `Living_Situation`, the reference category is `Family`. We define
 
 $$
 x_{i,9} =
@@ -1881,7 +1972,7 @@ x_{i,10} =
 \end{cases}
 $$
 
-Similarly, the categorical variable `Housing_Type` has the levels *Rent*, *Own*, and *Dormitory* where *Rent* is selected as the baseline category. Then we define
+For `Housing_Type`, the reference category is `Rent`. We define
 
 $$
 x_{i,11} =
@@ -1901,11 +1992,10 @@ x_{i,12} =
 \end{cases}
 $$
 
-The subscript $i$ indexes individual students in the dataset. The response variable $Y_i$ represents the financial outcome we aim to explain, while the regressors capture economic, behavioral, and lifestyle characteristics that may influence student financial balance.
 
-Together, these regressors provide a representation of the economic, behavioral, and lifestyle factors that may help explain variation in student financial balance.
+The subscript $i$ indexes individual students in the dataset, while the second subscript identifies the regressor. Together, the regressors represent the financial, demographic, and behavioral characteristics included in our model.
 
-Once the response variable and regressors have been defined, we can express the relationship mathematically using a multiple linear regression model. The model assumes that the expected value of the response variable can be represented as a linear combination of the regressors plus a random error term.
+Substituting these regressors into the multiple linear regression model gives
 
 <div style="overflow-x: auto; white-space: nowrap;">
 
@@ -1921,37 +2011,38 @@ $$
 +
 \beta_3 x_{i,3}
 +
-\ldots
+\cdots
 +
 \beta_{12} x_{i,12}
 }_{\text{Systematic component}}
 +
-\underbrace{\epsilon_i}_{\text{Random component}}
+\underbrace{\epsilon_i}_{\text{Random component}}.
 $${#eq-ols-main-formula-with-components}
 
 </div>
 
-where:
+Here,
 
-- $\beta_0$ represents the intercept, corresponding to the expected value of $Y_i$ when all regressors are equal to zero.
+- $\beta_0$ is the intercept.
 
-- $\beta_1, \beta_2, \ldots, \beta_{12}$ are the regression coefficients quantifying the relationship between each regressor and the response variable.
+- $\beta_1, \beta_2, \ldots, \beta_{12}$ are the regression coefficients describing the association between each regressor and the expected response.
 
-- $\epsilon_i$ is the error term, accounting for unexplained variability and random noise.
+- $\epsilon_i$ is the random error term representing variation in `Net_Money` that is not explained by the regressors included in the model.
 
-Each coefficient represents the expected change in $Y_i$ associated with a one-unit increase in a regressor, holding all other variables constant. For example:
+Each regression coefficient has an interpretation that depends on the type of regressor. For a numerical regressor, the coefficient represents the expected change in `Net_Money` associated with a one-unit increase in that regressor, while holding all other regressors fixed. For an indicator variable, the coefficient represents the expected difference in `Net_Money` between the corresponding category and its reference category, again holding the other regressors fixed.
 
-- $\beta_4$ represents the expected change in financial balance associated with an additional dollar of monthly allowance.
-- $\beta_7$ measures the association between alcohol consumption and financial balance.
-- $\beta_{10}$ represents the expected difference in financial balance between students living alone and students living with family, after controlling for the remaining regressors.
+For example:
 
-More generally, a multiple linear regression model with $k$ regressors can be written as follows:
+- $\beta_4$ represents the expected change in `Net_Money` associated with a one-dollar increase in `Monthly_Allowance`, holding the other regressors fixed.
 
-$$
-Y_i = \beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j} + \epsilon_i.
-$${#eq-ols-main-formula-compact-version}
+- $\beta_7$ represents the expected difference in `Net_Money` between students who drink alcohol and students who do not, holding the other regressors fixed.
 
-Note that the index $i$ represents the $i$-th individual in the sample and the $j$-th presents the $j$-th regressor. The model can be extended to include interaction terms between regressors but we will not consider that in this example.
+- $\beta_{10}$ represents the expected difference in `Net_Money` between students who live alone and students who live with family, holding the other regressors fixed.
+
+The intercept $\beta_0$ represents the expected value of `Net_Money` when all numerical regressors are equal to zero and all categorical regressors are at their reference categories. Depending on the values that are meaningful for the regressors, the intercept may not always have a useful practical interpretation.
+
+Although interaction terms or nonlinear terms could be added to extend this model, we do not include them in the current case study. We begin with the additive multiple linear regression model defined above and later assess its adequacy using model diagnostics.
+
 
 ## Estimation
 
