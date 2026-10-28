@@ -2691,27 +2691,34 @@ This numeric treatment is appropriate when a linear trend across the ordered cat
 ::::
 :::
 
-
 ## Goodness of Fit
 
-After estimating the regression coefficients, the next step is to assess how well the model fits on the training data and whether it satisfies the assumptions of Ordinary Least Squares (OLS) regression. This evaluation helps us understand how well the model fits the training data and whether the fitted model is appropriate for interpretation. Generalization to unseen data should be assessed separately using prediction performance on test or validation data. A well-fitting model should explain a substantial proportion of variation in the response variable while adhering to key statistical assumptions. If these assumptions are seriously violated, coefficient estimates, standard errors, confidence intervals, hypothesis tests, or predictions may become unreliable.
+After estimating the regression coefficients, the next step is to assess how well the model fits the training data and whether the assumptions of Ordinary Least Squares (OLS) regression are reasonable. This evaluation helps us determine whether the fitted model is appropriate for interpretation and statistical inference.
+
+At this stage, we focus on the model fitted to the training data. Generalization to unseen observations will be assessed separately using predictive performance on the test data. We examine both the overall fit of the model and a series of diagnostic checks related to the OLS assumptions. Serious violations of these assumptions can affect coefficient estimates, standard errors, confidence intervals, hypothesis tests, or predictions.
 
 ### Checking Model Assumptions
 
-OLS regression is built on several fundamental assumptions:
+The OLS model relies on several assumptions about the relationship between the regressors, the response variable, and the random error terms. The main assumptions we examine in this chapter are:
 
 - Linearity
-- Independence of errors
-- Homoscedasticity
-- Normality of residuals
 
-If these assumptions hold, OLS provides unbiased, efficient, and consistent estimates. We assess each assumption through diagnostic plots and statistical tests.
+- Independence of errors
+
+- Homoscedasticity, or constant error variance
+
+- Normality of errors
+
+These assumptions play different roles in OLS regression. Some are important for the statistical properties of the coefficient estimates, while others are particularly important for standard errors, confidence intervals, and hypothesis tests which we introduce later in this chapter. We assess whether these assumptions are reasonable using diagnostic plots and statistical tests (where appropriate).
+
 
 #### Linearity
 
-A core assumption of OLS is that the relationship between each predictor and the response variable is linear. If this assumption is violated, the model may systematically under (or over) estimate the response variable `Net_Money`, leading to biased predictions. To check the linearity assumption visually, the Residuals vs. Fitted values plot is a common diagnostic tool. In a well-specified linear model, residuals should be randomly scattered around zero, without any discernible patterns. If the residuals exhibit a U-shaped or curved pattern, this suggests a non-linear relationship, indicating that transformations such as logarithmic, square root, or polynomial terms may be necessary.
+A core assumption of OLS regression is that the conditional mean of the response variable is appropriately represented as a linear combination of the regressors. If important nonlinear relationships are not represented in the model, the residuals may display systematic patterns. This indicates that the linear model does not adequately capture the relationship between the regressors and the response variable.
 
-To visualize linearity, we plot the residuals against the fitted values:
+A common diagnostic for assessing the linearity of the fitted model is a **Residuals vs. Fitted** plot. In a well-specified linear model, the residuals should be scattered around zero without a clear systematic pattern. Curved or other structured patterns may suggest that nonlinear terms, transformations, or other changes to the model should be considered.
+
+To assess this assumption, we plot the standardized residuals against the fitted values:
 
 
 ::: {.panel-tabset}
@@ -2751,17 +2758,18 @@ residuals_vs_fitted
 ``` {.python}
 import matplotlib.pyplot as plt
 
-# Extract fitted values and residuals
+# Extract fitted values and standardized residuals
 fitted_vals = ols_model.fittedvalues
-residuals = ols_model.resid
+influence = ols_model.get_influence()
+standardized_residuals = influence.resid_studentized_internal
 
 # Plot Residuals vs Fitted
 plt.figure(figsize=(6, 4))
-plt.scatter(fitted_vals, residuals, alpha=0.7)
+plt.scatter(fitted_vals, standardized_residuals, alpha=0.7)
 plt.axhline(y=0, color='red', linestyle='--')
-plt.title("Standardized Residuals\n vs Fitted")
+plt.title("Standardized Residuals vs Fitted")
 plt.xlabel("Fitted Values")
-plt.ylabel("Standardized Residuals\n")
+plt.ylabel("Standardized Residuals")
 plt.tight_layout()
 plt.show()
 ```
@@ -2840,38 +2848,43 @@ plt.show()
 
 :::
 
-If the residual plot displays a clear trend, polynomial regression or feature engineering may be required to better capture the underlying data structure. However, in this case, the residuals appear to be randomly scattered around the horizontal axis, with no obvious patterns such as curves or systematic structure. This suggests that the linearity assumption of the OLS model holds reasonably well in this case. Therefore, no immediate transformation or addition of nonlinear terms is necessary to capture the relationship between predictors and the response variable.
+The standardized residuals are scattered around zero across the range of fitted values, with no obvious curved or systematic pattern. This provides no strong visual evidence that the linear mean structure is inappropriate for these data. Therefore, we do not make any changes to the functional form of the model at this stage.
+
+If a clear curved or systematic pattern were present, possible approaches could include adding polynomial terms, transforming regressors, or otherwise modifying the systematic component of the model to better represent the relationship between the regressors and the response variable.
+
 
 #### Independence of Errors
 
-The residuals, or errors, in an OLS model should be independent of one another. This assumption is particularly relevant in time-series or sequential data, where errors from one observation might influence subsequent observations, leading to autocorrelation. If the errors are correlated, the estimated standard errors will be biased, making hypothesis testing unreliable.
+Another assumption of the classical linear regression model is that the error terms are independent across observations. In other words, the unexplained component associated with one observation should not systematically depend on the unexplained component associated with another observation.
 
-The Durbin-Watson test is commonly used to detect autocorrelation. This test produces a statistic that ranges between 0 and 4, where values close to 2 indicate no significant autocorrelation, while values near 0 or 4 suggest positive or negative correlation in the residuals.
+This assumption is particularly important for data with a natural ordering, such as time-series or longitudinal data, where errors from nearby observations may be correlated. Such dependence is commonly referred to as autocorrelation. When errors are correlated, the usual OLS standard errors may be incorrect, which can affect confidence intervals and hypothesis tests.
+
+For the current dataset, observations correspond to different students rather than repeated measurements over time. Therefore, the independence assumption is primarily supported by the data collection and study design. Nevertheless, we use the Durbin-Watson statistic as an additional diagnostic for first-order autocorrelation in the residuals.
 
 The Durbin-Watson statistic is defined as
 
 $$
 DW =
 \frac{
-\sum_{i=2}^{n} (\hat{\varepsilon}_i - \hat{\varepsilon}_{i-1})^2
+\sum_{i=2}^{n} (e_i - e_{i-1})^2
 }{
-\sum_{i=1}^{n} \hat{\varepsilon}_i^2
+\sum_{i=1}^{n} e_i^2
 },
 $${#eq-durbin-watson-formula}
 
-where $\hat{\varepsilon}_i$ is the residual for observation $i$. The numerator in @eq-durbin-watson-formula compares each residual to the previous residual. If consecutive residuals are very similar, the numerator becomes small because the term $\hat{\varepsilon}_i - \hat{\varepsilon}_{i-1}$ is small for most values of $i$. This leads to a Durbin-Watson statistic closer to 0 and suggests positive autocorrelation. If consecutive residuals tend to move in opposite directions, the numerator becomes larger, which can lead to larger statistic values and suggests negative autocorrelation. As a general rule of thumb, values close to 2 suggest little concern about autocorrelation among the residuals while values greater than 2.5 or less than 1.5 may indicate potential autocorrelation.
+where $e_i$ denotes the residual for observation $i$. The statistic generally takes values between 0 and 4. Values near 2 suggest little evidence of first-order autocorrelation, values substantially below 2 are associated with positive autocorrelation, and values substantially above 2 are associated with negative autocorrelation.
 
-We can also formally test whether there is evidence of autocorrelation in the residuals. The Durbin-Watson test can be written as the following hypothesis test:
-
-$$
-H_0: \text{There is no autocorrelation in the residuals.}
-$$
+In R, the default dwtest() tests for positive autocorrelation:
 
 $$
-H_1: \text{There is autocorrelation in the residuals.}
+H_0: \rho = 0,
 $$
 
-In practice, a small p-value provides evidence against the null hypothesis and suggests that the residuals may be autocorrelated.
+$$
+H_1: \rho > 0,
+$$
+
+where $\rho$ represents the first-order autocorrelation parameter.
 
 ::: {.panel-tabset}
 ## **`R` Code**
@@ -2892,7 +2905,9 @@ print(f"Durbin-Watson statistic: {dw_stat:.3f}")
 ```
 :::
 
-Based on the Durbin-Watson test, the test statistic is 1.891 with a p-value of 0.06215. Since the statistic is close to 2 and the p-value is not statistically significant at 5 percent, we do not find evidence of autocorrelation in the residuals. This suggests that the assumption of independence of errors holds for this model.
+For the fitted model, the Durbin-Watson statistic is 1.957 with a p-value of 0.2713. The statistic is close to 2, and the p-value provides no evidence against the null hypothesis in favour of positive first-order autocorrelation. Together with the cross-sectional study design, we do not identify an immediate concern regarding dependence among the errors.
+
+Because the observations in this dataset do not have a natural temporal ordering, the Durbin-Watson diagnostic should be interpreted as supplementary rather than as the primary justification for the independence assumption.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -2908,13 +2923,13 @@ $$
 d
 \sim
 \frac{
-\sum_{i=1}^{n-k} \nu_i \xi_i^2
+\sum_{i=1}^{n-k-1} \nu_i \xi_i^2
 }{
-\sum_{i=1}^{n-k} \xi_i^2
+\sum_{i=1}^{n-k-1} \xi_i^2
 },
 $$
 
-where $\xi_1, \ldots, \xi_{n-k}$ are independent standard Normal random variables, and $\nu_1, \ldots, \nu_{n-k}$ are eigenvalues that depend on the regression design matrix $X$.
+where $\xi_1, \ldots, \xi_{n-k-1}$ are independent standard Normal random variables, and $\nu_1, \ldots, \nu_{n-k-1}$ are eigenvalues that depend on the regression design matrix $X$.
 
 The main takeaway is that the Durbin-Watson test has a special null distribution that depends on the fitted regression model. In practice, software computes or approximates the relevant p-value for us, so we usually focus on interpreting the statistic and its p-value.
 
@@ -2936,36 +2951,40 @@ Note that because this dataset is not a time series, the independence assumption
 ::::
 :::
 
-
 #### Homoscedasticity (Constant Variance of Errors)
 
-OLS regression assumes that the variance of residuals remains constant across all fitted values. This assumption is called **homoscedasticity**. If this assumption is violated, the model exhibits **heteroscedasticity**, where the spread of residuals increases or decreases systematically. When heteroscedasticity is present, the coefficient estimates may still be unbiased if the other OLS assumptions hold, but the estimated standard errors can be incorrect. This can make confidence intervals and hypothesis tests unreliable.
-
-To check for heteroscedasticity, we plot residuals against the fitted values and conduct a Breusch-Pagan test, which formally tests whether the residual variance is constant.
-
-The Breusch-Pagan test is based on the idea that, under the assumption that homoscedasticity is correct, the squared residuals should not be systematically related to the regressors or fitted values. If the squared residuals can be explained by the regressors, this suggests that the error variance changes across observations. Note that the sum of residuals is nearly zero and you can think of squared residuals as an estimate for the variance of error terms. Now if the variance can be explained by regressors then it means the variance is not constant across regressors.
-
-The Breusch-Pagan test can be written as the following hypothesis test:
+OLS regression assumes that the conditional variance of the error terms is constant across observations. This assumption is called homoscedasticity and can be written as
 
 $$
-H_0: \text{The residual variance is constant.}
+\operatorname{Var}(\epsilon_i \mid \mathbf{x}_i) = \sigma^2.
+$$
+
+If the error variance changes systematically with the regressors or fitted values, the model shows heteroscedasticity. Under heteroscedasticity, the OLS coefficient estimates can still be unbiased under the other classical assumptions. However, the usual estimated standard errors may be incorrect. As a result, confidence intervals and hypothesis tests based on those standard errors may be unreliable.
+
+We can assess constant variance visually using the Residuals vs. Fitted plot introduced earlier. If the spread of the residuals remains reasonably similar across the range of fitted values, this is consistent with the constant-variance assumption. A funnel-shaped pattern, where the spread systematically increases or decreases, may indicate heteroscedasticity.
+
+We can also assess this assumption formally using the **Breusch-Pagan test**. The test is based on the idea that, under homoscedasticity, the squared residuals should not be systematically related to the regressors. If the magnitude of the squared residuals can be explained by the regressors, this provides evidence that the conditional error variance changes across observations.
+
+The Breusch-Pagan test can be written as
+
+$$
+H_0: \text{The error variance is constant.}
 $$
 
 $$
-H_1: \text{The residual variance is not constant.}
+H_1: \text{The error variance is not constant.}
 $$
 
-Equivalently, the null hypothesis states that the model does not show evidence of heteroscedasticity, while the alternative hypothesis states that heteroscedasticity is present.
-
-One way to express the Breusch-Pagan test is to first compute the residuals from the original OLS model, square them, and then regress the squared residuals on the regressors. The test statistic is commonly written as
+One way to construct the Breusch-Pagan test is to obtain the residuals from the fitted OLS model, square them, and regress the squared residuals on the regressors. The test statistic is commonly written as
 
 $$
 BP = nR^2_{\text{aux}},
 $$
 
-where $n$ is the sample size and $R^2_{\text{aux}}$ is the coefficient of determination from the auxiliary regression of the squared residuals on the regressors. Under the null hypothesis of constant variance, this statistic is approximately distributed as a chi-square random variable with degrees of freedom equal to the number of regressors in the auxiliary regression.
+where $n$ is the sample size and $R^2_{\text{aux}}$ is the coefficient of determination from this auxiliary regression. Under the null hypothesis of constant variance, the test statistic is asymptotically distributed as a chi-square random variable, with degrees of freedom corresponding to the number of regressors tested in the auxiliary regression.
 
-In practice, a small p-value provides evidence against the null hypothesis and suggests that the residual variance is not constant.
+A small p-value provides evidence against the null hypothesis and suggests that heteroscedasticity may be present.
+
 
 ::: {.panel-tabset}
 
@@ -2996,16 +3015,27 @@ print(f"P-value: {bp_pvalue:.4f}")
 
 :::
 
-Since the p-value (0.09357) is greater than the conventional threshold of 0.05, we fail to reject the null hypothesis of constant variance. This indicates no statistically significant evidence of heteroscedasticity, and thus the assumption of homoscedasticity appears reasonable for this model.
+The studentized Breusch-Pagan test gives a test statistic of 20.769 with 12 degrees of freedom and a p-value of 0.05387. At the conventional 5% significance level, we fail to reject the null hypothesis of constant error variance. Therefore, the test does not provide statistically significant evidence of heteroscedasticity.
 
-If heteroscedasticity is detected, possible solutions include applying weighted least squares (WLS) regression, transforming variables, or computing robust standard errors to account for non-constant variance.
+However, the p-value is close to 0.05, so the result is somewhat borderline and should not be interpreted as strong evidence that the error variance is perfectly constant. Taken together with the Residuals vs. Fitted plot, which does not show a clear funnel-shaped pattern, the homoscedasticity assumption appears reasonably plausible for this model.
 
-#### Normality of Residuals
+If substantial heteroscedasticity were detected, possible approaches could include using heteroscedasticity-robust standard errors, applying an appropriate transformation, or considering weighted least squares when the variance structure can be meaningfully modeled.
 
-For valid hypothesis testing and confidence interval estimation, OLS assumes that residuals follow a normal distribution. If residuals deviate significantly from normality, statistical inference may be unreliable, particularly for small sample sizes.
+#### Normality of Errors
 
-A Q-Q plot (Quantile-Quantile plot) is used to assess normality. If residuals are normally distributed, the points should lie along the reference line.
+For statistical inference in OLS regression, we additionally assume that the error terms are Normally distributed conditional on the regressors:
 
+$$
+\epsilon_i \mid \mathbf{x}_i
+\sim
+\mathcal{N}(0,\sigma^2).
+$$
+
+This Normality assumption is not required to compute the OLS coefficient estimates. However, it supports the exact finite-sample distributions used for confidence intervals and hypothesis tests. Departures from Normality can therefore affect statistical inference, particularly in smaller samples.
+
+Because the error terms $\epsilon_i$ are unobserved, we assess this assumption using the residuals from the fitted model. A **Q-Q (Quantile-Quantile) plot** compares the quantiles of the standardized residuals with the theoretical quantiles of a Normal distribution. If the error distribution is approximately Normal, the points should lie reasonably close to the reference line.
+
+We therefore examine a Q-Q plot of the standardized residuals:
 
 ::: {.panel-tabset}
 
@@ -3040,13 +3070,18 @@ QQ_plot
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
-# Extract residuals from the model
-residuals = ols_model.resid
+# Extract standardized residuals from the model
+influence = ols_model.get_influence()
+standardized_residuals = influence.resid_studentized_internal
 
-# Q-Q plot of residuals
+# Q-Q plot of standardized residuals
 plt.figure(figsize=(6, 4))
-empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to _
-plt.title("Q-Q Plot of Residuals")
+empty = stats.probplot(
+    standardized_residuals,
+    dist="norm",
+    plot=plt
+)
+plt.title("Q-Q Plot of Standardized Residuals")
 plt.tight_layout()
 plt.show()
 ```
@@ -3103,28 +3138,33 @@ QQ_plot
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
-# Extract residuals from the model
-residuals = ols_model.resid
+# Extract standardized residuals from the model
+influence = ols_model.get_influence()
+standardized_residuals = influence.resid_studentized_internal
 
-# Q-Q plot of residuals
+# Q-Q plot of standardized residuals
 plt.figure(figsize=(6, 4))
-empty = stats.probplot(residuals, dist="norm", plot=plt)  # Suppress output by assigning to empty
-plt.title("Q-Q Plot of Residuals")
+empty = stats.probplot(
+    standardized_residuals,
+    dist="norm",
+    plot=plt
+)
+plt.title("Q-Q Plot of Standardized Residuals")
 plt.tight_layout()
 plt.show()
 ```
 
 :::
 
-The Q-Q plot shows that the residuals closely follow the 45-degree reference line, indicating that the residuals are approximately normally distributed. While there are some mild deviations at the tails, these are minimal and do not suggest serious violations of the normality assumption.
+The Q-Q plot shows that the standardized residuals follow the reference line closely across most of the distribution. Some deviations are visible in the extreme tails, particularly in the upper tail, but these departures are relatively mild. Overall, the plot does not provide strong evidence of a serious departure from Normality, so the Normal error assumption appears reasonable for this model.
 
-If the plot reveals heavy tails or skewness, potential solutions include applying log or Box-Cox transformations to normalize the distribution. In cases where normality is severely violated, using a non-parametric model or bootstrapping confidence intervals may be appropriate.
+If substantial departures from Normality were observed, we would investigate their source before modifying the model. Depending on the problem, possible approaches could include transforming the response variable, reconsidering the model specification, using bootstrap-based inference, or applying other inferential methods that are less sensitive to the Normality assumption.
 
 ### Evaluating Model Fit
 
-#### R-Squared
+#### R-Squared and Adjusted R-Squared
 
-A good model should explain a large proportion of the variability in the response variable. Beyond checking model assumptions, it is also important to assess how well the model explains variation in the observed response values. One of the most commonly used goodness-of-fit metrics for OLS regression is **R-squared** ($R^2$) also known as coefficient of determination, which measures the proportion of variation in the response variable that is explained by the regressors in the model.
+Beyond checking the model assumptions, it is also useful to assess how much of the observed variation in the response variable is explained by the fitted regression model. One of the most commonly used goodness-of-fit measures for OLS regression is R-squared ($R^2$), also known as the coefficient of determination.
 
 The $R^2$ statistic is defined as
 
@@ -3146,11 +3186,11 @@ $${#eq-r-sst}
 
 is the total sum of squares. Here, $y_i$ is the observed response value, $\hat{y}_i$ is the fitted response value, and $\bar{y}$ is the sample mean of the response variable.
 
-The rationale behind $R^2$ define in @eq-r-squared is to compare the fitted regression model with a simple baseline model that always predicts the sample mean $\bar{y}$. If the regression model greatly reduces the unexplained variation compared with this baseline, then $\text{SSE}$ will be much smaller than $\text{SST}$, and $R^2$ will be closer to 1. If the model does not improve much over predicting the mean, then $\text{SSE}$ will be close to $\text{SST}$, and $R^2$ will be closer to 0.
+The rationale behind $R^2$ in @eq-r-squared is to compare the fitted regression model with a simple baseline model that always predicts the sample mean $\bar{y}$. If the regression model substantially reduces the unexplained variation relative to this baseline, then $\text{SSE}$ will be much smaller than $\text{SST}$ and $R^2$ will be closer to 1. If the fitted model provides little improvement over predicting the sample mean, then $\text{SSE}$ will be close to $\text{SST}$ and $R^2$ will be closer to 0.
 
-An $R^2$ value close to 1 indicates that the model explains a large proportion of the variation in the response variable. A low $R^2$ suggests that the model explains less of the variation, which may indicate that important regressors are missing, that the relationship is not well captured by a linear model, or that the response variable is naturally difficult to predict.
+A larger $R^2$ indicates that the fitted model explains a greater proportion of the observed variation in the response variable. However, the usefulness of a particular $R^2$ value depends on the context and purpose of the analysis.
 
-Because $R^2$ never decreases when more regressors are added to the model, we often also report **adjusted R-squared**. Adjusted R-squared accounts for the number of regressors in the model and is defined as
+Because $R^2$ never decreases when additional regressors are added to the model, we often also report adjusted R-squared. Adjusted R-squared accounts for model complexity and is defined as:
 
 $$
 R^2_{\text{adj}}
@@ -3162,9 +3202,11 @@ R^2_{\text{adj}}
 (1 - R^2),
 $${#eq-r-square-adj}
 
-where $n$ is the sample size and $p$ is the number of regressors in the model (not including the intercept). Adjusted R-squared is useful because it penalizes unnecessary model complexity and only increases when adding a regressor improves the model more than would be expected by chance.
+where $n$ is the sample size and $p$ is the number of estimated slope coefficients, excluding the intercept. For categorical regressors represented by multiple indicator variables, each estimated indicator coefficient contributes to $p$.
 
-We can retrieve the R-squared and adjusted R-squared values from the model summary:
+Adjusted R-squared penalizes the inclusion of additional regressors that provide little improvement in model fit and is therefore useful when comparing models with different numbers of estimated coefficients.
+
+We can retrieve the R-squared and adjusted R-squared values from the fitted model:
 
 ::: {.panel-tabset}
 
@@ -3191,27 +3233,33 @@ print(f"Adjusted R-squared: {adj_r_squared:.4f}")
 
 :::
 
-In this model, the R-squared is 0.9109 and the adjusted R-squared is 0.9095. This indicates that approximately 91% of the variation in `Net_Money` is explained by the regressors included in the model.
+For this model, the R-squared is `r round(summary(ols_model)$r.squared, 4)` and the adjusted R-squared is `r round(summary(ols_model)$adj.r.squared, 4)`. This means that approximately `r round(100 * summary(ols_model)$r.squared, 1)`% of the variation in `Net_Money` in the training data is explained by the regressors included in the fitted model.
 
-However, while $R^2$ provides useful information about model fit, it has important limitations. A high $R^2$ does not mean that the model is causal, nor does it guarantee that the model assumptions are satisfied. It also does not rule out issues such as omitted variable bias, multicollinearity, or poor predictive performance on new data. Therefore, $R^2$ and adjusted $R^2$ should be interpreted together with residual diagnostics, statistical inference, and prediction-based performance metrics.
+The relatively small difference between $R^2$ and adjusted $R^2$ indicates that accounting for the number of estimated coefficients does not substantially reduce the reported goodness of fit.
 
+However, a high $R^2$ does not imply that the relationships in the model are causal, nor does it guarantee that the model assumptions are satisfied. It also does not rule out problems such as omitted variables, multicollinearity, or poor predictive performance on new observations. Therefore, $R^2$ and adjusted $R^2$ should be interpreted together with model diagnostics, statistical inference, and prediction-based performance measures.
+
+
+### Additional Model Diagnostics
 
 #### Multicollinearity
 
-In multiple regression, we also need to consider whether some regressors are strongly correlated with each other. This issue is called **multicollinearity**. Multicollinearity does not necessarily make the fitted values poor, but it can make individual coefficient estimates unstable and difficult to interpret. In particular, it can inflate standard errors and make it harder to determine which regressors are meaningfully associated with the response variable.
+In multiple regression, we also need to consider whether some regressors are strongly linearly related to the other regressors in the model. This issue is called **multicollinearity**.
 
-One common diagnostic for multicollinearity is the **Variance Inflation Factor** (VIF). The VIF measures how much the variance of an estimated coefficient is inflated because of linear relationships among the regressors. For the $j$th regressor, the VIF is defined as
+Multicollinearity does not necessarily imply poor overall model fit, but it can make individual coefficient estimates unstable and difficult to interpret. In particular, it can inflate the variances and standard errors of estimated coefficients, making it harder to distinguish the association of one regressor from the associations of the others.
+
+For a regressor represented by a single coefficient, a common diagnostic is the **Variance Inflation Factor (VIF)**. The VIF measures how much the variance of an estimated coefficient is inflated because of linear relationships between that regressor and the remaining regressors. For the $j$th regressor,
 
 $$
 \text{VIF}_j =
 \frac{1}{1 - R_j^2},
 $${#eq-vif}
 
-where $R_j^2$ is the coefficient of determination obtained by regressing the $j$th regressor on all the other regressors in the model.
+where $R_j^2$ is obtained by regressing the $j$th regressor on the remaining regressors in the model. If a regressor can be well explained by the other regressors, then $R_j^2$ will be large, making the VIF large. A VIF close to 1 indicates little evidence of multicollinearity involving that regressor. 
 
-The rationale behind VIF defined in @eq-vif is that if a regressor can be well explained by the other regressors, then $R_j^2$ will be large and $1 - R_j^2$ will be small. As a result, the VIF will be large, indicating that the variance of the estimated coefficient for that regressor has been inflated. A VIF close to 1 suggests little multicollinearity, while larger values suggest stronger multicollinearity. As a rough rule of thumb, VIF values above 5 may deserve further investigation and values above 10 are often considered problematic.
+As rough rules of thumb, VIF values greater than 5 may deserve further investigation, while values greater than 10 are often considered evidence of substantial multicollinearity. These thresholds should not be treated as strict decision rules.
 
-Unlike tests such as the Breusch-Pagan or Durbin-Watson tests, VIF is usually used as a diagnostic measure rather than a formal hypothesis test. Therefore, we do not usually write a null and alternative hypothesis for VIF. Instead, we compare the VIF values to practical rule-of-thumb thresholds and use subject-matter knowledge to decide whether any variables should be removed, combined, or interpreted with caution.
+Unlike the Breusch-Pagan or Durbin-Watson procedures, VIF is a diagnostic measure rather than a formal hypothesis test. We therefore examine the magnitude of the VIF values together with the structure and interpretation of the regressors.
 
 ::: {.panel-tabset}
 
@@ -3241,9 +3289,12 @@ print(vif_table)
 
 :::
 
-The VIF diagnostics do not suggest severe multicollinearity for this model. Most reported values are close to 1, indicating little evidence that these regressors are strongly linearly related to the remaining regressors in the model. The largest values occur for `Has_Job` and `Monthly_Earnings`. Both values are around 6.35, suggesting some multicollinearity involving these variables. This is expected because students who have a job are also more likely to report monthly earnings. However, these values are not extreme, and both variables have clear practical interpretations in the context of the analysis.
+For the fitted model, most regressors show little evidence of multicollinearity. The largest values occur for `Has_Job` and `Monthly_Earnings`, with GVIF values of approximately `r round(vif_table["Has_Job", "GVIF"], 2)` and `r round(vif_table["Monthly_Earnings", "GVIF"], 2)`, respectively. Because both terms have one degree of freedom, these values can be interpreted in the same way as ordinary VIF values. Values around 6.4 suggest some multicollinearity involving these two regressors.
 
-Therefore, we do not remove either variable at this stage. Overall, the VIF diagnostics suggest that multicollinearity is not a major concern for this model. If high multicollinearity is detected, possible strategies include removing one of the highly related regressors, reducing dimension using methods such as principal component analysis (PCA), using domain knowledge to simplify the model, or using regularization methods such as ridge regression.
+This relationship is reasonable in the context of the data because students who have a job are also likely to report monthly earnings. Although the VIF values warrant some attention, they are not sufficiently extreme to justify automatically removing either regressor. Both variables also represent substantively different characteristics: `Has_Job` indicates employment status, whereas `Monthly_Earnings` measures the amount earned.
+
+
+The remaining regressors show values close to 1, providing little evidence of substantial multicollinearity. For the multi-level categorical regressors `Living_Situation` and `Housing_Type`, we use the generalized VIF reported by `car::vif()`, as discussed in the following Tip. A detailed treatment of GVIF is beyond the scope of this book so readers should not be concerned with its mathematical details here. The following Tip provides a brief explanation for readers who are interested followed by a technical reference.
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -3251,32 +3302,41 @@ Generalized VIF
 ::::
 ::::{.Tip-container}
 
-When a regression model includes only numeric regressors or binary categorical regressors, the usual Variance Inflation Factor (VIF) can be used to assess multicollinearity. However, categorical regressors with more than two levels are represented by multiple dummy variables. In that case, the `car::vif()` function reports the **generalized variance inflation factor** (GVIF), which extends VIF to model terms with more than one degree of freedom.
+When a regression model includes a categorical regressor with more than two levels, that regressor is represented by multiple indicator variables and therefore contributes more than one coefficient to the model. In this situation, the ordinary Variance Inflation Factor (VIF) for a single coefficient is not sufficient to describe multicollinearity for the categorical regressor as a whole.
 
-To make GVIF values comparable across regressors with different numbers of degrees of freedom, we usually interpret the adjusted value,
+The `car::vif()` function therefore reports the **generalized variance inflation factor (GVIF)** for model terms with more than one degree of freedom. To make GVIF values more comparable across terms with different numbers of degrees of freedom, we can examine
 
 $$
-\text{GVIF}^{1/(2 \times \text{Df})}.
+\text{GVIF}^{1/(2 \times \text{Df})},
 $$
 
-Values close to 1 suggest little evidence of multicollinearity. Larger values suggest that the regressor may be strongly related to other regressors in the model and may deserve further investigation. In this model, most adjusted GVIF values are close to 1, suggesting no major multicollinearity problem. The main exception is the pair of variables `Has_Job` and `Monthly_Earnings`, which show moderate multicollinearity for practical reasons. You can read more about GVIF in @GVIF. The full mathematical definition of GVIF is beyond the scope of this book, so we focus on interpreting the adjusted GVIF value without knowing the details of formula.
+where $\text{Df}$ is the number of degrees of freedom associated with the model term.
+
+Values of this adjusted measure close to 1 indicate little evidence of multicollinearity. For the current model, the adjusted GVIF values for `Living_Situation` and `Housing_Type` are both very close to 1, indicating little evidence that these categorical regressors are strongly related to the remaining regressors.
+
+For model terms with one degree of freedom, the reported GVIF is equivalent to the usual VIF. Therefore, for variables such as `Has_Job` and `Monthly_Earnings`, we can interpret the GVIF values using the usual VIF scale. More details on generalized VIF are available in @GVIF.
 
 ::::
 :::
 
-#### Identifying Outliers and Influential Points
 
-Outliers and influential observations can distort regression estimates, making it crucial to detect and address them appropriately. An **outlier** is an observation with an unusually large residual, meaning that its observed response value is far from the value predicted by the model. An **influential observation** is an observation that has a strong effect on the fitted regression model. An observation can be an outlier without being highly influential, and an influential observation does not always have the largest residual.
+#### Outliers, Leverage, and Influential Observations
 
-For observation $i$, the residual is defined as
+Another important part of regression diagnostics is identifying observations that may behave differently from the majority of the data or have an unusually large influence on the fitted model. Three related concepts are useful here: **outliers**, **high-leverage observations**, and **influential observations**.
+
+An **outlier** is an observation whose observed response value is unusually far from the value predicted by the model. Such observations tend to have relatively large residuals. For observation $i$, the residual is
 
 $$
-\hat{\varepsilon}_i = y_i - \hat{y}_i,
+e_i = y_i - \hat{y}_i,
 $$
 
-where $y_i$ is the observed response value and $\hat{y}_i$ is the fitted response value from the model. The rationale behind residual plots is that unusually large positive or negative residuals may indicate observations that are poorly fit by the model. Plotting residuals against the observation index can help identify whether a small number of observations have unusually large deviations from zero.
+where $y_i$ is the observed response value and $\hat{y}_i$ is the fitted response value.
 
-Unlike formal tests such as the Breusch-Pagan or Durbin-Watson tests, identifying outliers using residual plots is usually treated as a diagnostic procedure rather than a formal hypothesis test. We inspect whether any residuals stand out clearly from the rest and then investigate those observations in the context of the data.
+A **high-leverage observation** has an unusual combination of regressor values relative to the other observations in the dataset. High leverage does not necessarily mean that an observation is poorly fit by the model, but such observations have greater potential to affect the fitted regression coefficients.
+
+An **influential observation** is one whose inclusion or removal has a noticeable effect on the fitted regression model. Influence therefore depends on both how unusual an observation is in terms of its regressors and how poorly it is fit by the model. An observation may be an outlier without being highly influential, and a high-leverage observation is not necessarily influential if it is well aligned with the fitted regression relationship.
+
+We begin by examining the residuals across observations. Plotting residuals against the observation index can help identify observations with unusually large positive or negative residuals. This is primarily a diagnostic procedure rather than a formal hypothesis test, so we inspect whether any observations stand out clearly from the rest of the data.
 
 ::: {.panel-tabset}
 
@@ -3401,11 +3461,192 @@ plt.show()
 
 :::
 
-In the residual plot above, the residuals appear to be evenly and randomly scattered around zero, with no clear pattern or extreme values. This suggests that there are no obvious outliers based on the residual plot. The residuals behave as expected, providing no visual evidence that a small number of observations are poorly fit by the model.
+The residuals are generally scattered around zero with no obvious pattern across the observation index. Several observations have relatively large positive or negative residuals, although no single observation appears dramatically separated from the rest of the residual distribution. These observations may warrant further investigation but a large residual alone does not imply that an observation has a substantial influence on the fitted model.
 
-Another important diagnostic tool is **Cook’s Distance**, which measures the influence of each observation on the fitted regression model. Cook’s Distance combines information about the size of the residual and the leverage of the observation. Therefore, it helps identify observations that may have a large effect on the estimated regression coefficients.
+To distinguish observations that are simply poorly fit from those that may have a greater ability to affect the fitted regression model, we next consider leverage and influence diagnostics.
 
-For observation $i$, Cook’s Distance can be written as
+
+##### Leverage
+
+Leverage measures how unusual an observation's regressor values are relative to those of the other observations. In linear regression, leverage is obtained from the diagonal elements of the hat matrix. Observations with larger leverage values have greater potential to affect the fitted regression model.
+
+A commonly used screening guideline is to investigate observations with leverage values larger than
+
+$$
+\frac{2p}{n},
+$$
+
+where $p$ is the total number of estimated regression parameters, including the intercept, and $n$ is the number of observations used to fit the model. This threshold is only a rule of thumb and should not be used as an automatic criterion for removing observations.
+
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+``` {.r}
+# Extract model diagnostics
+aug_training <- augment(ols_model) |>
+  mutate(row_id = row_number())
+
+# Number of observations and estimated parameters
+n <- nrow(aug_training)
+p <- length(coef(ols_model))
+
+# Leverage screening threshold
+leverage_threshold <- 2 * p / n
+
+# Plot leverage values
+leverage_plot <- ggplot(aug_training, aes(x = row_id, y = .hat)) +
+  geom_col(fill = "#0073C2FF", color = "#0073C2FF") +
+  geom_hline(
+    yintercept = leverage_threshold,
+    linewidth = 1,
+    linetype = "dashed",
+    color = "red"
+  ) +
+  labs(
+    x = "\nObservation Index",
+    y = "Leverage\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5)
+  )
+
+leverage_plot
+```
+
+## **`Python` Code**
+
+``` {.python}
+import matplotlib.pyplot as plt
+
+# Extract leverage values
+influence = ols_model.get_influence()
+leverage = influence.hat_matrix_diag
+
+# Number of observations and estimated parameters
+n = len(leverage)
+p = len(ols_model.params)
+
+# Leverage screening threshold
+leverage_threshold = 2 * p / n
+
+# Plot leverage values
+plt.figure(figsize=(6, 4))
+plt.bar(range(n), leverage)
+plt.axhline(
+    y=leverage_threshold,
+    color="red",
+    linestyle="--"
+)
+plt.xlabel("Observation Index")
+plt.ylabel("Leverage")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+
+::: {.panel-tabset}
+
+## **`R` Output**
+
+```{r}
+#| label: fig-leverage-net-money-r
+#| fig-cap: "OLS diagnostic plot of leverage values via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+# Extract model diagnostics
+aug_training <- augment(ols_model) |>
+  mutate(row_id = row_number())
+
+# Number of observations and estimated parameters
+n <- nrow(aug_training)
+p <- length(coef(ols_model))
+
+# Leverage screening threshold
+leverage_threshold <- 2 * p / n
+
+# Plot leverage values
+leverage_plot <- ggplot(aug_training, aes(x = row_id, y = .hat)) +
+  geom_col(fill = "#0073C2FF", color = "#0073C2FF") +
+  geom_hline(
+    yintercept = leverage_threshold,
+    linewidth = 1,
+    linetype = "dashed",
+    color = "red"
+  ) +
+  labs(
+    x = "\nObservation Index",
+    y = "Leverage\n"
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 15.5),
+    axis.title.x = element_text(size = 20),
+    axis.title.y = element_text(size = 20, vjust = 0.5)
+  )
+
+leverage_plot
+```
+
+## **`Python` Output**
+
+```{python}
+#| label: fig-leverage-net-money-py
+#| fig-cap: "OLS diagnostic plot of leverage values via training set."
+#| warning: false
+#| echo: false
+#| message: false
+#| fig.height: 8
+#| fig.width: 14
+
+import matplotlib.pyplot as plt
+
+# Extract leverage values
+influence = ols_model.get_influence()
+leverage = influence.hat_matrix_diag
+
+# Number of observations and estimated parameters
+n = len(leverage)
+p = len(ols_model.params)
+
+# Leverage screening threshold
+leverage_threshold = 2 * p / n
+
+# Plot leverage values
+plt.figure(figsize=(6, 4))
+plt.bar(range(n), leverage)
+plt.axhline(
+    y=leverage_threshold,
+    color="red",
+    linestyle="--"
+)
+plt.xlabel("Observation Index")
+plt.ylabel("Leverage")
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The leverage plot shows that most observations have leverage values well below the screening threshold of $2p/n$. However, a small number of observations exceed this threshold, indicating that they have relatively unusual combinations of regressor values compared with the rest of the training data.
+
+These observations are not necessarily problematic. A high-leverage observation may still be well represented by the fitted model and therefore have little influence on the estimated regression coefficients. The threshold is intended as a screening guideline rather than an automatic rule for removing observations. 
+
+We therefore retain these observations and next examine **Cook's Distance**, which combines information about residual size and leverage to assess how strongly individual observations influence the fitted model.
+
+Another important diagnostic tool is **Cook's Distance**, which measures how strongly each observation influences the fitted regression model. Cook's Distance combines information about both the residual size and the leverage of an observation. An observation with a large residual, high leverage, or both may therefore have a relatively large Cook's Distance.
+
+For observation $i$, Cook's Distance can be written as
 
 $$
 D_i =
@@ -3416,11 +3657,20 @@ p \, \widehat{\sigma}^2
 },
 $${#eq-cooks-distance}
 
-where $\hat{y}_j$ is the fitted value for observation $j$ using the full dataset, $\hat{y}_{j(i)}$ is the fitted value for observation $j$ after removing observation $i$, $p$ is the number of estimated parameters in the model, and $\widehat{\sigma}^2$ is the estimated error variance.
+where $\hat{y}_j$ is the fitted value for observation $j$ using the full dataset, $\hat{y}_{j(i)}$ is the fitted value for observation $j$ after removing observation $i$, $p$ is the total number of estimated regression parameters including the intercept, and $\widehat{\sigma}^2$ is the estimated error variance.
 
-The rationale behind Cook’s Distance is to ask how much the fitted model would change if one observation were removed. If removing an observation changes the fitted values substantially, then that observation may be influential. Common rules of thumb include investigating Cook’s Distance values greater than 0.5 or values that stand out clearly relative to the rest of the observations.
+The rationale behind Cook's Distance is to ask how much the fitted model would change if a particular observation were removed. Larger values indicate observations with greater influence on the fitted model.
 
-As with residual plots, Cook’s Distance is usually treated as a diagnostic measure rather than a formal hypothesis test. We do not usually write a null and alternative hypothesis for Cook’s Distance. Instead, we inspect the values and investigate any observations that appear unusually influential.
+There is no universal cutoff that determines whether an observation is influential. One commonly used screening guideline is
+
+$$
+D_i > \frac{4}{n},
+$$
+
+where $n$ is the number of observations used to fit the model. Observations exceeding this guideline may deserve further investigation, particularly when their Cook's Distance values also stand out relative to the rest of the data. This threshold should be treated as a diagnostic guideline rather than an automatic rule for removing observations.
+
+As with the residual and leverage diagnostics, Cook's Distance is not a formal hypothesis test. We inspect the values and investigate observations that appear potentially influential.
+
 
 ::: {.panel-tabset}
 
@@ -3549,9 +3799,11 @@ plt.show()
 
 :::
 
-In the plot above, all observations have Cook’s Distance values well below the 0.5 rule-of-thumb threshold, and no observation appears to stand out substantially from the others. This suggests that no individual data point has an undue influence on the model’s estimates.
+The largest Cook's Distance in the fitted model is approximately 0.0128, while the $4/n$ screening guideline is 0.005. Several observations exceed this guideline and stand out relative to the majority of the Cook's Distance values. These observations may therefore have greater influence on the fitted model and deserve further investigation.
 
-If influential points are identified, the next steps involve investigating data quality, checking whether the observation is a data entry error or a valid unusual case, and refitting the model with and without the influential observation to assess sensitivity. Other possible approaches include using robust regression techniques or applying Winsorization, which involves replacing extreme values with more moderate values to reduce their impact.
+However, exceeding the $4/n$ guideline does not mean that an observation should automatically be removed. Cook's Distance is a diagnostic measure, and influential observations may represent valid and meaningful cases rather than data errors. The appropriate next step is to inspect these observations, verify their data quality, and assess whether the substantive conclusions of the model are sensitive to their inclusion.
+
+Taken together with the residual and leverage diagnostics, the results suggest that a small number of observations warrant additional attention but there is no immediate justification for removing them from the analysis.
 
 
 ::: {.Tip}
