@@ -738,9 +738,41 @@ data <- data |>
 
 ## **`Python` Code**
 ```{python}
-# Convert categorical variables to categorical dtype
-cols_to_convert = ["Has_Job", "Drinks_Alcohol", "Financially_Dependent", "Cooks_at_Home", "Living_Situation", "Housing_Type"]
-data[cols_to_convert] = data[cols_to_convert].astype("category")
+# Encode binary categorical variables and set reference categories
+binary_mappings = {
+    "Has_Job": {0: "No", 1: "Yes"},
+    "Drinks_Alcohol": {0: "No", 1: "Yes"},
+    "Financially_Dependent": {0: "No", 1: "Yes"},
+    "Cooks_at_Home": {0: "No", 1: "Yes"},
+}
+
+for column, mapping in binary_mappings.items():
+    data[column] = data[column].map(mapping)
+    data[column] = pd.Categorical(
+        data[column],
+        categories=["No", "Yes"]
+    )
+
+# Encode categorical variables with more than two levels
+data["Living_Situation"] = data["Living_Situation"].map({
+    1: "Family",
+    2: "Shared",
+    3: "Alone"
+})
+data["Living_Situation"] = pd.Categorical(
+    data["Living_Situation"],
+    categories=["Family", "Shared", "Alone"]
+)
+
+data["Housing_Type"] = data["Housing_Type"].map({
+    1: "Rent",
+    2: "Own",
+    3: "Dormitory"
+})
+data["Housing_Type"] = pd.Categorical(
+    data["Housing_Type"],
+    categories=["Rent", "Own", "Dormitory"]
+)
 ```
 :::
 
@@ -2046,34 +2078,252 @@ Although interaction terms or nonlinear terms could be added to extend this mode
 
 ## Estimation
 
-With the data modelling stage completed, we now move to estimation, where we fit the Ordinary Least Squares (OLS) regression model to the data and obtain numerical estimates for the regression coefficients. These estimates quantify how much each regressor contributes to the response variable, allowing us to measure their individual effects on net money.
+With the regression model specified, we now turn to **estimation**. The unknown parameters $\beta_0, \beta_1, \ldots, \beta_k$ describe the relationship between the regressors and the conditional mean of the response. Because these parameters are unknown, we use the observed data to estimate them.
 
-In ordinary least squares, the coefficients are chosen so that the fitted values are as close as possible to the observed responses. For a given observation, the fitted value is
+Let
 
 $$
-\widehat{Y}_i = \beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}.
+\hat{\boldsymbol{\beta}}
+=
+(\hat{\beta}_0,\hat{\beta}_1,\ldots,\hat{\beta}_k)^\top
+$$
+
+denote the estimated regression coefficients. For the $i$-th observation, the fitted response value is
+
+$$
+\widehat{Y}_i
+=
+\hat{\beta}_0
++
+\sum_{j=1}^{k}\hat{\beta}_j x_{i,j}.
 $${#eq-ols-fitted-value}
 
-Therefore, the residual for the $i$-th observation is
+The difference between the observed response $Y_i$ and its fitted value $\widehat{Y}_i$ is called the **residual**:
 
 $$
-Y_i - \widehat{Y}_i
+e_i
 =
-Y_i - \left(\beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}\right).
+Y_i-\widehat{Y}_i.
 $${#eq-residual-formula}
 
-OLS chooses the coefficient estimates that minimize the sum of squared residuals:
+Ordinary least squares estimates the regression coefficients by choosing the values that make these residuals collectively as small as possible. More specifically, OLS minimizes the **sum of squared errors (SSE)**,
 
 $$
+SSE(\boldsymbol{\beta})
+=
 \sum_{i=1}^{n}
 \left[
-Y_i - \left(\beta_0 + \sum_{j=1}^{k} \beta_j x_{i,j}\right)
+Y_i
+-
+\left(
+\beta_0+\sum_{j=1}^{k}\beta_j x_{i,j}
+\right)
 \right]^2.
 $${#eq-sse-obj-function}
 
-This objective function gives a mathematical meaning to the phrase “best-fitting line” described earlier in this chapter. The best-fitting model is the one whose coefficients make the squared residuals as small as possible. Strictly speaking, when a regression model has more than one regressor, the fitted object is not a line but a hyperplane.
+The OLS estimator can therefore be written as
 
-Although functions such as `lm()` in R and `ols()` in Python estimate regression coefficients automatically for us, it is helpful to understand the mathematical foundation behind ordinary least squares. The following tip briefly shows how the same least squares idea can be written compactly using matrix notation and how the coefficients are estimated so that the sum of squared of residuals is minimized. 
+$$
+\hat{\boldsymbol{\beta}}
+=
+\underset{\boldsymbol{\beta}}{\operatorname{argmin}}
+\;
+SSE(\boldsymbol{\beta}).
+$${#eq-ols-argmin}
+
+This formalizes the idea of the “best-fitting” model introduced earlier in the chapter. In simple linear regression, OLS chooses the line that minimizes the sum of squared residuals. With multiple regressors, the same principle applies, although geometrically the fitted model represents a hyperplane rather than a single line.
+
+So far, we have described OLS as an optimization problem based on squared residuals. However, there is also an important probabilistic interpretation. Under the Normal linear regression model introduced earlier, the same coefficient estimates can be obtained using **maximum likelihood estimation**. We examine this connection next.
+
+
+### The Likelihood Perspective
+
+Ordinary least squares can also be viewed from a probabilistic perspective. Recall that under the classical Normal linear regression model, we assume
+
+$$
+Y_i \mid \mathbf{x}_i
+\sim
+\mathcal{N}(\mu_i,\sigma^2),
+$$
+
+where
+
+$$
+\mu_i
+=
+\beta_0
++
+\sum_{j=1}^{k}\beta_j x_{i,j}.
+$$
+
+Here, $\mu_i$ is the conditional mean of the response for the $i$-th observation, and $\sigma^2$ represents the conditional variance of the response around that mean. Equivalently, this corresponds to assuming
+
+$$
+\epsilon_i \mid \mathbf{x}_i
+\sim
+\mathcal{N}(0,\sigma^2).
+$$
+
+For an observed response value $y_i$, the Normal probability density is therefore
+
+$$
+f(y_i \mid \mathbf{x}_i; \boldsymbol{\beta},\sigma^2)
+=
+\frac{1}{\sqrt{2\pi\sigma^2}}
+\exp\left[
+-\frac{
+\left(
+y_i-\beta_0-\sum_{j=1}^{k}\beta_j x_{i,j}
+\right)^2
+}{
+2\sigma^2
+}
+\right],
+$${#eq-ols-normal-density}
+
+where
+
+$$
+\boldsymbol{\beta}
+=
+(\beta_0,\beta_1,\ldots,\beta_k)^\top
+$$
+
+is the vector of regression coefficients.
+
+The density in @eq-ols-normal-density describes how plausible a particular observed response $y_i$ is for given values of the model parameters. The **likelihood function** reverses this perspective: we treat the observed data as fixed and view the likelihood as a function of the unknown parameters $\boldsymbol{\beta}$ and $\sigma^2$.
+
+Because the observations are assumed to be independent, the joint likelihood for all $n$ observations is the product of their individual Normal densities:
+
+$$
+L(\boldsymbol{\beta},\sigma^2)
+=
+\prod_{i=1}^{n}
+f(y_i \mid \mathbf{x}_i; \boldsymbol{\beta},\sigma^2).
+$$
+
+Substituting the Normal density gives
+
+$$
+L(\boldsymbol{\beta},\sigma^2)
+=
+\prod_{i=1}^{n}
+\frac{1}{\sqrt{2\pi\sigma^2}}
+\exp\left[
+-\frac{
+\left(
+y_i-\beta_0-\sum_{j=1}^{k}\beta_j x_{i,j}
+\right)^2
+}{
+2\sigma^2
+}
+\right].
+$${#eq-ols-likelihood-product}
+
+Collecting the terms, we can write the likelihood more compactly as
+
+$$
+L(\boldsymbol{\beta},\sigma^2)
+=
+(2\pi\sigma^2)^{-n/2}
+\exp\left[
+-\frac{1}{2\sigma^2}
+\sum_{i=1}^{n}
+\left(
+y_i-\beta_0-\sum_{j=1}^{k}\beta_jx_{i,j}
+\right)^2
+\right].
+$${#eq-ols-likelihood}
+
+Notice that the summation appearing inside the exponential function is exactly the **sum of squared errors**:
+
+$$
+SSE(\boldsymbol{\beta})
+=
+\sum_{i=1}^{n}
+\left(
+y_i-\beta_0-\sum_{j=1}^{k}\beta_jx_{i,j}
+\right)^2.
+$$
+
+Therefore, the likelihood can also be written as
+
+$$
+L(\boldsymbol{\beta},\sigma^2)
+=
+(2\pi\sigma^2)^{-n/2}
+\exp\left[
+-\frac{SSE(\boldsymbol{\beta})}{2\sigma^2}
+\right].
+$${#eq-ols-likelihood-sse}
+
+Rather than maximizing the likelihood directly, it is usually easier to work with its natural logarithm. Because the logarithm is a strictly increasing function, the values of the parameters that maximize the likelihood also maximize the **log-likelihood**:
+
+$$
+\ell(\boldsymbol{\beta},\sigma^2)
+=
+\log L(\boldsymbol{\beta},\sigma^2).
+$$
+
+Taking the logarithm of @eq-ols-likelihood-sse gives
+
+$$
+\ell(\boldsymbol{\beta},\sigma^2)
+=
+-\frac{n}{2}\log(2\pi)
+-\frac{n}{2}\log(\sigma^2)
+-\frac{1}{2\sigma^2}SSE(\boldsymbol{\beta}).
+$${#eq-ols-log-likelihood}
+
+Now consider estimation of the regression coefficients $\boldsymbol{\beta}$. For a fixed value of $\sigma^2$, the first two terms in @eq-ols-log-likelihood do not depend on $\boldsymbol{\beta}$. Since $\sigma^2 > 0$, maximizing the log-likelihood with respect to $\boldsymbol{\beta}$ is therefore equivalent to minimizing
+
+$$
+SSE(\boldsymbol{\beta}).
+$$
+
+In other words,
+
+$$
+\underset{\boldsymbol{\beta}}{\operatorname{argmax}}
+\;
+L(\boldsymbol{\beta},\sigma^2)
+=
+\underset{\boldsymbol{\beta}}{\operatorname{argmin}}
+\;
+SSE(\boldsymbol{\beta}).
+$${#eq-ols-mle-sse-equivalence}
+
+This establishes an important connection: **under the Normal linear regression model, the maximum likelihood estimates of the regression coefficients are the same as the ordinary least-squares estimates**.
+
+Therefore,
+
+$$
+\hat{\boldsymbol{\beta}}_{\mathrm{MLE}}
+=
+\hat{\boldsymbol{\beta}}_{\mathrm{OLS}}.
+$$
+
+The Normal likelihood also allows us to estimate the error variance $\sigma^2$. After substituting the estimated regression coefficients, maximizing the likelihood with respect to $\sigma^2$ gives
+
+$$
+\hat{\sigma}^2_{\mathrm{MLE}}
+=
+\frac{SSE(\hat{\boldsymbol{\beta}})}{n}.
+$${#eq-ols-sigma-mle}
+
+However, the maximum likelihood estimator in @eq-ols-sigma-mle is biased downward as an estimator of the population error variance. In classical linear regression, we therefore commonly use the degrees-of-freedom-adjusted estimator
+
+$$
+\hat{\sigma}^2
+=
+\frac{SSE(\hat{\boldsymbol{\beta}})}
+{n-k-1},
+$${#eq-ols-sigma-unbiased}
+
+where $k$ is the number of regressors and $k+1$ parameters are estimated when the intercept is included.
+
+The likelihood perspective therefore leads to the same coefficient estimates as the least-squares criterion introduced earlier. The remaining question is how we obtain these coefficient estimates explicitly. The matrix formulation of OLS provides a convenient way to derive the closed-form solution.
+
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -2081,178 +2331,257 @@ The Matrix Form of Linear Regression
 ::::
 ::::{.Tip-container}
 
-In ordinary least squares (OLS) regression, we model the relationship between a response variable and one or more predictors using the matrix equation
+The multiple linear regression model can be written compactly using matrix notation as
 
 $$
-\mathbf{Y} = \mathbf{X}\boldsymbol{\beta} + \boldsymbol{\varepsilon}
+\mathbf{Y}
+=
+\mathbf{X}\boldsymbol{\beta}
++
+\boldsymbol{\varepsilon},
 $${#eq-ols-formula-matrix-notation}
+
 where:
-  
-- $\mathbf{Y}$ is an $n \times 1$ vector of observed response values, where $n$ is the number of observations in the sample.
-  
-- $\mathbf{X}$ is an $n \times (k+1)$ design matrix containing the regressors, where $k$ is the number of regressors The additional column corresponds to the intercept term.
-  
-- $\boldsymbol{\beta}$ is a $(k+1) \times 1$ vector of regression coefficients including the intercept coefficient.
-  
-- $\boldsymbol{\varepsilon}$ is an $n \times 1$ vector of random errors (residual terms).
 
-If we have $n$ observations and $k$ regressors, the **design matrix** may look like
+- $\mathbf{Y}$ is an $n \times 1$ vector containing the observed response values.
+- $\mathbf{X}$ is an $n \times (k+1)$ **design matrix**, where $k$ is the number of regressors. The additional column corresponds to the intercept.
+- $\boldsymbol{\beta}$ is a $(k+1) \times 1$ vector containing the unknown regression coefficients, including the intercept.
+- $\boldsymbol{\varepsilon}$ is an $n \times 1$ vector containing the random error terms.
+
+For $n$ observations and $k$ regressors, the design matrix has the form
 
 $$
-\mathbf{X} =
+\mathbf{X}
+=
 \begin{bmatrix}
-1 & x_{11} & x_{12} & \cdots & x_{1k} \\
-1 & x_{21} & x_{22} & \cdots & x_{2k} \\
+1 & x_{1,1} & x_{1,2} & \cdots & x_{1,k} \\
+1 & x_{2,1} & x_{2,2} & \cdots & x_{2,k} \\
 \vdots & \vdots & \vdots & \ddots & \vdots \\
-1 & x_{n1} & x_{n2} & \cdots & x_{nk}
-\end{bmatrix}
+1 & x_{n,1} & x_{n,2} & \cdots & x_{n,k}
+\end{bmatrix}.
 $${#eq-design-matrix}
-  
-Each row of the matrix corresponds to one observation in the dataset, while each column corresponds to a regressor. For example, the element $x_{ij}$ represents the value of the $j$th predictor for the $i$th observation.
 
-The first column of ones represents the intercept term. Including this column allows the model to estimate a constant baseline value (the intercept) rather than forcing the regression line (or more accurately hyperplane) to pass through the origin.
+Each row of $\mathbf{X}$ corresponds to one observation, while each column after the first corresponds to a regressor. The element $x_{i,j}$ therefore represents the value of the $j$-th regressor for the $i$-th observation.
 
-For example, suppose we have data from $n = 100$ individuals and we want to predict salary using two regressors: *years of experience* and *years of education.* In this case, the response vector $\mathbf{Y}$ would contain 100 salary values, making it a $100 \times 1$ vector. Since we have two regressors plus an intercept term, the design matrix $\mathbf{X}$ would have 100 rows and 3 columns. The first column would contain only ones for the intercept, the second column might contain years of experience, and the third column might contain years of education. The coefficient vector $\boldsymbol{\beta}$ would therefore contain three coefficients: one intercept coefficient and one coefficient for each regressor.
+The first column contains only ones and represents the intercept term. Including this column allows the model to estimate an intercept rather than forcing the fitted regression line, or more generally the fitted hyperplane, to pass through the origin.
 
-A small portion of the design matrix may look like
+For example, suppose we have data from $n=100$ individuals and want to model salary using two regressors: *years of experience* and *years of education*. The response vector $\mathbf{Y}$ contains the 100 observed salary values and is therefore a $100 \times 1$ vector. Since the model contains two regressors plus an intercept, the design matrix $\mathbf{X}$ has 100 rows and 3 columns.
+
+A small portion of the design matrix might look like
 
 $$
-\mathbf{X} =
+\mathbf{X}
+=
 \begin{bmatrix}
 1 & 5 & 16 \\
 1 & 2 & 14 \\
 1 & 8 & 18 \\
 1 & 10 & 20 \\
 \vdots & \vdots & \vdots
-\end{bmatrix}
+\end{bmatrix},
 $$
 
 where:
 
-- the first column of ones represents the intercept term,
+- the first column represents the intercept,
 - the second column contains years of experience,
 - the third column contains years of education,
-- and each row corresponds to one individual in the dataset.
+- and each row represents one individual.
 
-Recall that the goal of OLS is to find the coefficient vector $\boldsymbol{\beta}$ that minimizes the sum of squared residuals:
-  
-$$
-SSE = \sum_{i=1}^{n}(Y_i - \hat{Y}_i)^2
-$$
-This objective function can be written more compactly by using matrix notation as:
+The corresponding coefficient vector is
 
 $$
-SSE = (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top (\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+\boldsymbol{\beta}
+=
+\begin{bmatrix}
+\beta_0 \\
+\beta_1 \\
+\beta_2
+\end{bmatrix}.
+$$
+
+Recall that OLS estimates the coefficient vector by minimizing the sum of squared errors. In scalar notation,
+
+$$
+SSE(\boldsymbol{\beta})
+=
+\sum_{i=1}^{n}
+\left(
+Y_i-\beta_0-\sum_{j=1}^{k}\beta_jx_{i,j}
+\right)^2.
+$$
+
+Using matrix notation, the same objective can be written more compactly as
+
+$$
+SSE(\boldsymbol{\beta})
+=
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta})^\top
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta}).
 $${#eq-ols-sse-matrix-notation}
-  
-These two objects are mathematically the same, the second one is presented in matrix form. Here, the superscript ${}^\top$ denotes the matrix transpose operation, which converts a column vector into a row vector. This allows the expression to produce a single scalar value representing the residual sum of squares.
-  
-To find the value of $\boldsymbol{\beta}$ that minimizes the residual sum of squares, we differentiate the objective function with respect to $\boldsymbol{\beta}$ and set the derivative equal to zero. Starting from the matrix form of the residual sum of squares,
+
+The superscript ${}^\top$ denotes the transpose operation. Since $\mathbf{Y}-\mathbf{X}\boldsymbol{\beta}$ is an $n \times 1$ vector, multiplying its transpose by itself produces a scalar equal to the sum of its squared elements.
+
+To find the value of $\boldsymbol{\beta}$ that minimizes the SSE, we differentiate the objective function with respect to $\boldsymbol{\beta}$ and set the derivative equal to zero.
+
+Starting with
 
 $$
-SSE =
-(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})^\top
-(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
+SSE(\boldsymbol{\beta})
+=
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta})^\top
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta}),
 $$
 
-we can expand the expression as follows:
+we first expand the expression:
 
 $$
-SSE =
-\left(\mathbf{Y}^\top - (\mathbf{X}\boldsymbol{\beta})^\top\right)
-(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
-$$
-
-Using the transpose rule $(\mathbf{X}\boldsymbol{\beta})^\top =
-\boldsymbol{\beta}^\top \mathbf{X}^\top$, we get
-
-$$
-SSE =
-(\mathbf{Y}^\top - \boldsymbol{\beta}^\top \mathbf{X}^\top)
-(\mathbf{Y} - \mathbf{X}\boldsymbol{\beta})
-$$
-
-Now multiply the terms:
-
-$$
-SSE =
-\mathbf{Y}^\top \mathbf{Y}
+SSE(\boldsymbol{\beta})
+=
+\left(
+\mathbf{Y}^\top
 -
-\mathbf{Y}^\top \mathbf{X}\boldsymbol{\beta}
+(\mathbf{X}\boldsymbol{\beta})^\top
+\right)
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta}).
+$$
+
+Using the transpose rule
+
+$$
+(\mathbf{X}\boldsymbol{\beta})^\top
+=
+\boldsymbol{\beta}^\top\mathbf{X}^\top,
+$$
+
+we obtain
+
+$$
+SSE(\boldsymbol{\beta})
+=
+(\mathbf{Y}^\top-\boldsymbol{\beta}^\top\mathbf{X}^\top)
+(\mathbf{Y}-\mathbf{X}\boldsymbol{\beta}).
+$$
+
+Multiplying the terms gives
+
+$$
+SSE(\boldsymbol{\beta})
+=
+\mathbf{Y}^\top\mathbf{Y}
 -
-\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
-+
-\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
-$$
-
-The two middle terms are scalars and are equal to each other:
-
-$$
-\mathbf{Y}^\top \mathbf{X}\boldsymbol{\beta}
-=
-\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
-$$
-
-Therefore, the expression simplifies to
-
-$$
-SSE =
-\mathbf{Y}^\top \mathbf{Y}
+\mathbf{Y}^\top\mathbf{X}\boldsymbol{\beta}
 -
-2\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{Y}
+\boldsymbol{\beta}^\top\mathbf{X}^\top\mathbf{Y}
 +
-\boldsymbol{\beta}^\top \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+\boldsymbol{\beta}^\top\mathbf{X}^\top\mathbf{X}\boldsymbol{\beta}.
 $$
 
-
-  
-Taking the derivative with respect to $\boldsymbol{\beta}$:
-  
-$$
-  \frac{\partial RSS}{\partial \boldsymbol{\beta}}
-=
-  -2\mathbf{X}^\top \mathbf{Y}
-+
-  2\mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
-$$
-  
-Setting the derivative equal to zero:
-  
-$$
-  -2\mathbf{X}^\top \mathbf{Y}
-+
-  2\mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
-= 0
-$$
-  
-which simplifies to the **normal equations**
+The two middle terms are scalars and are equal:
 
 $$
-  \mathbf{X}^\top \mathbf{X}\boldsymbol{\beta}
+\mathbf{Y}^\top\mathbf{X}\boldsymbol{\beta}
 =
-  \mathbf{X}^\top \mathbf{Y}
+\boldsymbol{\beta}^\top\mathbf{X}^\top\mathbf{Y}.
 $$
-  
-Assuming $(\mathbf{X}^\top \mathbf{X})$ is invertible, we can solve for the estimated coefficient vector:
-  
+
+Therefore,
+
 $$
-  \hat{\boldsymbol{\beta}}
+SSE(\boldsymbol{\beta})
 =
-  (\mathbf{X}^\top \mathbf{X})^{-1}
-\mathbf{X}^\top \mathbf{Y}
+\mathbf{Y}^\top\mathbf{Y}
+-
+2\boldsymbol{\beta}^\top\mathbf{X}^\top\mathbf{Y}
++
+\boldsymbol{\beta}^\top\mathbf{X}^\top\mathbf{X}\boldsymbol{\beta}.
+$$
+
+Differentiating with respect to $\boldsymbol{\beta}$ gives
+
+$$
+\frac{\partial SSE(\boldsymbol{\beta})}
+{\partial\boldsymbol{\beta}}
+=
+-2\mathbf{X}^\top\mathbf{Y}
++
+2\mathbf{X}^\top\mathbf{X}\boldsymbol{\beta}.
+$${#eq-ols-sse-gradient}
+
+Setting the gradient equal to zero gives
+
+$$
+-2\mathbf{X}^\top\mathbf{Y}
++
+2\mathbf{X}^\top\mathbf{X}\boldsymbol{\beta}
+=
+\mathbf{0}.
+$$
+
+After simplifying, we obtain the **normal equations**:
+
+$$
+\mathbf{X}^\top\mathbf{X}\boldsymbol{\beta}
+=
+\mathbf{X}^\top\mathbf{Y}.
+$${#eq-ols-normal-equations}
+
+If the columns of $\mathbf{X}$ are linearly independent, then $\mathbf{X}^\top\mathbf{X}$ is invertible. Solving the normal equations gives the OLS estimator
+
+$$
+\boxed{
+\hat{\boldsymbol{\beta}}
+=
+(\mathbf{X}^\top\mathbf{X})^{-1}
+\mathbf{X}^\top\mathbf{Y}
+}.
 $${#eq-ols-coefficient-estimates-matrix-notation}
-  
-This expression is known as the **ordinary least squares estimator**. Conceptually, OLS chooses the regression coefficients that produce the smallest possible squared prediction error for the observed data.
 
-In practice, software such as `lm()` in R computes these estimates automatically using efficient numerical algorithms rather than explicitly calculating matrix inverses. Although we do not need to perform these calculations by hand, it is still important to understand what happens behind the scenes when fitting a linear regression model using the `lm()` function for example.
+The second derivative matrix, or **Hessian**, of the SSE is
 
+$$
+\frac{\partial^2 SSE(\boldsymbol{\beta})}
+{\partial\boldsymbol{\beta}\partial\boldsymbol{\beta}^\top}
+=
+2\mathbf{X}^\top\mathbf{X}.
+$$
+
+When the columns of $\mathbf{X}$ are linearly independent, $\mathbf{X}^\top\mathbf{X}$ is positive definite. Therefore, the solution in @eq-ols-coefficient-estimates-matrix-notation corresponds to the unique minimum of the SSE.
+
+This expression is the **ordinary least-squares estimator**. It shows explicitly how the observed response vector $\mathbf{Y}$ and the design matrix $\mathbf{X}$ determine the estimated regression coefficients.
+
+Once the coefficients have been estimated, the fitted values can be written as
+
+$$
+\widehat{\mathbf{Y}}
+=
+\mathbf{X}\hat{\boldsymbol{\beta}},
+$$
+
+and the vector of residuals is
+
+$$
+\mathbf{e}
+=
+\mathbf{Y}-\widehat{\mathbf{Y}}
+=
+\mathbf{Y}-\mathbf{X}\hat{\boldsymbol{\beta}}.
+$$
+
+Notice the distinction between the **error vector** $\boldsymbol{\varepsilon}$ in the statistical model and the **residual vector** $\mathbf{e}$ obtained after fitting the model. The errors are unobserved random quantities, whereas the residuals can be calculated from the observed data and the fitted model.
+
+In practice, statistical software such as `lm()` in `R` and `ols()` in `Python` computes the coefficient estimates using numerically stable matrix algorithms rather than explicitly forming the inverse $(\mathbf{X}^\top\mathbf{X})^{-1}$. 
+
+Nevertheless, the closed-form expression above is useful for understanding the mathematical foundation of OLS and why, unlike many other regression models in this book, its regression coefficients can be obtained without iterative numerical optimization.
 ::::
 :::
 
 
 ### Fitting the Model
 
-To estimate the regression coefficients, we fit the OLS model to the training data using Python (`ols` method from `statsmodels`) or R (`lm` function). The model is trained using least squares estimation, which finds the coefficients that minimize the total squared error between observed values and predictions. In R, we can fit the regression model using the `lm()` function:
+Having specified the regression model and derived the OLS estimator, we now fit the model to the training data. In `R`, we use the `lm()` function, while in `Python` we use the `ols()` function from `statsmodels`. Both implementations estimate the regression coefficients by minimizing the sum of squared errors described in the previous section.
+
+The same set of regressors is included in both implementations so that the fitted models are directly comparable.
 
 ::: {.panel-tabset}
 
@@ -2281,7 +2610,7 @@ ols_model = smf.ols(
 ).fit()
 
 # Creating a tidy summary table
-testing_OLS_tidy = pd.DataFrame({
+OLS_tidy = pd.DataFrame({
      "term": ols_model.params.index,
      "estimate": np.round(ols_model.params.values, 2),
      "std_error": np.round(ols_model.bse.values, 2),
@@ -2290,7 +2619,7 @@ testing_OLS_tidy = pd.DataFrame({
  })
  
 # Displaying the tidy table
-print(testing_OLS_tidy)
+print(OLS_tidy)
 ```
 
 :::
@@ -2328,7 +2657,7 @@ ols_model = smf.ols(
 ).fit()
 
 # Creating a tidy summary table
-testing_OLS_tidy = pd.DataFrame({
+OLS_tidy = pd.DataFrame({
      "term": ols_model.params.index,
      "estimate": np.round(ols_model.params.values, 2),
      "std_error": np.round(ols_model.bse.values, 2),
@@ -2337,10 +2666,10 @@ testing_OLS_tidy = pd.DataFrame({
  })
  
 # Displaying the tidy table
-print(testing_OLS_tidy)
+print(OLS_tidy)
 ```
-
 :::
+
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -2350,18 +2679,18 @@ A note on ordinal regressors
 
 Some regressors are ordered categories. In this example, `Year_of_Study` and `Goes_Out_Spends_Money` are ordinal variables because their values have a natural ordering. For instance, year 4 comes after year 3, and a spending-frequency score of 5 represents more frequent spending than a score of 4.
 
-In this model, we treat these ordinal variables as numeric regressors. This is a modeling choice. It means that we assume a one-unit increase has a constant linear association with the response variable, holding the other regressors fixed. For example, the model assumes that the expected change in `Net_Money` from year 1 to year 2 is the same as the expected change from year 3 to year 4.
+In this model, we treat these ordinal variables as numeric regressors. This is a modelling choice. It means that we assume a one-unit increase has a constant linear association with the response variable, holding the other regressors fixed. For example, the model assumes that the expected change in `Net_Money` from year 1 to year 2 is the same as the expected change from year 3 to year 4.
 
 This approach keeps the model simpler and easier to interpret. Instead of estimating a separate coefficient for each level of an ordinal variable, we estimate one coefficient that summarizes the average linear change across the ordered scale.
 
-For example, suppose the estimated coefficient for `Year_of_Study` is $-100.14$. Then, holding all other regressors fixed, moving up by one academic year is associated with an estimated decrease of 100.14 CAD in predicted financial balance, on average.
+For example, suppose the estimated coefficient for `Year_of_Study` is $-100$. Then, holding all other regressors fixed, moving up by one academic year is associated with an estimated decrease of 100 CAD in expected `Net_Money`, on average.
 
-Similarly, suppose the estimated coefficient for `Goes_Out_Spends_Money` is $-47.85$. Since this variable is treated as numeric, a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 47.85 CAD in predicted financial balance, on average, holding the other regressors fixed.
+Similarly, suppose the estimated coefficient for `Goes_Out_Spends_Money` is $-50$. Since this variable is treated as numeric, a one-unit increase on the spending-frequency scale is associated with an estimated decrease of 50 CAD in expected `Net_Money`, on average, holding the other regressors fixed.
 
-This numeric treatment is appropriate when a linear trend across the ordered categories is a reasonable approximation. If we do not want to assume a constant one-unit effect, we could instead represent the ordinal variable using dummy variables and compare each level to a baseline category.
-
+This numeric treatment is appropriate when a linear trend across the ordered categories is a reasonable approximation. If we do not want to assume a constant one-unit association, we could instead represent the ordinal variable using indicator variables and compare each level with a reference category.
 ::::
 :::
+
 
 ## Goodness of Fit
 
