@@ -4452,7 +4452,6 @@ In this final section, you can test your understanding of the main concepts intr
 
 ### Conceptual Questions
 
-
 ::: {.quiz}
 
 ::: {.Question}
@@ -4462,7 +4461,7 @@ Question 3.1
 ::::{.Question-container}
 **Multiple Choice** 
 
-Suppose you fit a linear regression model by OLS for the conditional response $Y_i \mid \mathbf{x}_i$, where $\mathbf{x}_i = (x_{1,i}, \dots, x_{k,i})^\top$ contains $k$ features. Under which distributional assumption on the conditional response is OLS estimation equivalent to MLE for the parameter vector $\boldsymbol{\beta} = (\beta_0, \beta_1, \dots, \beta_k)^\top$? Select the correct option:
+Suppose you fit a linear regression model by OLS for the conditional response $Y_i \mid \mathbf{x}_i$, where $\mathbf{x}_i = (x_{1,i}, \dots, x_{k,i})^\top$ contains $k$ regressors. Under which distributional assumption on the conditional response is OLS estimation equivalent to MLE for the parameter vector $\boldsymbol{\beta} = (\beta_0, \beta_1, \dots, \beta_k)^\top$? Select the correct option:
 
 **A.** $Y_i \mid \mathbf{x}_i$ is a Normal random variable with mean $\mu_i = \beta_0 + \beta_1 x_{1,i} + \dots + \beta_k x_{k,i}$ and constant variance $\sigma^2$.
 
@@ -4493,7 +4492,9 @@ $$
 Y_i \mid \mathbf{x}_i \sim \mathcal{N}(\mu_i, \sigma^2),
 $$
 
-where the conditional mean is linear in the regressors and the variance is constant. Under this assumption, maximizing the likelihood is equivalent to minimizing the sum of squared residuals. The Poisson and Bernoulli assumptions are used for count and binary responses, respectively, and their likelihoods lead to different estimation procedures. Therefore, a Normal conditional response with constant variance is the distributional assumption that connects OLS and MLE.
+where the conditional mean is linear in the regressors and the variance is constant. Under this assumption, maximizing the likelihood is equivalent to minimizing the sum of squared residuals.
+
+The Poisson and Bernoulli assumptions are used for count and binary responses, respectively, and their likelihoods lead to different estimation procedures. Therefore, a Normal conditional response with constant variance is the distributional assumption that connects OLS and MLE.
 
 </details>
 ::::
@@ -4537,7 +4538,11 @@ Answer 3.2
 
 **Rationale:** 
 
-The regression coefficient $\beta_1$ is a statement about the **conditional mean relationship** $\mathbb{E}[Y \mid x]$, not about individual outcomes or probabilities. Option B is close, but can be misleading because it sounds deterministic, as if the response itself must change by a fixed amount. In an OLS model, the response is random around its conditional mean. Option A is incorrect because a regression coefficient is not the average response, and option D incorrectly interprets the coefficient as a probability statement.
+The regression coefficient $\beta_1$ is a statement about the **conditional mean relationship** $\mathbb{E}[Y \mid x]$, not about individual outcomes or probabilities. 
+
+Option B is close, but can be misleading because it sounds deterministic, as if the response itself must change by a fixed amount.  In an OLS model, the response is random around its conditional mean. 
+
+Option A is incorrect because a regression coefficient is not the average response, and option D incorrectly interprets the coefficient as a probability statement.
 
 </details>
 ::::
@@ -4551,7 +4556,7 @@ Question 3.3
 ::::{.Question-container}
 **Open-ended Question** 
 
-**In two to four sentences**, write a full interpretation of an estimated slope $\hat{\beta}_1 = 2.3$ in an OLS model predicting exam score from hours studied, including the word "*average*" and the phrase "*holding other variables fixed*" (even if there are no other variables!).
+**In two to four sentences**, write a full interpretation of an estimated slope $\hat{\beta}_1 = 2.3$ in an OLS model predicting exam score from hours studied, including the word *average* and the phrase "*holding other variables fixed*" (even if there are no other variables!).
 ::::
 :::
 
@@ -5067,722 +5072,1516 @@ A confounding variable is a variable that is related to both the response variab
 :::
 
 
-### Coding Question
+### Case Study
 
-In this question, you will investigate a dataset of students enrolled in a programming course with a final exam at the end. Each student was asked to report their current grade out of 100, the number of previous programming courses they had taken, the number of hours they spent studying for the final exam, and their final exam score out of 30. These variables are stored as `current_grade`, `prior_courses`, `hours_studied`, and `exam_score`, respectively. A full breakdown of the variables is provided below:
+In this case study, you will work with a simulated dataset of 700 apartment listings. Each listing contains information about the apartment's physical characteristics, location, and monthly rent. Your goal is to carry out an ordinary least-squares regression analysis following the same workflow used throughout this chapter.
 
+The variables are:
 
-| **Variable** | **Type / Range** | **Description** |
-|--------------|------------------|-----------------|
-| `current_grade` | Numeric, 0 to 100 | Student's current course grade, measured as a percentage before the final exam. |
-| `prior_courses` | Integer, 0 or greater | Number of previous programming courses the student has taken. |
-| `hours_studied` | Numeric, 0 or greater | Number of hours the student spent studying for the final exam. |
-| `exam_score` | Numeric, 0 to 30 | Student's score on the final exam. |
+| **Variable Name** | **Description** |
+|-------------------|-----------------|
+| `monthly_rent` | Monthly apartment rent in CAD |
+| `area_sqft` | Apartment floor area in square feet |
+| `bedrooms` | Number of bedrooms |
+| `distance_downtown_km` | Distance from the apartment to downtown in kilometres |
+| `building_age_years` | Age of the building in years |
+| `furnished` | Whether the apartment is furnished (`No` or `Yes`) |
+| `neighbourhood` | Neighbourhood category (`Suburban`, `East`, `West`, or `Central`) |
+| `data_split` | Pre-generated random partition (`training` or `test`) used only to ensure that `R` and `Python` use the same observations |
 
-For future iterations of the course, you are curious to know if it is possible to **understand how well a student will do on the final given these three factors**. To answer this, the questions below will guide you through an OLS analysis on this data. Specifically, by the end of these questions, you will be able to answer the following concrete questions:
+The dataset is available in `ols_apartment_rent.csv`.
 
-1. How does a 5% increase in a particular variable (one of `current_grade`, `prior_courses`, `hours_studied`) affect the `exam_score`?
-2. Inference: How does `hours_studied` influence `exam_score`, holding other variables constant?
-3. Prediction: Given a particular set of predictor values, what is the expected `exam_score`?
+#### Study Design
 
-Dive in to see how you can answer these questions using OLS regression!
+Before looking at the data, define the purpose of the analysis.
 
+1. What is the observational unit in this study?
+2. Identify the response variable and the potential regressors.
+3. Formulate one **inferential** question and one **predictive** question that can be addressed using these data.
+4. Is this an observational or experimental study? What does this imply about causal interpretation?
 
-::: {.Question}
-::::{.Question-header}
-Question 3.20
-::::
-::::{.Question-container}
-**Coding Question**
-
-**Part A: Data Wrangling and Exploratory Data Analysis**
-
-1. Read in the data from `problem-1-data.csv` (you can find the data [here](https://github.com/alexrod61/regression-cookbook/tree/main/book/03-ols_files/simulations), checking for any missing entries. 
-2. Plot histograms of each variable. Are any distributions skewed or bimodal? Do you notice anything peculiar? Are there any extreme outliers that may affect the OLS?
-3. Plot relationships between each predictor and the outcome `exam_score`. Do any appear non-linear?
-::::
-:::
-
-::: {.Answer}
-::::{.Answer-header}
-Answer 3.20
-::::
-::::{.Answer-container}
-<details>
-
-<summary><strong>Click here to reveal the answer!</strong></summary>
+Click to reveal answer
 
 **Answer:**
+
+The observational unit is an individual apartment listing.
+
+The response variable is `monthly_rent`. The potential regressors are `area_sqft`, `bedrooms`, `distance_downtown_km`, `building_age_years`, `furnished`, and `neighbourhood`.
+
+A possible inferential question is:
+
+> After accounting for the other apartment characteristics, which physical and location characteristics are associated with differences in the conditional mean of monthly rent?
+
+A possible predictive question is:
+
+> How accurately can monthly rent be predicted for a new apartment using its physical and location characteristics?
+
+This is an **observational study**. The apartment characteristics were observed rather than assigned through an experiment. Therefore, the estimated regression coefficients should be interpreted as **associations rather than causal effects**.
+
+#### Data Understanding
+
+Let us first inspect the dataset without developing or comparing regression models.
+
+1. Load `ols_apartment_rent.csv`.
+2. Report the number of observations and variables.
+3. Inspect the variable types.
+4. Check the number of missing values in each variable.
+5. Examine the ranges of the numeric variables. Are there any obviously impossible values?
+
+Click to reveal answer
 
 ::: {.panel-tabset}
 
 ## **`R` Code**
 
-``` {.r}
-# Load required libraries
-library(readr)
-library(ggplot2)
+```{r}
 library(tidyverse)
+library(broom)
+library(lmtest)
+library(car)
 
-# Read data
-df <- read_csv("./03-ols_files/simulations/problem-1-data.csv")
+############################################################
+# Data Understanding
+############################################################
 
-# A.1 Check for missing entries
-cat("Missing values:\n")
-print(colSums(is.na(df)))
+df <- readr::read_csv(
+  "data/ols_apartment_rent.csv",
+  show_col_types = FALSE
+)
 
-# A.2 Plot histograms (using ggplot2)
-# Pivot the data longer so we can facet
-df_long <- df %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
+# Dimensions
+dim(df)
 
-ggplot(df_long, aes(x = value)) +
-  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.5) +
-  facet_wrap(~ variable, scales = "free", nrow = 1) +
-  theme_minimal() +
-  ggtitle("Distribution of each variable")
+# Variable types
+glimpse(df)
 
-# A.3 Plot relationships with outcome
-predictors <- c("current_grade", "prior_courses", "hours_studied")
+# Missing values
+colSums(is.na(df))
 
-for (pred in predictors) {
-  p <- ggplot(df, aes(x = .data[[pred]], y = exam_score)) +
-    geom_point(alpha = 0.6) +
-    ggtitle(paste("exam_score vs", pred)) +
-    theme_minimal()
-  print(p)
-}
+# Numeric summaries
+df |>
+  summarize(
+    min_rent = min(monthly_rent, na.rm = TRUE),
+    max_rent = max(monthly_rent, na.rm = TRUE),
+    min_area = min(area_sqft, na.rm = TRUE),
+    max_area = max(area_sqft, na.rm = TRUE),
+    min_bedrooms = min(bedrooms, na.rm = TRUE),
+    max_bedrooms = max(bedrooms, na.rm = TRUE),
+    min_distance = min(distance_downtown_km, na.rm = TRUE),
+    max_distance = max(distance_downtown_km, na.rm = TRUE),
+    min_building_age = min(building_age_years, na.rm = TRUE),
+    max_building_age = max(building_age_years, na.rm = TRUE)
+  )
 ```
 
 ## **`Python` Code**
 
-``` {.python}
+```{python}
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from scipy import stats
+import statsmodels.formula.api as smf
 
-# Read data
-# point this to the data location
-df = pd.read_csv("./03-ols_files/simulations/problem-1-data.csv") 
-
-# A.1 Check for missing entries
-print("Missing values:\n", df.isnull().sum())
-
-# A.2 Plot histograms
-fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
-for i, col in enumerate(df.columns):
-    axes[i].hist(df[col], bins=30, alpha=0.5)
-    axes[i].set_title(f'Distribution of {col}')
-plt.tight_layout()
-plt.show()
-
-# A.3 Plot relationships with outcome
-fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
-predictors = ['current_grade', 'prior_courses', 'hours_studied']
-for i, pred in enumerate(predictors):
-    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
-    axes[i].set_title(f'exam_score vs {pred}')
-plt.tight_layout()
-plt.show()
-```
-
-:::
-
-
-::: {.panel-tabset}
-
-## **`R` Output**
-
-```{r}
-#| label: fig-problem-1-eda-r
-#| fig-cap: "Exploratory plots for the programming course dataset."
-#| warning: false
-#| echo: false
-#| message: false
-#| fig.height: 8
-#| fig.width: 14
-
-# Load required libraries
-library(readr)
-library(ggplot2)
-library(tidyverse)
-
-# Read data
-df <- read_csv("./03-ols_files/simulations/problem-1-data.csv")
-
-# A.1 Check for missing entries
-cat("Missing values:\n")
-print(colSums(is.na(df)))
-
-# A.2 Plot histograms (using ggplot2)
-# Pivot the data longer so we can facet
-df_long <- df %>% pivot_longer(everything(), names_to = "variable", values_to = "value")
-
-variable_labels <- c(
-  current_grade = "Current Grade",
-  prior_courses = "Prior Programming Courses",
-  hours_studied = "Hours Studied",
-  exam_score = "Final Exam Score"
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
 )
-
-ggplot(df_long, aes(x = value)) +
-  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.5) +
-  facet_wrap(~ variable, 
-             scales = "free", 
-             nrow = 1,
-             labeller = labeller(variable = variable_labels) 
-  ) +
-  theme_minimal() +
-  ggtitle("")
-
-# A.3 Plot relationships with outcome
-predictors <- c("current_grade", "prior_courses", "hours_studied")
-
-for (pred in predictors) {
-  p <- ggplot(df, aes(x = .data[[pred]], y = exam_score)) +
-    geom_point(alpha = 0.6) +
-    ggtitle(paste("exam_score vs", pred)) +
-    theme_minimal()
-  print(p)
-}
-```
-
-## **`Python` Output**
-
-```{python}
-#| label: fig-problem-1-eda-python
-#| fig-cap: "Exploratory plots for the programming course dataset."
-#| warning: false
-#| echo: false
-#| message: false
-#| fig.height: 8
-#| fig.width: 14
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from scipy import stats
-
-# Read data
-# point this to the data location
-df = pd.read_csv("./03-ols_files/simulations/problem-1-data.csv") 
-
-# A.1 Check for missing entries
-print("Missing values:\n", df.isnull().sum())
-
-# A.2 Plot histograms
-fig, axes = plt.subplots(1, 4, figsize=(16, 4), dpi=300)
-for i, col in enumerate(df.columns):
-    axes[i].hist(df[col], bins=30, alpha=0.5)
-    axes[i].set_title(f'Distribution of {col}')
-plt.tight_layout()
-plt.show()
-
-# A.3 Plot relationships with outcome
-fig, axes = plt.subplots(1, 3, figsize=(15, 5), dpi=300)
-predictors = ['current_grade', 'prior_courses', 'hours_studied']
-for i, pred in enumerate(predictors):
-    sns.scatterplot(data=df, x=pred, y='exam_score', ax=axes[i])
-    axes[i].set_title(f'exam_score vs {pred}')
-plt.tight_layout()
-plt.show()
-```
-
-:::
-
-
-`current_grade` appears roughly uniform over its range, with no strong skew or extreme outliers. `prior_courses` is discrete and right-skewed, with most students having taken 0–2 prior courses and very few above 4. `hours_studied` is relatively uniform. `exam_score` is unimodal and left-skewed, with most scores concentrated between roughly 60 and 90. Now for the relationships with `exam_score`: `exam_score` vs `current_grade` shows a fairly weak positive trend, with a lot of noise. `exam_score` vs `prior_courses` shows strong variation at low integers, and no strong monotonic trend. This suggests a weak or nonlinear effect, and motivates categorical treatment. `exam_score` vs `hours_studied` is strongly increasing but clearly nonlinear, with diminishing returns at high study times. This is potentially consistent with a log-linear effect rather than a linear one.
-
-</details>
-::::
-:::
-
-
-::: {.Question}
-::::{.Question-header}
-Question 3.21
-::::
-::::{.Question-container}
-**Coding Question**
-
-**Part B: Data Modelling**
-
-1. Fit a multiple linear regression model predicting `exam_score` using the other variables. Display a statistics summary table.
-2. Report the $R^2$ value and coefficients. Do all of the coefficients match intuition? Can you find a plausible explantion for why they would not? We will revisit this. 
-3. Plot residuals against the fitted values. Is heteroscedasticity present?
-4. Create a Q-Q plot of the residuals. Are they normally distributed?
-::::
-:::
-
-::: {.Answer}
-::::{.Answer-header}
-Answer 3.21
-::::
-::::{.Answer-container}
-<details>
-
-<summary><strong>Click here to reveal the answer!</strong></summary>
-
-**Answer:**
-
-::: {.panel-tabset}
-
-## **`R` Code**
-
-```{r}
-# B.1 Fit initial model
-model1 <- lm(exam_score ~ current_grade + prior_courses + hours_studied, data = df)
-summary(model1)
-
-# B.2 Report R² and coefficients
-cat(sprintf("\nR-squared: %.3f\n", summary(model1)$r.squared))
-cat("Coefficients:\n")
-print(coef(model1))
-
-# B.3 Residuals vs Fitted
-ggplot(data = NULL, aes(x = fitted(model1), y = resid(model1))) +
-  geom_point(alpha = 0.6) +
-  geom_smooth(method = "loess", se = FALSE, color = "blue") +
-  labs(x = "Fitted values", y = "Residuals", title = "Residuals vs Fitted") +
-  theme_minimal()
-
-# B.4 Q-Q plot
-ggplot(data = NULL, aes(sample = resid(model1))) +
-  stat_qq(alpha = 0.6) +
-  stat_qq_line(color = "red") +
-  labs(title = "Q-Q Plot of Residuals") +
-  theme_minimal()
-
-```
-
-## **`Python` Code**
-
-```{python}
-# B.1 Fit initial model
-model1 = ols('exam_score ~ current_grade + prior_courses + hours_studied', data=df.dropna()).fit()
-print(model1.summary())
-
-# B.2 Report R² and coefficients
-print(f"\nR-squared: {model1.rsquared:.3f}")
-print("Coefficients:\n", model1.params)
-
-# B.3 Residuals vs fitted
-sns.residplot(x=model1.fittedvalues, y=model1.resid, lowess=True)
-plt.xlabel('Fitted values')
-plt.ylabel('Residuals')
-plt.title('Residuals vs Fitted')
-plt.show()
-
-# B.4 Q-Q plot
-sm.qqplot(model1.resid, line='45')
-plt.title('Q-Q Plot of Residuals')
-plt.show()
-```
-
-:::
-
-The coefficients do not entirely match intuition---`prior_courses` comes out negative in the linear model. A plausible explanation could be a selection bias: students who took more prior courses may be doing so because they struggled previously, leading to lower exam scores. Or, `pior_courses` is a poor linear proxy.
-
-Heteroscedasticity appears present in the residuals vs fitted plot and the Breusch-Pagan test, which shown non-constant variance. The Q-Q plot shows residuals which deviate from a normal distribution.
-
-</details>
-::::
-:::
-
-
-::: {.Question}
-::::{.Question-header}
-Question 3.22
-::::
-::::{.Question-container}
-**Coding Question**
-
-**Part C: Goodness of Fit**
-
-1. Perform the Durbin-Watson test to check for autocorrelation in the residuals. What does the test statistic tell you about the independence of errors assumption?
-2. Test for Homoscedasticity: You already plotted residuals against fitted values. Perform the Breusch-Pagan test to formally assess homoscedasticity. What does the p-value of the test indicate about the model?
-3. Identify Outliers: Create a plot of the residuals against the observation index. Does this plot reveal any obvious outliers or problematic patterns?
-4. Check for Influential Points: Calculate and plot the Cook's Distance for each observation. Are there any data points that have a disproportionately large influence on the model's coefficients?
-::::
-:::
-
-::: {.Answer}
-::::{.Answer-header}
-Answer 3.22
-::::
-::::{.Answer-container}
-<details>
-
-<summary><strong>Click here to reveal the answer!</strong></summary>
-
-**Answer:**
-
-::: {.panel-tabset}
-
-## **`R` Code**
-
-```{r}
-# C.1 Durbin-Watson Test (Independence)
-
-dw <- dwtest(model1)
-print(dw$statistic)
-
-# C.2 Breusch-Pagan Test (Homoscedasticity)
-
-bp <- bptest(model1)
-print(bp$statistic)
-print(bp$p.value)
-
-# C.3 Residuals vs Observation Index
-
-# Create data frame for index plotting
-
-df_diag <- data.frame(
-resid = residuals(model1),
-index = 1:length(residuals(model1)),
-cooks = cooks.distance(model1)
-)
-
-ggplot(df_diag, aes(x = index, y = resid)) +
-geom_point(alpha = 0.7) +
-geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
-labs(title = "Residual Plot vs. Observation Index",
-x = "Observation Index", y = "Residuals") +
-theme_minimal()
-
-# C.4 Cook's Distance
-
-ggplot(df_diag, aes(x = index, y = cooks)) +
-geom_segment(aes(xend = index, yend = 0)) + 
-geom_point() +
-geom_hline(yintercept = 0.5, color = "red", linetype = "dashed") +
-labs(title = "Cook's Distance", x = "Observation Index", y = "Cook's Distance") +
-theme_minimal()
-
-```
-
-## **`Python` Code**
-
-```{python}
-import statsmodels.stats.api as sms
-# C.1 Perform the Durbin-Watson test...
-dw_stat = durbin_watson(model1.resid)
-print(f"Durbin-Watson statistic: {dw_stat:.4f}")
-
-# C.2 Perform the Breusch-Pagan test...
 
 from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.stattools import durbin_watson
+from statsmodels.stats.outliers_influence import (
+    OLSInfluence,
+    variance_inflation_factor
+)
 
-# Perform Breusch-Pagan test
-bp_test = het_breuschpagan(model1.resid, model1.model.exog)
+############################################################
+# Data Understanding
+############################################################
 
-# Unpack results
-bp_stat, bp_pvalue, empty, empty = bp_test
+df = pd.read_csv("data/ols_apartment_rent.csv")
 
-print(f"Breusch-Pagan test statistic: {bp_stat:.3f}")
-print(f"P-value: {bp_pvalue:.4f}")
+# Dimensions
+print(df.shape)
 
+# Variable types
+print(df.dtypes)
 
-# bp_test = sms.het_breuschpagan(residuals, model.model.exog)
-# labels = ['LM Statistic', 'LM-Test p-value', 'F-Statistic', 'F-Test p-value']
-# bp_results = dict(zip(labels, bp_test))
-# print(f"Breusch-Pagan test p-value: {bp_results['LM-Test p-value']:.4f}")
-# 
-# C.3 Plot the residuals against the observation index...
+# Missing values
+print(df.isna().sum())
+
+# Numeric summaries
+print(
+    df[
+        [
+            "monthly_rent",
+            "area_sqft",
+            "bedrooms",
+            "distance_downtown_km",
+            "building_age_years"
+        ]
+    ].describe()
+)
+```
+
+:::
+
+The dataset contains **700 apartment listings** and 8 variables, including the pre-generated `data_split` variable.
+
+There are 5 missing values in `distance_downtown_km` and 5 missing values in `building_age_years`. The other variables contain no missing observations.
+
+The numeric variables fall within plausible ranges for the simulated apartment setting. There are no negative apartment sizes, negative bedroom counts, negative building ages, or negative distances. Therefore, no observations are removed because of impossible values at this stage.
+
+#### Data Wrangling
+
+Now prepare the data for analysis.
+
+1. Remove observations with missing values using complete-case analysis for this exercise.
+2. Convert `furnished` and `neighbourhood` to categorical variables.
+3. Use `No` as the reference category for `furnished` and `Suburban` as the reference category for `neighbourhood`.
+4. Use `data_split` to create the training and test datasets, and then remove `data_split` from the modelling data.
+5. Report the number of observations in each dataset.
+6. Verify the category counts in the training data.
+
+Click to reveal answer
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+############################################################
+# Data Wrangling
+############################################################
+
+# Complete-case analysis
+df <- df |>
+  tidyr::drop_na()
+
+# Convert categorical variables
+df <- df |>
+  mutate(
+    furnished = factor(
+      furnished,
+      levels = c("No", "Yes")
+    ),
+    neighbourhood = factor(
+      neighbourhood,
+      levels = c(
+        "Suburban",
+        "East",
+        "West",
+        "Central"
+      )
+    )
+  )
+
+# Use the pre-generated split
+train_data <- df |>
+  filter(data_split == "training") |>
+  select(-data_split)
+
+test_data <- df |>
+  filter(data_split == "test") |>
+  select(-data_split)
+
+cat(
+  "Training observations:",
+  nrow(train_data),
+  "\n"
+)
+
+cat(
+  "Test observations:",
+  nrow(test_data),
+  "\n"
+)
+
+# Check categorical variables
+table(train_data$furnished)
+table(train_data$neighbourhood)
+```
+
+## **`Python` Code**
+
+```{python}
+############################################################
+# Data Wrangling
+############################################################
+
+# Complete-case analysis
+df = df.dropna().copy()
+
+# Define category order and reference levels
+furnished_levels = ["No", "Yes"]
+
+neighbourhood_levels = [
+    "Suburban",
+    "East",
+    "West",
+    "Central"
+]
+
+df["furnished"] = pd.Categorical(
+    df["furnished"],
+    categories=furnished_levels
+)
+
+df["neighbourhood"] = pd.Categorical(
+    df["neighbourhood"],
+    categories=neighbourhood_levels
+)
+
+# Use the pre-generated split
+train_data = (
+    df.loc[df["data_split"] == "training"]
+      .drop(columns="data_split")
+      .copy()
+)
+
+test_data = (
+    df.loc[df["data_split"] == "test"]
+      .drop(columns="data_split")
+      .copy()
+)
+
+print(
+    "Training observations:",
+    len(train_data)
+)
+
+print(
+    "Test observations:",
+    len(test_data)
+)
+
+# Check categorical variables
+print(
+    train_data["furnished"].value_counts()
+)
+
+print(
+    train_data["neighbourhood"].value_counts()
+)
+```
+
+:::
+
+After removing the 10 incomplete observations, **690 complete observations** remain. Of these, **552 observations are in the training data** and **138 observations are in the test data**.
+
+From this point onward, the training data are used for exploratory analysis, model development, estimation, and goodness-of-fit assessment. The test responses remain protected until the Results section.
+
+#### Exploratory Data Analysis
+
+Using the **training data only**:
+
+1. Examine the distribution of `monthly_rent` using summary statistics and a histogram.
+2. Create a scatterplot of `monthly_rent` against `area_sqft`.
+3. Divide `area_sqft` into 10 approximately equally sized groups and overlay the grouped mean rent on the scatterplot.
+4. Create a scatterplot of `monthly_rent` against `distance_downtown_km`.
+5. Compare the distribution of `monthly_rent` across the levels of `furnished` and `neighbourhood`.
+6. Comment on the main patterns. Does a linear relationship between apartment area and mean monthly rent appear to be a reasonable working approximation?
+
+Click to reveal answer
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+############################################################
+# Exploratory Data Analysis
+############################################################
+
+# Response summary
+summary(train_data$monthly_rent)
+
+# Distribution of monthly rent
+ggplot(
+  train_data,
+  aes(x = monthly_rent)
+) +
+  geom_histogram(bins = 30) +
+  labs(
+    x = "Monthly Rent (CAD)",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+# Binned means for apartment area
+area_binned <- train_data |>
+  mutate(
+    area_bin = ntile(area_sqft, 10)
+  ) |>
+  group_by(area_bin) |>
+  summarize(
+    mean_area = mean(area_sqft),
+    mean_rent = mean(monthly_rent),
+    .groups = "drop"
+  )
+
+# Monthly rent versus apartment area
+ggplot(
+  train_data,
+  aes(x = area_sqft, y = monthly_rent)
+) +
+  geom_point(alpha = 0.25) +
+  geom_point(
+    data = area_binned,
+    aes(
+      x = mean_area,
+      y = mean_rent
+    ),
+    size = 3
+  ) +
+  geom_line(
+    data = area_binned,
+    aes(
+      x = mean_area,
+      y = mean_rent
+    )
+  ) +
+  labs(
+    x = "Area (square feet)",
+    y = "Monthly Rent (CAD)"
+  ) +
+  theme_minimal()
+
+# Monthly rent versus distance from downtown
+ggplot(
+  train_data,
+  aes(
+    x = distance_downtown_km,
+    y = monthly_rent
+  )
+) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE
+  ) +
+  labs(
+    x = "Distance from Downtown (km)",
+    y = "Monthly Rent (CAD)"
+  ) +
+  theme_minimal()
+
+# Furnished versus unfurnished
+ggplot(
+  train_data,
+  aes(
+    x = furnished,
+    y = monthly_rent
+  )
+) +
+  geom_boxplot() +
+  labs(
+    x = "Furnished",
+    y = "Monthly Rent (CAD)"
+  ) +
+  theme_minimal()
+
+# Neighbourhood comparison
+ggplot(
+  train_data,
+  aes(
+    x = neighbourhood,
+    y = monthly_rent
+  )
+) +
+  geom_boxplot() +
+  labs(
+    x = "Neighbourhood",
+    y = "Monthly Rent (CAD)"
+  ) +
+  theme_minimal()
+```
+
+## **`Python` Code**
+
+```{python}
+############################################################
+# Exploratory Data Analysis
+############################################################
+
+# Response summary
+print(
+    train_data["monthly_rent"].describe()
+)
+
+# Distribution of monthly rent
 plt.figure(figsize=(6, 4))
-plt.plot(residuals, marker='o', linestyle='none', alpha=0.7)
-plt.axhline(y=0, color='red', linestyle='--')
-plt.title("Residual Plot vs. Observation Index")
-plt.xlabel("Observation Index")
-plt.ylabel("Residuals")
+
+plt.hist(
+    train_data["monthly_rent"],
+    bins=30
+)
+
+plt.xlabel("Monthly Rent (CAD)")
+plt.ylabel("Count")
 plt.tight_layout()
 plt.show()
 
-# C.4 Calculate and plot Cook's Distance...
-influence = model.get_influence()
-cooks_d = influence.cooks_distance[0]
+# Binned means for apartment area
+area_binned_data = train_data.copy()
 
+area_binned_data["area_bin"] = pd.qcut(
+    area_binned_data["area_sqft"],
+    10,
+    labels=False,
+    duplicates="drop"
+)
+
+area_binned = (
+    area_binned_data
+    .groupby(
+        "area_bin",
+        observed=True
+    )
+    .agg(
+        mean_area=("area_sqft", "mean"),
+        mean_rent=("monthly_rent", "mean")
+    )
+    .reset_index()
+)
+
+# Monthly rent versus apartment area
 plt.figure(figsize=(6, 4))
-# use_line_collection=True is for compatibility
-plt.stem(np.arange(len(cooks_d)), cooks_d, markerfmt=",")
-plt.axhline(y=0.5, color='red', linestyle='--', label='Threshold (0.5)')
-plt.title("Cook's Distance")
-plt.xlabel("Observation Index")
+
+plt.scatter(
+    train_data["area_sqft"],
+    train_data["monthly_rent"],
+    alpha=0.25
+)
+
+plt.plot(
+    area_binned["mean_area"],
+    area_binned["mean_rent"],
+    marker="o"
+)
+
+plt.xlabel("Area (square feet)")
+plt.ylabel("Monthly Rent (CAD)")
+plt.tight_layout()
+plt.show()
+
+# Monthly rent versus distance from downtown
+plt.figure(figsize=(6, 4))
+
+sns.regplot(
+    data=train_data,
+    x="distance_downtown_km",
+    y="monthly_rent",
+    scatter_kws={"alpha": 0.3}
+)
+
+plt.tight_layout()
+plt.show()
+
+# Furnished versus unfurnished
+plt.figure(figsize=(6, 4))
+
+sns.boxplot(
+    data=train_data,
+    x="furnished",
+    y="monthly_rent"
+)
+
+plt.tight_layout()
+plt.show()
+
+# Neighbourhood comparison
+plt.figure(figsize=(7, 4))
+
+sns.boxplot(
+    data=train_data,
+    x="neighbourhood",
+    y="monthly_rent"
+)
+
+plt.tight_layout()
+plt.show()
+```
+
+:::
+
+The training data contain a mean monthly rent of approximately **1,842 CAD**, with substantial variation across apartment listings.
+
+The relationship between `area_sqft` and `monthly_rent` is clearly positive. The grouped means increase approximately linearly as apartment area increases, so a linear relationship between apartment area and the conditional mean of monthly rent is a reasonable working approximation.
+
+Apartments farther from downtown tend to have lower rents. Furnished apartments generally have higher rents than unfurnished apartments, and the distribution of rent also differs across neighbourhoods. These patterns motivate considering additional regressors after first examining a simple area-only OLS model.
+
+The marginal distribution of `monthly_rent` itself does not need to be perfectly Normal for OLS. The relevant classical Normality assumption concerns the errors conditional on the regressors and will be assessed using model residuals.
+
+#### Simple OLS Regression and Goodness of Fit
+
+We first consider a simple OLS model relating monthly rent to apartment area:
+
+$$
+E(Y_i \mid X_{i,\text{area}})
+=
+\beta_0
++
+\beta_1 X_{i,\text{area}},
+$$
+
+where $Y_i$ is `monthly_rent` and $X_{i,\text{area}}$ is `area_sqft`.
+
+Using the **training data**:
+
+1. Fit the simple OLS regression model.
+2. Report the coefficient estimates, $R^2$, adjusted $R^2$, and the 95% confidence interval for the `area_sqft` coefficient.
+3. Interpret the estimated coefficient for `area_sqft`.
+4. Assess goodness of fit using:
+   - a residuals-versus-fitted plot,
+   - a Q-Q plot of standardized residuals,
+   - the Breusch-Pagan test,
+   - the Durbin-Watson statistic,
+   - Cook's Distance using $4/n$ as a screening guideline.
+5. Based on the diagnostics, is the simple OLS model reasonable enough to continue investigating?
+
+Click to reveal answer
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+############################################################
+# Simple OLS Regression and Goodness of Fit
+############################################################
+
+# Fit the simple model
+mod_simple <- lm(
+  monthly_rent ~ area_sqft,
+  data = train_data
+)
+
+# Coefficient estimates and confidence intervals
+simple_results <- tidy(
+  mod_simple,
+  conf.int = TRUE,
+  conf.level = 0.95
+)
+
+simple_results
+
+# Model-level fit statistics
+glance(mod_simple) |>
+  select(
+    r.squared,
+    adj.r.squared
+  )
+
+# Diagnostic data
+simple_diag <- augment(mod_simple) |>
+  mutate(
+    observation = row_number(),
+    cooks_distance = cooks.distance(mod_simple)
+  )
+
+# Residuals versus fitted values
+ggplot(
+  simple_diag,
+  aes(
+    x = .fitted,
+    y = .std.resid
+  )
+) +
+  geom_point(alpha = 0.6) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed"
+  ) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE
+  ) +
+  labs(
+    x = "Fitted Values",
+    y = "Standardized Residuals"
+  ) +
+  theme_minimal()
+
+# Q-Q plot
+ggplot(
+  simple_diag,
+  aes(sample = .std.resid)
+) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(
+    x = "Theoretical Quantiles",
+    y = "Standardized Residuals"
+  ) +
+  theme_minimal()
+
+# Breusch-Pagan test
+bptest(mod_simple)
+
+# Durbin-Watson test
+dwtest(mod_simple)
+
+# Cook's Distance
+cooks_threshold_simple <-
+  4 / nrow(simple_diag)
+
+ggplot(
+  simple_diag,
+  aes(
+    x = observation,
+    y = cooks_distance
+  )
+) +
+  geom_segment(
+    aes(
+      xend = observation,
+      y = 0,
+      yend = cooks_distance
+    )
+  ) +
+  geom_point() +
+  geom_hline(
+    yintercept = cooks_threshold_simple,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Observation",
+    y = "Cook's Distance"
+  ) +
+  theme_minimal()
+
+cat(
+  "Maximum Cook's Distance:",
+  max(simple_diag$cooks_distance),
+  "\n"
+)
+
+cat(
+  "4/n screening guideline:",
+  cooks_threshold_simple,
+  "\n"
+)
+```
+
+## **`Python` Code**
+
+```{python}
+############################################################
+# Simple OLS Regression and Goodness of Fit
+############################################################
+
+# Fit the simple model
+mod_simple = smf.ols(
+    "monthly_rent ~ area_sqft",
+    data=train_data
+).fit()
+
+# Coefficient estimates and confidence intervals
+simple_ci = mod_simple.conf_int(
+    alpha=0.05
+)
+
+simple_results = pd.DataFrame({
+    "estimate": mod_simple.params,
+    "std_error": mod_simple.bse,
+    "t_statistic": mod_simple.tvalues,
+    "p_value": mod_simple.pvalues,
+    "conf_low": simple_ci[0],
+    "conf_high": simple_ci[1]
+})
+
+print(simple_results)
+
+print(
+    "R-squared:",
+    round(mod_simple.rsquared, 4)
+)
+
+print(
+    "Adjusted R-squared:",
+    round(
+        mod_simple.rsquared_adj,
+        4
+    )
+)
+
+# Diagnostics
+simple_influence = OLSInfluence(
+    mod_simple
+)
+
+simple_std_resid = (
+    simple_influence
+    .resid_studentized_internal
+)
+
+# Residuals versus fitted values
+plt.figure(figsize=(6, 4))
+
+sns.regplot(
+    x=mod_simple.fittedvalues,
+    y=simple_std_resid,
+    lowess=True,
+    scatter_kws={"alpha": 0.6},
+    line_kws={"linewidth": 2}
+)
+
+plt.axhline(
+    0,
+    linestyle="--"
+)
+
+plt.xlabel("Fitted Values")
+plt.ylabel("Standardized Residuals")
+plt.tight_layout()
+plt.show()
+
+# Q-Q plot
+sm.qqplot(
+    simple_std_resid,
+    line="45"
+)
+
+plt.tight_layout()
+plt.show()
+
+# Breusch-Pagan test
+bp_stat, bp_pvalue, bp_fstat, bp_fpvalue = (
+    het_breuschpagan(
+        mod_simple.resid,
+        mod_simple.model.exog
+    )
+)
+
+print(
+    f"Breusch-Pagan p-value: "
+    f"{bp_pvalue:.4f}"
+)
+
+# Durbin-Watson statistic
+dw_stat = durbin_watson(
+    mod_simple.resid
+)
+
+print(
+    f"Durbin-Watson statistic: "
+    f"{dw_stat:.4f}"
+)
+
+# Cook's Distance
+simple_cooks_d = (
+    simple_influence
+    .cooks_distance[0]
+)
+
+cooks_threshold_simple = (
+    4 / len(train_data)
+)
+
+plt.figure(figsize=(7, 4))
+
+plt.stem(
+    np.arange(
+        len(simple_cooks_d)
+    ),
+    simple_cooks_d,
+    markerfmt=","
+)
+
+plt.axhline(
+    cooks_threshold_simple,
+    linestyle="--"
+)
+
+plt.xlabel("Observation")
 plt.ylabel("Cook's Distance")
-plt.legend()
 plt.tight_layout()
 plt.show()
+
+print(
+    "Maximum Cook's Distance:",
+    simple_cooks_d.max()
+)
+
+print(
+    "4/n screening guideline:",
+    cooks_threshold_simple
+)
 ```
 
 :::
 
-The Durbin-Watson test produces a value of 1.79, close to 2, meaning there is no strong evidence of autocorrelation (errors are approximately independent). The p-value of the Breusch-Pagan test is essentially 0, and thus we reject homoscedasticity: residual variance changes with fitted values. Looking at the residuals vs observation index, there is no obvious time/order pattern implied here. Using Cook's Distance plot, there are no point that appear to have disproportionately large influence on the fitted coefficients.
+The estimated coefficient for `area_sqft` is approximately **1.82**. Therefore, within the training data, each additional square foot of apartment area is associated with an estimated increase of approximately **1.82 CAD** in mean monthly rent. Equivalently, a 100-square-foot increase is associated with an estimated increase of approximately **182 CAD** in mean monthly rent.
 
-</details>
-::::
-:::
+The 95% confidence interval for the training-data slope is approximately **1.71 to 1.94 CAD per square foot**. The training $R^2$ is approximately **0.654**, and the adjusted $R^2$ is approximately **0.653**.
 
+The residuals-versus-fitted plot should show residuals distributed around zero without strong curvature or a pronounced funnel shape. The Q-Q plot should be reasonably close to a straight line.
 
-::: {.Question}
-::::{.Question-header}
-Question 3.23
-::::
-::::{.Question-container}
-**Coding Question**
+The Breusch-Pagan p-value is approximately **0.907**, providing no statistical evidence of non-constant error variance at the 5% significance level. The Durbin-Watson statistic is approximately **2.01**, which is consistent with little first-order autocorrelation. The cross-sectional study design is also important because the observations represent different apartment listings rather than repeated measurements ordered through time.
 
-**Part D: Data Modelling - Improvements**
+The maximum Cook's Distance is approximately **0.041**, compared with a $4/n$ screening guideline of approximately **0.0072**. Some observations therefore deserve closer inspection, but exceeding this guideline does not by itself justify removing an observation.
 
-1. Should `prior_courses` be converted to another variable type? If so, why and which one? If you answered yes, try converting it and re-fit. Do you notice any improvements?
-2. Create `log_hours_studied`, the log of `hours_studied`. Re-fit the OLS using this predictor instead. Does $R^2$ improve? 
+Overall, the simple model provides a useful description of the strong bivariate association between apartment area and monthly rent. However, the EDA suggests that other apartment characteristics also contain important information, motivating an extended OLS model.
 
-> Hint: the true data generation process used `log(hours_studied)`!
+#### Extended OLS Regression and Goodness of Fit
 
-3. Add an interaction term, `current_grade * prior_courses` and re-fit. Is this interaction significant?
-::::
-:::
+We now consider the following extended OLS model:
 
-::: {.Answer}
-::::{.Answer-header}
-Answer 3.23
-::::
-::::{.Answer-container}
-<details>
+$$
+\begin{aligned}
+E(Y_i \mid \mathbf{X}_i)
+={}&
+\beta_0
++
+\beta_1 \text{area\_sqft}_i
++
+\beta_2 \text{bedrooms}_i \\
+&+
+\beta_3 \text{distance\_downtown\_km}_i
++
+\beta_4 \text{building\_age\_years}_i \\
+&+
+\beta_5 \text{furnished}_i
++
+\text{neighbourhood terms}.
+\end{aligned}
+$$
 
-<summary><strong>Click here to reveal the answer!</strong></summary>
+Using the **training data**:
 
-**Answer:**
+1. Fit the extended OLS model.
+2. Report the coefficient estimates, $R^2$, and adjusted $R^2$.
+3. Compare the adjusted $R^2$ with the simple model.
+4. Assess goodness of fit using:
+   - a residuals-versus-fitted plot,
+   - a Q-Q plot,
+   - the Breusch-Pagan test,
+   - the Durbin-Watson statistic,
+   - variance inflation factors (VIFs),
+   - Cook's Distance.
+5. Based on the diagnostics, is the extended model reasonable enough to carry forward to the Results section?
+
+Click to reveal answer
 
 ::: {.panel-tabset}
 
 ## **`R` Code**
 
 ```{r}
-# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
-df <- df %>% mutate(prior_courses_category = factor(prior_courses))
+############################################################
+# Extended OLS Regression and Goodness of Fit
+############################################################
 
-model2 <- lm(exam_score ~ current_grade + prior_courses_category + hours_studied, data = df)
-cat("Model 2:\n")
-summary(model2)
-cat("##########################################################\n")
+extended_formula <-
+  monthly_rent ~
+  area_sqft +
+  bedrooms +
+  distance_downtown_km +
+  building_age_years +
+  furnished +
+  neighbourhood
 
-# D.2 Log transform hours_studied and fit model
-df <- df %>% mutate(log_hours = log(hours_studied))
+# Fit the extended model
+mod_extended <- lm(
+  extended_formula,
+  data = train_data
+)
 
-model3 <- lm(exam_score ~ current_grade + prior_courses + log_hours, data = df)
-cat("Model 3:\n")
-summary(model3)
-cat("##########################################################\n")
+# Coefficient-level results
+extended_results <- tidy(
+  mod_extended,
+  conf.int = TRUE,
+  conf.level = 0.95
+)
 
-# D.3 Add interaction term
-model4 <- lm(exam_score ~ current_grade * prior_courses + hours_studied, data = df)
-cat("Model 4:\n")
-summary(model4)
+extended_results
 
+# Model-level fit
+glance(mod_extended) |>
+  select(
+    r.squared,
+    adj.r.squared
+  )
+
+# Diagnostic data
+extended_diag <- augment(
+  mod_extended
+) |>
+  mutate(
+    observation = row_number(),
+    cooks_distance =
+      cooks.distance(mod_extended)
+  )
+
+# Residuals versus fitted values
+ggplot(
+  extended_diag,
+  aes(
+    x = .fitted,
+    y = .std.resid
+  )
+) +
+  geom_point(alpha = 0.6) +
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed"
+  ) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE
+  ) +
+  labs(
+    x = "Fitted Values",
+    y = "Standardized Residuals"
+  ) +
+  theme_minimal()
+
+# Q-Q plot
+ggplot(
+  extended_diag,
+  aes(sample = .std.resid)
+) +
+  stat_qq() +
+  stat_qq_line() +
+  labs(
+    x = "Theoretical Quantiles",
+    y = "Standardized Residuals"
+  ) +
+  theme_minimal()
+
+# Breusch-Pagan test
+bptest(mod_extended)
+
+# Durbin-Watson test
+dwtest(mod_extended)
+
+# Variance inflation factors
+vif(mod_extended)
+
+# Cook's Distance
+cooks_threshold_extended <-
+  4 / nrow(extended_diag)
+
+ggplot(
+  extended_diag,
+  aes(
+    x = observation,
+    y = cooks_distance
+  )
+) +
+  geom_segment(
+    aes(
+      xend = observation,
+      y = 0,
+      yend = cooks_distance
+    )
+  ) +
+  geom_point() +
+  geom_hline(
+    yintercept =
+      cooks_threshold_extended,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Observation",
+    y = "Cook's Distance"
+  ) +
+  theme_minimal()
+
+cat(
+  "Maximum Cook's Distance:",
+  max(
+    extended_diag$cooks_distance
+  ),
+  "\n"
+)
+
+cat(
+  "4/n screening guideline:",
+  cooks_threshold_extended,
+  "\n"
+)
 ```
 
 ## **`Python` Code**
 
 ```{python}
-# D.1 prior_courses is an integer. We can try convert prior_courses to categorical and fit the model again:
-df["prior_courses_category"] = df['prior_courses'].astype('category')
-model2 = ols('exam_score ~ current_grade + prior_courses_category + hours_studied', 
-             data=df.dropna()).fit()
-print(model2.summary())
-print("##########################################################")
+############################################################
+# Extended OLS Regression and Goodness of Fit
+############################################################
 
+extended_formula = (
+    "monthly_rent ~ area_sqft + bedrooms "
+    "+ distance_downtown_km "
+    "+ building_age_years "
+    "+ C(furnished, Treatment(reference='No')) "
+    "+ C(neighbourhood, "
+    "Treatment(reference='Suburban'))"
+)
 
-# D.2 Log transform hours_studied
-df['log_hours'] = np.log(df['hours_studied'])
-model3 = ols('exam_score ~ current_grade + prior_courses + log_hours', 
-             data=df.dropna()).fit()
-print(model3.summary())
-print("##########################################################")
+# Fit the extended model
+mod_extended = smf.ols(
+    extended_formula,
+    data=train_data
+).fit()
 
+print(
+    mod_extended.summary()
+)
 
-# D.3 Add interaction term
-model4 = ols('exam_score ~ current_grade * prior_courses + hours_studied', 
-             data=df.dropna()).fit()
-print(model4.summary())
+print(
+    "R-squared:",
+    round(
+        mod_extended.rsquared,
+        4
+    )
+)
+
+print(
+    "Adjusted R-squared:",
+    round(
+        mod_extended.rsquared_adj,
+        4
+    )
+)
+
+# Diagnostics
+extended_influence = OLSInfluence(
+    mod_extended
+)
+
+extended_std_resid = (
+    extended_influence
+    .resid_studentized_internal
+)
+
+# Residuals versus fitted values
+plt.figure(figsize=(6, 4))
+
+sns.regplot(
+    x=mod_extended.fittedvalues,
+    y=extended_std_resid,
+    lowess=True,
+    scatter_kws={"alpha": 0.6},
+    line_kws={"linewidth": 2}
+)
+
+plt.axhline(
+    0,
+    linestyle="--"
+)
+
+plt.xlabel("Fitted Values")
+plt.ylabel("Standardized Residuals")
+plt.tight_layout()
+plt.show()
+
+# Q-Q plot
+sm.qqplot(
+    extended_std_resid,
+    line="45"
+)
+
+plt.tight_layout()
+plt.show()
+
+# Breusch-Pagan test
+bp_stat, bp_pvalue, bp_fstat, bp_fpvalue = (
+    het_breuschpagan(
+        mod_extended.resid,
+        mod_extended.model.exog
+    )
+)
+
+print(
+    f"Breusch-Pagan p-value: "
+    f"{bp_pvalue:.4f}"
+)
+
+# Durbin-Watson statistic
+dw_stat = durbin_watson(
+    mod_extended.resid
+)
+
+print(
+    f"Durbin-Watson statistic: "
+    f"{dw_stat:.4f}"
+)
+
+# VIFs
+exog = pd.DataFrame(
+    mod_extended.model.exog,
+    columns=
+      mod_extended.model.exog_names
+)
+
+vif_table = pd.DataFrame({
+    "term": exog.columns,
+    "VIF": [
+        variance_inflation_factor(
+            exog.values,
+            i
+        )
+        for i in range(
+            exog.shape[1]
+        )
+    ]
+})
+
+print(
+    vif_table[
+        vif_table["term"]
+        != "Intercept"
+    ]
+)
+
+# Cook's Distance
+extended_cooks_d = (
+    extended_influence
+    .cooks_distance[0]
+)
+
+cooks_threshold_extended = (
+    4 / len(train_data)
+)
+
+plt.figure(figsize=(7, 4))
+
+plt.stem(
+    np.arange(
+        len(extended_cooks_d)
+    ),
+    extended_cooks_d,
+    markerfmt=","
+)
+
+plt.axhline(
+    cooks_threshold_extended,
+    linestyle="--"
+)
+
+plt.xlabel("Observation")
+plt.ylabel("Cook's Distance")
+plt.tight_layout()
+plt.show()
+
+print(
+    "Maximum Cook's Distance:",
+    extended_cooks_d.max()
+)
+
+print(
+    "4/n screening guideline:",
+    cooks_threshold_extended
+)
 ```
 
 :::
 
-`prior_courses` should be converted to categorical, because it is discrete and its relationship with exam_score isn't clearly linear. We see that this gives a small improvement in the fit ($R^2$ increases). Following the log-transform of `hours_studied`, $R^2$ improves and reaches 0.973. This is consistent with diminishing returns in studying. The `current_grade * prior_courses` interaction is not very significant, having a p-value of 0.830. There is therefore no evidence of  a dependence of `current_grade` on `prior_courses` here.
+The extended model has a training $R^2$ of approximately **0.857** and an adjusted $R^2$ of approximately **0.855**. This is substantially higher than the adjusted $R^2$ of approximately **0.653** from the simple area-only model.
 
-</details>
-::::
-:::
+The residual plots should show no strong remaining systematic curvature or funnel-shaped pattern. The Breusch-Pagan p-value is approximately **0.147**, so there is no statistical evidence of heteroscedasticity at the 5% significance level. The Durbin-Watson statistic is approximately **1.91**, which is reasonably close to 2.
 
+The VIF values for the non-intercept terms are all modest. The largest values are approximately **2.62** for `area_sqft` and `bedrooms`, reflecting their natural relationship, but there is no indication of severe multicollinearity.
 
-::: {.Question}
-::::{.Question-header}
-Question 3.24
-::::
-::::{.Question-container}
-**Coding Question**
+The maximum Cook's Distance is approximately **0.019**, compared with the $4/n$ screening guideline of approximately **0.0072**. A small number of observations may therefore warrant inspection, but there is no automatic justification for removing them.
 
-**Part E: Final Evaluation**
+Taken together, the diagnostics suggest that the extended OLS model provides a reasonable working description of the training data and can be carried forward to the Results stage.
 
-1. Select the final best performing model from the combinations of improvements above, by comparing $R^2$ and RMSE.
-2. Interpret the final model: How does a 5% increase in `current_grade` affect `exam_score`?
-3. Why might having taken more `prior_courses` show diminishing returns in `exam_score`?
-4. Inference: Based on your final model, describe the relationship between `hours_studied` and `exam_score`. Namely, if a student increases their study time by 10%, how does their expected exam score change?
-5. Prediction: Suppose a student has a current grade of 82, has taken 2 prior programming courses, and studied for 12.5 hours. Based on your final model, what is the predicted exam score of this student?
-::::
-:::
+#### Results
 
-::: {.Answer}
-::::{.Answer-header}
-Answer 3.24
-::::
-::::{.Answer-container}
-<details>
+We now separate the final analysis into **inference** and **prediction**.
 
-<summary><strong>Click here to reveal the answer!</strong></summary>
+For inference, we fit the pre-specified extended model structure to the protected test data. For prediction, we retain the model fitted on the training data and apply it unchanged to the test data.
 
-**Answer:**
+**Inferential Analysis**
+
+1. Fit the pre-specified extended OLS model to the protected test data.
+2. Report the coefficient estimates, standard errors, p-values, and 95% confidence intervals.
+3. At $\alpha = 0.05$, which model terms show statistical evidence of association with the conditional mean of monthly rent?
+4. Interpret the coefficients for:
+   - `distance_downtown_km`,
+   - `furnished = Yes`,
+   - `neighbourhood = Central` relative to `Suburban`.
+
+**Predictive Analysis**
+
+5. Use the **training-fitted extended model** to predict `monthly_rent` for every observation in the test data. Do not refit the model.
+6. Compute MAE, MSE, RMSE, and test-set $R^2$.
+7. Consider a new apartment with:
+   - `area_sqft = 900`,
+   - `bedrooms = 2`,
+   - `distance_downtown_km = 5`,
+   - `building_age_years = 10`,
+   - `furnished = Yes`,
+   - `neighbourhood = West`.
+
+   Compute:
+   - the point prediction,
+   - a 95% confidence interval for the expected mean monthly rent,
+   - a 95% prediction interval for one new apartment.
+
+Click to reveal answer
 
 ::: {.panel-tabset}
 
 ## **`R` Code**
 
 ```{r}
-# E.1 Compare models
-# Create a comparison table of R² and RMSE
-models <- list(
-  Initial = model1,
-  Categorical = model2,
-  Log_Transform = model3,
-  Interaction = model4
+############################################################
+# Results
+############################################################
+
+# ---------------------------
+# Inferential Analysis
+# ---------------------------
+
+mod_extended_test <- lm(
+  extended_formula,
+  data = test_data
 )
 
-results <- tibble(
-  Model = names(models),
-  R_squared = sapply(models, function(m) summary(m)$r.squared),
-  RMSE = sapply(models, function(m) sqrt(mean(resid(m)^2)))
+extended_test_results <- tidy(
+  mod_extended_test,
+  conf.int = TRUE,
+  conf.level = 0.95
 )
 
-# Show models sorted by R-squared
-results %>% arrange(desc(R_squared)) %>% print()
+extended_test_results
 
+# ---------------------------
+# Predictive Analysis
+# ---------------------------
 
-# E.2 Interpretation of final model (model3)
-# Interpretation: effect of a 5% increase in current_grade
-coef <- coef(model3)["current_grade"]
-effect <- 0.05 * coef
+# Apply the training-fitted model unchanged
+y_test <- test_data$monthly_rent
 
-cat(sprintf("\nA 5%% increase in current_grade increases exam_score by %.5f points\n", effect))
-
-# E.3 Diminishing returns explanation
-# see below!
-
-# E.4 Inference: Effect of hours_studied
-
-# Since Model 3 uses log(hours_studied), this is a Level-Log interpretation.
-
-# A 10% increase in X is associated with a (beta / 100) change in Y.
-# Delta Y = beta * ln(1 + 0.10)
-
-coef_log_hours <- coef(model3)["log_hours"]
-effect_hours <- coef_log_hours * log(1.10)
-
-cat("\nA 10% increase in study time is associated with an exam_score increase of:\n")
-print(effect_hours)
-
-# E.5 Prediction
-
-# Define the new student profile
-
-new_student <- data.frame(
-current_grade = 82,
-prior_courses = 2,
-hours_studied = 12.5
+y_pred <- predict(
+  mod_extended,
+  newdata = test_data
 )
 
-# Note: model3 was trained on a dataframe with a 'log_hours' column.
-# We must create that column in the new data to predict successfully.
-new_student <- new_student %>%
-mutate(log_hours = log(hours_studied))
+mae <- mean(
+  abs(y_test - y_pred)
+)
 
-predicted_score <- predict(model3, newdata = new_student)
+mse <- mean(
+  (y_test - y_pred)^2
+)
 
-cat(sprintf("\nPredicted exam score for the student: %.2f\n", predicted_score))
+rmse <- sqrt(mse)
+
+r2_test <- 1 -
+  sum((y_test - y_pred)^2) /
+  sum(
+    (y_test - mean(y_test))^2
+  )
+
+cat(sprintf(
+  "MAE: %.2f\nMSE: %.2f\nRMSE: %.2f\nTest R-squared: %.4f\n",
+  mae,
+  mse,
+  rmse,
+  r2_test
+))
+
+# New apartment profile
+new_apartment <- tibble::tibble(
+  area_sqft = 900,
+  bedrooms = 2,
+  distance_downtown_km = 5,
+  building_age_years = 10,
+  furnished = factor(
+    "Yes",
+    levels =
+      levels(train_data$furnished)
+  ),
+  neighbourhood = factor(
+    "West",
+    levels =
+      levels(
+        train_data$neighbourhood
+      )
+  )
+)
+
+# Confidence interval for expected mean rent
+mean_prediction <- predict(
+  mod_extended,
+  newdata = new_apartment,
+  interval = "confidence",
+  level = 0.95
+)
+
+# Prediction interval for one new apartment
+individual_prediction <- predict(
+  mod_extended,
+  newdata = new_apartment,
+  interval = "prediction",
+  level = 0.95
+)
+
+mean_prediction
+individual_prediction
 ```
-
-1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
-
-3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
-   - Students who have taken many prior courses may be repeating courses due to past struggles, indicating a negative selection bias.
-   - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
-   - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
 
 ## **`Python` Code**
 
 ```{python}
-# E.1 Compare models
-models = {
-    'Initial': model1,
-    'Categorical': model2,
-    'Log Transform': model3,
-    'Interaction': model4
-}
+############################################################
+# Results
+############################################################
 
-results = pd.DataFrame({
-    'Model': models.keys(),
-    'R-squared': [m.rsquared for m in models.values()],
-    'RMSE': [np.sqrt(m.mse_resid) for m in models.values()]
-})
-print(results.sort_values('R-squared', ascending=False))
+# ---------------------------
+# Inferential Analysis
+# ---------------------------
 
-# E.2 Interpretation of final model (model3)
-final_model = model3
-coef = final_model.params['current_grade']
-print(f"\nA 5% increase in current_grade increases exam_score by {0.05*coef:.5f} points")
+mod_extended_test = smf.ols(
+    extended_formula,
+    data=test_data
+).fit()
 
-# E.3 Diminishing returns explanation
-# see below!
+extended_test_ci = (
+    mod_extended_test
+    .conf_int(alpha=0.05)
+)
 
-
-# E.4 Inference: Effect of hours_studied (10% increase)
-# Interpretation of Level-Log model: Delta Y = beta * ln(1.10)
-coef_log_hours = final_model.params['log_hours']
-effect_hours = coef_log_hours * np.log(1.10)
-
-print("\nA 10% increase in study time is associated with an exam_score increase of:")
-print(effect_hours)
-
-# E.5 Prediction
-# Create a DataFrame for the new student
-new_student = pd.DataFrame({
-    'current_grade': [82],
-    'prior_courses': [2],
-    'hours_studied': [12.5]
+extended_test_results = pd.DataFrame({
+    "estimate":
+        mod_extended_test.params,
+    "std_error":
+        mod_extended_test.bse,
+    "t_statistic":
+        mod_extended_test.tvalues,
+    "p_value":
+        mod_extended_test.pvalues,
+    "conf_low":
+        extended_test_ci[0],
+    "conf_high":
+        extended_test_ci[1]
 })
 
-# We must add the log_hours feature as used in model3 training
-new_student['log_hours'] = np.log(new_student['hours_studied'])
+print(
+    extended_test_results
+)
 
-# Predict
-prediction = final_model.predict(new_student)
-print("\nPredicted exam score for the student:")
-print(prediction[0])
+# ---------------------------
+# Predictive Analysis
+# ---------------------------
+
+# Apply the training-fitted model unchanged
+y_test = test_data["monthly_rent"]
+
+y_pred = mod_extended.predict(
+    test_data
+)
+
+mae = mean_absolute_error(
+    y_test,
+    y_pred
+)
+
+mse = mean_squared_error(
+    y_test,
+    y_pred
+)
+
+rmse = np.sqrt(mse)
+
+r2_test = r2_score(
+    y_test,
+    y_pred
+)
+
+print(f"MAE: {mae:.2f}")
+print(f"MSE: {mse:.2f}")
+print(f"RMSE: {rmse:.2f}")
+print(
+    f"Test R-squared: "
+    f"{r2_test:.4f}"
+)
+
+# New apartment profile
+new_apartment = pd.DataFrame({
+    "area_sqft": [900],
+    "bedrooms": [2],
+    "distance_downtown_km": [5],
+    "building_age_years": [10],
+    "furnished": ["Yes"],
+    "neighbourhood": ["West"]
+})
+
+new_prediction = (
+    mod_extended
+    .get_prediction(
+        new_apartment
+    )
+    .summary_frame(
+        alpha=0.05
+    )
+)
+
+print(
+    new_prediction[
+        [
+            "mean",
+            "mean_ci_lower",
+            "mean_ci_upper",
+            "obs_ci_lower",
+            "obs_ci_upper"
+        ]
+    ]
+)
 ```
 
-1. Comparing $R^2$ and RMSE, one should choose the Log Transform model, which has the highest $R^2=0.9733$ and lowest RMSE$\approx3.28$.
-
-3. There are a number of plausible explanations for why taking more prior courses may show diminishing returns:
-   - Students who have taken many prior courses may be repeating courses due to past struggles, indicating a negative selection bias.
-   - The knowledge gained from additional courses may overlap, leading to less incremental benefit for each additional course taken.
-   - Students with many prior courses may have less time or motivation (or more overconfidence!) to study effectively for the current course.
-
 :::
 
-</details>
-::::
-:::
+**Inferential Analysis**
+
+On the protected test data:
+
+- `distance_downtown_km` has an estimated coefficient of approximately **-31.15**, with a 95% confidence interval from approximately **-36.58 to -25.73**. Holding the other regressors fixed, each additional kilometre from downtown is associated with an estimated decrease of about **31 CAD** in mean monthly rent.
+- `furnished = Yes` has an estimated coefficient of approximately **175.88**, with a 95% confidence interval from approximately **106.49 to 245.26**. Holding the other regressors fixed, furnished apartments are estimated to have about **176 CAD** higher mean monthly rent than unfurnished apartments.
+- `neighbourhood = Central` has an estimated coefficient of approximately **347.27**, with a 95% confidence interval from approximately **260.23 to 434.31**. Holding the other regressors fixed, apartments in the Central neighbourhood are estimated to have about **347 CAD** higher mean monthly rent than otherwise comparable apartments in the Suburban reference neighbourhood.
+
+At the 5% significance level, all non-intercept terms in this simulated example show statistical evidence of association with the conditional mean of monthly rent.
+
+These estimates describe **associations rather than causal effects**.
+
+**Predictive Analysis**
+
+When the extended model fitted on the training data is applied unchanged to the test data:
+
+- MAE is approximately **143.89 CAD**,
+- MSE is approximately **33,980.86 CAD$^2$**,
+- RMSE is approximately **184.34 CAD**,
+- test-set $R^2$ is approximately **0.8748**.
+
+Thus, the predicted monthly rents differ from the observed test-set rents by about **144 CAD on average in absolute value**. The test-set $R^2$ indicates strong out-of-sample predictive performance for this simulated dataset.
+
+For the selected new apartment profile, the model predicts a monthly rent of approximately **2,244.56 CAD**. The 95% confidence interval for the expected mean monthly rent is approximately **2,199.05 to 2,290.06 CAD**, while the 95% prediction interval for one new apartment is approximately **1,867.41 to 2,621.70 CAD**.
+
+The prediction interval is wider because it accounts for both uncertainty in estimating the conditional mean and the additional apartment-to-apartment variability around that mean.
+
+#### Storytelling
+
+Using the results above, write a short summary that could be communicated to a non-technical audience. Your summary should:
+
+1. describe the main associations identified by the extended OLS model,
+2. report the model's predictive performance,
+3. mention the prediction for the selected new apartment,
+4. avoid causal language.
+
+Click to reveal answer
+
+**Answer:**
+
+Apartment rent in this simulated dataset is associated with a combination of apartment size, location, building characteristics, and furnishing. After accounting for the other regressors, larger apartments and furnished apartments tend to have higher monthly rents, while apartments farther from downtown and apartments in older buildings tend to have lower rents. Neighbourhood also remains associated with rent after accounting for the other apartment characteristics; for example, apartments in the Central neighbourhood have a higher estimated mean monthly rent than otherwise comparable apartments in the Suburban reference neighbourhood.
+
+The model also performs well from a predictive perspective. When the model fitted on the training data is applied to the protected test data, the MAE is approximately 144 CAD, the RMSE is approximately 184 CAD, and the test-set $R^2$ is approximately 0.875. For a 900-square-foot, two-bedroom, furnished apartment located 5 km from downtown in the West neighbourhood and in a 10-year-old building, the model predicts a monthly rent of approximately 2,245 CAD. The 95% prediction interval for one apartment with these characteristics ranges from approximately 1,867 CAD to 2,622 CAD.
+
+Because these data are observational, the estimated relationships should be interpreted as **associations rather than causal effects**. The analysis describes how apartment characteristics and monthly rent vary together in this simulated dataset; it does not establish that changing one characteristic would necessarily cause rent to change by the corresponding regression coefficient.
+
