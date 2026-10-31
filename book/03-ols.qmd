@@ -2570,6 +2570,26 @@ $$
 
 Notice the distinction between the **error vector** $\boldsymbol{\varepsilon}$ in the statistical model and the **residual vector** $\mathbf{e}$ obtained after fitting the model. The errors are unobserved random quantities, whereas the residuals can be calculated from the observed data and the fitted model.
 
+The matrix
+
+$$
+\mathbf{H}
+=
+\mathbf{X}
+(\mathbf{X}^\top \mathbf{X})^{-1}
+\mathbf{X}^\top
+$${#eq-hat-matrix}
+
+is called the **hat matrix** because it maps the observed response vector $\mathbf{Y}$ to the fitted response vector $\hat{\mathbf{Y}}$:
+
+$$
+\hat{\mathbf{Y}}
+=
+\mathbf{H}\mathbf{Y}.
+$$
+
+The diagonal elements of $\mathbf{H}$, denoted $h_{ii}$, are called **leverage values**. They measure how unusual an observation's regressor values are relative to those of the other observations. We will return to leverage when discussing influential observations in the Goodness of Fit section.
+
 In practice, statistical software such as `lm()` in `R` and `ols()` in `Python` computes the coefficient estimates using numerically stable matrix algorithms rather than explicitly forming the inverse $(\mathbf{X}^\top\mathbf{X})^{-1}$. 
 
 Nevertheless, the closed-form expression above is useful for understanding the mathematical foundation of OLS and why, unlike many other regression models in this book, its regression coefficients can be obtained without iterative numerical optimization.
@@ -2619,7 +2639,7 @@ OLS_tidy = pd.DataFrame({
  })
  
 # Displaying the tidy table
-print(OLS_tidy)
+print(OLS_tidy.params)
 ```
 
 :::
@@ -2653,20 +2673,10 @@ import statsmodels.formula.api as smf
 # Fit the OLS model using a formula
 ols_model = smf.ols(
     formula="Net_Money ~ Has_Job + Year_of_Study + Financially_Dependent + Monthly_Allowance + Cooks_at_Home + Goes_Out_Spends_Money + Drinks_Alcohol + Monthly_Earnings + Living_Situation + Housing_Type",
-    data=train_data
+    data = r.train_data
 ).fit()
 
-# Creating a tidy summary table
-OLS_tidy = pd.DataFrame({
-     "term": ols_model.params.index,
-     "estimate": np.round(ols_model.params.values, 2),
-     "std_error": np.round(ols_model.bse.values, 2),
-     "t_value": np.round(ols_model.tvalues.values, 2),
-     "p_value": np.round(ols_model.pvalues.values, 2)
- })
- 
-# Displaying the tidy table
-print(OLS_tidy)
+ols_model.params
 ```
 :::
 
@@ -2872,7 +2882,19 @@ DW =
 },
 $${#eq-durbin-watson-formula}
 
-where $e_i$ denotes the residual for observation $i$. The statistic generally takes values between 0 and 4. Values near 2 suggest little evidence of first-order autocorrelation, values substantially below 2 are associated with positive autocorrelation, and values substantially above 2 are associated with negative autocorrelation.
+where $e_i$ is the residual for observation $i$. The Durbin-Watson statistic is not itself the autocorrelation coefficient. Instead, for first-order autocorrelation, it is approximately related to the residual autocorrelation $\rho$ by
+
+$$
+DW \approx 2(1-\rho).
+$$
+
+Therefore, under the null hypothesis of no first-order autocorrelation,
+
+$$
+H_0:\rho = 0,
+$$
+
+we expect the Durbin-Watson statistic to be close to 2. Values near 2 suggest little evidence of first-order autocorrelation, values substantially below 2 are associated with positive autocorrelation, and values substantially above 2 are associated with negative autocorrelation.
 
 In R, the default dwtest() tests for positive autocorrelation:
 
@@ -3468,7 +3490,7 @@ To distinguish observations that are simply poorly fit from those that may have 
 
 ##### Leverage
 
-Leverage measures how unusual an observation's regressor values are relative to those of the other observations. In linear regression, leverage is obtained from the diagonal elements of the hat matrix. Observations with larger leverage values have greater potential to affect the fitted regression model.
+Leverage measures how unusual an observation's regressor values are relative to those of the other observations. In linear regression, leverage is obtained from the diagonal elements of the hat matrix (reminder that we defined hat matrix in @eq-hat-matrix). Observations with larger leverage values have greater potential to affect the fitted regression model.
 
 A commonly used screening guideline is to investigate observations with leverage values larger than
 
