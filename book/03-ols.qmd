@@ -4306,21 +4306,21 @@ The additional $\widehat{\sigma}^2$ term represents the unexplained variability 
 ``` {.r}
 # Define the new student profile
 new_student_profile <- tibble::tibble(
-  Has_Job = factor("Yes", levels = levels(test_data$Has_Job)),
+  Has_Job = factor("Yes", levels = levels(train_data$Has_Job)),
   Year_of_Study = 3,
-  Financially_Dependent = factor("No", levels = levels(test_data$Financially_Dependent)),
+  Financially_Dependent = factor("No", levels = levels(train_data$Financially_Dependent)),
   Monthly_Allowance = 800,
-  Cooks_at_Home = factor("Yes", levels = levels(test_data$Cooks_at_Home)),
+  Cooks_at_Home = factor("Yes", levels = levels(train_data$Cooks_at_Home)),
   Goes_Out_Spends_Money = 3,
-  Drinks_Alcohol = factor("No", levels = levels(test_data$Drinks_Alcohol)),
+  Drinks_Alcohol = factor("No", levels = levels(train_data$Drinks_Alcohol)),
   Monthly_Earnings = 1200,
-  Living_Situation = factor("Shared", levels = levels(test_data$Living_Situation)),
-  Housing_Type = factor("Rent", levels = levels(test_data$Housing_Type))
+  Living_Situation = factor("Shared", levels = levels(train_data$Living_Situation)),
+  Housing_Type = factor("Rent", levels = levels(train_data$Housing_Type))
 )
 
 # Confidence interval for the expected mean Net Money
 mean_prediction <- predict(
-  testing_OLS_model,
+  ols_model,
   newdata = new_student_profile,
   interval = "confidence",
   level = 0.95
@@ -4328,7 +4328,7 @@ mean_prediction <- predict(
 
 # Prediction interval for a new individual student's Net Money
 individual_prediction <- predict(
-  testing_OLS_model,
+  ols_model,
   newdata = new_student_profile,
   interval = "prediction",
   level = 0.95
@@ -4363,6 +4363,77 @@ new_student_predictive_summary_vertical <- tibble::tibble(
 new_student_predictive_summary_vertical |>
   mutate(Value = formatC(Value, format = "f", digits = 2, big.mark = ",")) |>
   knitr::kable(align = c("c", "c"))
+```
+
+## **`Python` Code**
+
+``` {.python}
+import pandas as pd
+
+# Define the new student profile
+new_student_profile = pd.DataFrame({
+    "Has_Job": ["Yes"],
+    "Year_of_Study": [3],
+    "Financially_Dependent": ["No"],
+    "Monthly_Allowance": [800],
+    "Cooks_at_Home": ["Yes"],
+    "Goes_Out_Spends_Money": [3],
+    "Drinks_Alcohol": ["No"],
+    "Monthly_Earnings": [1200],
+    "Living_Situation": ["Shared"],
+    "Housing_Type": ["Rent"]
+})
+
+# Obtain the point prediction, confidence interval for the expected mean,
+# and prediction interval for a new individual student
+new_student_prediction = (
+    ols_model
+    .get_prediction(new_student_profile)
+    .summary_frame(alpha=0.05)
+)
+
+# Create summary table
+new_student_predictive_summary = pd.DataFrame({
+    "predicted_net_money": [
+        new_student_prediction["mean"].iloc[0]
+    ],
+    "mean_ci_lower": [
+        new_student_prediction["mean_ci_lower"].iloc[0]
+    ],
+    "mean_ci_upper": [
+        new_student_prediction["mean_ci_upper"].iloc[0]
+    ],
+    "pred_pi_lower": [
+        new_student_prediction["obs_ci_lower"].iloc[0]
+    ],
+    "pred_pi_upper": [
+        new_student_prediction["obs_ci_upper"].iloc[0]
+    ]
+})
+
+new_student_predictive_summary_vertical = pd.DataFrame({
+    "Quantity": [
+        "Predicted Net Money",
+        "95% confidence interval for the expected mean Net Money (lower bound)",
+        "95% confidence interval for the expected mean Net Money (upper bound)",
+        "95% prediction interval (lower bound)",
+        "95% prediction interval (upper bound)"
+    ],
+    "Value": [
+        new_student_predictive_summary["predicted_net_money"].iloc[0],
+        new_student_predictive_summary["mean_ci_lower"].iloc[0],
+        new_student_predictive_summary["mean_ci_upper"].iloc[0],
+        new_student_predictive_summary["pred_pi_lower"].iloc[0],
+        new_student_predictive_summary["pred_pi_upper"].iloc[0]
+    ]
+})
+
+new_student_predictive_summary_vertical["Value"] = (
+    new_student_predictive_summary_vertical["Value"]
+    .map(lambda x: f"{x:,.2f}")
+)
+
+print(new_student_predictive_summary_vertical.to_string(index=False))
 ```
 
 :::
@@ -4438,6 +4509,81 @@ new_student_predictive_summary_vertical <- tibble::tibble(
 new_student_predictive_summary_vertical |>
   mutate(Value = formatC(Value, format = "f", digits = 2, big.mark = ",")) |>
   knitr::kable(align = c("c", "c"))
+```
+
+## **`Python` Output**
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+import pandas as pd
+
+# Define the new student profile
+new_student_profile = pd.DataFrame({
+    "Has_Job": ["Yes"],
+    "Year_of_Study": [3],
+    "Financially_Dependent": ["No"],
+    "Monthly_Allowance": [800],
+    "Cooks_at_Home": ["Yes"],
+    "Goes_Out_Spends_Money": [3],
+    "Drinks_Alcohol": ["No"],
+    "Monthly_Earnings": [1200],
+    "Living_Situation": ["Shared"],
+    "Housing_Type": ["Rent"]
+})
+
+# Obtain the point prediction, confidence interval for the expected mean,
+# and prediction interval for a new individual student
+new_student_prediction = (
+    ols_model
+    .get_prediction(new_student_profile)
+    .summary_frame(alpha=0.05)
+)
+
+# Create summary table
+new_student_predictive_summary = pd.DataFrame({
+    "predicted_net_money": [
+        new_student_prediction["mean"].iloc[0]
+    ],
+    "mean_ci_lower": [
+        new_student_prediction["mean_ci_lower"].iloc[0]
+    ],
+    "mean_ci_upper": [
+        new_student_prediction["mean_ci_upper"].iloc[0]
+    ],
+    "pred_pi_lower": [
+        new_student_prediction["obs_ci_lower"].iloc[0]
+    ],
+    "pred_pi_upper": [
+        new_student_prediction["obs_ci_upper"].iloc[0]
+    ]
+})
+
+new_student_predictive_summary_vertical = pd.DataFrame({
+    "Quantity": [
+        "Predicted Net Money",
+        "95% confidence interval for the expected mean Net Money (lower bound)",
+        "95% confidence interval for the expected mean Net Money (upper bound)",
+        "95% prediction interval (lower bound)",
+        "95% prediction interval (upper bound)"
+    ],
+    "Value": [
+        new_student_predictive_summary["predicted_net_money"].iloc[0],
+        new_student_predictive_summary["mean_ci_lower"].iloc[0],
+        new_student_predictive_summary["mean_ci_upper"].iloc[0],
+        new_student_predictive_summary["pred_pi_lower"].iloc[0],
+        new_student_predictive_summary["pred_pi_upper"].iloc[0]
+    ]
+})
+
+new_student_predictive_summary_vertical["Value"] = (
+    new_student_predictive_summary_vertical["Value"]
+    .map(lambda x: f"{x:,.2f}")
+)
+
+print(new_student_predictive_summary_vertical.to_string(index=False))
 ```
 
 :::
