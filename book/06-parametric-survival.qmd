@@ -2187,6 +2187,125 @@ We also observed two notable associations: Group B appears to have longer heart 
 
 In the next step, Data Modelling, we will move beyond these exploratory comparisons and develop a parametric survival regression model. We will consider which survival-time distribution is appropriate, specify the AFT regression equation, estimate its parameters while accounting for censoring, and interpret the resulting coefficients as time ratios. This will allow us to investigate how multiple patient characteristics are associated with time until a heart attack.
 
+## Data Modelling
+
+Our exploratory analysis suggested that heart attack-free survival differs across patient groups and ages. However, these comparisons did not account for other patient characteristics. We will now develop a regression model to examine these relationships simultaneously by choosing a suitable model, defining its parameters, and specifying the equation for our dataset.
+
+### Choosing a Suitable Regression Model
+
+As introduced earlier, the accelerated failure time (AFT) model describes how predictors are associated with longer or shorter survival times by modelling the logarithm of survival time. To specify a parametric AFT model, we must also choose a distribution for survival times. Recall the three distributions introduced earlier:
+
+- **Exponential:** Assumes a constant hazard rate over time.
+- **Weibull:** Allows the hazard rate to increase, decrease, or remain constant.
+- **Log-normal:** Allows the hazard rate to increase initially and then decrease.
+
+For our initial model, we will choose the Weibull distribution. It provides greater flexibility than the Exponential distribution by allowing the hazard rate to change over time, while maintaining a relatively simple mathematical structure. This makes it a reasonable starting point for modelling time until a heart attack, where the hazard may vary throughout follow-up. However, we have not yet established that Weibull provides the best fit, so we will evaluate this choice and compare alternative distributions later in the workflow.
+
+### Defining the Model Parameters
+
+Recall the general AFT regression equation:
+
+$$
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma\varepsilon_i.
+$$
+
+The model contains two types of unknown parameters: regression coefficients ($\beta$), which describe how predictors are associated with log survival time, and a scale parameter ($\sigma>0$), which controls the spread of log survival times and determines the Weibull hazard shape.
+
+For our case study, we will estimate:
+
+- **$\beta_0$ (Intercept):** Baseline log survival-time location when all predictors equal zero.
+- **$\beta_1$ (Age):** Association between a one-year increase in age and log survival time.
+- **$\beta_2$ (Patient Group):** Difference in log survival time between Group B and the reference Group A.
+- **$\beta_3$ (Baseline Marker):** Association between a one-unit increase in the baseline marker and log survival time.
+- **$\beta_4$ (Comorbidity Count):** Association between one additional existing medical condition and log survival time.
+- **$\sigma$ (Scale Parameter):** Controls the spread of log survival times and the Weibull hazard shape.
+
+An important feature of AFT regression is that exponentiating a regression coefficient produces a **time ratio**:
+
+$$
+\text{Time Ratio} = e^{\beta_j}.
+$$
+
+A time ratio greater than one indicates longer survival times, while a value below one indicates shorter survival times, holding the other predictors constant. We will use these time ratios to interpret the estimated coefficients after fitting our model.
+
+::: {.Tip}
+:::: {.Tip-header}
+What Does the Scale Parameter Tell Us?
+::::
+:::: {.Tip-container}
+
+Unlike the regression coefficients, the scale parameter $\sigma$ describes the shape of the survival-time distribution. Recall that the Weibull distribution has a shape parameter $k$, which is related to $\sigma$ by:
+
+$$
+k = \frac{1}{\sigma}.
+$$
+
+Therefore:
+
+- **$\sigma<1$ ($k>1$):** The hazard increases over time.
+- **$\sigma>1$ ($k<1$):** The hazard decreases over time.
+- **$\sigma=1$ ($k=1$):** The hazard is constant, corresponding to the Exponential distribution.
+
+This allows the Weibull AFT model to accommodate different hazard patterns while estimating the associations between predictors and survival time.
+
+::::
+:::
+
+### Setting Up the Modelling Equation
+
+With our parameters defined, we can now specify the Weibull AFT model using our four predictors:
+
+- `age`: Patient age at baseline.
+- `group_B`: An indicator equal to 1 for Group B and 0 for Group A.
+- `baseline_marker`: The patient's baseline health marker.
+- `comorbidity_count`: The number of existing medical conditions.
+
+Our modelling equation is:
+
+$$
+\begin{aligned}
+\log T_i =\;& \beta_0
++ \beta_1 \text{Age}_i \\
+&+ \beta_2 \text{GroupB}_i \\
+&+ \beta_3 \text{BaselineMarker}_i \\
+&+ \beta_4 \text{ComorbidityCount}_i
++ \sigma\varepsilon_i.
+\end{aligned}
+$$
+
+Here, $T_i$ represents the underlying time until a heart attack for patient $i$, while $\varepsilon_i$ follows a standard minimum-type extreme value distribution, corresponding to our chosen Weibull AFT model. This equation allows us to examine how each patient characteristic is associated with survival time while holding the other predictors constant. For example, we can compare Groups A and B at the same age, baseline marker value, and comorbidity count.
+
+::: {.Tip}
+:::: {.Tip-header}
+Why Do We Use the Minimum-Type Extreme Value Distribution?
+::::
+:::: {.Tip-container}
+
+The AFT model describes log survival time, rather than survival time directly:
+
+$$
+\log T = \eta + \sigma\varepsilon.
+$$
+
+To return to the original time scale, we exponentiate both sides:
+
+$$
+T = e^\eta \times e^{\sigma\varepsilon}.
+$$
+
+Notice that survival time depends on the random error term, $\varepsilon$. Different error distributions therefore produce different distributions of survival time.
+
+- **Normal errors:** Exponentiating a Normally distributed log survival time produces a Log-normal distribution.
+- **Minimum-type extreme value errors:** Exponentiating these errors produces a Weibull distribution for survival time.
+
+The second relationship follows from the mathematical shape of the extreme value distribution, which transforms into the Weibull survival function when we exponentiate the AFT equation. For our case study, we use minimum-type extreme value errors because we have chosen a Weibull AFT model.
+
+::::
+:::
+
+One final consideration is censoring. Although our equation describes the underlying time until a heart attack, we do not observe that exact time for every patient. Rather than removing censored patients or assigning them artificial event times, we will use their recorded follow-up times and event indicators during estimation.
+
+With our Weibull AFT model specified, we are ready to move to Estimation, where we will use maximum likelihood estimation to estimate the unknown parameters while accounting for both observed heart attacks and censored observations.
 
 ## Estimation
 
