@@ -2309,37 +2309,155 @@ With our Weibull AFT model specified, we are ready to move to Estimation, where 
 
 ## Estimation
 
-With the model structure defined, the next step is to estimate its parameters from data.
+With our Weibull AFT model specified, we can now estimate its regression coefficients and scale parameter using maximum likelihood estimation (MLE). As in Gamma and Beta regression, MLE finds the parameter values that make the observed data most likely under the assumed distribution. In survival regression, however, we must also account for patients whose exact event times are unknown due to censoring.
 
-::: {.Tip}
-::::{.Tip-header}
-How Parametric Survival Models Are Fit
-::::
-::::{.Tip-container}
-Like Gamma and Beta regression, parametric survival models are estimated using maximum likelihood estimation (MLE). MLE finds the parameter values that make the observed data most likely under the assumed distribution. The distinctive feature in the survival setting is that the likelihood is modified so that censored observations contribute exactly the information they carry, no more and no less.
-::::
-:::
+### Fitting the Model
 
-The key idea is that observed events and censored observations contribute differently to the likelihood. If subject $i$ experienced the event at time $t_i$, the appropriate contribution is the density $f(t_i)$, reflecting that the event happened precisely then. If subject $i$ was censored at time $t_i$, we only know that their event time exceeds $t_i$, and the appropriate contribution is the survival probability $S(t_i) = P(T_i > t_i)$.
+To understand how MLE handles censoring, consider two patients:
 
-Using the event indicator $\delta_i$ to select the right contribution for each subject, the likelihood for a sample of $n$ independent observations is
+- **Patient A:** Experienced a heart attack after 5 years. We know when the event occurred.
+- **Patient B:** Was followed for 5 years without experiencing a heart attack. We do not know their eventual event time, but we know they remained event-free throughout those 5 years.
+
+Both patients provide useful information, but in different ways. For Patient A, we use the probability density $f(t)$, which describes how event times are distributed. For Patient B, we use the survival function $S(t)$, which gives the probability of remaining event-free beyond a particular time. The following graphs illustrate these two contributions using the same hypothetical Weibull distribution. The dashed lines mark the patients' recorded follow-up time of 5 years.
+
+```{python}
+#| label: fig-likelihood-contributions
+#| echo: false
+#| fig-cap: "Probability density and survival function for a hypothetical Weibull distribution."
+#| fig-width: 11
+#| fig-height: 4
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import weibull_min
+
+shape, scale = 1.7, 9
+t = np.linspace(0.01, 15, 500)
+t_obs = 5
+
+density = weibull_min.pdf(t, shape, scale=scale)
+survival = weibull_min.sf(t, shape, scale=scale)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+for ax, values, color, title, ylabel in [
+    (axes[0], density, "steelblue",
+     "Patient A: Event-Time Density", "Density"),
+    (axes[1], survival, "darkcyan",
+     "Patient B: Survival Function", "Survival Probability")
+]:
+    ax.plot(t, values, color=color, linewidth=2)
+    ax.axvline(t_obs, color="gray", linestyle="--")
+    ax.scatter(
+        t_obs,
+        weibull_min.pdf(t_obs, shape, scale=scale)
+        if ax == axes[0]
+        else weibull_min.sf(t_obs, shape, scale=scale),
+        color=color,
+        zorder=3
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Follow-up Time (Years)")
+    ax.set_ylabel(ylabel)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+axes[1].set_ylim(0, 1)
+
+fig.tight_layout()
+plt.show()
+```
+
+For Patient A, the height of the density curve at 5 years, $f(5)$, contributes to the likelihood because the heart attack occurred at that time. For Patient B, the height of the survival curve, $S(5)$, contributes instead because the patient remained event-free beyond 5 years. In other words, observed events tell us when heart attacks occur, while censored observations tell us how long patients have survived without one .
+
+We can combine these contributions into a single likelihood function:
 
 $$
-L = \prod_{i=1}^{n} f(t_i)^{\delta_i} \, S(t_i)^{1 - \delta_i}
+L(\boldsymbol{\theta})
+=
+\prod_{i=1}^{n}
+\underbrace{f(t_i\mid\mathbf{x}_i)^{\delta_i}}_{\text{Observed events}}
+\underbrace{S(t_i\mid\mathbf{x}_i)^{1-\delta_i}}_{\text{Censored observations}},
 $$
 
-When $\delta_i = 1$, the exponent on the survival function vanishes and the observation contributes its density. When $\delta_i = 0$, the density term vanishes and the observation contributes its survival probability. This construction is the precise sense in which survival analysis uses censored observations rather than discarding them: a subject censored at five years pushes the estimates toward distributions under which surviving past five years is plausible.
+where $t_i$ is the recorded follow-up time, $\mathbf{x}_i$ represents the patient's characteristics, $\delta_i$ is the event indicator (1 = heart attack, 0 = censored), and $\boldsymbol{\theta}$ represents our unknown model parameters.
 
-Maximizing this likelihood, in practice via its logarithm and numerical optimization, yields estimates of the regression coefficients and the scale parameter, along with standard errors that support the usual confidence intervals and hypothesis tests.
+The event indicator acts like a switch, selecting the appropriate contribution for each patient. The product symbol ($\prod$) simply means that we multiply these contributions across all patients. MLE then finds the regression coefficients and scale parameter that maximize this likelihood. In practice, statistical software maximizes the log-likelihood, an equivalent calculation that is easier to optimize numerically.
 
 ::: {.Heads-up}
-::::{.Heads-up-header}
-Heads-up!
+:::: {.Heads-up-header}
+Non-Informative Censoring
 ::::
-::::{.Heads-up-container}
-This likelihood construction relies on the assumption of **non-informative censoring**: the reason an observation is censored must be unrelated to the subject's risk of the event, given the predictors in the model. Censoring that occurs because a study reaches its planned end date typically satisfies this assumption. By contrast, if the sickest patients are the ones who drop out of a study, censoring carries information about risk, and estimates from any standard survival analysis will be biased. This assumption deserves careful thought in every application.
+:::: {.Heads-up-container}
+
+This approach assumes **non-informative censoring**: after accounting for the predictors in our model, censoring should not provide additional information about a patient's underlying heart attack time.
+
+For example, patients who remain event-free when a study reaches its planned end date may be censored for reasons unrelated to their health. However, if patients with worsening health are more likely to drop out, their censoring may be related to their risk of experiencing a heart attack.
+
+If this assumption is violated, our model estimates may be biased.
+
 ::::
 :::
+
+With this understanding of how censored observations contribute to estimation, we can now fit our Weibull AFT model using statistical software.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: fit-weibull-aft-r
+
+library(survival)
+
+# Fit the Weibull AFT model
+weibull_model <- survreg(
+  Surv(time, event) ~ age + group_B +
+    baseline_marker + comorbidity_count,
+  data = data,
+  dist = "weibull"
+)
+
+# Display model results
+summary(weibull_model)
+```
+
+## Python Code
+
+```{python}
+#| label: fit-weibull-aft-python
+
+from lifelines import WeibullAFTFitter
+
+# Fit the Weibull AFT model
+weibull_model = WeibullAFTFitter()
+
+weibull_model.fit(
+    data[
+        [
+            "time",
+            "event",
+            "age",
+            "group_B",
+            "baseline_marker",
+            "comorbidity_count"
+        ]
+    ],
+    duration_col="time",
+    event_col="event"
+)
+
+# Display model results
+weibull_model.print_summary()
+```
+
+:::
+
+Both implementations produce consistent estimates, although their output formats and parameterizations differ slightly. R's `survreg()` reports the regression coefficients and log-time scale parameter $\sigma$, while Python's `WeibullAFTFitter` reports coefficients for the Weibull time-scale parameter (`lambda_`) and shape parameter (`rho_`).
+
+Our fitted model uses 1,000 patient observations, including 258 observed heart attacks and 742 right-censored observations. Both implementations produce a log-likelihood of approximately $-1050.11$, confirming that they have fitted the same model.
+
+Although we now have estimates of the regression coefficients, we should not rush to interpret them. Recall that we initially chose the Weibull distribution for its flexibility, but have not yet established whether it adequately represents our data. Before drawing conclusions about the relationships between patient characteristics and survival time, we will assess the model's goodness of fit and compare it with alternative parametric distributions.
 
 ## Choosing Among Distributions and Assessing Fit
 
