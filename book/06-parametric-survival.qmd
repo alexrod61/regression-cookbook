@@ -23,6 +23,2474 @@ colourize <- function(x, color) {
 }
 ```
 
+```{r setup, include=FALSE}
+# Load required libraries
+library(devtools)
+library(readr)
+library(ggplot2)
+library(ggcorrplot)
+library(cookbook)
+library(tidyverse)
+library(car)
+library(lmtest)
+library(fastDummies)
+library(betareg)
+
+# Setting up Python dependencies
+library(reticulate)
+
+py_require("pandas") 
+py_require("numpy")
+py_require("matplotlib")
+py_require("statsmodels")
+py_require("pyreadr")
+py_require("scikit-learn")
+py_require("seaborn")
+py_require("scipy")
+py_require("lifelines")
+
+pandas <- import("pandas")
+numpy <- import("numpy")
+matplotlib <- import("matplotlib")
+statsmodels <- import("statsmodels")
+pyreadr <- import("pyreadr")
+sklearn <- import("sklearn")
+seaborn <- import("seaborn")
+scipy <- import("scipy")
+lifelines <- import("lifelines")
+
+# Load data in R
+data <- parametric_survival
+
+py$data <- r_to_py(parametric_survival)
+```
+
+::: {.LO}
+::::{.LO-header}
+Learning Objectives
+::::
+::::{.LO-container}
+By the end of this chapter, you will be able to:
+
+- Explain what **parametric survival regression** is and identify when it is the appropriate modelling choice for time-to-event data.
+- Describe what **censoring** is and why it makes Ordinary Least Squares unsuitable for survival outcomes.
+- Define the **survival function** and the **hazard function** and explain how they relate to each other and to the distribution of survival times.
+- Describe the **Exponential**, **Weibull**, and **Log-normal** distributions as models for survival times and recognize the hazard shapes each one can represent.
+- Explain the **accelerated failure time** formulation of parametric survival regression and interpret exponentiated coefficients as **time ratios**.
+- Explain how **maximum likelihood estimation** incorporates censored observations and how **log-likelihood**, **AIC**, and **BIC** are used to compare candidate distributions.
+
+::::
+:::
+
+## Introduction
+
+Many real world problems involve modelling the time until an event occurs. A manufacturer may want to know how long a machine component lasts before it fails. A medical researcher may study how long patients remain relapse-free after receiving a treatment. A subscription business may track how long customers stay before cancelling their plans. In each case, the outcome of interest is not a category or an ordinary measurement, but a duration: the amount of time that passes before something happens.
+
+Time-to-event data has two features that make it stand apart from the outcomes we have modelled so far. First, survival times are nonnegative and usually right skewed, with many short durations and a long tail of larger ones. Second, and more importantly, we often do not get to observe the event for everyone. A study may end before a machine fails, or a patient may still be relapse-free when data collection stops. For these observations, we only know that the event had not yet happened by a certain time. This phenomenon is called censoring, and it is the defining challenge of survival data.
+
+Traditional linear regression cannot handle either feature gracefully. It may predict negative durations, and it has no mechanism for using observations whose event times are only partially known. Problems like this call for a regression approach that is designed specifically for time-to-event outcomes. This is exactly where parametric survival regression comes to shine.
+
+## What is Parametric Survival Regression
+
+Parametric survival regression is a regression model for response variables that represent the time until an event occurs. It works by assuming that survival times follow a specific probability distribution, such as the Exponential, Weibull, or Log-normal distribution, and modelling how the parameters of that distribution change with the predictors.
+
+The word *parametric* refers to this distributional assumption. Different distributions describe different patterns in how event times are spread out. For example, some distributions place more probability on shorter durations, while others allow event times to be concentrated around a particular period or spread across a longer range.
+
+The figure below illustrates how the Exponential, Weibull, and Log-normal distributions can describe different patterns of survival times. Each curve represents a possible distribution of the time until an event occurs, with different shapes reflecting different assumptions about how those times are distributed.
+
+
+```{python}
+#| label: survival-distributions
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import expon, weibull_min, lognorm
+
+t = np.linspace(0.001, 4, 500)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+# Exponential distribution
+ax.plot(
+    t,
+    expon.pdf(t, scale=1),
+    label="Exponential (rate = 1)"
+)
+
+# Weibull distribution
+ax.plot(
+    t,
+    weibull_min.pdf(t, c=2, scale=1),
+    label="Weibull (shape = 2, scale = 1)"
+)
+
+# Log-normal distribution
+ax.plot(
+    t,
+    lognorm.pdf(t, s=0.5, scale=np.exp(0)),
+    label="Log-normal (mu = 0, sigma = 0.5)"
+)
+
+ax.set_title("Examples of Survival Time Distributions")
+ax.set_xlabel("Time until event")
+ax.set_ylabel("Probability Density")
+ax.set_xlim(0, 4)
+ax.set_ylim(bottom=0)
+ax.legend(frameon=False)
+
+fig.tight_layout()
+fig
+```
+
+By committing to a particular distribution, the model gains a complete mathematical description of survival times, allowing it to make use of both observed and censored durations. This stands in contrast to semiparametric approaches, such as the Cox proportional hazards model, which do not require specifying a particular probability distribution for survival times. We explore that alternative in the [next chapter](07-semiparametric-survival.qmd).
+
+Although the language of *survival* comes from medical research, where the event of interest was historically death or relapse, the same framework applies far beyond medicine. In engineering, it is known as reliability analysis or failure-time analysis. In economics and business, it often appears under the name duration analysis. Whatever the label, the underlying statistical machinery is the same.
+
+## Survival Data and Censoring
+
+Before introducing the model itself, we need to be precise about what survival data looks like.
+
+The response of interest is a nonnegative random variable $T$, representing the time from a well-defined starting point until the event occurs. The starting point might be the moment a machine is put into service, the date a patient begins treatment, or the day a customer signs up.
+
+In an ideal world, we would observe the exact event time for every subject. In practice, observation is limited. A study has a finite duration, participants can drop out or be lost to follow-up, and some events simply have not happened yet when the data is collected. When a subject's follow-up ends before their event occurs, that observation is said to be **right censored**: we do not know the exact event time, but we do know it exceeds the time at which observation stopped.
+
+To make this more concrete, imagine a study tracking how long five machines operate before failing. Some machines fail during the observation period, while others are still operating when the study ends or their follow-up stops.
+
+```{python}
+#| label: survival-censoring-timeline
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+
+machines = [
+    ("A", 4, 1),
+    ("B", 7, 0),
+    ("C", 6, 1),
+    ("D", 10, 0),
+    ("E", 9, 1),
+]
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+
+for i, (name, time, event) in enumerate(machines):
+    y = len(machines) - i
+
+    color = "tab:green" if event else "tab:orange"
+
+    ax.hlines(y, 0, time, color=color, linewidth=3)
+
+    if event:
+        ax.plot(time, y, marker="x", color=color,
+                markersize=10, markeredgewidth=2)
+    else:
+        ax.plot(time, y, marker="o", color=color,
+                markersize=9, markerfacecolor="white",
+                markeredgewidth=2)
+
+ax.plot([], [], marker="x", linestyle="None",
+        color="tab:green", label="Failure observed")
+ax.plot([], [], marker="o", linestyle="None",
+        color="tab:orange", markerfacecolor="white",
+        label="Right censored")
+
+ax.set_yticks(range(1, 6))
+ax.set_yticklabels(["E", "D", "C", "B", "A"])
+ax.set_xlabel("Follow-up time (months)")
+ax.set_ylabel("Machine")
+ax.set_title("Observed Machine Lifetimes and Right Censoring")
+
+ax.set_xlim(0, 11)
+ax.set_ylim(0.5, 5.5)
+ax.legend(frameon=False, loc="upper right")
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+In the figure above, Machines A, C, and E experienced failures at months 4, 6, and 9, respectively. Their exact failure times are known. Machines B and D, however, were right censored at months 7 and 10. This does not mean they failed at those times. It simply means we stopped observing them while they were still operating. Their actual failure times remain unknown.
+
+Because of censoring, we distinguish between a subject's true event time $T_i$ and their censoring time $C_i$. What we actually observe is the smaller of the two:
+
+$$
+t_i = \min(T_i, C_i)
+$$
+
+Each observation in a survival dataset therefore carries two pieces of information:
+
+- the **observed follow-up time** $t_i$, which is either the event time or the censoring time, and
+- an **event indicator** $\delta_i$, which equals 1 if the event was observed and 0 if the observation was censored.
+
+Mathematically, the event indicator can be written as
+
+$$
+\delta_i =
+\begin{cases}
+1 & \text{if } T_i \leq C_i \
+0 & \text{if } T_i > C_i
+\end{cases}
+$$
+
+For example, Machine A would have $t_i=4$ and $\delta_i=1$, since its failure was observed at month 4. Machine D would have $t_i=10$ and $\delta_i=0$, since it was still operating when the study ended at month 10.
+
+::: {.Tip}
+::::{.Tip-header}
+Censored Observations are NOT Missing Data
+:::
+::::{.Tip-container}
+It is worth emphasizing that censored observations are not missing data. A machine that ran for five years without failing tells us something real: its lifetime is greater than five years. A central goal of survival analysis is to extract exactly this partial information rather than discard it.
+:::
+:::
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up!
+::::
+::::{.Heads-up-container}
+Right censoring is not the only kind of censoring. An observation is left censored when the event is known to have occurred before a particular observation time, but its exact timing is unknown. An observation is interval censored when the event is only known to have occurred between two time points. Right censoring is especially common in survival studies, and it is the case we focus on throughout this chapter.
+::::
+:::
+
+## Why Ordinary Least Squares is Not Suitable
+
+Before introducing new machinery, it is worth being clear about why the familiar linear regression toolkit does not carry over directly. Given that survival times are numerical, it is tempting to model them using ordinary least squares (OLS) regression. However, there are three important reasons why conventional OLS is often unsuitable for survival data.
+
+First and foremost, OLS does not directly account for censoring. Recall our earlier example of machines being observed until they fail or their follow-up ends. Suppose a machine is still operating when the study ends after ten months. We know its lifetime exceeds ten months, but we do not know its actual failure time. If we treat those ten months as the exact failure time, we underestimate how long the machine truly lasts. If we instead discard the censored observation, we lose valuable information and may introduce selection bias, since the observations with known failure times may not be representative of the full population. Neither approach makes appropriate use of the information available.
+
+Second, OLS does not guarantee positive predictions. A fitted linear regression model can predict negative survival times, which are meaningless for a duration. Although this may not always happen in practice, it highlights a limitation of modelling survival times directly on an unrestricted linear scale.
+
+Third, survival times often have distributional characteristics that are poorly captured by a conventional linear regression model. They are nonnegative and frequently right-skewed, with variability that may change across predictor values. Although OLS does not require normally distributed errors or constant variance to estimate coefficients, a simple linear model may not adequately represent these features. Transforming survival times, for example by taking their logarithm, can help address some of these issues, but it does not solve the censoring problem.
+
+Parametric survival regression addresses all three issues at once: it models a nonnegative, skewed response through an appropriate distribution, and its estimation procedure is built to use censored observations correctly. To get there, we first need a vocabulary for describing when events happen, which is the purpose of the two functions introduced next.
+
+## The Survival and Hazard Functions
+
+Survival analysis describes the distribution of event times using two functions that are more natural for this setting than the density alone: the survival function and the hazard function.
+
+### The Survival Function
+
+The **survival function** gives the probability that the event has not yet occurred by time $t$:
+
+$$
+S(t) = P(T > t) = 1 - F_T(t)
+$$
+
+where $F_T(t)$ is the cumulative distribution function (CDF) of the survival time $T$. In other words, $S(t)$ answers a simple question: what is the probability that a randomly selected subject will remain event-free beyond time $t$?
+
+For example, suppose we are studying the lifetimes of machine components. If $S(12)=0.8$, this means that a randomly selected component has an 80% probability of continuing to operate for more than 12 months. Equivalently, there is a 20% probability that the component will have failed by month 12.
+
+::: {.Heads-up}
+::::{.Heads-up-header}
+Heads-up on the properties of the cumulative distribution function!
+::::
+::::{.Heads-up-container}
+Recall that the cumulative distribution function (CDF) gives the probability that a random variable takes a value less than or equal to a particular point:
+
+$$
+F_T(t)=P(T\leq t)
+$$
+
+In the context of survival analysis, this represents the probability that the event has already occurred by time $t$.
+
+The survival function looks at the exact opposite: the probability that the event has not yet occurred by time $t$. Since these two possibilities are mutually exclusive and cover all possible outcomes, their probabilities must add up to 1:
+
+$$
+F_T(t)+S(t)=1
+$$
+
+For example, if the probability of a machine failing within its first 12 months is 20%, then the probability of it surviving beyond 12 months must be 80%.
+
+This is why the survival function is simply the complement of the CDF:
+
+$$
+S(t)=1-F_T(t)
+$$
+::::
+:::
+
+Because the survival function is one minus the CDF, several useful properties follow directly:
+
+- **It starts at 1**: For the continuous positive survival-time distributions considered here, $S(0)=1$, since the event has not occurred at time zero.
+- **It never increases**: As time passes, the probability of remaining event-free can only stay the same or decrease.
+- **It approaches 0**: If the event eventually occurs with probability 1, then $S(t)\rightarrow0$ as $t\rightarrow\infty$.
+
+The figure below illustrates survival functions from Exponential distributions with different rate parameters.
+
+```{python}
+#| label: survival-curves
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 5, 500)
+
+rates = [0.5, 1.0, 2.0]
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for lam in rates:
+    S = np.exp(-lam * t)
+    line, = ax.plot(t, S, label=rf"$\lambda = {lam}$")
+
+    ax.scatter(
+        1, np.exp(-lam),
+        color=line.get_color(),
+        s=50,
+        zorder=5
+    )
+
+ax.axvline(1, color="gray", linestyle="--", alpha=0.5)
+
+ax.set_title("Examples of Survival Functions (Exponential Distributions)")
+ax.set_xlabel("Time")
+ax.set_ylabel("Survival Probability S(t)")
+ax.set_ylim(0, 1.02)
+ax.legend(frameon=False)
+
+fig.tight_layout()
+fig
+```
+
+All three curves begin at 1 and gradually approach 0, but they decline at different speeds. A larger rate parameter $\lambda$ corresponds to events occurring sooner, causing the survival probability to decrease more quickly.
+
+For example, at time $t=1$, the survival probabilities for $\lambda=0.5$, $\lambda=1$, and $\lambda=2$ are approximately 0.61, 0.37, and 0.14, respectively. This means that under the distribution with $\lambda=0.5$, approximately 61% of subjects are expected to survive beyond one time unit, compared with only 14% when $\lambda=2$.
+
+The key takeaway is that a survival curve describes how the probability of remaining event-free decreases over time. While different distributions and parameter values can produce different survival patterns, the interpretation remains the same: at any given time $t$, the height of the curve tells us the probability of surviving beyond that point.
+
+But survival probabilities only tell us how likely subjects are to remain event-free. What if we instead want to understand how quickly events are occurring among those who have survived so far? This brings us to another fundamental concept in survival analysis: the hazard function.
+
+
+### The Hazard Function
+
+In the previous section, we learned that the survival function $S(t)$ tells us the probability that a subject remains event-free beyond time $t$. For example, if $S(12)=0.8$, a randomly selected machine component has an 80% probability of continuing to operate beyond 12 months.
+
+But suppose we want to ask a slightly different question:
+
+> Among the machines that are still operating after 12 months, how quickly are failures occurring at that moment?
+
+This is where the **hazard function** comes in. While the survival function describes the probability of remaining event-free beyond a particular time, the hazard function describes the instantaneous event rate among subjects who have survived up to that time.
+
+For a continuous survival time, the hazard function is defined as
+
+$$
+h(t)=\frac{f_T(t)}{S(t)},
+$$
+
+where $f_T(t)$ is the probability density function (PDF) of the survival time and $S(t)$ is its survival function. The numerator describes the density of events around time $t$; dividing by $S(t)$ accounts for the subjects who are still at risk at that time. In this way, the hazard focuses on failures among those who have survived so far, rather than among all subjects initially observed.
+
+More precisely, the hazard is defined by
+
+$$
+h(t)=\lim_{\Delta t\to 0^+}
+\frac{P(t<T\leq t+\Delta t\mid T>t)}{\Delta t}.
+$$
+
+The expression inside the limit is the probability of an event during a short interval immediately after $t$, conditional on surviving beyond $t$, divided by the interval's length. As the interval becomes arbitrarily short, this becomes an instantaneous rate.
+
+To see why the population at risk matters, consider 100 machines at the start of a study. Suppose 80 are still operating at month 12, and 8 of those 80 fail during the following month. The observed proportion failing during that month among machines still at risk is $8/80=0.10$, or 10%. We divide by 80 rather than 100 because only those 80 machines were operating at the beginning of the interval.
+
+The following illustration shows the same idea. The 80 machines still operating at month 12 form the **risk set**; the 8 failures occur among those machines during the next month.
+
+```{python}
+#| label: fig-hazard-risk-set
+#| fig-cap: "Illustration of the population at risk: 80 of 100 machines remain operational at month 12, and 8 of those 80 fail during the following month."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+
+fig, ax = plt.subplots(figsize=(10, 4.6))
+
+n_total = 100
+n_at_risk = 80
+n_fail_next = 8
+n_cols = 20
+
+for i in range(n_total):
+    col = i % n_cols
+    row = i // n_cols
+    if i < n_fail_next:
+        color = "tab:orange"  # Fail during the next month
+    elif i < n_at_risk:
+        color = "tab:green"   # Still operating after next month
+    else:
+        color = "lightgray"   # Failed by month 12
+    ax.scatter(col, 4 - row, marker="s", s=190, color=color,
+               edgecolor="white", linewidth=0.6)
+
+ax.set_xlim(-0.8, 19.8)
+ax.set_ylim(-0.7, 4.8)
+ax.set_aspect("equal")
+ax.axis("off")
+ax.set_title("Which Machines Are at Risk at Month 12?")
+ax.legend(handles=[
+    Patch(facecolor="tab:green", label="72 operating after month 13"),
+    Patch(facecolor="tab:orange", label="8 fail during months 12–13"),
+    Patch(facecolor="lightgray", label="20 failed by month 12")
+], loc="upper center", bbox_to_anchor=(0.5, -0.05),
+          ncol=1, frameon=False)
+fig.text(0.5, 0.02,
+         "Failure proportion among machines at risk: 8 / 80 = 10%",
+         ha="center", fontsize=11)
+fig.subplots_adjust(bottom=0.28, top=0.86)
+fig
+```
+
+Importantly, this 10% is a probability over a one-month interval, not the instantaneous hazard at month 12. The hazard is a *rate*, not a probability: it is measured per unit of time and can exceed 1. For a sufficiently short interval $\Delta t$, the conditional probability of an event during that interval is approximately $h(t)\Delta t$, provided the hazard is well behaved near $t$.
+
+The difference between a survival probability and a hazard rate is especially clear for the **Exponential distribution**. Its survival function decreases over time, even though its hazard remains constant. The next figure shows both functions for the same Exponential distribution with rate $\lambda=0.3$ per time unit.
+
+```{python}
+#| label: fig-survival-vs-hazard
+#| fig-cap: "For an Exponential distribution, survival probability decreases over time while the instantaneous hazard remains constant."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 10, 500)
+lam = 0.3
+survival = np.exp(-lam * t)
+hazard = np.full_like(t, lam)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+axes[0].plot(t, survival, linewidth=2.5, color="tab:blue")
+axes[0].set_title("Survival Function")
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("Survival Probability, S(t)")
+axes[0].set_ylim(0, 1.05)
+
+axes[1].plot(t, hazard, linewidth=2.5, color="tab:orange")
+axes[1].set_title("Hazard Function")
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("Hazard Rate, h(t)")
+axes[1].set_ylim(0, 0.5)
+
+for ax in axes:
+    ax.set_xlim(0, 10)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.suptitle("Same Distribution, Different Views", fontsize=13)
+fig.tight_layout()
+fig
+```
+
+This is not a contradiction. Even with a constant instantaneous failure rate among the machines that remain operational, the probability that a machine survives all the way from the beginning to a later time continues to fall. A decreasing survival function does not imply an increasing hazard.
+
+The shape of the hazard function also tells us something about the underlying failure process. For example, a machine's hazard may increase as components wear out, decrease if defective units tend to fail early, or remain constant when the event rate does not depend on how long the machine has already operated. These three common patterns are illustrated below.
+
+```{python}
+#| label: fig-hazard-patterns
+#| fig-cap: "Three common hazard patterns: decreasing, constant, and increasing event rates among subjects still at risk."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0.1, 5, 500)
+
+# Valid illustrative hazards (Weibull for the decreasing and
+# increasing curves, Exponential for the constant curve).
+decreasing = 0.5 / np.sqrt(t)
+constant = np.full_like(t, 0.5)
+increasing = 0.25 * t
+
+fig, ax = plt.subplots(figsize=(9, 5))
+ax.plot(t, decreasing, linewidth=2.5,
+        label="Decreasing (early failures)")
+ax.plot(t, constant, linewidth=2.5,
+        label="Constant (unchanging event rate)")
+ax.plot(t, increasing, linewidth=2.5,
+        label="Increasing (wear and aging)")
+
+ax.set_title("Common Hazard Function Patterns")
+ax.set_xlabel("Time")
+ax.set_ylabel("Hazard Rate (per unit of time)")
+ax.set_xlim(0, 5)
+ax.set_ylim(bottom=0)
+ax.legend(frameon=False)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+These patterns are one reason parametric survival models are useful: different distributions allow us to represent different ways that event rates change with time. We will revisit these shapes when introducing specific survival-time distributions.
+
+
+::: {.Tip}
+:::: {.Tip-header}
+One Distribution, Many Views
+::::
+:::: {.Tip-container}
+
+So far, we have encountered several functions that describe event times: the **probability density function (PDF)**, the **cumulative distribution function (CDF)**, the **survival function**, and the **hazard function**.
+
+At first, these might seem like four entirely different concepts. But they are actually four ways of describing the same underlying distribution.
+
+Imagine we are studying how long machine components last. Each function answers a different question:
+
+| Function | What does it tell us? |
+|---|---|
+| PDF, $f_T(t)$ | Where are failure times most concentrated? |
+| CDF, $F_T(t)$ | What is the probability that a machine has failed by time $t$? |
+| Survival, $S(t)$ | What is the probability that a machine is still operating beyond time $t$? |
+| Hazard, $h(t)$ | Among machines still operating, how rapidly are failures occurring at time $t$? |
+
+Let's see how these different perspectives are connected.
+
+**1. The CDF and survival function are opposites**
+
+We have already seen that the CDF tells us the probability that an event has occurred by time $t$, while the survival function tells us the probability that it has not.
+
+For example, suppose that by month 5, 60% of machines are expected to have failed. That means the remaining 40% are expected to survive beyond month 5.
+
+Mathematically,
+
+$$
+S(t)=1-F_T(t).
+$$
+
+The two probabilities always add up to 1. As the CDF increases, the survival function decreases.
+
+**2. The PDF tells us how quickly the survival probability is changing**
+
+Now imagine looking at a survival curve. At some points, the curve drops quickly; at others, it declines more slowly.
+
+A steep drop means that more probability is concentrated in failures occurring around that time. A flatter section means that relatively little probability is concentrated there. This is exactly what the PDF describes.
+
+For a differentiable survival function,
+
+$$
+f_T(t)=-\frac{\mathrm{d}}{\mathrm{d}t}S(t).
+$$
+
+Don't worry too much about the calculus here. The derivative simply measures how quickly a function changes. The negative sign appears because survival probabilities decrease over time, while probability densities cannot be negative. In other words, the PDF describes the rate at which probability is leaving the survival curve, measured relative to the original population.
+
+**3. The hazard focuses on those who have survived**
+
+The PDF describes the density of failures in the original population. But what if we only care about machines that are still operating?
+
+That's where the hazard comes in:
+
+$$
+h(t)=\frac{f_T(t)}{S(t)}.
+$$
+
+Dividing by the survival probability adjusts the event density to focus on machines that are still at risk.
+
+This also gives us another useful mathematical relationship:
+
+$$
+h(t)=-\frac{\mathrm{d}}{\mathrm{d}t}\ln S(t),
+$$
+
+where $S(t)>0$.
+
+The logarithm may look intimidating, but the intuition is simple: the hazard measures how quickly survival probability is declining relative to how much survival probability remains.
+
+**4. From hazard back to survival**
+
+Finally, suppose we know the hazard rate at every point in time. Can we work backward to find the survival probability?
+
+Yes! We first accumulate the hazard over time to obtain the **cumulative hazard function**, $H(t)$:
+
+$$
+H(t)=\int_0^t h(u)\,\mathrm{d}u.
+$$
+
+Integration simply means adding up contributions over a continuous interval. In this case, we are accumulating the instantaneous hazard rates from time 0 to time $t$.
+
+For the continuous positive survival-time distributions considered here, this gives
+
+$$
+H(t)=-\ln S(t).
+$$
+
+Rearranging, we obtain
+
+$$
+S(t)=\exp\left(-H(t)\right).
+$$
+
+```{python}
+#| label: fig-cumulative-hazard-survival
+#| fig-cap: "Relationship between cumulative hazard and survival probability for an Exponential distribution with constant hazard 0.2 per month."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 10, 500)
+lam = 0.2
+
+H = lam * t
+S = np.exp(-H)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+
+axes[0].plot(t, H, linewidth=2.5, color="tab:orange")
+axes[0].fill_between(t, H, alpha=0.15, color="tab:orange")
+axes[0].set_title("Cumulative Hazard")
+axes[0].set_xlabel("Time (months)")
+axes[0].set_ylabel("H(t)")
+axes[0].set_xlim(0, 10)
+axes[0].set_ylim(bottom=0)
+
+axes[1].plot(t, S, linewidth=2.5, color="tab:blue")
+axes[1].set_title("Survival Function")
+axes[1].set_xlabel("Time (months)")
+axes[1].set_ylabel("S(t)")
+axes[1].set_xlim(0, 10)
+axes[1].set_ylim(0, 1.05)
+
+for ax in axes:
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.suptitle(
+    "Accumulating Hazard Corresponds to Declining Survival",
+    fontsize=13
+)
+
+fig.tight_layout()
+fig
+```
+
+This identity tells us that the greater the accumulated hazard, the lower the probability of surviving beyond that time.
+
+The important takeaway is that these functions are not competing descriptions of survival data. They are mathematically connected ways of understanding the same event-time distribution, each emphasizing a different aspect of when events occur.
+
+::::
+:::
+
+## Common Distributions for Survival Times
+
+In the previous section, we learned that survival and hazard functions describe different aspects of the same event-time distribution. But what do these functions actually look like in practice?
+
+In parametric survival regression, we answer this question by assuming that survival times follow a particular probability distribution. Each distribution implies a specific survival function and hazard function, allowing us to represent different patterns of events over time. In this section, we introduce three commonly used distributions: the Exponential, Weibull, and Log-normal. We will focus especially on how their hazard functions differ, since the shape of the hazard often helps determine which distribution is appropriate for a particular application.
+
+### The Exponential Distribution
+
+The Exponential distribution is one of the simplest distributions used to model survival times. It is characterized by a single rate parameter, $\lambda>0$, which determines how quickly events occur.
+
+Its survival function is given by
+
+$$
+S(t)=e^{-\lambda t},
+$$
+
+while its hazard function is
+
+$$
+h(t)=\lambda.
+$$
+
+Notice that the hazard function does not depend on time $t$. This means that the instantaneous event rate remains constant over time, regardless of how long a subject has already survived.
+
+This leads to an important characteristic of the Exponential distribution known as the **memoryless property**. Imagine two identical types of machine components: one has already operated for 12 months without failing, while the other is brand new. Under an Exponential model, both have exactly the same probability of failing during the next month, conditional on their being operational at the start of that month.
+
+In other words, the Exponential distribution assumes that the amount of time a subject has already survived does not affect its future survival probabilities. Mathematically, this property can be expressed as
+
+$$
+P(T>s+t\mid T>s)=P(T>t).
+$$
+
+Although this assumption is mathematically convenient, it may not always reflect reality. For example, mechanical components may become more prone to failure as they wear out, while defective units may fail disproportionately early. In such cases, a model with a changing hazard may be more appropriate. Nevertheless, the Exponential distribution provides a useful starting point for understanding and comparing more flexible survival models.
+
+#### Interpreting the Rate Parameter
+
+The rate parameter $\lambda$ controls how quickly survival probabilities decline. A larger $\lambda$ corresponds to a higher instantaneous event rate and, consequently, shorter survival times on average.
+
+One way to make this parameter more interpretable is through the median survival time, which is the time by which 50% of subjects are expected to have experienced the event.
+
+For the Exponential distribution, the median survival time is
+
+$$
+t_{\text{median}}=\frac{\ln 2}{\lambda}.
+$$
+
+This follows directly from setting the survival function equal to 0.5 and solving for $t$.
+
+For example, if $\lambda=0.1$ per month, then
+
+$$
+t_{\text{median}}=\frac{\ln 2}{0.1}\approx6.93\text{ months}.
+$$
+
+This means that a randomly selected machine component has a 50% probability of surviving beyond approximately 6.93 months, and a 50% probability of failing by that time.
+
+The key takeaway is that the Exponential distribution assumes a constant hazard over time, making it a simple and useful reference model. However, when the event rate changes as subjects age or survive longer, more flexible distributions may be needed.
+
+### The Weibull Distribution
+
+The Exponential distribution assumes that the instantaneous event rate remains constant over time. But in many real-world situations, this assumption may be unrealistic. For example, mechanical components may become more likely to fail as they age, while components with manufacturing defects may fail early, leaving behind a more reliable group of survivors.
+
+The **Weibull distribution** extends the Exponential distribution by allowing the hazard rate to change over time. It introduces two parameters:
+
+- **Shape parameter ($k>0$):** Determines how the hazard changes over time.
+- **Scale parameter ($\eta>0$):** Determines the overall timescale of the distribution.
+
+Its survival function is
+
+$$
+S(t)=\exp\left[-\left(\frac{t}{\eta}\right)^k\right],
+$$
+
+and its hazard function is
+
+$$
+h(t)=\frac{k}{\eta}\left(\frac{t}{\eta}\right)^{k-1}.
+$$
+
+#### Interpreting the Shape Parameter
+
+The shape parameter $k$ is particularly important because it determines whether the instantaneous event rate increases, decreases, or remains constant as time passes.
+
+- **When $k>1$:** The hazard increases over time. This is common in wear-out processes, where components become increasingly prone to failure as they age.
+- **When $k<1$:** The hazard decreases over time. This can describe situations where defective or more failure-prone components tend to fail early, leaving behind a more reliable surviving population.
+- **When $k=1$:** The hazard remains constant. In this case, the Weibull distribution reduces to the Exponential distribution.
+
+```{python}
+#| label: fig-weibull-shape
+#| fig-cap: "Effect of the Weibull shape parameter on the hazard function, holding the scale parameter constant at η = 2."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0.1, 4, 500)
+eta = 2
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for k, label in [
+    (0.5, "k = 0.5 (decreasing)"),
+    (1.0, "k = 1 (constant)"),
+    (2.0, "k = 2 (increasing)")
+]:
+    hazard = (k / eta) * (t / eta) ** (k - 1)
+    ax.plot(t, hazard, linewidth=2.5, label=label)
+
+ax.set_title("How the Weibull Shape Parameter Changes the Hazard")
+ax.set_xlabel("Time")
+ax.set_ylabel("Hazard Rate")
+ax.set_xlim(0, 4)
+ax.set_ylim(bottom=0)
+ax.legend(frameon=False)
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+For example, imagine monitoring a group of identical types of machine components over several years. If their hazard increases with age, a Weibull model with $k>1$ may be appropriate. On the other hand, if failures are concentrated shortly after installation and become less frequent among surviving components, a model with $k<1$ may better describe the process.
+
+Importantly, a decreasing hazard does not necessarily mean that individual machines become more reliable as they age. Rather, it means that the instantaneous failure rate among machines still operating decreases over time.
+
+#### Interpreting the Scale Parameter
+
+While the shape parameter controls *how* the hazard changes, the scale parameter $\eta$ controls the overall timescale of survival.
+
+A larger $\eta$ stretches the distribution toward longer survival times, while a smaller $\eta$ corresponds to shorter survival times, assuming the shape parameter remains fixed. One useful interpretation comes from substituting $t=\eta$ into the survival function:
+
+$$
+S(\eta)=\exp(-1)\approx0.368.
+$$
+
+This means that approximately 36.8% of subjects are expected to survive beyond time $\eta$, while approximately 63.2% are expected to have experienced the event by that time. For example, if $\eta=10$ months, approximately 36.8% of machine components are expected to remain operational beyond 10 months, regardless of the value of $k$.
+
+
+::: {.Tip}
+:::: {.Tip-header}
+Connecting the Weibull to the Exponential Distribution
+::::
+:::: {.Tip-container}
+
+The Exponential distribution is actually a special case of the Weibull distribution. When the Weibull shape parameter $k=1$, its survival function becomes
+
+$$
+S(t)=\exp\left(-\frac{t}{\eta}\right).
+$$
+
+Recall that the Exponential survival function is
+
+$$
+S(t)=e^{-\lambda t}.
+$$
+
+Comparing these two expressions, we can see that they are identical when
+
+$$
+\lambda=\frac{1}{\eta}.
+$$
+
+In other words, a Weibull distribution with $k=1$ is equivalent to an Exponential distribution, where the Exponential rate $\lambda$ is the reciprocal of the Weibull scale $\eta$.
+
+This also explains why the two parameters have opposite interpretations: a larger Exponential rate means shorter survival times, whereas a larger Weibull scale means longer survival times.
+
+::::
+:::
+
+Overall, the Weibull distribution offers greater flexibility than the Exponential distribution by allowing the hazard to increase, decrease, or remain constant over time. Combined with its relatively simple mathematical form, this flexibility makes the Weibull one of the most widely used distributions in parametric survival analysis.
+
+
+### The Log-normal Distribution
+
+So far, we have seen that the Exponential distribution assumes a constant hazard, while the Weibull distribution allows the hazard to increase or decrease over time. But what if the hazard first increases and then decreases?
+
+The **Log-normal distribution** provides another way to model survival times, particularly when the event rate does not follow a simple increasing or decreasing pattern.
+
+A survival time $T$ follows a Log-normal distribution when its natural logarithm follows a normal distribution. In other words,
+
+$$
+\ln T\sim N(\mu,\sigma^2),
+$$
+
+where:
+
+- **$\mu$** is the mean of the logarithm of survival time.
+- **$\sigma>0$** is the standard deviation of the logarithm of survival time.
+
+This means that while the logarithm of survival time follows a symmetric, bell-shaped distribution, the survival times themselves are **strictly positive and right-skewed**. Most events may occur within a relatively short period, while some subjects experience much longer survival times.
+
+The survival function of the Log-normal distribution is
+
+$$
+S(t)=1-\Phi\left(\frac{\ln t-\mu}{\sigma}\right),
+$$
+
+where $\Phi$ represents the cumulative distribution function (CDF) of the standard normal distribution.
+
+Although this formula looks more complicated than those of the Exponential and Weibull distributions, the underlying idea is familiar: it tells us the probability that a subject survives beyond time $t$.
+
+#### Interpreting the Parameters
+
+The parameter $\mu$ determines the location of the distribution on the logarithmic time scale. Increasing $\mu$ shifts survival times toward larger values.
+
+The parameter $\sigma$ controls the spread of log survival times. A larger $\sigma$ generally produces a wider distribution of survival times, including a more pronounced right tail.
+
+One particularly useful property is that the median survival time is
+
+$$
+t_{\text{median}}=e^\mu.
+$$
+
+For example, if $\mu=\ln(10)$, the median survival time is 10 months. This means that 50% of subjects are expected to experience the event by month 10, while the remaining 50% survive beyond that point.
+
+::: {.Tip}
+:::: {.Tip-header}
+A Hazard That Rises and Then Falls
+::::
+:::: {.Tip-container}
+
+What makes the Log-normal distribution especially interesting is the shape of its hazard function.
+
+Unlike the Exponential distribution, which has a constant hazard, or the Weibull distribution, whose hazard either increases, decreases, or remains constant, the Log-normal hazard initially increases, reaches a peak, and then decreases.
+
+For example, imagine studying the time until a particular type of machine component fails. The instantaneous failure rate might initially rise as components accumulate operating time, reach a peak, and then decline among those that remain operational for unusually long periods.
+
+A Log-normal distribution can represent this pattern, whereas the Exponential and Weibull distributions cannot.
+
+Importantly, a declining hazard does not mean that the survival probability begins increasing. The survival function continues to decrease over time; it is only the instantaneous event rate among surviving subjects that eventually declines.
+
+::::
+:::
+
+
+### Comparing the Three Distributions
+
+The following figure compares the survival and hazard functions of the Exponential, Weibull, and Log-normal distributions. Notice how different assumptions about event times lead to different survival curves and hazard patterns.
+
+```{python}
+#| label: fig-distribution-comparison
+#| fig-cap: "Comparison of survival functions (left) and hazard functions (right) for Exponential, Weibull, and Log-normal distributions. Parameter values are illustrative."
+#| echo: false
+#| message: false
+#| results: hide
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import expon, weibull_min, lognorm
+
+t = np.linspace(0.05, 10, 500)
+
+# Distribution parameters
+exp_rate = 0.3
+weibull_shape = 2.0
+weibull_scale = 4.0
+lognorm_mu = np.log(4)
+lognorm_sigma = 0.6
+
+# Exponential
+exp_survival = expon.sf(t, scale=1 / exp_rate)
+exp_hazard = np.full_like(t, exp_rate)
+
+# Weibull
+weibull_survival = weibull_min.sf(
+    t, c=weibull_shape, scale=weibull_scale
+)
+weibull_hazard = weibull_min.pdf(
+    t, c=weibull_shape, scale=weibull_scale
+) / weibull_survival
+
+# Log-normal
+lognorm_survival = lognorm.sf(
+    t, s=lognorm_sigma, scale=np.exp(lognorm_mu)
+)
+lognorm_hazard = lognorm.pdf(
+    t, s=lognorm_sigma, scale=np.exp(lognorm_mu)
+) / lognorm_survival
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
+
+distributions = [
+    ("Exponential", exp_survival, exp_hazard, "tab:blue"),
+    ("Weibull (k = 2)", weibull_survival, weibull_hazard, "tab:orange"),
+    ("Log-normal", lognorm_survival, lognorm_hazard, "tab:green"),
+]
+
+for name, survival, hazard, color in distributions:
+    axes[0].plot(t, survival, label=name, color=color, linewidth=2.5)
+    axes[1].plot(t, hazard, label=name, color=color, linewidth=2.5)
+
+axes[0].set_title("Survival Functions")
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("Survival Probability, S(t)")
+axes[0].set_ylim(0, 1.05)
+
+axes[1].set_title("Hazard Functions")
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("Hazard Rate, h(t)")
+axes[1].set_ylim(bottom=0)
+
+for ax in axes:
+    ax.set_xlim(0, 10)
+    ax.legend(frameon=False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+The figure illustrates an important distinction. Although all three distributions describe positive survival times, they imply different patterns of event occurrence. The Exponential assumes a constant hazard, the Weibull allows monotonically increasing or decreasing hazards, and the Log-normal allows a hazard that rises and then falls.
+
+Choosing an appropriate distribution therefore involves more than selecting a familiar mathematical formula. We need to consider whether its implied hazard pattern is plausible, how well it fits the observed data, and whether its assumptions are reasonable.
+
+So far, we have described survival times without accounting for differences between subjects. In practice, characteristics such as age, treatment, or operating conditions may influence how long subjects survive. In the next section, we will see how parametric survival regression incorporates these explanatory variables.
+
+
+
+## The Parametric Survival Regression Model
+
+So far, we have explored survival times through their probability distributions, survival functions, and hazard functions. We have also seen how different distributions, such as the Exponential, Weibull, and Log-normal, can describe different patterns of events over time. However, these distributions alone do not explain why some subjects experience events earlier or later than others.
+
+For example, suppose we are studying the lifetimes of machine components. We might expect their survival times to depend on factors such as operating temperature, component type, or maintenance conditions. How can we incorporate these characteristics into our survival models? This is where parametric survival regression comes in. Instead of assuming that every subject follows exactly the same survival-time distribution, we allow the distribution to depend on explanatory variables, also known as predictors. One common and interpretable approach is the accelerated failure time (AFT) model, which describes how predictors stretch or shrink the time until an event occurs.
+
+### The Accelerated Failure Time (AFT) Model
+
+The AFT model places a familiar linear regression structure on the logarithm of survival time:
+
+$$
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma \varepsilon_i.
+$$
+
+Here:
+
+- $T_i$ represents the survival time of subject $i$.
+- $\beta_0$ is the intercept.
+- $x_{i1},\ldots,x_{ip}$ are the predictor values for subject $i$.
+- $\beta_1,\ldots,\beta_p$ are the regression coefficients describing how the predictors are associated with log survival time.
+- $\sigma>0$ is a scale parameter controlling the spread of log survival times.
+- $\varepsilon_i$ is a random error term following a specified probability distribution.
+
+At first glance, this equation looks very similar to an ordinary linear regression model. The key difference is that we are modeling log survival time, rather than survival time directly. Using the logarithm helps ensure that the modeled survival times remain positive. More importantly, it allows us to interpret the effects of predictors as multiplicative changes in survival time.
+
+The distribution of the error term determines which survival-time distribution the AFT model represents:
+
+- **Normal errors:** Produce a Log-normal survival model.
+- **Minimum-type extreme value errors:** Produce a Weibull survival model.
+- **Minimum-type extreme value errors with $\sigma=1$:** Produce an Exponential survival model.
+
+You do not need to understand the mathematical details of the extreme value distribution to use these models. The important idea is that choosing an error distribution determines the distribution of survival times, connecting the AFT regression model to the distributions we introduced earlier.
+
+### Interpreting the Coefficients
+
+One of the most appealing features of the AFT model is that its coefficients have a relatively intuitive interpretation. Recall that the model is linear in log survival time:
+
+$$
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma \varepsilon_i.
+$$
+
+Because the response is expressed on a logarithmic scale, we can exponentiate a regression coefficient to interpret its effect on the original time scale:
+
+$$
+\text{Time Ratio} = e^{\beta_j}.
+$$
+
+This quantity is called a **time ratio**, also known as an **acceleration factor**. It tells us how survival times change multiplicatively for a one-unit increase in predictor $x_j$, holding all other predictors constant. The interpretation depends on the value of the time ratio:
+
+- **$e^{\beta_j}>1$:** Survival times are stretched, indicating longer predicted times until the event.
+- **$e^{\beta_j}<1$:** Survival times are compressed, indicating shorter predicted times until the event.
+- **$e^{\beta_j}=1$:** The predictor has no effect on the survival-time distribution under the model.
+
+For example, suppose we fit an AFT model to machine-component lifetimes and obtain a time ratio of 2 for a particular maintenance treatment. This means that, according to the model, components receiving the treatment have survival times that are twice as long on the time scale as those without the treatment, holding other predictors constant. If the predicted median survival time for untreated components is 5 months, the predicted median for treated components would be 10 months. Conversely, a time ratio of 0.5 would indicate that the predicted median survival time is halved.
+
+Importantly, these are multiplicative shifts in the predicted survival-time distribution, not guarantees about exactly how long an individual subject will survive. This is what gives the AFT model its name: predictors can effectively *accelerate* or *decelerate* the passage of survival time.
+
+### From Regression Coefficients to Survival Predictions
+
+Although interpreting coefficients is useful, a fitted survival regression model can tell us much more than whether a predictor increases or decreases survival time. Once the model has been estimated, we can substitute a subject's predictor values into the linear predictor:
+
+$$
+\beta_0+\beta_1x_{i1}+\cdots+\beta_px_{ip}.
+$$
+
+Together with the assumed error distribution and its estimated parameters, this gives us a predicted survival-time distribution for that subject.
+
+From this distribution, we can obtain quantities such as:
+
+- **Predicted median survival time:** How long is the subject expected to survive before reaching a 50% probability of experiencing the event?
+- **Survival probability at a particular time:** What is the probability that the subject remains event-free beyond 12 months?
+- **Predicted survival curve:** How does the subject's probability of remaining event-free change over time?
+- **Predicted hazard curve:** How does the instantaneous event rate change over time for subjects with those characteristics?
+
+For example, rather than simply concluding that maintenance improves component longevity, a fitted model might estimate that a component receiving maintenance has a 75% probability of remaining operational beyond 12 months, compared with 50% for an otherwise similar component without maintenance. These are illustrative values, but they demonstrate how parametric survival regression turns an abstract statistical model into concrete predictions.
+
+::: {.Tip}
+:::: {.Tip-header}
+Accelerated Failure Time vs. Proportional Hazards
+::::
+:::: {.Tip-container}
+
+The AFT model describes predictors as stretching or shrinking survival time. An alternative approach, called the **proportional hazards (PH) model**, describes predictors as multiplying the hazard rate.
+
+The two approaches answer related questions, but they make different assumptions about how predictors affect survival.
+
+- **AFT models:** How much longer or shorter are predicted survival times?
+- **PH models:** How much higher or lower is the instantaneous event rate?
+
+These are not generally equivalent. For example, a Log-normal AFT model does not have a proportional hazards interpretation. However, the Weibull distribution, including its Exponential special case, has a useful property: it can be expressed in both AFT and proportional hazards forms.
+
+We will explore the proportional hazards approach in greater detail in the [next chapter](07-semiparametric-survival.qmd), where we introduce the Cox proportional hazards model.
+
+::::
+:::
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up!
+::::
+:::: {.Heads-up-container}
+
+Unlike the [Gamma](04-gamma.qmd) and [Beta](05-beta.qmd) regression models introduced in previous chapters, AFT survival regression is not generally fitted as a standard generalized linear model (GLM).
+
+Although its linear predictor resembles ordinary regression, the AFT model specifies a probability distribution for log survival time. In addition, survival datasets often contain censored observations, meaning that the exact event time is not known for every subject.
+
+As a result, we need estimation methods that can account for both observed event times and censored observations. One common approach is **maximum likelihood estimation (MLE)**, using a likelihood function specifically designed for survival data. We will see how this works when we fit our first model in the case study.
+
+::::
+:::
+
+We now have the essential building blocks of parametric survival regression: a distribution for survival times, a regression equation connecting predictors to those times, and a way to interpret the resulting coefficients.
+
+In the next section, we will bring these ideas together through a practical case study. We will work with a dataset containing both observed events and censored observations, fit a parametric survival regression model, interpret its results, and evaluate how well it describes the data.
+
+
+## Case Study: Modeling Time to a Heart Attack
+
+To demonstrate parametric survival regression in action, we will walk through a case study using a toy dataset containing information about patients and their cardiovascular health. Rather than simply predicting whether a patient experiences a heart attack, we are interested in how long it takes for a heart attack to occur and how that time may be associated with different patient characteristics.
+
+Unlike the regression models introduced in previous chapters, survival regression allows us to incorporate patients who have not experienced the event by the end of their observation period. These patients still provide valuable information because we know that they remained event-free for at least as long as they were observed.
+
+Our goal is to investigate how factors such as age, patient group, baseline health measurements, and existing medical conditions are associated with the time until a heart attack.
+
+We will approach this case study using the data science workflow introduced in the [first chapter](01-intro.qmd). This provides a structured approach to framing the research question, exploring the data, preparing the variables, fitting a parametric survival regression model, and interpreting the results.
+
+### The Dataset
+
+The toy dataset used in this case study represents a group of patients being followed over time to study the occurrence of heart attacks. Each row corresponds to a single patient and includes demographic information, baseline health characteristics, and follow-up outcomes.
+
+Unlike a conventional regression dataset, where each observation has a fully observed response variable, our survival dataset contains **both an observed follow-up time and an event indicator**. Together, these tell us how long each patient was observed and whether a heart attack occurred during that period.
+
+Below is a summary of the variables included in the dataset.
+
+| **Variable Name** | **Description** |
+|---|---|
+| **id** | Unique identifier assigned to each patient. |
+| **age** | Patient's age at baseline. |
+| **group** | Patient group, categorized as A or B. |
+| **baseline_marker** | Numerical health marker measured at baseline. |
+| **comorbidity_count** | Number of existing medical conditions recorded at baseline. |
+| **time** | Observed time until a heart attack or the end of follow-up, whichever occurs first. |
+| **heart attacks** | Event indicator: 1 if a heart attack was observed, and 0 if the observation was right-censored. |
+
+Here is a snapshot of the first five observations:
+
+<div style="overflow-x: auto;">
+
+| id | age | group | baseline_marker | comorbidity_count | time | heart attacks |
+|---:|---:|:---:|---:|---:|---:|---:|
+| 1 | 49.1 | B | 10.56 | 3 | 11.61 | 0 |
+| 2 | 70.0 | A | 14.45 | 0 | 11.32 | 0 |
+| 3 | 62.8 | A | 6.90 | 0 | 13.30 | 0 |
+| 4 | 44.9 | B | 2.09 | 1 | 8.77 | 0 |
+| 5 | 54.2 | B | 14.80 | 2 | 12.42 | 0 |
+
+</div>
+
+Notice that all five patients shown above have an event indicator of 0. Assuming 0 denotes right-censoring, this means that none of these patients experienced an observed heart attack during their recorded follow-up periods. For example, Patient 1 was observed for 11.61 time units without an observed heart attack. This does not mean that the patient will never experience a heart attack. Rather, it tells us that the patient's time to a heart attack exceeds the recorded follow-up time. 
+
+This distinction is central to survival analysis. Instead of discarding patients without observed events, we incorporate the information provided by their follow-up times into our regression model. We will see how the model handles this distinction when we introduce maximum likelihood estimation later in the workflow.
+
+### The Problem We're Trying to Solve
+
+In this case study, our goal is to understand which patient characteristics are associated with longer or shorter times until a heart attack. We are particularly interested in whether age, patient group, baseline health measurements, and the number of existing medical conditions help explain differences in survival times.
+
+The key question we aim to answer is:
+
+> **Which patient characteristics are associated with differences in the time until a heart attack?**
+
+Rather than focusing only on whether a heart attack occurs, we want to understand when it occurs, while properly accounting for patients whose event times are not fully observed.
+
+Using parametric survival regression, we will estimate how these characteristics are associated with survival time, interpret their effects using time ratios, and generate predicted survival probabilities for different patient profiles. We will also compare different survival-time distributions to evaluate which model provides a reasonable description of the observed data.
+
+In the next section, we will clarify our study design and begin applying the data science workflow to this problem.
+
+## Study Design
+
+Knowing what we want to learn, the next step is to be clear about the type of question we are asking.
+
+This is an inferential task. We are interested in understanding how patient characteristics, such as age, patient group, baseline health measurements, and existing medical conditions, are associated with the time until a heart attack. Rather than building a model optimized for predicting exactly when an individual patient might experience a heart attack, our primary goal is to identify which factors are associated with longer or shorter survival times and interpret the magnitude and direction of those relationships.
+
+An important consideration is that not every patient experiences a heart attack during the observation period. Some patients are right-censored, meaning we know they remained event-free until their last recorded follow-up, but we do not know their eventual event time. Our analysis must account for these incomplete observations rather than treating them as patients who will never experience a heart attack.
+
+We will treat this as an observational study, meaning that the relationships we identify should be interpreted as associations rather than causal effects. For example, if patients in Group A tend to experience longer times until a heart attack than those in Group B, this does not necessarily mean that group membership itself causes the difference. Other factors, including unmeasured health characteristics or differences in medical care, may contribute to the observed relationship.
+
+
+## Data Collection and Wrangling
+
+With our research question and study design established, the next step is to ensure that our data is suitable for survival analysis. Although the dataset is already provided, it is still useful to consider how this type of data might be collected and what preparation is required before fitting a model.
+
+Unlike conventional regression, survival analysis requires us to consider not only the observed outcome, but also whether the event actually occurred during the observation period. This distinction makes data preparation especially important.
+
+### Data Collection
+
+For a study examining time until a heart attack, data like this could reasonably be collected from several sources:
+
+- **Patient Records:** Demographic information, such as age, and existing medical conditions may be obtained from electronic health records. These provide information about patients' characteristics at the beginning of the study.
+
+- **Baseline Health Assessments:** Measurements such as our `baseline_marker` may be collected during an initial clinical assessment. These measurements allow us to investigate whether a patient's health status is associated with subsequent event times.
+
+- **Follow-up Records:** Patients may be monitored over time to record whether and when a heart attack occurs. Follow-up may end because the study concludes, a patient is lost to follow-up, or another censoring event occurs.
+
+Each source introduces potential limitations. Clinical records may contain missing or inconsistently recorded information, while follow-up periods may differ across patients. In particular, survival analysis requires us to think carefully about censoring. Patients who have not experienced a heart attack during their recorded follow-up still provide valuable information, but their exact eventual event times remain unknown.
+
+For our case study, we will use a simulated dataset designed to illustrate these features. Although the data is artificial, the preparation steps reflect those commonly encountered in real survival studies.
+
+### Data Wrangling
+
+Once the data has been collected, we need to prepare it for modeling. Even a relatively simple survival dataset requires several checks to ensure that its variables are represented correctly.
+
+For parametric survival regression, data wrangling typically involves:
+
+- Verifying that observed survival times are positive and measured consistently.
+- Confirming that the event indicator correctly distinguishes observed events from censored observations.
+- Checking for missing values, duplicate records, and other inconsistencies.
+- Preparing categorical predictors for regression.
+- Creating a modeling dataset containing the relevant predictors, follow-up times, and event indicators.
+
+Let's walk through these steps using our heart attack dataset, demonstrating each step in both R and Python.
+
+#### 1. Preparing and Validating the Survival Outcome
+
+Unlike Beta regression, where we modeled a single continuous response variable, survival regression requires two variables to describe the observed outcome:
+
+- `time`: The observed follow-up time, ending at either a heart attack or censoring.
+- `heart attacks`: An indicator of whether a heart attack was observed.
+
+Together, these variables tell us both how long each patient was observed and whether the event occurred. We begin by loading the dataset and inspecting the variables.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Inspect the first few observations
+head(data)
+
+# Inspect variable types
+str(data)
+```
+
+## Python Code
+
+```{python}
+print(data.head())
+
+# Inspect variable types
+print(data.dtypes)
+```
+
+:::
+
+For convenience, we will rename the event indicator from `heart attacks` to `event`. This makes it easier to reference in our code and emphasizes its role in survival analysis.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+names(data)[names(data) == "heart attacks"] <- "event"
+
+# Summary of observed follow-up times
+summary(data$time)
+
+# Count observed events and censored observations
+table(data$event)
+```
+
+## Python Code
+
+```{python}
+data = data.rename(columns={"heart attacks": "event"})
+
+# Summary of observed follow-up times
+print(data["time"].describe())
+
+# Count observed events and censored observations
+print(data["event"].value_counts(dropna=False))
+```
+
+:::
+
+Recall that, for this dataset, we assume the event indicator is coded as follows:
+
+| Event Indicator | Interpretation |
+|---|---|
+| `1` | A heart attack was observed at the recorded time. |
+| `0` | The observation was right-censored at the recorded time. |
+
+We can now examine how many patients experienced a heart attack and how many were censored.
+
+::: {.Tip}
+::::{.Tip-header}
+Proportion not Probability
+::::
+::::{.Tip-container}
+The proportion of observed events is useful for understanding the dataset, although it should not be interpreted as the overall probability of experiencing a heart attack. Patients may have different follow-up durations, and some event times are censored.
+::::
+:::
+
+Next, we verify that the survival outcomes have valid values. For the continuous survival-time distributions considered in this chapter, observed times should be strictly positive. The event indicator should contain only zeros and ones.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Check for non-positive survival times
+sum(data$time <= 0, na.rm = TRUE)
+
+# Check for invalid event indicators
+sum(
+  !(data$event %in% c(0, 1)) & !is.na(data$event)
+)
+
+# Check for missing survival outcomes
+colSums(is.na(data[c("time", "event")]))
+```
+
+## Python Code
+
+```{python}
+# Check for non-positive survival times
+print((data["time"] <= 0).sum())
+
+# Check for invalid event indicators
+print(
+    (~data["event"].isin([0, 1]) &
+     data["event"].notna()).sum()
+)
+
+# Check for missing survival outcomes
+print(data[["time", "event"]].isna().sum())
+```
+
+:::
+
+If these checks reveal invalid values, we should investigate them before proceeding. For example, a negative follow-up time would indicate a data error, while an unexpected event indicator such as `2` might suggest inconsistent coding. The data looks valid here though.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Heads-up!
+::::
+:::: {.Heads-up-container}
+
+Importantly, as a reminder, censored observations are not invalid observations. A patient with `event = 0` still contributes information about their survival time and should not be removed simply because the event was not observed.
+
+Removing censored observations would exclude censored patients and could substantially bias the analysis toward shorter survival times. Instead, survival models use the event indicator to distinguish between patients whose event times are known and those whose event times are only partially observed. We will see how these two types of observations contribute differently to the likelihood function when fitting our model.
+
+::::
+:::
+
+#### 2. Checking for Missing Values and Inconsistencies
+
+Before preparing the predictors, we should check whether any observations contain missing or inconsistent information. Missing values can affect model fitting, especially when they occur in important predictors or in the survival outcome itself. We begin by counting missing values in each column.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Count missing values in each column
+colSums(is.na(data))
+
+# Check for duplicated patient identifiers
+sum(duplicated(data$id))
+
+# Examine the categorical group variable
+table(data$group, useNA = "ifany")
+```
+
+## Python Code
+
+```{python}
+# Count missing values in each column
+print(data.isna().sum())
+
+# Check for duplicated patient identifiers
+print(data["id"].duplicated().sum())
+
+# Examine the categorical group variable
+print(data["group"].value_counts(dropna=False))
+```
+
+:::
+
+Great! No missing values! We should also inspect the numerical predictors for potentially implausible values. For example, age should not be negative, and the number of comorbidities should be a non-negative whole number.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Summarize numerical predictors
+summary(
+  data[c("age", "baseline_marker", "comorbidity_count")]
+)
+
+# Check for invalid ages
+sum(data$age < 0, na.rm = TRUE)
+
+# Check for invalid comorbidity counts
+sum(
+  data$comorbidity_count < 0 |
+  data$comorbidity_count != floor(data$comorbidity_count),
+  na.rm = TRUE
+)
+```
+
+## Python Code
+
+```{python}
+# Summarize numerical predictors
+print(
+    data[
+        ["age", "baseline_marker", "comorbidity_count"]
+    ].describe()
+)
+
+# Check for invalid ages
+print((data["age"] < 0).sum())
+
+# Check for invalid comorbidity counts
+print(
+    (
+        (data["comorbidity_count"] < 0) |
+        (data["comorbidity_count"] % 1 != 0)
+    ).sum()
+)
+```
+
+:::
+
+These checks help identify values that may require further investigation. However, we should avoid automatically removing unusual observations simply because they are extreme. A particularly high baseline measurement, for example, might be clinically meaningful rather than erroneous.
+
+If missing or invalid values are identified, the appropriate treatment depends on their cause and extent. Possible approaches include correcting data-entry errors, reviewing the original records, or applying suitable missing-data methods. For now, it appears that the toy dataset that we're dealing with is clean. We will proceed under the assumption that any issues identified by these checks have been reviewed and resolved.
+
+#### 3. Encoding Categorical Variables
+
+Our dataset contains one categorical predictor, `group`, which identifies whether a patient belongs to Group A or Group B. Regression models require categorical predictors to be represented appropriately. Since `group` has two categories, we can use a binary indicator with Group A as the reference category. The resulting variable, `group_B`, takes the value:
+
+- `0` for patients in Group A.
+- `1` for patients in Group B.
+
+This allows us to interpret the coefficient for `group_B` as the difference between Group B and Group A, holding other predictors constant.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Convert group into a categorical factor
+data$group <- factor(
+  data$group,
+  levels = c("A", "B")
+)
+
+# Examine the reference category
+levels(data$group)
+
+# Create an indicator for Group B
+data$group_B <- as.integer(data$group == "B")
+
+head(data[c("group", "group_B")])
+```
+
+## Python Code
+
+```{python}
+import pandas as pd
+
+# Define Group A as the reference category
+data["group"] = pd.Categorical(
+    data["group"],
+    categories=["A", "B"]
+)
+
+# Create an indicator for Group B
+data["group_B"] = (
+    data["group"] == "B"
+).astype(int)
+
+print(data[["group", "group_B"]].head())
+```
+
+:::
+
+With this encoding, a coefficient associated with `group_B` will describe how survival times differ between patients in Group B and those in Group A. Because we are using an AFT model, exponentiating this coefficient will give us a time ratio, rather than a difference in the probability of experiencing a heart attack. We will return to this interpretation when examining our fitted regression model.
+
+#### 4. Preparing the Final Modeling Dataset
+
+Now that we have validated our survival outcomes and prepared the categorical predictor, we can assemble the dataset that will be used for regression. Our model will include the following predictors:
+
+- `age`
+- `group_B`
+- `baseline_marker`
+- `comorbidity_count`
+
+The response will be represented by `time` and `event`. We will exclude `id` from the model because it is simply a unique patient identifier, rather than a characteristic that we expect to explain survival time.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+# Select the variables needed for modeling
+model_data <- data[
+  c(
+    "time",
+    "event",
+    "age",
+    "group_B",
+    "baseline_marker",
+    "comorbidity_count"
+  )
+]
+
+# Confirm that all required values are present
+stopifnot(!anyNA(model_data))
+
+# Confirm valid survival outcomes
+stopifnot(all(model_data$time > 0))
+stopifnot(all(model_data$event %in% c(0, 1)))
+
+# Inspect the final dataset
+head(model_data)
+str(model_data)
+```
+
+## Python Code
+
+```{python}
+# Select the variables needed for modeling
+model_data = data[
+    [
+        "time",
+        "event",
+        "age",
+        "group_B",
+        "baseline_marker",
+        "comorbidity_count"
+    ]
+].copy()
+
+# Confirm that all required values are present
+assert not model_data.isna().any().any()
+
+# Confirm valid survival outcomes
+assert (model_data["time"] > 0).all()
+assert model_data["event"].isin([0, 1]).all()
+
+# Inspect the final dataset
+print(model_data.head())
+print(model_data.dtypes)
+```
+
+:::
+
+The final modeling dataset now contains the variables required for parametric survival regression. Notice that we have not transformed the observed survival times by taking their logarithms. Although the AFT model is formulated in terms of log survival time, the survival regression software handles this transformation internally while accounting for censored observations. Similarly, we have retained both observed events and censored observations. This ensures that the model can make use of all available follow-up information.
+
+With the data prepared, we can now move on to exploratory data analysis, where we will examine the distribution of follow-up times, the frequency of observed events, and the relationships between patient characteristics and survival outcomes.
+
+
+## Exploratory Data Analysis (EDA)
+
+With our data prepared, we can now explore its main characteristics before fitting a regression model. As in previous chapters, the goal of exploratory data analysis (EDA) is to identify patterns, understand the variables, and develop expectations about the relationships we may find.
+
+For survival data, however, we need to pay particular attention to censoring. Since not every patient's heart attack time is observed, we cannot treat recorded follow-up times as if they were all exact event times. We will begin by examining follow-up times and censoring, then explore the overall survival pattern, the distributions of our predictors, and potential differences in survival across patient groups.
+
+### Understanding Follow-up Times and Censoring
+
+We begin by examining how many patients experienced a heart attack during follow-up and how many were censored. This gives us an initial sense of how much event-time information is available for our analysis.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-event-summary-r
+
+event_counts <- table(
+  factor(
+    model_data$event,
+    levels = c(0, 1),
+    labels = c("Censored", "Heart Attack")
+  )
+)
+
+event_summary <- data.frame(
+  Outcome = names(event_counts),
+  Count = as.integer(event_counts),
+  Percentage = round(
+    100 * as.integer(event_counts) / nrow(model_data),
+    1
+  )
+)
+
+print(event_summary)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-event-summary-python
+
+event_summary = (
+    model_data["event"]
+    .map({0: "Censored", 1: "Heart Attack"})
+    .value_counts()
+    .reindex(["Censored", "Heart Attack"], fill_value=0)
+)
+
+event_summary = pd.DataFrame({
+    "Count": event_summary,
+    "Percentage": (
+        event_summary / len(model_data) * 100
+    ).round(1)
+})
+
+print(event_summary)
+```
+
+:::
+
+Next, we visualize the distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations.
+
+::: {.panel-tabset}
+
+## R Code
+
+
+```{r}
+#| label: eda-followup-hist-r
+#| fig-cap: "Distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations."
+
+# Create common histogram bins
+breaks <- pretty(model_data$time, n = 12)
+
+# Count observations in each bin by event status
+heart_attacks <- hist(
+  model_data$time[model_data$event == 1],
+  breaks = breaks,
+  plot = FALSE
+)$counts
+
+censored <- hist(
+  model_data$time[model_data$event == 0],
+  breaks = breaks,
+  plot = FALSE
+)$counts
+
+# Combine counts into a matrix
+counts <- rbind(
+  "Heart Attack" = heart_attacks,
+  "Censored" = censored
+)
+
+# Plot stacked bars
+barplot(
+  counts,
+  beside = FALSE,
+  col = c("steelblue", "lightgray"),
+  border = "white",
+  main = "Distribution of Observed Follow-up Times",
+  xlab = "Follow-up Time",
+  ylab = "Number of Patients",
+  names.arg = head(breaks, -1),
+  space = 0,
+  legend.text = TRUE,
+  args.legend = list(
+    x = "topright",
+    bty = "n"
+  )
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-followup-hist-python
+#| fig-cap: "Distribution of recorded follow-up times, distinguishing observed heart attacks from censored observations."
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+fig, ax = plt.subplots(figsize=(9, 4.5))
+
+bins = np.histogram_bin_edges(
+    model_data["time"],
+    bins=12
+)
+
+ax.hist(
+    [
+        model_data.loc[model_data["event"] == 1, "time"],
+        model_data.loc[model_data["event"] == 0, "time"]
+    ],
+    bins=bins,
+    stacked=True,
+    label=["Heart Attack", "Censored"],
+    color=["steelblue", "lightgray"],
+    edgecolor="white"
+)
+
+ax.set_title("Distribution of Observed Follow-up Times")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Number of Patients")
+ax.legend(frameon=False)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The histogram shows that follow-up times are spread across the observation period, with many concentrated around the middle. A substantial proportion of observations are censored, particularly at longer follow-up times.
+
+Importantly, this histogram represents observed follow-up times rather than the distribution of actual heart attack times. For patients who experienced a heart attack (blue), the recorded time corresponds to the event. For censored patients (gray), we only know that they remained event-free until their recorded follow-up time. Consequently, the histogram alone cannot tell us how the probability of remaining free from a heart attack changes over time. For that, we need a method that accounts for censoring.
+
+### Exploring Survival Patterns with Kaplan–Meier
+
+To explore survival probabilities, we can use the **Kaplan–Meier estimator**, a nonparametric method that estimates the survival function without assuming a particular probability distribution for event times.
+
+The idea is straightforward: the estimated survival probability decreases whenever a heart attack occurs, based on the number of patients still at risk. Censored patients contribute information until their last observed follow-up time, but censoring itself does not cause the survival probability to decrease. Let's estimate the overall Kaplan–Meier survival curve.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-overall-r
+#| fig-cap: "Kaplan–Meier estimate of heart attack-free survival, with a 95% confidence interval."
+
+library(survival)
+
+km_fit <- survfit(
+  Surv(time, event) ~ 1,
+  data = model_data
+)
+
+plot(
+  km_fit,
+  conf.int = TRUE,
+  mark.time = TRUE,
+  col = "steelblue",
+  lwd = 2,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Kaplan-Meier Survival Curve",
+  ylim = c(0, 1)
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-overall-python
+#| fig-cap: "Kaplan–Meier estimate of heart attack-free survival, with a 95% confidence interval."
+#| echo: false
+#| message: false
+#| results: hide
+
+from lifelines import KaplanMeierFitter
+import matplotlib.pyplot as plt
+
+kmf = KaplanMeierFitter()
+
+kmf.fit(
+    durations=model_data["time"],
+    event_observed=model_data["event"],
+    label="Overall Survival"
+)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+kmf.plot_survival_function(
+    ax=ax,
+    ci_show=True,
+    show_censors=True,
+    color="steelblue"
+)
+
+ax.set_title("Kaplan-Meier Survival Curve")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+Unlike the smooth theoretical survival functions introduced earlier, the Kaplan–Meier curve has a step-like appearance. Each downward step corresponds to one or more observed heart attacks, while small marks indicate censored observations. The curve shows how the estimated probability of remaining free from a heart attack changes throughout follow-up. Its confidence interval also illustrates the uncertainty surrounding these estimates, which may become greater as fewer patients remain at risk. Because Kaplan–Meier does not require us to assume an Exponential, Weibull, or Log-normal distribution, it provides a useful reference for evaluating the parametric survival models we will fit later.
+
+
+### Exploring the Predictor Variables
+
+Now that we have examined the survival outcome, let's turn our attention to the patient characteristics that may help explain differences in survival time. Our dataset includes three numerical predictors, age, baseline marker, and comorbidity count, and one categorical predictor, patient group.
+
+
+#### Numerical Predictors
+
+We begin by visualizing the distributions of our numerical predictors.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-predictors-r
+
+par(mfrow = c(1, 3))
+
+hist(
+  model_data$age,
+  main = "Age",
+  xlab = "Age",
+  col = "lightgray",
+  border = "white"
+)
+
+hist(
+  model_data$baseline_marker,
+  main = "Baseline Marker",
+  xlab = "Marker Value",
+  col = "lightgray",
+  border = "white"
+)
+
+barplot(
+  table(model_data$comorbidity_count),
+  main = "Comorbidity Count",
+  xlab = "Number of Comorbidities",
+  ylab = "Number of Patients",
+  col = "lightgray",
+  border = "white"
+)
+
+par(mfrow = c(1, 1))
+```
+
+## Python Code
+
+```{python}
+#| label: eda-predictors-python
+#| fig-cap: "Distributions of age, baseline marker, and number of comorbidities."
+#| echo: false
+#| message: false
+#| results: hide
+
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+
+axes[0].hist(
+    model_data["age"],
+    bins=12,
+    color="lightgray",
+    edgecolor="white"
+)
+axes[0].set_title("Age")
+axes[0].set_xlabel("Age")
+axes[0].set_ylabel("Number of Patients")
+
+axes[1].hist(
+    model_data["baseline_marker"],
+    bins=12,
+    color="lightgray",
+    edgecolor="white"
+)
+axes[1].set_title("Baseline Marker")
+axes[1].set_xlabel("Marker Value")
+
+counts = model_data["comorbidity_count"].value_counts().sort_index()
+
+axes[2].bar(
+    counts.index.astype(str),
+    counts.values,
+    color="lightgray"
+)
+axes[2].set_title("Comorbidity Count")
+axes[2].set_xlabel("Number of Comorbidities")
+
+for ax in axes:
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+Both age and baseline marker appear approximately bell-shaped, without substantial skewness or obvious extreme outliers. Most patients are between 50 and 70 years old, while baseline marker values are concentrated around 10–12. Comorbidity count follows a different pattern, as we would expect from a discrete count variable. Most patients have between zero and two existing conditions, with relatively few having three.
+
+Overall, these distributions do not reveal any obvious issues requiring additional preprocessing. However, the shape of a predictor's distribution does not by itself tell us whether it is associated with survival time, nor does AFT regression require predictors to be normally distributed.
+
+#### Categorical Predictor
+
+Next, we examine how patients are distributed between Groups A and B.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-group-r
+
+barplot(
+  table(data$group),
+  main = "Patient Group",
+  xlab = "Group",
+  ylab = "Number of Patients",
+  col = "lightgray",
+  border = "white"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-group-python
+#| fig-cap: "Number of patients in Groups A and B."
+#| echo: false
+#| message: false
+#| results: hide
+
+fig, ax = plt.subplots(figsize=(6, 4))
+
+counts = data["group"].value_counts().reindex(["A", "B"])
+
+ax.bar(
+    counts.index,
+    counts.values,
+    color="lightgray"
+)
+
+ax.set_title("Patient Group")
+ax.set_xlabel("Group")
+ax.set_ylabel("Number of Patients")
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The bar chart shows that Groups A and B are evenly represented, with approximately 500 patients in each group. This gives us reasonably balanced sample sizes for comparing their survival experiences. However, similar group sizes do not necessarily imply similar health characteristics or event rates. To investigate whether the groups differ in their observed survival patterns, we can return to the Kaplan–Meier estimator.
+
+### Comparing Survival Across Patient Groups
+
+One of our research questions is whether patients in Groups A and B experience different times until a heart attack. We can explore this by estimating a separate Kaplan–Meier survival curve for each group.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-groups-r
+#| fig-cap: "Kaplan–Meier survival curves comparing patients in Groups A and B."
+
+library(survival)
+
+km_groups <- survfit(
+  Surv(time, event) ~ group,
+  data = data
+)
+
+plot(
+  km_groups,
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  conf.int = FALSE,
+  mark.time = TRUE,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Survival by Patient Group",
+  ylim = c(0, 1)
+)
+
+legend(
+  "topright",
+  legend = c("Group A", "Group B"),
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-groups-python
+#| fig-cap: "Kaplan–Meier survival curves comparing patients in Groups A and B."
+#| echo: false
+#| message: false
+#| results: hide
+
+from lifelines import KaplanMeierFitter
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for group, color in [
+    ("A", "steelblue"),
+    ("B", "darkorange")
+]:
+    subset = data[data["group"] == group]
+
+    kmf_group = KaplanMeierFitter()
+
+    kmf_group.fit(
+        durations=subset["time"],
+        event_observed=subset["event"],
+        label=f"Group {group}"
+    )
+
+    kmf_group.plot_survival_function(
+        ax=ax,
+        ci_show=False,
+        show_censors=True,
+        color=color
+    )
+
+ax.set_title("Survival by Patient Group")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The curves reveal a noticeable difference between the two groups. Although both begin with survival probabilities close to one, they gradually separate as follow-up progresses. Group B maintains a higher estimated survival probability than Group A, with the difference becoming particularly pronounced later in the observation period. Near the end of follow-up, approximately 70% of patients in Group B are estimated to remain free from a heart attack, compared with around 40% in Group A.
+
+This suggests that patients in Group B tend to experience longer times until a heart attack. Whether this difference remains after accounting for other patient characteristics is something we will investigate through regression.
+
+### Exploring Survival Across Age Groups
+
+Patient group is not the only characteristic that may be associated with survival time. We are also interested in whether age plays a role. Since age is continuous, one simple exploratory approach is to divide patients into two groups based on the median age and compare their Kaplan–Meier curves.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: eda-km-age-r
+
+median_age <- median(data$age, na.rm = TRUE)
+
+data$age_group <- ifelse(
+  data$age <= median_age,
+  "Younger Half",
+  "Older Half"
+)
+
+data$age_group <- factor(
+  data$age_group,
+  levels = c("Younger Half", "Older Half")
+)
+
+km_age <- survfit(
+  Surv(time, event) ~ age_group,
+  data = data
+)
+
+plot(
+  km_age,
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  conf.int = FALSE,
+  xlab = "Follow-up Time",
+  ylab = "Estimated Survival Probability",
+  main = "Survival by Age Group"
+)
+
+legend(
+  "topright",
+  legend = levels(data$age_group),
+  col = c("steelblue", "darkorange"),
+  lwd = 2,
+  bty = "n"
+)
+```
+
+## Python Code
+
+```{python}
+#| label: eda-km-age-python
+#| fig-cap: "Exploratory comparison of survival curves for patients below or above the median age."
+#| echo: false
+#| message: false
+#| results: hide
+
+median_age = data["age"].median()
+
+data["age_group"] = np.where(
+    data["age"] <= median_age,
+    "Younger Half",
+    "Older Half"
+)
+
+fig, ax = plt.subplots(figsize=(9, 5))
+
+for group, color in [
+    ("Younger Half", "steelblue"),
+    ("Older Half", "darkorange")
+]:
+    subset = data[data["age_group"] == group]
+
+    kmf_age = KaplanMeierFitter()
+
+    kmf_age.fit(
+        durations=subset["time"],
+        event_observed=subset["event"],
+        label=group
+    )
+
+    kmf_age.plot_survival_function(
+        ax=ax,
+        ci_show=False,
+        color=color
+    )
+
+ax.set_title("Survival by Age Group")
+ax.set_xlabel("Follow-up Time")
+ax.set_ylabel("Estimated Survival Probability")
+ax.set_ylim(0, 1.05)
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+fig.tight_layout()
+fig
+```
+
+:::
+
+The curves suggest a noticeable relationship between age and survival. Younger patients have higher estimated probabilities of remaining free from a heart attack, with the difference becoming more pronounced over time. Near the end of follow-up, approximately 70% of patients in the younger half are estimated to remain event-free, compared with around 40% in the older half. These patterns suggest that older age may be associated with shorter times until a heart attack.
+
+::: {.Tip}
+:::: {.Tip-header}
+Exploring Continuous Predictors Without Losing Information
+::::
+:::: {.Tip-container}
+
+Dividing a continuous predictor into categories can make exploratory comparisons easier to visualize, but it also discards information. For example, two patients with nearly identical ages may be placed into different groups simply because they fall on opposite sides of the median.
+
+We use this grouping only for exploratory purposes. When fitting our AFT regression model, we will retain age as a continuous predictor, allowing us to estimate how survival time changes with each additional year of age. Similarly, we will retain the original numerical values of baseline marker and comorbidity count rather than categorizing them solely for visualization.
+
+::::
+:::
+
+### What Have We Learned from EDA?
+
+Our exploratory analysis has revealed several useful patterns. A substantial proportion of patients were censored, reinforcing the importance of using methods that account for incomplete event times. The Kaplan–Meier estimator allowed us to explore survival probabilities without assuming a particular survival-time distribution.
+
+We also observed two notable associations: Group B appears to have longer heart attack-free survival than Group A, while younger patients appear to have longer survival than older patients. However, these comparisons are unadjusted. Differences between groups may reflect other patient characteristics, and the patterns we observe do not establish causal relationships. Furthermore, we have not yet examined how all predictors relate to survival time simultaneously.
+
+In the next step, Data Modelling, we will move beyond these exploratory comparisons and develop a parametric survival regression model. We will consider which survival-time distribution is appropriate, specify the AFT regression equation, estimate its parameters while accounting for censoring, and interpret the resulting coefficients as time ratios. This will allow us to investigate how multiple patient characteristics are associated with time until a heart attack.
+
+## Data Modelling
+
+Our exploratory analysis suggested that heart attack-free survival differs across patient groups and ages. However, these comparisons did not account for other patient characteristics. We will now develop a regression model to examine these relationships simultaneously by choosing a suitable model, defining its parameters, and specifying the equation for our dataset.
+
+### Choosing a Suitable Regression Model
+
+As introduced earlier, the accelerated failure time (AFT) model describes how predictors are associated with longer or shorter survival times by modelling the logarithm of survival time. To specify a parametric AFT model, we must also choose a distribution for survival times. Recall the three distributions introduced earlier:
+
+- **Exponential:** Assumes a constant hazard rate over time.
+- **Weibull:** Allows the hazard rate to increase, decrease, or remain constant.
+- **Log-normal:** Allows the hazard rate to increase initially and then decrease.
+
+For our initial model, we will choose the Weibull distribution. It provides greater flexibility than the Exponential distribution by allowing the hazard rate to change over time, while maintaining a relatively simple mathematical structure. This makes it a reasonable starting point for modelling time until a heart attack, where the hazard may vary throughout follow-up. However, we have not yet established that Weibull provides the best fit, so we will evaluate this choice and compare alternative distributions later in the workflow.
+
+### Defining the Model Parameters
+
+Recall the general AFT regression equation:
+
+$$
+\log T_i = \beta_0 + \beta_1 x_{i1} + \cdots + \beta_p x_{ip} + \sigma\varepsilon_i.
+$$
+
+The model contains two types of unknown parameters: regression coefficients ($\beta$), which describe how predictors are associated with log survival time, and a scale parameter ($\sigma>0$), which controls the spread of log survival times and determines the Weibull hazard shape.
+
+For our case study, we will estimate:
+
+- **$\beta_0$ (Intercept):** Baseline log survival-time location when all predictors equal zero.
+- **$\beta_1$ (Age):** Association between a one-year increase in age and log survival time.
+- **$\beta_2$ (Patient Group):** Difference in log survival time between Group B and the reference Group A.
+- **$\beta_3$ (Baseline Marker):** Association between a one-unit increase in the baseline marker and log survival time.
+- **$\beta_4$ (Comorbidity Count):** Association between one additional existing medical condition and log survival time.
+- **$\sigma$ (Scale Parameter):** Controls the spread of log survival times and the Weibull hazard shape.
+
+An important feature of AFT regression is that exponentiating a regression coefficient produces a **time ratio**:
+
+$$
+\text{Time Ratio} = e^{\beta_j}.
+$$
+
+A time ratio greater than one indicates longer survival times, while a value below one indicates shorter survival times, holding the other predictors constant. We will use these time ratios to interpret the estimated coefficients after fitting our model.
+
+::: {.Tip}
+:::: {.Tip-header}
+What Does the Scale Parameter Tell Us?
+::::
+:::: {.Tip-container}
+
+Unlike the regression coefficients, the scale parameter $\sigma$ describes the shape of the survival-time distribution. Recall that the Weibull distribution has a shape parameter $k$, which is related to $\sigma$ by:
+
+$$
+k = \frac{1}{\sigma}.
+$$
+
+Therefore:
+
+- **$\sigma<1$ ($k>1$):** The hazard increases over time.
+- **$\sigma>1$ ($k<1$):** The hazard decreases over time.
+- **$\sigma=1$ ($k=1$):** The hazard is constant, corresponding to the Exponential distribution.
+
+This allows the Weibull AFT model to accommodate different hazard patterns while estimating the associations between predictors and survival time.
+
+::::
+:::
+
+### Setting Up the Modelling Equation
+
+With our parameters defined, we can now specify the Weibull AFT model using our four predictors:
+
+- `age`: Patient age at baseline.
+- `group_B`: An indicator equal to 1 for Group B and 0 for Group A.
+- `baseline_marker`: The patient's baseline health marker.
+- `comorbidity_count`: The number of existing medical conditions.
+
+Our modelling equation is:
+
+$$
+\begin{aligned}
+\log T_i =\;& \beta_0
++ \beta_1 \text{Age}_i \\
+&+ \beta_2 \text{GroupB}_i \\
+&+ \beta_3 \text{BaselineMarker}_i \\
+&+ \beta_4 \text{ComorbidityCount}_i
++ \sigma\varepsilon_i.
+\end{aligned}
+$$
+
+Here, $T_i$ represents the underlying time until a heart attack for patient $i$, while $\varepsilon_i$ follows a standard minimum-type extreme value distribution, corresponding to our chosen Weibull AFT model. This equation allows us to examine how each patient characteristic is associated with survival time while holding the other predictors constant. For example, we can compare Groups A and B at the same age, baseline marker value, and comorbidity count.
+
+::: {.Tip}
+:::: {.Tip-header}
+Why Do We Use the Minimum-Type Extreme Value Distribution?
+::::
+:::: {.Tip-container}
+
+The AFT model describes log survival time, rather than survival time directly:
+
+$$
+\log T = \eta + \sigma\varepsilon.
+$$
+
+To return to the original time scale, we exponentiate both sides:
+
+$$
+T = e^\eta \times e^{\sigma\varepsilon}.
+$$
+
+Notice that survival time depends on the random error term, $\varepsilon$. Different error distributions therefore produce different distributions of survival time.
+
+- **Normal errors:** Exponentiating a Normally distributed log survival time produces a Log-normal distribution.
+- **Minimum-type extreme value errors:** Exponentiating these errors produces a Weibull distribution for survival time.
+
+The second relationship follows from the mathematical shape of the extreme value distribution, which transforms into the Weibull survival function when we exponentiate the AFT equation. For our case study, we use minimum-type extreme value errors because we have chosen a Weibull AFT model.
+
+::::
+:::
+
+One final consideration is censoring. Although our equation describes the underlying time until a heart attack, we do not observe that exact time for every patient. Rather than removing censored patients or assigning them artificial event times, we will use their recorded follow-up times and event indicators during estimation.
+
+With our Weibull AFT model specified, we are ready to move to Estimation, where we will use maximum likelihood estimation to estimate the unknown parameters while accounting for both observed heart attacks and censored observations.
+
+## Estimation
+
+With our Weibull AFT model specified, we can now estimate its regression coefficients and scale parameter using maximum likelihood estimation (MLE). As in Gamma and Beta regression, MLE finds the parameter values that make the observed data most likely under the assumed distribution. In survival regression, however, we must also account for patients whose exact event times are unknown due to censoring.
+
+### Fitting the Model
+
+To understand how MLE handles censoring, consider two patients:
+
+- **Patient A:** Experienced a heart attack after 5 years. We know when the event occurred.
+- **Patient B:** Was followed for 5 years without experiencing a heart attack. We do not know their eventual event time, but we know they remained event-free throughout those 5 years.
+
+Both patients provide useful information, but in different ways. For Patient A, we use the probability density $f(t)$, which describes how event times are distributed. For Patient B, we use the survival function $S(t)$, which gives the probability of remaining event-free beyond a particular time. The following graphs illustrate these two contributions using the same hypothetical Weibull distribution. The dashed lines mark the patients' recorded follow-up time of 5 years.
+
+```{python}
+#| label: fig-likelihood-contributions
+#| echo: false
+#| fig-cap: "Probability density and survival function for a hypothetical Weibull distribution."
+#| fig-width: 11
+#| fig-height: 4
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import weibull_min
+
+shape, scale = 1.7, 9
+t = np.linspace(0.01, 15, 500)
+t_obs = 5
+
+density = weibull_min.pdf(t, shape, scale=scale)
+survival = weibull_min.sf(t, shape, scale=scale)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+
+for ax, values, color, title, ylabel in [
+    (axes[0], density, "steelblue",
+     "Patient A: Event-Time Density", "Density"),
+    (axes[1], survival, "darkcyan",
+     "Patient B: Survival Function", "Survival Probability")
+]:
+    ax.plot(t, values, color=color, linewidth=2)
+    ax.axvline(t_obs, color="gray", linestyle="--")
+    ax.scatter(
+        t_obs,
+        weibull_min.pdf(t_obs, shape, scale=scale)
+        if ax == axes[0]
+        else weibull_min.sf(t_obs, shape, scale=scale),
+        color=color,
+        zorder=3
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Follow-up Time (Years)")
+    ax.set_ylabel(ylabel)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+axes[1].set_ylim(0, 1)
+
+fig.tight_layout()
+plt.show()
+```
+
+For Patient A, the height of the density curve at 5 years, $f(5)$, contributes to the likelihood because the heart attack occurred at that time. For Patient B, the height of the survival curve, $S(5)$, contributes instead because the patient remained event-free beyond 5 years. In other words, observed events tell us when heart attacks occur, while censored observations tell us how long patients have survived without one .
+
+We can combine these contributions into a single likelihood function:
+
+$$
+L(\boldsymbol{\theta})
+=
+\prod_{i=1}^{n}
+\underbrace{f(t_i\mid\mathbf{x}_i)^{\delta_i}}_{\text{Observed events}}
+\underbrace{S(t_i\mid\mathbf{x}_i)^{1-\delta_i}}_{\text{Censored observations}},
+$$
+
+where $t_i$ is the recorded follow-up time, $\mathbf{x}_i$ represents the patient's characteristics, $\delta_i$ is the event indicator (1 = heart attack, 0 = censored), and $\boldsymbol{\theta}$ represents our unknown model parameters.
+
+The event indicator acts like a switch, selecting the appropriate contribution for each patient. The product symbol ($\prod$) simply means that we multiply these contributions across all patients. MLE then finds the regression coefficients and scale parameter that maximize this likelihood. In practice, statistical software maximizes the log-likelihood, an equivalent calculation that is easier to optimize numerically.
+
+::: {.Heads-up}
+:::: {.Heads-up-header}
+Non-Informative Censoring
+::::
+:::: {.Heads-up-container}
+
+This approach assumes **non-informative censoring**: after accounting for the predictors in our model, censoring should not provide additional information about a patient's underlying heart attack time.
+
+For example, patients who remain event-free when a study reaches its planned end date may be censored for reasons unrelated to their health. However, if patients with worsening health are more likely to drop out, their censoring may be related to their risk of experiencing a heart attack.
+
+If this assumption is violated, our model estimates may be biased.
+
+::::
+:::
+
+With this understanding of how censored observations contribute to estimation, we can now fit our Weibull AFT model using statistical software.
+
+::: {.panel-tabset}
+
+## R Code
+
+```{r}
+#| label: fit-weibull-aft-r
+
+library(survival)
+
+# Fit the Weibull AFT model
+weibull_model <- survreg(
+  Surv(time, event) ~ age + group_B +
+    baseline_marker + comorbidity_count,
+  data = data,
+  dist = "weibull"
+)
+
+# Display model results
+summary(weibull_model)
+```
+
+## Python Code
+
+```{python}
+#| label: fit-weibull-aft-python
+
+from lifelines import WeibullAFTFitter
+
+# Fit the Weibull AFT model
+weibull_model = WeibullAFTFitter()
+
+weibull_model.fit(
+    data[
+        [
+            "time",
+            "event",
+            "age",
+            "group_B",
+            "baseline_marker",
+            "comorbidity_count"
+        ]
+    ],
+    duration_col="time",
+    event_col="event"
+)
+
+# Display model results
+weibull_model.print_summary()
+```
+
+:::
+
+Both implementations produce consistent estimates, although their output formats and parameterizations differ slightly. R's `survreg()` reports the regression coefficients and log-time scale parameter $\sigma$, while Python's `WeibullAFTFitter` reports coefficients for the Weibull time-scale parameter (`lambda_`) and shape parameter (`rho_`).
+
+Our fitted model uses 1,000 patient observations, including 258 observed heart attacks and 742 right-censored observations. Both implementations produce a log-likelihood of approximately $-1050.11$, confirming that they have fitted the same model.
+
+Although we now have estimates of the regression coefficients, we should not rush to interpret them. Recall that we initially chose the Weibull distribution for its flexibility, but have not yet established whether it adequately represents our data. Before drawing conclusions about the relationships between patient characteristics and survival time, we will assess the model's goodness of fit and compare it with alternative parametric distributions.
+
+## Choosing Among Distributions and Assessing Fit
+
+A parametric survival analysis requires choosing which distribution to assume, and this choice should be checked rather than taken on faith.
+
+Because these models are fit by maximum likelihood, the same tools we used in previous chapters apply here:
+
+- Log-likelihood
+- Akaike Information Criterion (AIC)
+- Bayesian Information Criterion (BIC)
+
+Higher log-likelihood values indicate a better fit, while lower AIC and BIC values indicate a preferable balance between fit and complexity. A standard practice is to fit the same regression model under several candidate distributions, for example Exponential, Weibull, and Log-normal, and compare their AIC or BIC values on the same data.
+
+The nesting relationship among these families is also useful. Since the Exponential distribution is the special case of the Weibull distribution with shape parameter equal to one, examining the estimated Weibull shape parameter directly indicates whether the simpler Exponential model is adequate or whether the hazard genuinely rises or falls over time.
+
+Subject-matter reasoning about hazard shapes should complement these numerical comparisons. If the process being studied plausibly involves wear-out, a model that forces a constant hazard is suspect no matter how its AIC compares on a particular sample. Graphical checks, such as comparing the fitted parametric survival curve against a nonparametric estimate like the Kaplan-Meier curve, provide a further diagnostic; we will see checks of this kind in action when we fit these models to data.
+
+## Conclusion
+
+And that wraps up the theoretical foundations of parametric survival regression. We have seen what makes time-to-event data special, most notably censoring, and why ordinary least squares cannot handle it. We introduced the survival and hazard functions as the natural language for describing event times, met the Exponential, Weibull, and Log-normal distributions along with the hazard shapes they represent, and built the accelerated failure time model, whose exponentiated coefficients have the appealing interpretation of stretching or compressing survival time. Finally, we saw how maximum likelihood estimation incorporates censored observations through the survival function and how likelihood-based metrics guide the choice among candidate distributions.
+
+The parametric approach draws its strength from its distributional assumption, which is also its main vulnerability: when the assumed distribution is wrong, the conclusions can be too. In the [next chapter](07-semiparametric-survival.qmd), we study the Cox proportional hazards model, a semiparametric approach that sidesteps this assumption entirely and has become the most widely used survival model in practice.
+
+::: {.Warning}
+::::{.Warning-header}
+Fun fact!
+::::
+::::{.Warning-container}
+**Hazard a guess where the name comes from?** The Weibull distribution is named for Waloddi Weibull, the Swedish engineer who brought it to a wide audience in a 1951 paper under the gloriously confident title *A Statistical Distribution Function of Wide Applicability*. He was not overselling it: the same two-parameter curve now describes the strength of steel, the lifetime of a ball bearing, and the wind speed outside your window.
+::::
+:::
+
+
 ::: {#fig-parametric-survival-regression}
 ```{mermaid}
 mindmap
@@ -45,26 +2513,7 @@ mindmap
           (Lognormal <br/>Outcome Y)
     Discrete <br/>Outcome Y
 ```
-:::
 
-::: {.Heads-up}
-::::{.Heads-up-header}
-Heads-up on the properties of the cumulative distribution function!
-::::
-::::{.Heads-up-container}
-It is important to clarify that a **valid** `r colourize("CDF", "blue")` $F_Y(y)$ fulfils the following properties:
+Regression analysis mind map depicting all modelling techniques explored so far in this book. Depending on the type of outcome $Y$, these techniques are split into two large zones: *discrete* and *continuous*.
 
-a. $F_Y(y)$ must **never** be a decreasing function.
-b. Given that $F_Y(y)  : \mathbb{R} \rightarrow [0, 1]$, it must **never** evaluate to be $< 0$ or $> 1$. The output of a `r colourize("CDF", "blue")` is a **cumulative `r colourize("probability", "blue")`**, hence the previous bounds.
-c. When $y \rightarrow -\infty$, if follows that $F_Y(y) \rightarrow 0$.
-d. When $y \rightarrow \infty$, if follows that $F_Y(y) \rightarrow 1$.
-
-Now, in the case of a `r colourize("CDF", "blue")` corresponding to a `r colourize("continuous random variable", "blue")` $Y$, there is an additional handy property that relates the `r colourize("CDF", "blue")` $F_Y(y)$ to the `r colourize("PDF", "blue")` $f_Y(y)$:
-
-$$
-f_Y(y) = \frac{\mathrm{d}}{\mathrm{d}y} F_Y(y).
-$${#eq-cdf-to-pdf}
-
-@eq-cdf-to-pdf indicates that the `r colourize("PDF", "blue")` of $Y$ can be obtained by taking the first derivative of the `r colourize("CDF", "blue")` with respect to $y$.
-::::
 :::
