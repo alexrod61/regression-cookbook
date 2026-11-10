@@ -1948,7 +1948,6 @@ When the observed counts vary more than a fitted Classical Poisson model allows,
 :::: {.Tip-header}
 Tip on the history of the Poisson distribution!
 ::::
-
 :::: {.Tip-container}
 The Poisson distribution is named after the French mathematician **Siméon-Denis Poisson** (1781--1840). Poisson worked across mathematics, mechanics, physics, and probability, and the distribution now carrying his name is most commonly associated with modelling counts of events. A major probability work by Poisson was *Recherches sur la probabilité des jugements en matière criminelle et en matière civile* [@poisson1837].
 
@@ -2080,7 +2079,6 @@ is always positive. This is one reason the log link is the standard link functio
 :::: {.Tip-header}
 Tip on the history of Classical Poisson regression!
 ::::
-
 :::: {.Tip-container}
 The Poisson distribution is much older than the modern GLM framework, but Classical Poisson regression is commonly taught today as a member of the GLM family. The GLM framework was formalized by @nelder1972, and it provided a unified way to handle models with different response distributions, including Normal, Binomial, Poisson, and Gamma responses.
 
@@ -2533,7 +2531,6 @@ The phrase **least-squares** in IRLS can be slightly misleading at first. We are
 :::: {.Heads-up-header}
 Heads-up on what IRLS is doing in a nutshell!
 ::::
-
 :::: {.Heads-up-container}
 IRLS turns the Poisson maximum likelihood problem into a sequence of easier weighted least-squares problems. At each step, the algorithm updates two quantities:
 
@@ -3233,7 +3230,7 @@ In @fig-classical-poisson-observed-fitted-r or @fig-classical-poisson-observed-f
 
 The horizontal bands in the plot are expected because the observed response is a count. The fitted expected count on the $x$-axis is allowed to be fractional, but the observed satellite count on the $y$-axis can only take values such as $0$, $1$, $2$, $3$, and so on. What is concerning is not the banding itself, but the amount of vertical spread around similar fitted expected counts. This pattern suggests that the simple width-only Classical Poisson model is not capturing all the structure in the training data and may be too restrictive in its variance assumption.
 
-### Mean-Variance Structure and Equidispersion {#sec-classical-poisson-equidispersion}
+### Mean-variance Structure and Equidispersion {#sec-classical-poisson-equidispersion}
 
 The defining mean-variance assumption of Classical Poisson regression is equidispersion:
 
@@ -3251,7 +3248,6 @@ This is a conditional statement. It does not say that the raw sample variance mu
 :::: {.definition-header}
 Definition of overdispersion
 ::::
-
 :::: {.definition-container}
 A count response variable shows **overdispersion** relative to a Classical Poisson regression model when its conditional variance is larger than the conditional mean allowed by the model. In practice, after accounting for $k$ regressors, the observed counts vary more than the fitted Poisson model would predict.
 
@@ -3314,7 +3310,6 @@ $$
 :::: {.Heads-up-header}
 Heads-up on regularity conditions for this test!
 ::::
-
 :::: {.Heads-up-container}
 The phrase "**regularity conditions**" means that the Chi-squared approximation used in this test relies on some practical assumptions about the fitted model and the data. In this setting, the most important ones are that the observations are independent conditional on the regressors, the fitted expected counts $\hat{\mu}_i$ are not too close to zero for too many observations, the sample size is large enough for the approximation to be reasonable, and the model is not affected by extreme leverage or a few observations dominating the fit.
 
@@ -3367,11 +3362,10 @@ Using the survival function is often numerically more stable than computing `1 -
 :::: {.Heads-up-header}
 Heads-up on the survival function!
 ::::
-
 :::: {.Heads-up-container}
 In the `Python` code, `stats.chi2.sf(...)` uses the **survival function** of the Chi-squared distribution. Here, the word "*survival*" does **not** mean that we are doing survival analysis.
 
-For a random variable $Z$ with cumulative distribution function $F_Z(z)$, the survival function is
+For a random variable $Z$ with cumulative distribution function (CDF) $F_Z(z)$, the survival function is
 
 $$
 S_Z(z)
@@ -3413,7 +3407,7 @@ pearson_dispersion <- pearson_chi_squared / pearson_df
 pearson_overdispersion_p_value <- pchisq(pearson_chi_squared, df = pearson_df,
   lower.tail = FALSE)
 
-overdispersion_summary <- tibble::tibble(
+overdispersion_summary <- tibble(
   `Pearson Chi-squared statistic` = pearson_chi_squared,
   `Residual degrees of freedom` = pearson_df,
   `Pearson dispersion estimate` = pearson_dispersion,
@@ -3484,7 +3478,31 @@ For this simple width-only model, the Pearson dispersion estimate is `r formatC(
 
 ### Excess Zero Counts {#sec-classical-poisson-excess-zeros}
 
-In @sec-classical-poisson-eda-general, the EDA also showed many zero satellite counts. We now check whether the fitted simple Classical Poisson model expects a similar number of zeros in the **training data**. Hence, this diagnostic focuses on the number of observed zero counts,
+In @sec-classical-poisson-eda-general, the EDA showed many zero satellite counts. We now ask a more targeted model-adequacy question:
+
+> **Does the fitted simple Classical Poisson model generate enough zero counts to make the number observed in the training data plausible?**
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/tablet-games-tetris-building-blocks-7426706/).](img/tablet.png){width="300"}
+
+To answer this question carefully, we first distinguish the **random number of zeros that could have been observed under the model** from the **number of zeros that was actually observed**.
+
+For observation $i$, define the zero-count indicator random variable
+
+$$
+I_i
+=
+\mathbb{1}(Y_i = 0),
+$$
+
+which equals $1$ when the random count $Y_i$ is zero and equals $0$ otherwise. Then, define
+
+$$
+Z
+=
+\sum_{i=1}^n I_i
+$$
+
+as the **random total number of zero counts among the $n$ training observations**. Its observed realization is
 
 $$
 z_{\operatorname{obs}}
@@ -3493,121 +3511,318 @@ z_{\operatorname{obs}}
 \mathbb{1}(y_i = 0),
 $$
 
-where $\mathbb{1}(y_i = 0)$ is an indicator that equals $1$ when the $i$th observed satellite count is zero and equals $0$ otherwise.
+where $y_i$ is the observed satellite count for female crab $i$.
 
-![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/tablet-games-tetris-building-blocks-7426706/).](img/tablet.png){width="300"}
-
-Under the fitted Classical Poisson model, the probability that the $i$th female crab has zero satellite males is
+Under the Classical Poisson model,
 
 $$
-\Pr(Y_i = 0 \mid \mathbf{x}_i; \hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}})
+Y_i \mid \mathbf{x}_i
+\sim
+\operatorname{Poisson}(\mu_i),
+$$
+
+so the model-implied probability of zero satellites is
+
+$$
+\pi_{0,i}
 =
-\exp(-\hat{\mu}_i).
+\Pr(Y_i = 0 \mid \mathbf{x}_i)
+=
+\exp(-\mu_i).
 $$
 
-Now, let
+Consequently,
+
+$$
+I_i \mid \mathbf{x}_i
+\sim
+\operatorname{Bernoulli}(\pi_{0,i}).
+$$
+
+If the observations are conditionally independent, then the indicators $I_1,\ldots,I_n$ are independent. However, they are generally **not identically distributed**, because different female crabs can have different expected counts $\mu_i$ and therefore different zero probabilities $\pi_{0,i}$. Hence,
+
+$$
+Z \mid \mathbf{X}
+\sim
+\operatorname{PoissonBinomial}
+\left(
+\pi_{0,1},
+\ldots,
+\pi_{0,n}
+\right),
+$${#eq-classical-poisson-zero-count-poisson-binomial}
+
+where $\mathbf{X}$ represents the collection of training-set regressor values. The **Poisson-binomial distribution** is precisely the distribution of a sum of independent Bernoulli random variables whose success probabilities are allowed to differ [@hong2013; @tang2023].
+
+Its mean and variance are
+
+$$
+\mathbb{E}(Z \mid \mathbf{X})
+=
+\sum_{i=1}^n \pi_{0,i}
+$$
+
+and
+
+$$
+\operatorname{Var}(Z \mid \mathbf{X})
+=
+\sum_{i=1}^n
+\pi_{0,i}(1-\pi_{0,i}).
+$$
+
+::: {.Tip}
+:::: {.Tip-header}
+Tip on the Poisson-binomial distribution and its Normal approximation!
+::::
+:::: {.Tip-container}
+
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-protocol-exchange-3947913/).](img/test.png){width="420"}
+
+The **Poisson-binomial distribution** is less familiar than the ordinary Binomial distribution (see @sec-binomial-distribution), so several distinctions are worth making:
+
+1. **It is a distribution for a sum of Bernoulli random variables.** If
+$$
+Z=\sum_{i=1}^n I_i,
+\qquad
+I_i\sim\operatorname{Bernoulli}(\pi_{0,i}),
+$$
+with independent $I_i$, then $Z$ has support $\{0,1,\ldots,n\}$.
+
+2. **It is not generally Binomial.** A Binomial random variable requires one common success probability $\pi$. On the other hand, the Poisson-binomial distribution allows
+$$
+\pi_{0,1},\ldots,\pi_{0,n}
+$$
+to differ. Only when all $\pi_{0,i}=\pi$ does the special case
+$$
+Z\sim\operatorname{Binomial}(n,\pi)
+$$
+arise.
+
+3. **Despite its name, it is not a Poisson distribution.** The term **Poisson-binomial** refers to this unequal-probability Bernoulli-sum distribution. In our application, the Bernoulli probabilities happen to come from a fitted Poisson regression through $\pi_{0,i}=\exp(-\mu_i)$, but the distribution of the total number of zeros is Poisson-binomial rather than Poisson.
+
+4. **Its distribution depends on the entire probability vector.** For $m\in\{0,\ldots,n\}$,
+$$
+\Pr(Z=m)
+=
+\sum_{\substack{A\subseteq\{1,\ldots,n\}\\|A|=m}}
+\left(
+\prod_{i\in A}\pi_{0,i}
+\right)
+\left[
+\prod_{j\notin A}(1-\pi_{0,j})
+\right].
+$$
+Therefore, knowing only the mean $\sum_i\pi_{0,i}$ is not enough to recover the complete finite-sample distribution. Fortunately, exact probabilities can be computed efficiently without explicitly enumerating all subsets; @hong2013 discusses exact and approximate computational methods.
+
+5. **A Normal approximation can be justified, but it is not exact.** The Central Limit Theorem (CLT) is not restricted to sample means (recall we discussed CLT in @sec-clt-pivot). A sample mean is itself a rescaled sum. Here, the relevant random quantity is the standardized sum
+$$
+\frac{
+Z-\mathbb{E}(Z)
+}{
+\sqrt{\operatorname{Var}(Z)}
+}.
+$$
+Under suitable Lyapunov or Lindeberg-type conditions for sums of independent, non-identically distributed Bernoulli variables, this standardized quantity approaches a standard Normal distribution as the amount of information grows [@tang2023]. Thus,
+$$
+\frac{
+Z-\mathbb{E}(Z)
+}{
+\sqrt{\operatorname{Var}(Z)}
+}
+\overset{\cdot}{\sim}
+\operatorname{Normal}(0,1)
+$$
+is an **approximation**, not an exact finite-sample equality.
+
+6. **Because $Z$ is discrete, a continuity correction improves the basic Normal approximation.** For an upper-tail probability,
+$$
+\Pr(Z\geq z_{\operatorname{obs}})
+\approx
+1-\Phi
+\left(
+\frac{
+z_{\operatorname{obs}}-0.5-\mathbb{E}(Z)
+}{
+\sqrt{\operatorname{Var}(Z)}
+}
+\right),
+$$
+where $\Phi(\cdot)$ is the standard Normal CDF. @hong2013 describes this CLT-based Normal approximation with continuity correction and also shows that its quality need not be good in every finite-sample configuration.
+
+For this chapter, we do not need to rely on the Normal approximation for the main zero-count conclusion. We can compute the Poisson-binomial upper tail directly and use the Normal calculation only to explain how the familiar $z$-scale approximation arises.
+::::
+:::
+
+#### Hypotheses and Why This Diagnostic Is One-Sided
+
+We can now state the hypothesis in both practical and parameter terms. Let
+
+$$
+p_{0,i}
+=
+\Pr(Y_i=0\mid\mathbf{x}_i)
+$$
+
+denote the actual conditional probability of a zero count, and let
+
+$$
+\pi_{0,i}
+=
+\exp(-\mu_i)
+$$
+
+denote the zero probability implied by the Classical Poisson model. Define the aggregate zero-frequency discrepancy
+
+$$
+\Delta_0
+=
+\sum_{i=1}^n
+\left(
+p_{0,i}-\pi_{0,i}
+\right).
+$${#eq-classical-poisson-zero-excess-parameter}
+
+The complete Classical Poisson model makes the stronger statement that
+
+$$
+p_{0,i}=\pi_{0,i}
+\qquad
+\text{for every }i,
+$$
+
+which implies $\Delta_0=0$. The particular diagnostic in this subsection isolates the **excess-zero direction**, so its working hypotheses are
+
+$$
+\begin{gather}
+H_0\text{: } \text{there is no aggregate excess of zeros relative to the} \\
+\text{Classical Poisson model, }
+\Delta_0\leq 0,
+\\[4pt]
+\text{versus}
+\\[4pt]
+H_1\text{: } \text{there is an aggregate excess of zeros relative to the} \\
+\text{Classical Poisson model, }
+\Delta_0>0.
+\end{gather}
+$${#eq-classical-poisson-zero-count-hypotheses}
+
+The diagnostic is therefore **one-sided by design**. Only unusually **large** values of $Z$ provide evidence for the stated alternative $\Delta_0>0$. A substantially smaller-than-expected number of zeros could also indicate model misspecification, but it would be evidence in the opposite direction and would not support an **excess-zero** or **zero-inflation conclusion**. If our scientific question were instead whether the fitted model gets the zero frequency wrong in **either direction**, we would need a two-sided diagnostic rather than the upper-tail diagnostic used here.
+
+This directional framing is also consistent with the established zero-inflation literature. For example, @vandenbroek1995 develops a formal score test for whether the number of zeros is too large for a Poisson model, and @jansakul2002 extends score-testing ideas to zero-inflated Poisson regression with covariates. Those score tests are not the same statistic as the Poisson-binomial diagnostic developed here; we will return to this distinction below.
+
+#### From the Model Probabilities to a Fitted Reference Distribution
+
+The probabilities $\pi_{0,i}$ are unknown because the Poisson means $\mu_i$ depend on unknown regression coefficients. After fitting the simple model, we therefore use
 
 $$
 \hat{\pi}_{0,i}
 =
-\exp(-\hat{\mu}_i)
+\exp(-\hat{\mu}_i).
 $$
 
-denote this fitted zero probability for observation $i$. Then, the fitted expected number of zeros in the training data is
+![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/?utm_source=link-attribution&utm_medium=referral&utm_campaign=image&utm_content=3699345) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-blended-learning-6230153/).](img/blender.png){width="400"}
+
+If these fitted probabilities are held fixed, they define the fitted-reference random variable
 
 $$
-\widehat{\mathbb{E}}(Z)
-=
-\sum_{i=1}^n
-\hat{\pi}_{0,i}.
+Z^{(\operatorname{fit})}
+\sim
+\operatorname{PoissonBinomial}
+\left(
+\hat{\pi}_{0,1},
+\ldots,
+\hat{\pi}_{0,n}
+\right).
 $$
 
-The question is whether the observed number of zeros is unusually large compared with what the fitted Classical Poisson model expects. We can frame this as a one-sided diagnostic test:
-
-$$
-\begin{gather}
-H_0\text{: } \text{the fitted Classical Poisson model adequately describes} \\
-\text{the frequency of zero counts}, \\
-\text{versus} \\
-H_1\text{: } \text{there are more zero counts than the} \\
-\text{fitted Classical Poisson model expects}.
-\end{gather}
-$$
-
-Under $H_0$, the zero-count indicators $\mathbb{1}(Y_i = 0)$ are treated as independent Bernoulli random variables with fitted probabilities $\hat{\pi}_{0,i}$. Because these probabilities can differ across observations, the total number of zeros is a sum of Bernoulli variables with unequal probabilities. Its fitted mean is
+Its fitted mean and variance are
 
 $$
 \widehat{\mathbb{E}}(Z)
 =
 \sum_{i=1}^n
-\hat{\pi}_{0,i},
+\hat{\pi}_{0,i}
 $$
 
-and its fitted variance is
+and
 
 $$
 \widehat{\operatorname{Var}}(Z)
 =
 \sum_{i=1}^n
 \hat{\pi}_{0,i}
-(1 - \hat{\pi}_{0,i}).
+(1-\hat{\pi}_{0,i}).
 $$
 
-This gives the approximate $z$-statistic
+The primary diagnostic tail probability is then
+
+$$
+p_{\operatorname{PB}}
+=
+\Pr
+\left(
+Z^{(\operatorname{fit})}
+\geq
+z_{\operatorname{obs}}
+\right).
+$${#eq-classical-poisson-pb-zero-pvalue}
+
+This probability is computed from the **Poisson-binomial distribution itself**, so no Normal approximation is needed for this step.
+
+For comparison, the continuity-corrected Normal statistic is
 
 $$
 z_{\operatorname{zero}}
 =
 \frac{
-z_{\operatorname{obs}} - \widehat{\mathbb{E}}(Z)
+z_{\operatorname{obs}}
+-
+0.5
+-
+\widehat{\mathbb{E}}(Z)
 }{
 \sqrt{
 \widehat{\operatorname{Var}}(Z)
 }
-}.
+},
 $${#eq-z-statistic-zero-counts}
 
-Large positive values of $z_{\operatorname{zero}}$ indicate that the training data contains more zero counts than the fitted Poisson model expects. The corresponding one-sided $p$-value is
+with approximate upper-tail probability
 
 $$
-\begin{gather}
-Z_{\operatorname{zero}} \sim \operatorname{Normal}\left(0,1\right) \\
-p\text{-value}
+p_{\operatorname{N,approx}}
 =
-\Pr
+1-\Phi
 \left(
-Z_{\operatorname{zero}}
-\geq
 z_{\operatorname{zero}}
-\right),
-\end{gather}
+\right).
 $$
 
-where $\operatorname{Normal}(0,1)$ denotes a standard Normal random variable.
+Thus, the standardized Poisson-binomial sum is **approximately** standard Normal when the relevant CLT conditions are reasonable, and the continuity correction acknowledges that $Z$ is discrete.
 
 ::: {.Heads-up}
 :::: {.Heads-up-header}
-Heads-up on what this zero-count test is checking!
+Heads-up on what is exact—and what is still estimated—in this zero-count diagnostic!
 ::::
-
 :::: {.Heads-up-container}
-This diagnostic is not testing whether the response variable can take the value zero. A Poisson model always allows zero counts. Instead, it asks whether the **number of zeros observed in the training data** is unusually large compared with the number of zeros expected under the fitted Classical Poisson model.
-
-The fitted model can assign a different zero probability to each female crab because each crab has its own fitted expected count $\hat{\mu}_i$. For the $i$th crab, that fitted zero probability is
+There are two different approximation issues to keep separate. First, once the fitted probabilities
 
 $$
-\hat{\pi}_{0,i}
-=
-\exp(-\hat{\mu}_i).
+\hat{\pi}_{0,1},\ldots,\hat{\pi}_{0,n}
 $$
 
-The fitted expected number of zeros is obtained by adding these fitted zero probabilities across the training observations. If the observed zero count is much larger than this fitted expectation, then the model may be missing a feature of the data-generating process. This can happen, for example, when some female crabs have zero satellite males for reasons not captured by width alone.
+are treated as fixed numbers, the Poisson-binomial probability in @eq-classical-poisson-pb-zero-pvalue can be computed **directly**, without using a Normal approximation. The recursive calculation in the code below evaluates this fitted-reference distribution.
 
-This check is a diagnostic, not a final model-selection rule. A large excess of zeros would motivate considering zero-inflated count models (see @sec-zero-inflated-poisson), but it should be interpreted alongside the overdispersion check, residual deviance, residual plots, and the scientific context.
+Second, the probabilities themselves were estimated from the **same training data** through $\hat{\boldsymbol{\beta}}_{\operatorname{MLE,obs}}$. Therefore, the plug-in Poisson-binomial tail probability is **not an exact unconditional finite-sample $p$-value for the entire regression-fitting procedure**. It is a targeted goodness-of-fit diagnostic that asks whether the observed zero count is unusual when the fitted zero probabilities are treated as the reference probabilities.
+
+A more computationally intensive option would be a **parametric bootstrap** that repeatedly simulates count data from the fitted Poisson regression, refits the model in each simulated dataset, and recomputes the zero-count discrepancy. Formal model-comparison approaches also exist. In particular, @vandenbroek1995 derives a score test for zero inflation in a Poisson model, and @jansakul2002 develops score tests for zero-inflated Poisson regression with covariates.
+
+For this chapter, the Poisson-binomial diagnostic is useful because every ingredient is visible: each observation contributes one model-implied probability of zero, those probabilities determine the distribution of the total number of zeros, and the observed total is compared with the corresponding upper tail. Nevertheless, we should describe it as a **plug-in diagnostic** rather than oversell it as an exact formal test of the full fitted regression model.
 ::::
 :::
 
-The following table computes the observed zero count, the fitted expected zero count, the approximate $z$-statistic, and the one-sided $p$-value.
+The following tables and code report the observed and fitted zero-count quantities, the plug-in Poisson-binomial upper-tail probability, and the continuity-corrected Normal approximation.
 
 ::: {.panel-tabset}
 
@@ -3616,33 +3831,100 @@ The following table computes the observed zero count, the fitted expected zero c
 ```{r}
 #| echo: true
 #| label: tbl-classical-poisson-zero-count-check-r
-#| tbl-cap: "Observed and fitted zero counts for the simple width-only Poisson regression model."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the simple width-only Poisson regression model."
 #| message: false
 #| warning: false
 
-observed_zero_count <- sum(simple_poisson_gof_data$satellites == 0)
+poisson_binomial_pmf <- function(probabilities) {
+  pmf <- 1
 
-expected_zero_count <- sum(simple_poisson_gof_data$fitted_zero_probability)
+  for (probability in probabilities) {
+    pmf <- c(pmf * (1 - probability), 0) +
+      c(0, pmf * probability)
+  }
 
-zero_count_variance <- sum(simple_poisson_gof_data$fitted_zero_probability *
-    (1 - simple_poisson_gof_data$fitted_zero_probability))
+  pmf
+}
 
-zero_count_z <- (observed_zero_count - expected_zero_count) / sqrt(zero_count_variance)
+fitted_zero_probabilities <-
+  simple_poisson_gof_data$fitted_zero_probability
 
-zero_count_p_value <- pnorm(zero_count_z, lower.tail = FALSE)
+observed_zero_count <- sum(
+  simple_poisson_gof_data$satellites == 0
+)
 
-zero_count_summary <- tibble::tibble(`Observed zero count` = observed_zero_count,
+expected_zero_count <- sum(fitted_zero_probabilities)
+
+zero_count_variance <- sum(
+  fitted_zero_probabilities *
+    (1 - fitted_zero_probabilities)
+)
+
+zero_count_sd <- sqrt(zero_count_variance)
+
+zero_count_pmf <- poisson_binomial_pmf(
+  fitted_zero_probabilities
+)
+
+stopifnot(abs(sum(zero_count_pmf) - 1) < 1e-10)
+
+zero_count_p_value <- sum(
+  zero_count_pmf[
+    seq.int(
+      observed_zero_count + 1L,
+      length(zero_count_pmf)
+    )
+  ]
+)
+
+zero_count_z <- (
+  observed_zero_count -
+    0.5 -
+    expected_zero_count
+) / zero_count_sd
+
+zero_count_normal_p_value <- pnorm(
+  zero_count_z,
+  lower.tail = FALSE
+)
+
+zero_count_summary <- tibble(
+  `Observed zero count` = observed_zero_count,
   `Fitted expected zero count` = expected_zero_count,
-  `Observed minus fitted zeros` = observed_zero_count - expected_zero_count,
-  `Approximate z-statistic` = zero_count_z, `One-sided p-value` = zero_count_p_value) |>
-  mutate(`Observed zero count` = formatC(`Observed zero count`, format = "f", digits = 0),
-    `Fitted expected zero count` = formatC(`Fitted expected zero count`, format = "f",
-      digits = 2),
-    `Observed minus fitted zeros` = formatC(`Observed minus fitted zeros`, format = "f",
-      digits = 2),
-    `Approximate z-statistic` = formatC(`Approximate z-statistic`, format = "f", digits = 2
-    ), `One-sided p-value` = formatC(`One-sided p-value`, format = "e", digits = 2)) |>
-  pivot_longer(cols = everything(), names_to = "Quantity", values_to = "Value")
+  `Fitted zero-count SD` = zero_count_sd,
+  `Plug-in Poisson-binomial upper-tail p-value` =
+    zero_count_p_value,
+  `Continuity-corrected Normal z` = zero_count_z,
+  `Normal-approximation upper-tail p-value` =
+    zero_count_normal_p_value
+) |>
+  mutate(
+    `Observed zero count` = formatC(
+      `Observed zero count`,
+      format = "f",
+      digits = 0
+    ),
+    across(
+      c(
+        `Fitted expected zero count`,
+        `Fitted zero-count SD`,
+        `Continuity-corrected Normal z`
+      ),
+      ~ formatC(.x, format = "f", digits = 2)
+    ),
+    across(
+      c(
+        `Plug-in Poisson-binomial upper-tail p-value`,
+        `Normal-approximation upper-tail p-value`
+      ),
+      ~ formatC(.x, format = "e", digits = 2)
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = "Quantity",
+    values_to = "Value"
+  )
 
 zero_count_summary |>
   kable(align = c("c", "c"))
@@ -3655,33 +3937,87 @@ zero_count_summary |>
 #| message: false
 #| warning: false
 
-observed_zero_count = (simple_poisson_gof_data["satellites"] == 0).sum()
+def poisson_binomial_pmf(probabilities):
+    pmf = np.array([1.0])
 
-expected_zero_count = (simple_poisson_gof_data["fitted_zero_probability"].sum())
+    for probability in probabilities:
+        pmf = np.convolve(
+            pmf,
+            np.array([1 - probability, probability]),
+        )
 
-zero_count_variance = (simple_poisson_gof_data["fitted_zero_probability"]
-    * (1 - simple_poisson_gof_data["fitted_zero_probability"])).sum()
+    return pmf
 
-zero_count_z = (observed_zero_count - expected_zero_count) / np.sqrt(zero_count_variance)
 
-zero_count_p_value = stats.norm.sf(zero_count_z)
+fitted_zero_probabilities = (
+    simple_poisson_gof_data[
+        "fitted_zero_probability"
+    ].to_numpy()
+)
+
+observed_zero_count = (
+    simple_poisson_gof_data["satellites"] == 0
+).sum()
+
+expected_zero_count = fitted_zero_probabilities.sum()
+
+zero_count_variance = (
+    fitted_zero_probabilities
+    * (1 - fitted_zero_probabilities)
+).sum()
+
+zero_count_sd = np.sqrt(zero_count_variance)
+
+zero_count_pmf = poisson_binomial_pmf(
+    fitted_zero_probabilities
+)
+
+assert np.isclose(zero_count_pmf.sum(), 1.0)
+
+zero_count_p_value = zero_count_pmf[
+    observed_zero_count:
+].sum()
+
+zero_count_z = (
+    observed_zero_count
+    - 0.5
+    - expected_zero_count
+) / zero_count_sd
+
+zero_count_normal_p_value = stats.norm.sf(
+    zero_count_z
+)
 
 zero_count_summary = pd.DataFrame(
-    {"Quantity": ["Observed zero count", "Fitted expected zero count",
-            "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value",
-        ], "Value": [f"{observed_zero_count:.0f}", f"{expected_zero_count:.2f}",
-            f"{observed_zero_count - expected_zero_count:.2f}", f"{zero_count_z:.2f}",
-            f"{zero_count_p_value:.2e}",
+    {
+        "Quantity": [
+            "Observed zero count",
+            "Fitted expected zero count",
+            "Fitted zero-count SD",
+            "Plug-in Poisson-binomial upper-tail p-value",
+            "Continuity-corrected Normal z",
+            "Normal-approximation upper-tail p-value",
         ],
-    })
+        "Value": [
+            f"{observed_zero_count:.0f}",
+            f"{expected_zero_count:.2f}",
+            f"{zero_count_sd:.2f}",
+            f"{zero_count_p_value:.2e}",
+            f"{zero_count_z:.2f}",
+            f"{zero_count_normal_p_value:.2e}",
+        ],
+    }
+)
 
-classical_poisson_zero_count_check_py_html = (scrollable_table_html(zero_count_summary))
+classical_poisson_zero_count_check_py_html = (
+    scrollable_table_html(zero_count_summary)
+)
 ```
 
 ```{r}
 #| echo: false
 #| label: tbl-classical-poisson-zero-count-check-py
-#| tbl-cap: "Observed and fitted zero counts for the simple width-only Poisson regression model."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the simple width-only Poisson regression model."
 #| message: false
 #| warning: false
 #| results: asis
@@ -3696,9 +4032,11 @@ cat(
 
 :::
 
-This zero-count check gives strong evidence that the simple width-only Classical Poisson model is not reproducing the zero-count part of the response distribution. In the **training data**, the observed number of female crabs with zero satellite males is `r observed_zero_count`, while the fitted model expects only `r formatC(expected_zero_count, format = "f", digits = 2)` zeros. The difference is therefore `r formatC(observed_zero_count - expected_zero_count, format = "f", digits = 2)` additional zero counts beyond what the fitted model expects. Then, the approximate $z$-statistic is `r formatC(zero_count_z, format = "f", digits = 2)`, with a one-sided $p$-value of `r formatC(zero_count_p_value, format = "e", digits = 2)`. This provides strong diagnostic evidence of **excess zero counts** relative to the simple Classical Poisson model. In practical terms, the model is not only struggling with the overall mean-variance structure; it is also substantially understating how often zero satellite counts occur in the training data.
+This zero-count diagnostic provides strong evidence that the simple width-only Classical Poisson model is not reproducing the zero-count part of the response distribution. In the **training data**, the observed number of female crabs with zero satellite males is `r observed_zero_count`, while the fitted model expects `r formatC(expected_zero_count, format = "f", digits = 2)` zeros. The difference is therefore `r formatC(observed_zero_count - expected_zero_count, format = "f", digits = 2)` additional observed zeros beyond the fitted expectation.
 
-Furthermore, this zero-count check should still be interpreted as one diagnostic rather than as the only criterion for choosing a model. However, when combined with the earlier overdispersion evidence from @sec-classical-poisson-equidispersion, it suggests that the simple Classical Poisson model is too restrictive for these data. This situation motivates a closer look at alternatives such as zero-inflated count models.
+Using the fitted probabilities as the reference, the **plug-in Poisson-binomial upper-tail $p$-value** is `r formatC(zero_count_p_value, format = "e", digits = 2)`. Thus, the observed number of zeros lies unusually far into the upper tail of the fitted Poisson-binomial zero-count distribution. The continuity-corrected Normal approximation gives $z_{\operatorname{zero}}=$ `r formatC(zero_count_z, format = "f", digits = 2)` and an approximate upper-tail probability of `r formatC(zero_count_normal_p_value, format = "e", digits = 2)`. We report this Normal result as an approximation check, not as the exact sampling distribution of the statistic.
+
+Hence, the substantive diagnostic conclusion is that the model **substantially understates how often zero satellite counts occur**. This conclusion is directional: it concerns **excess zeros**, not arbitrary disagreement in either direction. Furthermore, this zero-count diagnostic remains one part of a broader goodness-of-fit assessment. A small plug-in Poisson-binomial tail probability does not prove that a zero-inflated model is uniquely correct. It should be interpreted alongside the overdispersion check, residual deviance, residual plots, and scientific context. Formal score tests for zero inflation provide another route when the inferential goal is specifically to compare a Poisson model with a zero-inflated alternative [@vandenbroek1995; @jansakul2002].
 
 ### Residual Deviance {#sec-classical-poisson-residual-deviance}
 
@@ -3712,7 +4050,6 @@ Now, let us dig into **residual deviance**. This metric gives **a more global go
 :::: {.definition-header}
 Definition of saturated model
 ::::
-
 :::: {.definition-container}
 A **saturated model** is a model that fits the observed data perfectly by using enough parameters to reproduce every observed response value exactly. The saturated model is usually not useful as a practical regression model. Instead, it serves as a theoretical benchmark. Residual deviance compares the fitted model we actually use with this perfect-fit benchmark.
 ::::
@@ -3722,7 +4059,6 @@ A **saturated model** is a model that fits the observed data perfectly by using 
 :::: {.definition-header}
 Definition of residual deviance
 ::::
-
 :::: {.definition-container}
 The **residual deviance** of a fitted GLM measures how far the fitted regression model is from a saturated model, where the saturated model is the idealized benchmark that fits the observed responses perfectly.
 
@@ -3804,7 +4140,6 @@ A small $p$-value means that the residual deviance is unusually large under the 
 :::: {.Heads-up-header}
 Heads-up on residual deviance as a global diagnostic!
 ::::
-
 :::: {.Heads-up-container}
 The residual deviance is a **global goodness-of-fit diagnostic**. It does not tell us by itself whether the problem is overdispersion, excess zeros, a missing regressor, a nonlinear relationship, influential observations, or some combination of these issues. This is why we do not use residual deviance alone to decide what to do next. Instead, we interpret it alongside more targeted diagnostics, such as the Pearson Chi-squared overdispersion test, the zero-count check, and residual plots.
 
@@ -3843,7 +4178,7 @@ residual_deviance_ratio <- residual_deviance / residual_deviance_df
 residual_deviance_p_value <- pchisq(residual_deviance, df = residual_deviance_df,
   lower.tail = FALSE)
 
-residual_deviance_summary <- tibble::tibble(`Residual deviance` = residual_deviance,
+residual_deviance_summary <- tibble(`Residual deviance` = residual_deviance,
   `Residual degrees of freedom` = residual_deviance_df,
   `Residual deviance / df` = residual_deviance_ratio,
   `Goodness-of-fit p-value` = residual_deviance_p_value) |>
@@ -4005,7 +4340,7 @@ Now, we combine the diagnostic evidence. The goal is not to declare the model pe
 |:---:|:---:|:---:|:---:|
 | Observed versus fitted counts | Whether fitted expected counts track observed counts across the training data. | The model captures a broad increase in expected counts with width, but individual counts show large variability around the fitted expectations (see @fig-classical-poisson-observed-fitted-r or @fig-classical-poisson-observed-fitted-py). | Width is useful, but the simple model is **not a complete description of the response**. |
 | Pearson overdispersion test | Whether the conditional variance is compatible with the Classical Poisson mean-variance structure. | The Pearson dispersion estimate is much larger than $1$, and the overdispersion $p$-value is very small. | The model-based **standard errors** from the simple Poisson model are likely **too small**. |
-| Zero-count check | Whether the fitted model expects a similar number of zeros as observed. | If the observed zero count is larger than the fitted expected zero count, the model is not reproducing the zero-count part of the distribution. | Excess zeros may motivate a **zero-inflated model** in a later chapter. |
+| Poisson-binomial zero-count diagnostic | Whether the observed number of zeros is unusually large under the fitted Poisson-binomial reference distribution implied by the observation-specific fitted zero probabilities. | The plug-in Poisson-binomial upper-tail probability is `r formatC(zero_count_p_value, format = "e", digits = 2)`, indicating that the observed zero count is unusually large relative to the fitted reference distribution. | The model understates zero frequency. This may motivate a **zero-inflated model**, but the plug-in tail is a targeted diagnostic rather than an exact unconditional test of the full fitted regression procedure. |
 | Residual deviance | Whether the fitted model is close enough to a saturated benchmark. | The residual deviance is much larger than its degrees of freedom, with a very small goodness-of-fit $p$-value. | There is formal evidence of lack of fit for the simple Classical Poisson model. |
 | Pearson residual plot | Whether residuals show unusually large discrepancies relative to the fitted Poisson variance. | Large residuals and broad residual spread support the overdispersion conclusion (see @fig-classical-poisson-pearson-residuals-r or @fig-classical-poisson-pearson-residuals-py). | The simple model is too restrictive as a final inferential model. |
 
@@ -4325,13 +4660,13 @@ cat(
 
 @tbl-classical-poisson-extended-model-fit-r reports estimates, model-based standard errors, exponentiated estimates, and percent changes. We intentionally do **not** conduct Wald tests here. Hypothesis testing and final coefficient-level inferential decisions are saved for the later **results section**, after the model-building workflow has been completed.
 
-### Extended Goodness-of-Fit Checks {#sec-classical-poisson-extended-gof}
+### Extended Goodness-of-fit Checks {#sec-classical-poisson-extended-gof}
 
 Now, before interpreting the coefficients, we repeat the goodness-of-fit checks for the extended model. Since the simple width-only model showed overdispersion, excess zeros, and a large residual deviance, we now ask whether adding `weight_kg`, `color`, and `spine` improved those same diagnostics. We will use the same diagnostic tools developed for the simple model, but we will organize them more efficiently here. The goal is not to rederive the mathematics. Instead, we reuse the same ideas to assess whether the extended Classical Poisson model is more adequate on the training data.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-teacher-acrobatics-3974168/).](img/sequence.png){width="700"}
 
-#### Creating Extended-Model Diagnostic Quantities
+#### Creating Extended-model Diagnostic Quantities
 
 The first step is to create the **fitted expected counts**, **Pearson residuals**, and **fitted zero probabilities** for the extended model. These are the same diagnostic quantities used for the simple model in @sec-classical-poisson-gof, but now they come from the model with all available regressors.
 
@@ -4602,7 +4937,7 @@ extended_pearson_dispersion <- (extended_pearson_chi_square / extended_pearson_d
 extended_overdispersion_p_value <- pchisq(extended_pearson_chi_square,
   df = extended_pearson_df, lower.tail = FALSE)
 
-extended_overdispersion_summary <- tibble::tibble(
+extended_overdispersion_summary <- tibble(
   `Pearson Chi-squared statistic` = extended_pearson_chi_square,
   `Residual degrees of freedom` = extended_pearson_df,
   `Pearson dispersion estimate` = extended_pearson_dispersion,
@@ -4672,32 +5007,56 @@ For the extended model, the Pearson dispersion estimate is `r formatC(extended_p
 
 This means that adding weight, colour, and spine condition did not resolve the main variance problem. The training counts are still much more variable than the fitted Classical Poisson model allows. As a result, the model-based standard errors from this extended Poisson model still require caution because they rely on **equidispersion**. If used without adjustment, they may be too small, making Wald statistics too large, confidence intervals too narrow, and Type I errors more probable.
 
-#### Extended Zero-Count Check
+#### Extended Zero-count Check
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-download-data-transfer-3947910/).](img/pulling.png){width="600"}
 
-Next, we check whether the extended model expects **enough zero counts** as in @sec-classical-poisson-excess-zeros. This is important because the simple width-only model **substantially understated** the number of zero satellite counts in the training data. Recall that this diagnostic focuses on the number of observed zero counts,
+Next, we repeat the **Poisson-binomial zero-count diagnostic** from @sec-classical-poisson-excess-zeros for the extended model. The observed zero-count statistic is unchanged,
 
 $$
 z_{\operatorname{obs}}
 =
 \sum_{i=1}^n
-\mathbb{1}(y_i = 0),
+\mathbb{1}(y_i=0),
 $$
 
-where $\mathbb{1}(y_i = 0)$ is an indicator that equals $1$ when the $i$th observed satellite count is zero and equals $0$ otherwise. Furthermore, in this goodness-of-fit check for a one-sided test, the hypotheses are:
+but the fitted zero probabilities now come from the extended model:
 
 $$
-\begin{gather}
-H_0\text{: } \text{the fitted Classical Poisson model adequately describes} \\
-\text{the frequency of zero counts}, \\
-\text{versus} \\
-H_1\text{: } \text{there are more zero counts than the} \\
-\text{fitted Classical Poisson model expects},
-\end{gather}
+\hat{\pi}_{0,i}^{(\operatorname{ext})}
+=
+\exp
+\left(
+-\hat{\mu}_i^{(\operatorname{ext})}
+\right).
 $$
 
-with an approximate $z$-statistic as in @eq-z-statistic-zero-counts.
+Thus, when these fitted probabilities are treated as fixed, the reference distribution is
+
+$$
+Z_{\operatorname{ext}}^{(\operatorname{fit})}
+\sim
+\operatorname{PoissonBinomial}
+\left(
+\hat{\pi}_{0,1}^{(\operatorname{ext})},
+\ldots,
+\hat{\pi}_{0,n}^{(\operatorname{ext})}
+\right).
+$$
+
+The directional hypotheses remain:
+
+$$
+H_0\text{: }\Delta_0\leq 0
+\qquad
+\text{versus}
+\qquad
+H_1\text{: }\Delta_0>0,
+$$
+
+where $\Delta_0$ summarizes the aggregate excess of actual zero probabilities over the zero probabilities implied by the fitted Classical Poisson specification. Because the alternative concerns **excess zeros**, the diagnostic again uses the upper tail.
+
+We use the plug-in Poisson-binomial upper-tail probability as the primary numerical diagnostic and retain the continuity-corrected Normal approximation only as a comparison.
 
 ::: {.panel-tabset}
 
@@ -4706,37 +5065,85 @@ with an approximate $z$-statistic as in @eq-z-statistic-zero-counts.
 ```{r}
 #| echo: true
 #| label: tbl-classical-poisson-extended-zero-count-r
-#| tbl-cap: "Excess zero-count diagnostic for the extended Poisson regression model."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the extended Poisson regression model."
 #| message: false
 #| warning: false
 
-extended_observed_zero_count <- sum(extended_poisson_gof_data$satellites == 0)
+extended_fitted_zero_probabilities <-
+  extended_poisson_gof_data$fitted_zero_probability
 
-extended_expected_zero_count <- sum(extended_poisson_gof_data$fitted_zero_probability)
+extended_observed_zero_count <- sum(
+  extended_poisson_gof_data$satellites == 0
+)
+extended_expected_zero_count <- sum(
+  extended_fitted_zero_probabilities
+)
 
-extended_zero_count_variance <- sum(extended_poisson_gof_data$fitted_zero_probability *
-    (1 - extended_poisson_gof_data$fitted_zero_probability))
+extended_zero_count_variance <- sum(
+  extended_fitted_zero_probabilities *
+    (1 - extended_fitted_zero_probabilities)
+)
+extended_zero_count_sd <- sqrt(extended_zero_count_variance)
 
-extended_zero_count_z <- (extended_observed_zero_count - extended_expected_zero_count
-) / sqrt(extended_zero_count_variance)
+extended_zero_count_pmf <- poisson_binomial_pmf(
+  extended_fitted_zero_probabilities
+)
+stopifnot(abs(sum(extended_zero_count_pmf) - 1) < 1e-10)
 
-extended_zero_count_p_value <- pnorm(extended_zero_count_z, lower.tail = FALSE)
+extended_zero_count_p_value <- sum(
+  extended_zero_count_pmf[
+    seq.int(
+      extended_observed_zero_count + 1L,
+      length(extended_zero_count_pmf)
+    )
+  ]
+)
 
-extended_zero_count_summary <- tibble::tibble(
+extended_zero_count_z <- (
+  extended_observed_zero_count -
+    0.5 -
+    extended_expected_zero_count
+) / extended_zero_count_sd
+
+extended_zero_count_normal_p_value <- pnorm(
+  extended_zero_count_z,
+  lower.tail = FALSE
+)
+
+extended_zero_count_summary <- tibble(
   `Observed zero count` = extended_observed_zero_count,
   `Fitted expected zero count` = extended_expected_zero_count,
-  `Observed minus fitted zeros` = (
-    extended_observed_zero_count - extended_expected_zero_count),
-  `Zero-count z-statistic` = extended_zero_count_z,
-  `Zero-count p-value` = extended_zero_count_p_value) |>
-  mutate(`Observed zero count` = formatC(`Observed zero count`, format = "f", digits = 0),
-    `Fitted expected zero count` = formatC(`Fitted expected zero count`, format = "f",
-      digits = 2),
-    `Observed minus fitted zeros` = formatC(`Observed minus fitted zeros`, format = "f",
-      digits = 2),
-    `Zero-count z-statistic` = formatC(`Zero-count z-statistic`, format = "f", digits = 2),
-    `Zero-count p-value` = formatC(`Zero-count p-value`, format = "e", digits = 2)) |>
-  pivot_longer(cols = everything(), names_to = "Quantity", values_to = "Value")
+  `Fitted zero-count SD` = extended_zero_count_sd,
+  `Plug-in Poisson-binomial upper-tail p-value` =
+    extended_zero_count_p_value,
+  `Continuity-corrected Normal z` = extended_zero_count_z,
+  `Normal-approximation upper-tail p-value` =
+    extended_zero_count_normal_p_value
+) |>
+  mutate(
+    `Observed zero count` = formatC(
+      `Observed zero count`,
+      format = "f",
+      digits = 0
+    ),
+    across(
+      c(
+        `Fitted expected zero count`,
+        `Fitted zero-count SD`,
+        `Continuity-corrected Normal z`
+      ),
+      ~ formatC(.x, format = "f", digits = 2)
+    ),
+    across(
+      contains("p-value"),
+      ~ formatC(.x, format = "e", digits = 2)
+    )
+  ) |>
+  pivot_longer(
+    everything(),
+    names_to = "Quantity",
+    values_to = "Value"
+  )
 
 extended_zero_count_summary |>
   kable(align = c("c", "c"))
@@ -4749,36 +5156,74 @@ extended_zero_count_summary |>
 #| message: false
 #| warning: false
 
-extended_observed_zero_count = (extended_poisson_gof_data["satellites"] == 0).sum()
+extended_fitted_zero_probabilities = (
+    extended_poisson_gof_data[
+        "fitted_zero_probability"
+    ].to_numpy()
+)
 
-extended_expected_zero_count = (extended_poisson_gof_data["fitted_zero_probability"].sum())
+extended_observed_zero_count = (
+    extended_poisson_gof_data["satellites"] == 0
+).sum()
+extended_expected_zero_count = (
+    extended_fitted_zero_probabilities.sum()
+)
 
-extended_zero_count_variance = (extended_poisson_gof_data["fitted_zero_probability"]
-    * (1 - extended_poisson_gof_data["fitted_zero_probability"])).sum()
+extended_zero_count_variance = (
+    extended_fitted_zero_probabilities
+    * (1 - extended_fitted_zero_probabilities)
+).sum()
+extended_zero_count_sd = np.sqrt(extended_zero_count_variance)
 
-extended_zero_count_z = (extended_observed_zero_count - extended_expected_zero_count
-) / np.sqrt(extended_zero_count_variance)
+extended_zero_count_pmf = poisson_binomial_pmf(
+    extended_fitted_zero_probabilities
+)
+assert np.isclose(extended_zero_count_pmf.sum(), 1.0)
 
-extended_zero_count_p_value = stats.norm.sf(extended_zero_count_z)
+extended_zero_count_p_value = extended_zero_count_pmf[
+    extended_observed_zero_count:
+].sum()
+
+extended_zero_count_z = (
+    extended_observed_zero_count
+    - 0.5
+    - extended_expected_zero_count
+) / extended_zero_count_sd
+
+extended_zero_count_normal_p_value = stats.norm.sf(
+    extended_zero_count_z
+)
 
 extended_zero_count_summary = pd.DataFrame(
-    {"Quantity": ["Observed zero count", "Fitted expected zero count",
-            "Observed minus fitted zeros", "Zero-count z-statistic", "Zero-count p-value",
-        ], "Value": [f"{extended_observed_zero_count:.0f}",
-            f"{extended_expected_zero_count:.2f}",
-            f"{extended_observed_zero_count - extended_expected_zero_count:.2f}",
-            f"{extended_zero_count_z:.2f}", f"{extended_zero_count_p_value:.2e}",
+    {
+        "Quantity": [
+            "Observed zero count",
+            "Fitted expected zero count",
+            "Fitted zero-count SD",
+            "Plug-in Poisson-binomial upper-tail p-value",
+            "Continuity-corrected Normal z",
+            "Normal-approximation upper-tail p-value",
         ],
-    })
+        "Value": [
+            f"{extended_observed_zero_count:.0f}",
+            f"{extended_expected_zero_count:.2f}",
+            f"{extended_zero_count_sd:.2f}",
+            f"{extended_zero_count_p_value:.2e}",
+            f"{extended_zero_count_z:.2f}",
+            f"{extended_zero_count_normal_p_value:.2e}",
+        ],
+    }
+)
 
 classical_poisson_extended_zero_count_py_html = (
-    scrollable_table_html(extended_zero_count_summary))
+    scrollable_table_html(extended_zero_count_summary)
+)
 ```
 
 ```{r}
 #| echo: false
 #| label: tbl-classical-poisson-extended-zero-count-py
-#| tbl-cap: "Excess zero-count diagnostic for the extended Poisson regression model."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the extended Poisson regression model."
 #| message: false
 #| warning: false
 #| results: asis
@@ -4793,7 +5238,11 @@ cat(
 
 :::
 
-The extended model still shows a substantial zero-count mismatch. In the **training data**, we observe `r extended_observed_zero_count` female crabs with zero satellite males, but the fitted extended Classical Poisson model expects only `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros. This leaves `r formatC(extended_observed_zero_count - extended_expected_zero_count, format = "f", digits = 2)` additional observed zeros beyond what the fitted model expects. Moreover, the approximate zero-count $z$-statistic is `r formatC(extended_zero_count_z, format = "f", digits = 2)`, with a one-sided $p$-value of `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. This provides strong evidence that the extended model is still understating the zero-count part of the response distribution.
+
+
+The extended model still shows a substantial zero-count mismatch. In the **training data**, we observe `r extended_observed_zero_count` female crabs with zero satellite males, whereas the extended Classical Poisson model expects `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros.
+
+The corresponding **plug-in Poisson-binomial upper-tail $p$-value** is `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. Thus, even after adding weight, colour, and spine condition, the observed number of zeros remains unusually large relative to the fitted zero-count distribution. The continuity-corrected Normal approximation gives $z_{\operatorname{zero}}=$ `r formatC(extended_zero_count_z, format = "f", digits = 2)` and an approximate upper-tail probability of `r formatC(extended_zero_count_normal_p_value, format = "e", digits = 2)`. As in the simple model, the Poisson-binomial tail is a **plug-in diagnostic** because the fitted zero probabilities were estimated from the same training data. Nevertheless, the persistent upper-tail discrepancy shows that enriching the systematic component has not resolved the zero-count mismatch.
 
 Compared with the simple width-only model, adding weight, colour, and spine condition gives the fitted mean structure more flexibility. However, the extended Classical Poisson model still expects **far fewer zero satellite counts than we actually observe**. This suggests that the remaining problem is not only that the systematic component was too simple; the Classical Poisson distribution itself is struggling to represent how often zero satellite counts occur in these training data.
 
@@ -4830,7 +5279,7 @@ extended_residual_deviance_ratio <- (
 extended_residual_deviance_p_value <- pchisq(extended_residual_deviance,
   df = extended_residual_deviance_df, lower.tail = FALSE)
 
-extended_residual_deviance_summary <- tibble::tibble(
+extended_residual_deviance_summary <- tibble(
   `Residual deviance` = extended_residual_deviance,
   `Residual degrees of freedom` = extended_residual_deviance_df,
   `Residual deviance / df` = extended_residual_deviance_ratio,
@@ -4971,7 +5420,7 @@ plt.show()
 
 In @fig-classical-poisson-extended-pearson-residuals-r (or @fig-classical-poisson-extended-pearson-residuals-py), the solid horizontal line at $0$ marks where the observed count equals the fitted expected count after standardizing by the fitted Poisson standard deviation. The dashed horizontal lines at $-2$ and $2$ are informal reference bands for large Pearson residuals. They are not formal cutoffs, but they help us identify observations that are unusually far from the fitted model on the Poisson residual scale.
 
-Having said that, **the extended model still shows a clear residual pattern**. Many observations with fitted expected counts between roughly $1.5$ and $5$ have negative Pearson residuals, forming a visible lower band below $0$. These are female crabs whose observed satellite counts are smaller than the model expects, often corresponding to zero or very small observed counts. This pattern is consistent with the earlier zero-count diagnostic: even after adding weight, colour, and spine condition, the model still expects fewer zero satellite counts than we observe in the training data.
+Having said that, **the extended model still shows a clear residual pattern**. Many observations with fitted expected counts between roughly $1.5$ and $5$ have negative Pearson residuals, forming a visible lower band below $0.$ These are female crabs whose observed satellite counts are smaller than the model expects, often corresponding to zero or very small observed counts. This pattern is consistent with the earlier zero-count diagnostic: even after adding weight, colour, and spine condition, the model still expects fewer zero satellite counts than we observe in the training data.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-traffic-lights-police-6230164/).](img/traffic-lights.png){width="475"}
 
@@ -4979,7 +5428,7 @@ At the same time, several observations have positive Pearson residuals above $2$
 
 This plot helps explain why the extended Pearson dispersion and residual deviance diagnostics remain problematic. The issue is not only a single outlying crab or a small local pattern. The residuals show a wide vertical spread among observations with similar fitted expected counts, which is exactly the kind of pattern we would expect when the Classical Poisson mean-variance structure is **too restrictive**. Adding phenotypic regressors improves the systematic component, but it does not fully address the remaining distributional mismatch in these training data.
 
-#### Extended Goodness-of-Fit Summary
+#### Extended Goodness-of-fit Summary
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-pixel-social-network-3704066/).](img/privacy.png){width="500"}
 
@@ -4989,7 +5438,7 @@ The extended-model diagnostics are summarized in @tbl-classical-poisson-extended
 |:---:|:---:|:---:|
 | Observed versus fitted counts | Observed zero proportions exceed fitted zero probabilities across the fitted-count quartiles. In Q1, the observed zero proportion is `r extended_fitted_count_calibration$observed_zero_proportion[extended_fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`, while the average fitted probability of zero satellites is `r extended_fitted_count_calibration$mean_fitted_zero_probability[extended_fitted_count_calibration$fitted_count_quartile == "Q1: smallest fitted counts"]`. In Q4, the observed zero proportion is `r extended_fitted_count_calibration$observed_zero_proportion[extended_fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`, while the average fitted probability of zero satellites is `r extended_fitted_count_calibration$mean_fitted_zero_probability[extended_fitted_count_calibration$fitted_count_quartile == "Q4: largest fitted counts"]`. | The extended model captures some ordering in the fitted mean structure, but it still understates zero counts across the fitted-count range. |
 | Pearson overdispersion | The Pearson dispersion estimate is `r formatC(extended_pearson_dispersion, format = "f", digits = 3)`, with an overdispersion $p$-value of `r formatC(extended_overdispersion_p_value, format = "e", digits = 2)`. | The training counts remain much more variable than the Classical Poisson mean-variance structure allows. |
-| Excess zero counts | The training data contains `r extended_observed_zero_count` observed zero satellite counts, while the fitted extended model expects only `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros. The zero-count $p$-value is `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. | The extended model still expects far fewer zero satellite counts than observed in the training data. |
+| Poisson-binomial excess-zero diagnostic | The training data contain `r extended_observed_zero_count` observed zero satellite counts, while the fitted extended model expects `r formatC(extended_expected_zero_count, format = "f", digits = 2)` zeros. The plug-in Poisson-binomial upper-tail $p$-value is `r formatC(extended_zero_count_p_value, format = "e", digits = 2)`. | The extended model still expects too few zero satellite counts. The upper-tail result is a targeted fitted-reference diagnostic, not an exact unconditional test of the entire fitted-model procedure. |
 | Residual deviance | The residual deviance divided by its degrees of freedom is `r formatC(extended_residual_deviance_ratio, format = "f", digits = 3)`, with a goodness-of-fit $p$-value of `r formatC(extended_residual_deviance_p_value, format = "e", digits = 2)`. | The extended model remains far from the saturated benchmark, giving global evidence of lack of fit. |
 
 : Summary of goodness-of-fit conclusions for the extended Poisson regression model. {#tbl-classical-poisson-extended-gof-summary .striped .hover}
@@ -6055,7 +6504,7 @@ All other terms have $p$-values above $0.05$, so we fail to reject their corresp
 
 These decisions also require caution because the earlier goodness-of-fit checks showed overdispersion and excess zero counts. Since Classical Poisson Wald tests rely on model-based standard errors, the table should be reported together with the goodness-of-fit diagnostics and the expected-count ratio interpretations.
 
-### Statistical Interpretation of the Testing-Set Refit {#sec-classical-poisson-results-interpretation}
+### Statistical Interpretation of the Testing-set Refit {#sec-classical-poisson-results-interpretation}
 
 The final inferential summary is given in @tbl-classical-poisson-results-inference-summary. Note that the main inferential message should be written **cautiously**. The extended Classical Poisson model gives a coherent way to summarize how the expected number of satellite males changes with female crab characteristics, but the earlier diagnostics showed that the model's distributional assumptions are strained. Thus, the coefficient estimates are useful for learning and for describing the fitted mean pattern, while the model-based uncertainty summaries should be treated with care.
 
@@ -6068,7 +6517,7 @@ The final inferential summary is given in @tbl-classical-poisson-results-inferen
 
 : Inferential summary structure for the testing-set refit of the extended Classical Poisson model. {#tbl-classical-poisson-results-inference-summary .striped .hover}
 
-### Predictive Results: Held-Out Accuracy on the Testing Data {#sec-classical-poisson-predictive-results}
+### Predictive Results: Held-out Accuracy on the Testing Data {#sec-classical-poisson-predictive-results}
 
 For the predictive inquiry, we evaluate the extended model fitted on the **training data** by comparing its held-out predicted expected counts with the **observed testing counts**. This is the predictive counterpart to the inferential refit from @sec-classical-poisson-inferential-results. Hence, let $y_i$ be the observed satellite count in the testing data and let $\hat{\mu}_i$ be the predicted expected count from the training-fitted extended model. With $n_{\operatorname{test}}$ as the testing set size, we consider different prediction metrics because each metric highlights a different aspect of predictive performance. In the metric table, $p_Y(y_i;\hat{\mu}_i)$ denotes the Poisson PMF evaluated at the observed testing count $y_i$ using the predicted expected count $\hat{\mu}_i$. These prediction metrics are summarized in @tbl-classical-poisson-prediction-metric-guide. The term $y_i\log(y_i/\hat{\mu}_i)$ is defined to be $0$ when $y_i=0$. This is the same convention used in the Poisson residual deviance from @eq-classical-poisson-residual-deviance.
 
@@ -6140,7 +6589,7 @@ prediction_metric_summary <- function(observed, predicted_mean) {
 
   negative_log_predictive_mass <- -dpois(x = observed, lambda = predicted_mean, log = TRUE)
 
-  tibble::tibble(mean_error = mean(observed - predicted_mean),
+  tibble(mean_error = mean(observed - predicted_mean),
     mean_absolute_error = mean(abs(observed - predicted_mean)),
     root_mean_squared_error = sqrt(mean((observed - predicted_mean)^2)),
     mean_poisson_deviance = 2 * mean(kl_components),
@@ -7856,7 +8305,6 @@ A negative value deserves attention because the variable description does not ex
 Heads-up on unusual values versus data errors!
 ::::
 :::: {.Heads-up-container}
-
 Data wrangling should not become an unrecorded process of removing inconvenient observations. A value should be corrected or excluded only when the study documentation, the data provider, or a defensible data rule indicates that it is erroneous or outside the target population.
 
 The two negative income observations remain in this exercise. Their potential influence can be considered later through EDA and model diagnostics.
@@ -8127,7 +8575,6 @@ holding the remaining regressors fixed. `Uninsured` appears in the denominator b
 Heads-up on changing baseline categories!
 ::::
 :::: {.Heads-up-container}
-
 Changing a baseline category changes the parameterization and the wording of the coefficient comparison. It does **not** change the fitted expected counts, model likelihood, goodness-of-fit diagnostics, or predictions.
 
 For example, switching the insurance baseline from `Uninsured` to `Insured` would replace the expected-count ratio
@@ -9839,10 +10286,16 @@ The fitted expected counts range from **`r formatC(min(doctor_simple_poisson_gof
 Question 10.38 — Checking the Simple Model's Distributional Fit
 ::::
 :::: {.Question-container}
+
 For the simple age-only Classical Poisson regression:
 
 1. Compute the **Pearson Chi-squared statistic**, **residual degrees of freedom**, **Pearson dispersion estimate**, and **one-sided overdispersion $p$-value**.
-2. Compare the observed number of zero visits with the fitted expected number of zeros. Then, compute the approximate zero-count $z$-statistic and its one-sided $p$-value.
+2. For the zero-count diagnostic:
+   a. define the zero indicator $I_i=\mathbb{1}(Y_i=0)$ and explain why $Z=\sum_i I_i$ has a **Poisson-binomial distribution** under the fitted Poisson reference;
+   b. compute the observed zero count, fitted expected zero count, and fitted zero-count variance;
+   c. compute the **plug-in Poisson-binomial upper-tail $p$-value**;
+   d. compute the **continuity-corrected Normal approximation** and explain why this Normal reference is approximate rather than exact;
+   e. explain why the diagnostic is **one-sided**.
 3. Compute the **residual deviance**, **residual degrees of freedom**, **residual-deviance ratio**, and **goodness-of-fit $p$-value**.
 4. Construct a **Pearson-residual-versus-fitted plot** with horizontal reference lines at $0$, $-2$, and $2$.
 5. Interpret the checks jointly. Distinguish evidence of general lack of fit or overdispersion from evidence specifically concerning excess zeros.
@@ -9860,9 +10313,9 @@ Answer 10.38
 We begin with the **Pearson dispersion check** developed in @sec-classical-poisson-equidispersion. The Pearson Chi-squared statistic is defined in @eq-pearson-chi-squared-statistic, and the dispersion estimate is defined in @eq-pearson-dispersion-estimate. For the one-sided overdispersion check, the working hypotheses are
 
 $$
-H_0: \phi = 1
+H_0\text{: } \phi = 1
 \qquad \text{versus} \qquad
-H_A: \phi > 1.
+H_1\text{: } \phi > 1.
 $$
 
 A dispersion estimate appreciably above $1$, together with a small upper-tail $p$-value, indicates that the counts vary more around the fitted mean than the Classical Poisson model permits.
@@ -9969,17 +10422,55 @@ This diagnostic is critical for more than model fit. Under overdispersion, the C
 
 $$\operatorname{Var}(Y_i \mid x_{i,1}) = \mu_i.$$
 
-Next, we isolate the **zero-count component**. For each observation, the fitted probability of zero visits is $\exp(-\hat\mu_i)$. Adding these probabilities gives the fitted expected number of zeros. The approximate $z$-statistic follows @eq-z-statistic-zero-counts. The hypotheses are the following:
+Next, we isolate the **zero-count component**. For each training observation, define
 
 $$
-\begin{gather}
-H_0\text{: } \text{the fitted Classical Poisson model adequately describes} \\
-\text{the frequency of zero counts}, \\
-\text{versus} \\
-H_1\text{: } \text{there are more zero counts than the} \\
-\text{fitted Classical Poisson model expects}.
-\end{gather}
+I_i
+=
+\mathbb{1}(Y_i=0).
 $$
+
+Under the fitted Classical Poisson model, this indicator is Bernoulli with fitted success probability
+
+$$
+\hat{\pi}_{0,i}
+=
+\exp(-\hat{\mu}_i).
+$$
+
+Because the fitted expected number of doctor visits varies with age, the fitted zero probabilities generally differ across observations. Therefore, the total number of zero visits,
+
+$$
+Z
+=
+\sum_{i=1}^n I_i,
+$$
+
+has a fitted **Poisson-binomial** reference distribution rather than an ordinary Binomial distribution, as shown [here](#eq-classical-poisson-zero-count-poisson-binomial).
+
+Using the aggregate zero-frequency discrepancy $\Delta_0$ from @eq-classical-poisson-zero-excess-parameter, the directional hypotheses are
+
+$$
+H_0\text{: }\Delta_0\leq 0
+\qquad
+\text{versus}
+\qquad
+H_1\text{: }\Delta_0>0.
+$$
+
+In plain words, the alternative states that the Classical Poisson model **underpredicts the aggregate frequency of zero doctor visits**. This is why the diagnostic is one-sided: **unusually large values** of the observed zero count support the alternative, whereas unusually small zero counts would represent misspecification in the opposite direction.
+
+For the fitted-reference calculation, we use
+
+$$
+\hat{\pi}_{0,i}
+=
+\exp(-\hat{\mu}_i)
+$$
+
+for each training observation and compute the upper-tail probability of the corresponding Poisson-binomial distribution. We also report the continuity-corrected Normal approximation from @eq-z-statistic-zero-counts. Recall that this Normal reference is justified only approximately through the CLT for a standardized sum of independent, non-identically distributed Bernoulli random variables.
+
+The following code computes both quantities. The function `poisson_binomial_pmf()` was introduced in @sec-classical-poisson-excess-zeros and is reused here.
 
 ::: {.panel-tabset}
 
@@ -9988,40 +10479,59 @@ $$
 ```{r}
 #| echo: true
 #| label: tbl-classical-poisson-exercise-doctor-simple-zero-count-r
-#| tbl-cap: "Zero-count diagnostic for the simple age-only Poisson regression."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the simple age-only Poisson regression."
 #| message: false
 #| warning: false
 
-# Observed and fitted expected numbers of zeros
-doctor_simple_observed_zero_count <- sum(doctor_simple_poisson_gof_data$doctor_visits == 0)
+doctor_simple_fitted_zero_probabilities <-
+  doctor_simple_poisson_gof_data$fitted_zero_probability
 
+doctor_simple_observed_zero_count <- sum(
+  doctor_simple_poisson_gof_data$doctor_visits == 0)
 doctor_simple_expected_zero_count <- sum(
-  doctor_simple_poisson_gof_data$fitted_zero_probability)
+  doctor_simple_fitted_zero_probabilities)
 
-# Variance of the fitted sum of unequal-probability Bernoulli indicators
 doctor_simple_zero_count_variance <- sum(
-  doctor_simple_poisson_gof_data$fitted_zero_probability *
-    (1 - doctor_simple_poisson_gof_data$fitted_zero_probability))
+  doctor_simple_fitted_zero_probabilities *
+    (1 - doctor_simple_fitted_zero_probabilities))
+doctor_simple_zero_count_sd <- sqrt(doctor_simple_zero_count_variance)
 
-# Approximate one-sided z-test
-doctor_simple_zero_count_z <- (doctor_simple_observed_zero_count -
-    doctor_simple_expected_zero_count) / sqrt(doctor_simple_zero_count_variance)
+doctor_simple_zero_count_pmf <- poisson_binomial_pmf(
+  doctor_simple_fitted_zero_probabilities)
+stopifnot(abs(sum(doctor_simple_zero_count_pmf) - 1) < 1e-10)
 
-doctor_simple_zero_count_p_value <- pnorm(doctor_simple_zero_count_z, lower.tail = FALSE)
+doctor_simple_zero_count_p_value <- sum(
+  doctor_simple_zero_count_pmf[
+    seq.int(doctor_simple_observed_zero_count + 1L,
+      length(doctor_simple_zero_count_pmf))])
 
-# Summary table
+doctor_simple_zero_count_z <- (
+  doctor_simple_observed_zero_count - 0.5 -
+    doctor_simple_expected_zero_count) / doctor_simple_zero_count_sd
+
+doctor_simple_zero_count_normal_p_value <- pnorm(
+  doctor_simple_zero_count_z, lower.tail = FALSE)
+
 doctor_simple_zero_count_summary <- tibble(
-  quantity = c("Observed zero count", "Fitted expected zero count",
-    "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value"),
-  value = c(formatC(doctor_simple_observed_zero_count, format = "f", digits = 0),
-    formatC(doctor_simple_expected_zero_count, format = "f", digits = 2),
-    formatC(doctor_simple_observed_zero_count - doctor_simple_expected_zero_count,
-      format = "f", digits = 2),
-    formatC(doctor_simple_zero_count_z, format = "f", digits = 2),
-    formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)))
+  `Observed zero count` = doctor_simple_observed_zero_count,
+  `Fitted expected zero count` = doctor_simple_expected_zero_count,
+  `Fitted zero-count SD` = doctor_simple_zero_count_sd,
+  `Plug-in Poisson-binomial upper-tail p-value` =
+    doctor_simple_zero_count_p_value,
+  `Continuity-corrected Normal z` = doctor_simple_zero_count_z,
+  `Normal-approximation upper-tail p-value` =
+    doctor_simple_zero_count_normal_p_value) |>
+  mutate(
+    `Observed zero count` = formatC(
+      `Observed zero count`, format = "f", digits = 0),
+    across(c(`Fitted expected zero count`, `Fitted zero-count SD`,
+        `Continuity-corrected Normal z`),
+      ~ formatC(.x, format = "f", digits = 2)),
+    across(contains("p-value"),
+      ~ formatC(.x, format = "e", digits = 2))) |>
+  pivot_longer(everything(), names_to = "Quantity", values_to = "Value")
 
 doctor_simple_zero_count_summary |>
-  rename(`Quantity` = quantity, `Value` = value) |>
   kable(align = c("c", "c"))
 ```
 
@@ -10032,58 +10542,72 @@ doctor_simple_zero_count_summary |>
 #| message: false
 #| warning: false
 
-# Observed and fitted expected numbers of zeros
-doctor_simple_observed_zero_count = (doctor_simple_poisson_gof_data["doctor_visits"] == 0
-).sum()
+doctor_simple_fitted_zero_probabilities = (
+    doctor_simple_poisson_gof_data["fitted_zero_probability"].to_numpy())
 
-doctor_simple_expected_zero_count = (
-    doctor_simple_poisson_gof_data["fitted_zero_probability"].sum())
+doctor_simple_observed_zero_count = (
+    doctor_simple_poisson_gof_data["doctor_visits"] == 0).sum()
+doctor_simple_expected_zero_count = doctor_simple_fitted_zero_probabilities.sum()
 
-# Variance of the fitted sum of unequal-probability Bernoulli indicators
 doctor_simple_zero_count_variance = (
-    doctor_simple_poisson_gof_data["fitted_zero_probability"]
-    * (1 - doctor_simple_poisson_gof_data["fitted_zero_probability"])).sum()
+    doctor_simple_fitted_zero_probabilities
+    * (1 - doctor_simple_fitted_zero_probabilities)).sum()
+doctor_simple_zero_count_sd = np.sqrt(doctor_simple_zero_count_variance)
 
-# Approximate one-sided z-test
-doctor_simple_zero_count_z = (doctor_simple_observed_zero_count
-    - doctor_simple_expected_zero_count) / np.sqrt(doctor_simple_zero_count_variance)
+doctor_simple_zero_count_pmf = poisson_binomial_pmf(
+    doctor_simple_fitted_zero_probabilities)
+assert np.isclose(doctor_simple_zero_count_pmf.sum(), 1.0)
 
-doctor_simple_zero_count_p_value = stats.norm.sf(doctor_simple_zero_count_z)
+doctor_simple_zero_count_p_value = (
+    doctor_simple_zero_count_pmf[
+        doctor_simple_observed_zero_count:].sum())
 
-# Summary table
-doctor_simple_zero_count_summary = pd.DataFrame(
-    {"Quantity": ["Observed zero count", "Fitted expected zero count",
-            "Observed minus fitted zeros", "Approximate z-statistic", "One-sided p-value",
-        ], "Value": [f"{doctor_simple_observed_zero_count:.0f}",
-            f"{doctor_simple_expected_zero_count:.2f}",
-            f"{doctor_simple_observed_zero_count - doctor_simple_expected_zero_count:.2f}",
-            f"{doctor_simple_zero_count_z:.2f}", f"{doctor_simple_zero_count_p_value:.2e}",
-        ],
-    })
+doctor_simple_zero_count_z = (
+    doctor_simple_observed_zero_count - 0.5
+    - doctor_simple_expected_zero_count) / doctor_simple_zero_count_sd
 
-doctor_simple_zero_count_summary_html = (
-    scrollable_table_html(doctor_simple_zero_count_summary))
+doctor_simple_zero_count_normal_p_value = stats.norm.sf(
+    doctor_simple_zero_count_z)
+
+doctor_simple_zero_count_summary = pd.DataFrame({
+    "Quantity": [
+        "Observed zero count",
+        "Fitted expected zero count",
+        "Fitted zero-count SD",
+        "Plug-in Poisson-binomial upper-tail p-value",
+        "Continuity-corrected Normal z",
+        "Normal-approximation upper-tail p-value",
+    ],
+    "Value": [
+        f"{doctor_simple_observed_zero_count:.0f}",
+        f"{doctor_simple_expected_zero_count:.2f}",
+        f"{doctor_simple_zero_count_sd:.2f}",
+        f"{doctor_simple_zero_count_p_value:.2e}",
+        f"{doctor_simple_zero_count_z:.2f}",
+        f"{doctor_simple_zero_count_normal_p_value:.2e}",
+    ],
+})
+
+doctor_simple_zero_count_summary_html = scrollable_table_html(
+    doctor_simple_zero_count_summary)
 ```
 
 ```{r}
 #| echo: false
 #| label: tbl-classical-poisson-exercise-doctor-simple-zero-count-py
-#| tbl-cap: "Zero-count diagnostic for the simple age-only Poisson regression."
+#| tbl-cap: "Poisson-binomial zero-count diagnostic for the simple age-only Poisson regression."
 #| message: false
 #| warning: false
 #| results: asis
 
-cat(
-  "\n",
-  py$doctor_simple_zero_count_summary_html,
-  "\n",
-  sep = ""
-)
+cat("\n", py$doctor_simple_zero_count_summary_html, "\n", sep = "")
 ```
 
 :::
 
-The training data contains **`r doctor_simple_observed_zero_count` observed zero counts**, while the simple fitted model expects **`r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)` zeros**. The difference is **`r formatC(doctor_simple_observed_zero_count - doctor_simple_expected_zero_count, format = "f", digits = 2)`**, and the one-sided $p$-value is **`r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)`**. `r if (doctor_simple_zero_count_p_value < 0.05) "This provides evidence that the age-only model understates the frequency of zero doctor-visit counts (i.e., we reject the null hypothesis)." else "This does not provide strong evidence that excess zeros are a primary source of the age-only model's lack of fit (i.e., we fail to reject the null hypothesis)."` Note that this distinction is important. A model can show overdispersion or global lack of fit even when its zero-count frequency is not unusually poor. Therefore, **we should avoid treating every inadequate Poisson model as automatically requiring a zero-inflated alternative**.
+The training data contain **`r doctor_simple_observed_zero_count` observed zero counts**, while the simple age-only model expects **`r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)` zeros**. Thus, the observed zero count exceeds the fitted expectation by **`r formatC(doctor_simple_observed_zero_count - doctor_simple_expected_zero_count, format = "f", digits = 2)` visits**. Moreover, the **plug-in Poisson-binomial upper-tail $p$-value** is `r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)`. `r if (doctor_simple_zero_count_p_value < 0.05) "At the 5% reference level, the observed number of zero visits lies unusually far into the upper tail of the fitted Poisson-binomial reference distribution. This provides diagnostic evidence that the age-only Classical Poisson model understates the frequency of zero doctor visits." else "At the 5% reference level, the observed number of zero visits is not unusually large relative to the fitted Poisson-binomial reference distribution. Thus, this diagnostic does not identify excess zeros as a primary source of lack of fit in the age-only model."` For comparison, the continuity-corrected Normal approximation gives $z_{\operatorname{zero}}=$ **`r formatC(doctor_simple_zero_count_z, format = "f", digits = 2)`** and an **approximate upper-tail probability** of `r formatC(doctor_simple_zero_count_normal_p_value, format = "e", digits = 2)`. This Normal result is a **CLT-based approximation** to the fitted Poisson-binomial tail rather than an exact standard-Normal sampling result.
+
+This distinction is crucial when we combine the diagnostics. A Classical Poisson model can show overdispersion or global lack of fit even when the number of zeros is not unusually large. Conversely, evidence of excess zeros does not by itself establish that a zero-inflated model is the unique appropriate alternative. The zero-count diagnostic should therefore be interpreted alongside the Pearson dispersion, residual deviance, residual patterns, and the broader modelling context.
 
 Finally, we calculate the **residual deviance** from @eq-classical-poisson-residual-deviance. Under an adequate fitted model, the residual deviance is commonly compared with a Chi-squared reference distribution using the residual degrees of freedom. Recall that the hypotheses are the following:
 
@@ -10332,7 +10856,7 @@ Answer 10.39
 | Fitted age relationship | The fitted age multiplier is `r formatC(doctor_simple_age_multiplier, format = "f", digits = 4)` per year and `r formatC(doctor_simple_age_decade_multiplier, format = "f", digits = 3)` per ten years. The fitted expected count increases across the observed age range. | Age captures a **clear and interpretable** part of the conditional mean structure. |
 | Grouped calibration | The first fitted-count quartile has mean observed and fitted counts of `r formatC(doctor_simple_calibration$mean_observed_count[1], format = "f", digits = 3)` and `r formatC(doctor_simple_calibration$mean_fitted_count[1], format = "f", digits = 3)`, while the fourth has `r formatC(doctor_simple_calibration$mean_observed_count[4], format = "f", digits = 3)` and `r formatC(doctor_simple_calibration$mean_fitted_count[4], format = "f", digits = 3)`. | The model captures the **broad increase in average visits with age**, but grouped means do not assess the full conditional variability. |
 | Pearson dispersion | The dispersion estimate is `r formatC(doctor_simple_pearson_dispersion, format = "f", digits = 3)`, with one-sided $p$-value `r formatC(doctor_simple_pearson_p_value, format = "e", digits = 2)`. | `r if (doctor_simple_pearson_p_value < 0.05) "The remaining variability exceeds what the Classical Poisson variance assumption allows." else "This diagnostic does not identify statistically detectable overdispersion."` |
-| Zero counts | The training data contains `r doctor_simple_observed_zero_count` observed zeros, while the model expects `r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)`. The one-sided $p$-value is `r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)`. | `r if (doctor_simple_zero_count_p_value < 0.05) "The simple model understates the zero-count frequency." else "The diagnostic does not identify excess zeros as the main problem."` |
+| Poisson-binomial zero-count diagnostic | The training data contain `r doctor_simple_observed_zero_count` observed zeros, while the model expects `r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)`. The plug-in Poisson-binomial upper-tail $p$-value is `r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)`. | `r if (doctor_simple_zero_count_p_value < 0.05) "The observed zero count is unusually large under the fitted Poisson-binomial reference, so the simple model understates zero frequency." else "The fitted-reference upper tail does not identify excess zeros as the main problem."` |
 | Residual deviance | The residual-deviance ratio is `r formatC(doctor_simple_residual_deviance_ratio, format = "f", digits = 3)`, with goodness-of-fit $p$-value `r formatC(doctor_simple_residual_deviance_p_value, format = "e", digits = 2)`. | `r if (doctor_simple_residual_deviance_p_value < 0.05) "The age-only model shows global lack of fit relative to the saturated benchmark." else "The residual-deviance check does not reject the age-only model."` |
 | Pearson residuals | There are `r doctor_simple_large_positive_residuals` residuals above $2$ and `r doctor_simple_large_negative_residuals` below $-2$; the largest absolute residual is `r formatC(doctor_simple_maximum_absolute_residual, format = "f", digits = 3)`. | The fitted age trend **does not fully represent the individual-level spread of annual doctor visits**. |
 
@@ -10340,7 +10864,7 @@ Answer 10.39
 
 The age-only model is useful because it translates the strongest EDA pattern into a clear fitted mean relationship. However, model adequacy depends on more than whether one coefficient has the expected sign or whether grouped fitted means broadly track grouped observed means.
 
-At the 5% significance level, `r if (doctor_simple_pearson_p_value < 0.05 && doctor_simple_residual_deviance_p_value < 0.05) "both the Pearson dispersion and residual-deviance checks indicate that the simple Classical Poisson model is too restrictive for the training data." else if (doctor_simple_pearson_p_value < 0.05 || doctor_simple_residual_deviance_p_value < 0.05) "at least one of the main distributional checks raises a material concern about the simple Classical Poisson model." else "the two principal distributional checks do not reject the simple model, although the graphical diagnostics should still be considered."` In contrast, `r if (doctor_simple_zero_count_p_value < 0.05) "the zero-count check also indicates more zeros than the model expects." else "the zero-count check does not provide strong evidence that excess zeros are the main source of the discrepancy."`
+At the 5% significance level, `r if (doctor_simple_pearson_p_value < 0.05 && doctor_simple_residual_deviance_p_value < 0.05) "both the Pearson dispersion and residual-deviance checks indicate that the simple Classical Poisson model is too restrictive for the training data." else if (doctor_simple_pearson_p_value < 0.05 || doctor_simple_residual_deviance_p_value < 0.05) "at least one of the main distributional checks raises a material concern about the simple Classical Poisson model." else "the two principal distributional checks do not reject the simple model, although the graphical diagnostics should still be considered."` In contrast, `r if (doctor_simple_zero_count_p_value < 0.05) "the plug-in Poisson-binomial zero-count diagnostic also indicates more zeros than the model expects." else "the plug-in Poisson-binomial zero-count diagnostic does not provide strong evidence that excess zeros are the main source of the discrepancy."`
 
 The next modelling step is therefore to revisit the **systematic component** before abandoning Classical Poisson regression altogether. The EDA identified additional structure associated with:
 
@@ -10980,7 +11504,7 @@ Question 10.42 — Rechecking the Extended Model's Distributional Fit
 For the extended training-set model:
 
 1. Calculate the **Pearson Chi-squared statistic**, **residual degrees of freedom**, **dispersion estimate**, and **one-sided overdispersion $p$-value**.
-2. Compare the observed number of zero counts with the fitted expected number of zeros and calculate the approximate one-sided excess-zero $p$-value.
+2. For the **zero-count diagnostic**, compare the **observed and fitted expected numbers of zeros**, calculate the **plug-in Poisson-binomial upper-tail $p$-value**, and report the **continuity-corrected Normal approximation**.
 3. Calculate the **residual deviance**, **residual-deviance ratio**, and **upper-tail goodness-of-fit $p$-value**.
 4. Plot the **Pearson residuals against the fitted expected counts and count residuals** above $2$ and below $-2$.
 5. Determine whether the extended Classical Poisson model shows evidence of overdispersion, excess zeros, or global lack of fit at the 5% significance level.
@@ -10998,7 +11522,7 @@ Answer 10.42
 The mathematics of these checks is unchanged from **Question 10.38**. Therefore, in @tbl-classical-poisson-exercise-doctor-extended-gof-r, we calculate the three diagnostics together, while retaining their distinct interpretations:
 
 - the **Pearson check** targets remaining conditional variability relative to the Poisson variance;
-- the **zero-count check** targets more observed zeros than the fitted model expects; and
+- the **zero-count diagnostic** targets whether the observed number of zeros is unusually large under the fitted Poisson-binomial reference distribution; and
 - the **residual deviance** provides a global comparison with the saturated benchmark.
 
 ::: {.panel-tabset}
@@ -11026,21 +11550,35 @@ doctor_extended_pearson_p_value <- pchisq(doctor_extended_pearson_chi_squared,
   df = doctor_extended_pearson_df, lower.tail = FALSE)
 
 # Zero-count check
+doctor_extended_fitted_zero_probabilities <-
+  doctor_extended_poisson_gof_data$fitted_zero_probability
+
 doctor_extended_observed_zero_count <- sum(
   doctor_extended_poisson_gof_data$doctor_visits == 0)
-
 doctor_extended_expected_zero_count <- sum(
-  doctor_extended_poisson_gof_data$fitted_zero_probability)
+  doctor_extended_fitted_zero_probabilities)
 
 doctor_extended_zero_count_variance <- sum(
-  doctor_extended_poisson_gof_data$fitted_zero_probability *
-    (1 - doctor_extended_poisson_gof_data$fitted_zero_probability))
+  doctor_extended_fitted_zero_probabilities *
+    (1 - doctor_extended_fitted_zero_probabilities))
+doctor_extended_zero_count_sd <- sqrt(
+  doctor_extended_zero_count_variance)
 
-doctor_extended_zero_count_z <- (doctor_extended_observed_zero_count -
-    doctor_extended_expected_zero_count) / sqrt(doctor_extended_zero_count_variance)
+doctor_extended_zero_count_pmf <- poisson_binomial_pmf(
+  doctor_extended_fitted_zero_probabilities)
+stopifnot(abs(sum(doctor_extended_zero_count_pmf) - 1) < 1e-10)
 
-doctor_extended_zero_count_p_value <- pnorm(doctor_extended_zero_count_z, lower.tail = FALSE
-)
+doctor_extended_zero_count_p_value <- sum(
+  doctor_extended_zero_count_pmf[
+    seq.int(doctor_extended_observed_zero_count + 1L,
+      length(doctor_extended_zero_count_pmf))])
+
+doctor_extended_zero_count_z <- (
+  doctor_extended_observed_zero_count - 0.5 -
+    doctor_extended_expected_zero_count) / doctor_extended_zero_count_sd
+
+doctor_extended_zero_count_normal_p_value <- pnorm(
+  doctor_extended_zero_count_z, lower.tail = FALSE)
 
 # Residual-deviance check
 doctor_extended_residual_deviance <- deviance(doctor_extended_poisson_model)
@@ -11056,22 +11594,25 @@ doctor_extended_residual_deviance_p_value <- pchisq(doctor_extended_residual_dev
 
 # Consolidated summary table
 doctor_extended_gof_summary <- tibble(
-  diagnostic = c("Pearson", "Pearson", "Pearson", "Pearson", "Zero count", "Zero count",
-    "Zero count", "Zero count", "Residual deviance", "Residual deviance",
-    "Residual deviance", "Residual deviance"),
+  diagnostic = c(rep("Pearson", 4), rep("Zero count", 6),
+    rep("Residual deviance", 4)),
   quantity = c("Chi-squared statistic", "Residual degrees of freedom",
-    "Dispersion estimate", "One-sided overdispersion p-value", "Observed zero count",
-    "Fitted expected zero count", "Approximate z-statistic",
-    "One-sided excess-zero p-value", "Residual deviance", "Residual degrees of freedom",
-    "Residual deviance / df", "Goodness-of-fit p-value"),
+    "Dispersion estimate", "One-sided overdispersion p-value",
+    "Observed zero count", "Fitted expected zero count", "Fitted zero-count SD",
+    "Plug-in Poisson-binomial upper-tail p-value",
+    "Continuity-corrected Normal z", "Normal-approximation upper-tail p-value",
+    "Residual deviance", "Residual degrees of freedom", "Residual deviance / df",
+    "Goodness-of-fit p-value"),
   value = c(formatC(doctor_extended_pearson_chi_squared, format = "f", digits = 3),
     formatC(doctor_extended_pearson_df, format = "f", digits = 0),
     formatC(doctor_extended_pearson_dispersion, format = "f", digits = 3),
     formatC(doctor_extended_pearson_p_value, format = "e", digits = 2),
     formatC(doctor_extended_observed_zero_count, format = "f", digits = 0),
     formatC(doctor_extended_expected_zero_count, format = "f", digits = 2),
-    formatC(doctor_extended_zero_count_z, format = "f", digits = 2),
+    formatC(doctor_extended_zero_count_sd, format = "f", digits = 2),
     formatC(doctor_extended_zero_count_p_value, format = "e", digits = 2),
+    formatC(doctor_extended_zero_count_z, format = "f", digits = 2),
+    formatC(doctor_extended_zero_count_normal_p_value, format = "e", digits = 2),
     formatC(doctor_extended_residual_deviance, format = "f", digits = 3),
     formatC(doctor_extended_residual_deviance_df, format = "f", digits = 0),
     formatC(doctor_extended_residual_deviance_ratio, format = "f", digits = 3),
@@ -11108,20 +11649,34 @@ doctor_extended_pearson_p_value = stats.chi2.sf(doctor_extended_pearson_chi_squa
 )
 
 # Zero-count check
-doctor_extended_observed_zero_count = (doctor_extended_poisson_gof_data["doctor_visits"]
-    == 0).sum()
+doctor_extended_fitted_zero_probabilities = (
+    doctor_extended_poisson_gof_data["fitted_zero_probability"].to_numpy())
 
+doctor_extended_observed_zero_count = (
+    doctor_extended_poisson_gof_data["doctor_visits"] == 0).sum()
 doctor_extended_expected_zero_count = (
-    doctor_extended_poisson_gof_data["fitted_zero_probability"].sum())
+    doctor_extended_fitted_zero_probabilities.sum())
 
 doctor_extended_zero_count_variance = (
-    doctor_extended_poisson_gof_data["fitted_zero_probability"]
-    * (1 - doctor_extended_poisson_gof_data["fitted_zero_probability"])).sum()
+    doctor_extended_fitted_zero_probabilities
+    * (1 - doctor_extended_fitted_zero_probabilities)).sum()
+doctor_extended_zero_count_sd = np.sqrt(
+    doctor_extended_zero_count_variance)
 
-doctor_extended_zero_count_z = (doctor_extended_observed_zero_count
-    - doctor_extended_expected_zero_count) / np.sqrt(doctor_extended_zero_count_variance)
+doctor_extended_zero_count_pmf = poisson_binomial_pmf(
+    doctor_extended_fitted_zero_probabilities)
+assert np.isclose(doctor_extended_zero_count_pmf.sum(), 1.0)
 
-doctor_extended_zero_count_p_value = stats.norm.sf(doctor_extended_zero_count_z)
+doctor_extended_zero_count_p_value = (
+    doctor_extended_zero_count_pmf[
+        doctor_extended_observed_zero_count:].sum())
+
+doctor_extended_zero_count_z = (
+    doctor_extended_observed_zero_count - 0.5
+    - doctor_extended_expected_zero_count) / doctor_extended_zero_count_sd
+
+doctor_extended_zero_count_normal_p_value = stats.norm.sf(
+    doctor_extended_zero_count_z)
 
 # Residual-deviance check
 doctor_extended_residual_deviance = (doctor_extended_poisson_model.deviance)
@@ -11136,30 +11691,42 @@ doctor_extended_residual_deviance_p_value = stats.chi2.sf(doctor_extended_residu
 )
 
 # Consolidated summary table
-doctor_extended_gof_summary = pd.DataFrame(
-    {"Diagnostic": ["Pearson", "Pearson", "Pearson", "Pearson", "Zero count",
-            "Zero count", "Zero count", "Zero count", "Residual deviance",
-            "Residual deviance", "Residual deviance", "Residual deviance",
-        ], "Quantity": ["Chi-squared statistic", "Residual degrees of freedom",
-            "Dispersion estimate", "One-sided overdispersion p-value",
-            "Observed zero count", "Fitted expected zero count", "Approximate z-statistic",
-            "One-sided excess-zero p-value", "Residual deviance",
-            "Residual degrees of freedom", "Residual deviance / df",
-            "Goodness-of-fit p-value",
-        ], "Value": [f"{doctor_extended_pearson_chi_squared:.3f}",
-            f"{doctor_extended_pearson_df:.0f}",
-            f"{doctor_extended_pearson_dispersion:.3f}",
-            f"{doctor_extended_pearson_p_value:.2e}",
-            f"{doctor_extended_observed_zero_count:.0f}",
-            f"{doctor_extended_expected_zero_count:.2f}",
-            f"{doctor_extended_zero_count_z:.2f}",
-            f"{doctor_extended_zero_count_p_value:.2e}",
-            f"{doctor_extended_residual_deviance:.3f}",
-            f"{doctor_extended_residual_deviance_df:.0f}",
-            f"{doctor_extended_residual_deviance_ratio:.3f}",
-            f"{doctor_extended_residual_deviance_p_value:.2e}",
-        ],
-    })
+doctor_extended_gof_summary = pd.DataFrame({
+    "Diagnostic": (
+        ["Pearson"] * 4 + ["Zero count"] * 6 + ["Residual deviance"] * 4),
+    "Quantity": [
+        "Chi-squared statistic",
+        "Residual degrees of freedom",
+        "Dispersion estimate",
+        "One-sided overdispersion p-value",
+        "Observed zero count",
+        "Fitted expected zero count",
+        "Fitted zero-count SD",
+        "Plug-in Poisson-binomial upper-tail p-value",
+        "Continuity-corrected Normal z",
+        "Normal-approximation upper-tail p-value",
+        "Residual deviance",
+        "Residual degrees of freedom",
+        "Residual deviance / df",
+        "Goodness-of-fit p-value",
+    ],
+    "Value": [
+        f"{doctor_extended_pearson_chi_squared:.3f}",
+        f"{doctor_extended_pearson_df:.0f}",
+        f"{doctor_extended_pearson_dispersion:.3f}",
+        f"{doctor_extended_pearson_p_value:.2e}",
+        f"{doctor_extended_observed_zero_count:.0f}",
+        f"{doctor_extended_expected_zero_count:.2f}",
+        f"{doctor_extended_zero_count_sd:.2f}",
+        f"{doctor_extended_zero_count_p_value:.2e}",
+        f"{doctor_extended_zero_count_z:.2f}",
+        f"{doctor_extended_zero_count_normal_p_value:.2e}",
+        f"{doctor_extended_residual_deviance:.3f}",
+        f"{doctor_extended_residual_deviance_df:.0f}",
+        f"{doctor_extended_residual_deviance_ratio:.3f}",
+        f"{doctor_extended_residual_deviance_p_value:.2e}",
+    ],
+})
 
 classical_poisson_exercise_doctor_extended_gof_py_html = (
     scrollable_table_html(doctor_extended_gof_summary))
@@ -11186,26 +11753,28 @@ cat(
 For the **Pearson check**, recall that the hypotheses are the following:
 
 $$
-H_0: \phi = 1
+H_0\text{: } \phi = 1
 \qquad \text{versus} \qquad
-H_A: \phi > 1.
+H_1\text{: } \phi > 1.
 $$
 
-The Pearson dispersion estimate is **`r formatC(doctor_extended_pearson_dispersion, format = "f", digits = 3)`**, with a one-sided overdispersion $p$-value of **`r formatC(doctor_extended_pearson_p_value, format = "e", digits = 2)`**. `r if (doctor_extended_pearson_p_value < 0.05) "At the significance 5% level, this check provides evidence that the remaining conditional variability exceeds the Classical Poisson variance." else "At the 5% significance level, this check does not provide evidence of remaining overdispersion in the extended model."`
+The **Pearson dispersion estimate** is `r formatC(doctor_extended_pearson_dispersion, format = "f", digits = 3)`, with a one-sided overdispersion $p$-value of `r formatC(doctor_extended_pearson_p_value, format = "e", digits = 2)`. `r if (doctor_extended_pearson_p_value < 0.05) "At the significance 5% level, this check provides evidence that the remaining conditional variability exceeds the Classical Poisson variance." else "At the 5% significance level, this check does not provide evidence of remaining overdispersion in the extended model."`
 
-For the **zero-count check**, recall that the hypotheses are the following:
+For the **zero-count diagnostic**, the same parameter hypotheses from @eq-classical-poisson-zero-count-hypotheses apply:
 
 $$
-\begin{gather}
-H_0\text{: } \text{the fitted Classical Poisson model adequately describes} \\
-\text{the frequency of zero counts}, \\
-\text{versus} \\
-H_1\text{: } \text{there are more zero counts than the} \\
-\text{fitted Classical Poisson model expects}.
-\end{gather}
+H_0\text{: }\Delta_0\leq 0
+\qquad
+\text{versus}
+\qquad
+H_1\text{: }\Delta_0>0.
 $$
 
-The training data contains **`r doctor_extended_observed_zero_count` observed zeros**, while the extended model expects **`r formatC(doctor_extended_expected_zero_count, format = "f", digits = 2)` zeros**. The one-sided excess-zero $p$-value is **`r formatC(doctor_extended_zero_count_p_value, format = "e", digits = 2)`**. `r if (doctor_extended_zero_count_p_value < 0.05) "The extended model understates the frequency of zero counts." else "The diagnostic does not provide evidence that the extended model produces too few zeros."`
+The alternative is directional: it asks whether the extended model still generates **too few zeros**. Therefore, the primary fitted-reference diagnostic uses the upper tail of the Poisson-binomial distribution. The continuity-corrected Normal calculation is reported only as an approximation.
+
+The training data contain **`r doctor_extended_observed_zero_count` observed zeros**, while the extended model expects **`r formatC(doctor_extended_expected_zero_count, format = "f", digits = 2)` zeros**. The **plug-in Poisson-binomial upper-tail $p$-value** is **`r formatC(doctor_extended_zero_count_p_value, format = "e", digits = 2)`**. `r if (doctor_extended_zero_count_p_value < 0.05) "At the 5% reference level, the observed zero count remains unusually large under the fitted Poisson-binomial reference distribution, so the extended model still understates zero frequency." else "At the 5% reference level, the observed zero count is not unusually large under the fitted Poisson-binomial reference distribution, so this diagnostic does not identify remaining excess zeros."`
+
+For comparison, the continuity-corrected Normal approximation gives $z_{\operatorname{zero}}=$ `r formatC(doctor_extended_zero_count_z, format = "f", digits = 2)` and an **approximate upper-tail probability** of `r formatC(doctor_extended_zero_count_normal_p_value, format = "e", digits = 2)`. This Normal result is a CLT-based approximation to the fitted Poisson-binomial tail rather than an exact standard-Normal sampling result.
 
 Finally, the hypotheses for the global comparison with the saturated benchmark are the following:
 
@@ -11217,9 +11786,10 @@ H_1\text{: } \text{the fitted Classical Poisson model is not adequate}.
 \end{gather}
 $$
 
-The residual-deviance ratio is **`r formatC(doctor_extended_residual_deviance_ratio, format = "f", digits = 3)`**, and the corresponding goodness-of-fit $p$-value is **`r formatC(doctor_extended_residual_deviance_p_value, format = "e", digits = 2)`**. `r if (doctor_extended_residual_deviance_p_value < 0.05) "This provides global evidence of lack of fit relative to the saturated benchmark." else "This global check does not reject the extended Classical Poisson model at the 5% significance level."`
+The **residual-deviance ratio is** `r formatC(doctor_extended_residual_deviance_ratio, format = "f", digits = 3)`, and the corresponding goodness-of-fit $p$-value is `r formatC(doctor_extended_residual_deviance_p_value, format = "e", digits = 2)`. `r if (doctor_extended_residual_deviance_p_value < 0.05) "This provides global evidence of lack of fit relative to the saturated benchmark." else "This global check does not reject the extended Classical Poisson model at the 5% significance level."`
 
 Together, these numerical checks assess the distributional fit more directly than the grouped calibration table. We also inspect the Pearson residuals to see how the remaining discrepancies are distributed across fitted expected counts.
+
 
 ::: {.panel-tabset}
 
@@ -11340,7 +11910,7 @@ Bring together the model-development evidence from **Questions 10.40 to 10.42**:
 
 1. Compare the simple and extended models' **Pearson dispersion estimates** and **residual-deviance ratios**.
 2. Compare their **zero-count diagnostics**.
-3. State whether the extended model shows evidence of **overdispersion**, **excess zeros**, or **global lack of fit** at the 5% significance level.
+3. State whether the extended model shows evidence of **overdispersion** or **global lack of fit**, and whether the fitted-reference zero-count diagnostic identifies excess zeros, using 5% as the reference threshold for the reported tail probabilities.
 4. Explain whether the selected extended specification can proceed to the results stage.
 5. State precisely how the untouched testing set will be used for the inferential and predictive inquiries.
 ::::
@@ -11360,15 +11930,15 @@ Answer 10.43
 |:---:|:---:|:---:|:---:|
 | Pearson dispersion estimate | `r formatC(doctor_simple_pearson_dispersion, format = "f", digits = 3)` | `r formatC(doctor_extended_pearson_dispersion, format = "f", digits = 3)` | The remaining conditional variability is substantially closer to the Classical Poisson benchmark after the additional regressors are included. |
 | Pearson overdispersion $p$-value | `r formatC(doctor_simple_pearson_p_value, format = "e", digits = 2)` | `r formatC(doctor_extended_pearson_p_value, format = "e", digits = 2)` | `r if (doctor_extended_pearson_p_value < 0.05) "The extended model still shows evidence of overdispersion." else "The extended model no longer shows statistically detectable overdispersion at the 5% significance level."` |
-| Observed versus fitted expected zeros | `r doctor_simple_observed_zero_count` versus `r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)` | `r doctor_extended_observed_zero_count` versus `r formatC(doctor_extended_expected_zero_count, format = "f", digits = 2)` | `r if (doctor_extended_zero_count_p_value < 0.05) "The extended model still understates the number of zeros." else "The extended model does not show evidence of excess zeros."` |
-| One-sided excess-zero $p$-value | `r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)` | `r formatC(doctor_extended_zero_count_p_value, format = "e", digits = 2)` | The zero-count conclusion is kept separate from the broader dispersion and deviance conclusions. |
+| Observed versus fitted expected zeros | `r doctor_simple_observed_zero_count` versus `r formatC(doctor_simple_expected_zero_count, format = "f", digits = 2)` | `r doctor_extended_observed_zero_count` versus `r formatC(doctor_extended_expected_zero_count, format = "f", digits = 2)` | `r if (doctor_extended_zero_count_p_value < 0.05) "The extended model still understates the number of zeros." else "The fitted-reference diagnostic does not identify excess zeros in the extended model."` |
+| Plug-in Poisson-binomial upper-tail $p$-value | `r formatC(doctor_simple_zero_count_p_value, format = "e", digits = 2)` | `r formatC(doctor_extended_zero_count_p_value, format = "e", digits = 2)` | The directional zero-count conclusion is kept separate from the broader dispersion and deviance conclusions. These are plug-in fitted-reference tail probabilities, not exact unconditional finite-sample tests of the complete regression-fitting procedure. |
 | Residual deviance / df | `r formatC(doctor_simple_residual_deviance_ratio, format = "f", digits = 3)` | `r formatC(doctor_extended_residual_deviance_ratio, format = "f", digits = 3)` | The global discrepancy relative to the saturated model is much closer to its reference scale in the extended specification. |
 | Residual-deviance $p$-value | `r formatC(doctor_simple_residual_deviance_p_value, format = "e", digits = 2)` | `r formatC(doctor_extended_residual_deviance_p_value, format = "e", digits = 2)` | `r if (doctor_extended_residual_deviance_p_value < 0.05) "The global check continues to reject the extended model." else "The global check does not reject the extended model at the 5% significance level."` |
 | Pearson residuals outside $[-2,2]$ | `r doctor_simple_large_positive_residuals + doctor_simple_large_negative_residuals` | `r doctor_extended_large_positive_residuals + doctor_extended_large_negative_residuals` | Some individual discrepancies remain and should be acknowledged, even when the global distributional checks are acceptable. |
 
 : Comparison of the simple and extended training-set goodness-of-fit diagnostics. {#tbl-classical-poisson-exercise-doctor-simple-extended-comparison .striped .hover}
 
-At the 5% significance level, `r if (doctor_extended_pearson_p_value >= 0.05 && doctor_extended_zero_count_p_value >= 0.05 && doctor_extended_residual_deviance_p_value >= 0.05) "none of the three principal checks provides evidence against the extended Classical Poisson model: the Pearson check does not identify overdispersion, the one-sided zero-count check does not identify excess zeros, and the residual-deviance check does not identify global lack of fit." else "at least one of the principal checks continues to identify a distributional concern in the extended Classical Poisson model."`
+At the 5% reference level, `r if (doctor_extended_pearson_p_value >= 0.05 && doctor_extended_zero_count_p_value >= 0.05 && doctor_extended_residual_deviance_p_value >= 0.05) "none of the three principal checks raises evidence against the extended Classical Poisson model: the Pearson check does not identify overdispersion, the plug-in Poisson-binomial upper-tail diagnostic does not identify excess zeros, and the residual-deviance check does not identify global lack of fit." else "at least one of the principal checks continues to identify a distributional concern in the extended Classical Poisson model."`
 
 **This comparison is consistent with much of the simple model's lack of fit arising from an underspecified conditional mean.** Once income, education, marriage status, urban residence, and insurance are added alongside age, the remaining variability is much more compatible with the Classical Poisson assumptions. This does not prove that the extended model is the true data-generating mechanism, nor does it eliminate every individual residual discrepancy. It means that the selected model has passed the prespecified training-set checks well enough to proceed in this case-study workflow.
 
