@@ -1301,6 +1301,7 @@ ggplot(df_np, aes(x, y, color = curve)) +
     axis.title = element_text(size = 21)
   )
 ```
+
 ### The Log-Likelihood Function
 
 The ordinal logistic regression model describes the cumulative probabilities $P(Y_i \le j \mid \mathbf{x}_i)$, that is, the chance of falling in category $j$ or any lower category. To estimate the model, however, we need the category-specific probability $p_{i,j} = P(Y_i = j \mid \mathbf{x}_i)$, the chance of landing in exactly one category. We recover it by a simple differencing step: the probability of being in category $j$ alone is the probability of being at or below $j$, minus the probability of being at or below the category just beneath it,
@@ -1359,7 +1360,7 @@ $$ {#eq-likelihood}
 
 where $n$ is the number of individuals in the sample, $J$ is the number of ordered categories, and $p_{i,j} = P(Y_i = j \mid \mathbf{x}_i)$ is the model-implied probability that individual $i$ (with regressor values $\mathbf{x}_i$) falls in category $j$, as derived earlier by differencing the cumulative probabilities. The two unknown parameter sets being estimated are collected in $\boldsymbol{\alpha} = (\alpha_1, \alpha_2, \ldots, \alpha_{J-1})^\top$, the vector of thresholds (the category-specific intercepts), and $\boldsymbol{\beta} = (\beta_1, \beta_2, \ldots, \beta_k)^\top$, the vector of $k$ shared slopes that apply across all cumulative splits.
 
-The two products have intuitive roles. The **inner product** over $j$ runs across the $J$ categories for a single individual: because of the indicator $y_{i,j}$ in the exponent, every term equals $0$ except the one matching the individual's true category, so the inner product collapses to just $p_{i,j}$ for that observed category. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
+The two products have intuitive roles. The **inner product** over $j$ runs across the $J$ categories for a single individual. Because of the indicator $y_{i,j}$ in the exponent, every term equals $1$ except the one matching the individual's observed category, which equals $p_{i,j}$. Therefore, the inner product simplifies to the probability assigned to the observed category. The **outer product** over $i$ then multiplies these per-individual probabilities across all $n$ individuals, assuming the observations are independent. Overall, this is a **multinomial likelihood** evaluated at the ordinal-model category probabilities, rather than at freely estimated per-category probabilities.
 
 Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the **log-likelihood function**:
 
@@ -1391,7 +1392,7 @@ $$
 
 The key difference from the multinomial case is that the slopes $\beta_k$ appear in **all** $J-1$ cumulative logits simultaneously, so their score components aggregate information across every cumulative split.
 
-**Hessian matrix:** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of $\ell$ with respect to the thresholds and slopes. Because the shared slopes couple all cumulative logits together, the Hessian is a dense $(J-1+k) \times (J-1+k)$ matrix, unlike the block-diagonal structure seen in multinomial logistic regression. In software this is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, refer to Chapter 3 of @agresti2010.
+**Hessian matrix:** The Hessian $H(\boldsymbol{\alpha}, \boldsymbol{\beta})$ consists of second-order partial derivatives of the log-likelihood $\ell$ with respect to the thresholds and slopes. Because these parameters jointly determine the category probabilities, the Hessian generally contains nonzero cross-derivative terms between different parameters. It is a $(J-1+k) \times (J-1+k)$ matrix that describes the curvature of the log-likelihood function. In statistical software, its calculation is handled automatically. For a thorough treatment of the Hessian in the context of maximum likelihood estimation for ordinal models, refer to Chapter 3 of @agresti2010.
 
 **Iteration:** Collecting the thresholds and slopes into the stacked parameter pair $(\boldsymbol{\alpha}, \boldsymbol{\beta})$, the Newton–Raphson update at step $t$ is:
 
