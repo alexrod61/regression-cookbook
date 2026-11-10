@@ -2524,17 +2524,177 @@ Before interpreting these results, however, we should verify that the proportion
 
 ### Brant–Wald Test for Proportional Odds {#sec-brant-wald}
 
-The **Brant–Wald test** provides a formal check of the proportional odds assumption. The idea is to fit $J - 1 = 3$ separate binary logistic regression models (one per cumulative split) and test whether the slope estimates are "statistically equal" across splits for each regressor. If a regressor's slope varies significantly across cutpoints, the proportional odds assumption is violated for that regressor.
+The **Brant–Wald test** provides a formal check of the proportional odds assumption. The idea is to fit $J - 1 = 3$ separate binary logistic regression models (one for each cumulative split). For each cutpoint $j$, the binary response indicates whether an observation belongs to a category **above the cutpoint** ($Y_i > j$, coded as 1) or **at or below the cutpoint** ($Y_i \leq j$, coded as 0). 
 
-For each regressor $x_{i,k}$, let $\hat{\beta}_{k,j}$ be the estimated slope from the binary logistic regression for cutpoint $j$, and let $\hat{\beta}_k^{\text{pool}}$ be the inverse-variance weighted pooled estimate. The Brant statistic for regressor $k$ is:
+We then test whether the slope coefficients for a given regressor are equal across these splits. If the test detects statistically significant differences between the slopes across cutpoints, we have evidence against the proportional odds assumption for that regressor.
+
+For each regressor $x_{i,k}$, let $\hat{\beta}_{k,j}$ denote its estimated slope from the binary logistic regression corresponding to cutpoint $j$. We collect these estimates into a vector:
 
 $$
-B_k = \sum_{j=1}^{J-1} \frac{(\hat{\beta}_{k,j} - \hat{\beta}_k^{\text{pool}})^2}{\widehat{\text{Var}}(\hat{\beta}_{k,j})},
+\hat{\boldsymbol{\beta}}_k =
+\begin{pmatrix}
+\hat{\beta}_{k,1} \\
+\hat{\beta}_{k,2} \\
+\vdots \\
+\hat{\beta}_{k,J-1}
+\end{pmatrix}.
+$$
+
+Under the proportional odds assumption, all elements of this vector should be equal. We can formally test this using the Wald statistic:
+
+$$
+B_k =
+(D\hat{\boldsymbol{\beta}}_k)^\top
+\left(D\widehat{V}_kD^\top\right)^{-1}
+(D\hat{\boldsymbol{\beta}}_k),
 $$ {#eq-brant-wald}
 
-which follows a $\chi^2$ distribution with $J - 2$ degrees of freedom under $H_0$ (proportional odds holds for $x_{i,k}$). An omnibus version of the test aggregates across all $k$ regressors, giving a $\chi^2$ statistic with $(J-2) \times k$ degrees of freedom.
+where $\widehat{V}_k$ is the estimated covariance matrix of the slope estimates across the cumulative splits, and $D$ is a contrast matrix that compares these slopes to test whether they are equal.
 
-In `R`, the `brant()` function from the `brant` package computes this test directly on a `polr` object. In `Python`, we implement it manually by fitting three binary logistic regression models and comparing their slopes.
+An important consideration is that the binary logistic regression models are fitted using the same observations. Therefore, their estimated slopes are correlated, and the covariance matrix $\widehat{V}_k$ accounts for this dependence.
+
+Under the null hypothesis that the proportional odds assumption holds for regressor $k$, the test statistic approximately follows a $\chi^2$ distribution with $J - 2$ degrees of freedom. An omnibus version of the test jointly examines all $k$ slope coefficients, with $(J - 2) \times k$ degrees of freedom, where $k$ counts the slope coefficients, including those associated with indicator variables.
+
+
+::: {.Tip}
+::::{.Tip-header}
+Understanding the Contrast and Covariance Matrices in the Brant–Wald Test
+::::
+::::{.Tip-container}
+
+Consider a hypothetical ordinal response variable with four ordered categories ($J=4$) and a single regressor $x$. We fit three binary logistic regression models corresponding to the three cumulative splits.
+
+Suppose the estimated slopes are:
+
+$$
+\hat{\boldsymbol{\beta}} =
+\begin{pmatrix}
+0.2 \\
+0.4 \\
+0.6
+\end{pmatrix}.
+$$
+
+**1. The contrast matrix $D$**
+
+Under the proportional odds assumption, the three population slopes should be equal. Therefore, our null hypothesis is:
+
+$$
+H_0: \beta_1 = \beta_2 = \beta_3,
+$$
+
+against the alternative hypothesis that at least one slope differs.
+
+Instead of testing each possible pair separately, we can express the null hypothesis using two comparisons:
+
+$$
+H_0:
+\begin{cases}
+\beta_1 - \beta_2 = 0,\\
+\beta_2 - \beta_3 = 0.
+\end{cases}
+$$
+
+If both differences are zero, all three slopes must be equal. This motivates the construction of a **contrast matrix** $D$, which allows us to express these comparisons through matrix multiplication:
+
+$$
+D =
+\begin{pmatrix}
+1 & -1 & 0 \\
+0 & 1 & -1
+\end{pmatrix}.
+$$
+
+Multiplying this matrix by the estimated slope vector gives:
+
+$$
+\begin{aligned}
+D\hat{\boldsymbol{\beta}}
+&=
+\begin{pmatrix}
+1 & -1 & 0 \\
+0 & 1 & -1
+\end{pmatrix}
+\begin{pmatrix}
+0.2 \\
+0.4 \\
+0.6
+\end{pmatrix} \\[8pt]
+&=
+\begin{pmatrix}
+(1)(0.2) + (-1)(0.4) + (0)(0.6) \\
+(0)(0.2) + (1)(0.4) + (-1)(0.6)
+\end{pmatrix} \\[8pt]
+&=
+\begin{pmatrix}
+0.2 - 0.4 \\
+0.4 - 0.6
+\end{pmatrix}
+=
+\begin{pmatrix}
+-0.2 \\
+-0.2
+\end{pmatrix}.
+\end{aligned}
+$$
+
+If the proportional odds assumption holds, these differences should be statistically consistent with zero.
+
+**2. The estimated covariance matrix $\widehat{V}$**
+
+Suppose the estimated covariance matrix of the three slopes is:
+
+$$
+\widehat{V} =
+\begin{pmatrix}
+0.04 & 0.01 & 0.01 \\
+0.01 & 0.04 & 0.01 \\
+0.01 & 0.01 & 0.04
+\end{pmatrix}.
+$$
+
+The **diagonal elements** represent the estimated variances of the three slope estimates. For example, the standard error of the first slope is $\sqrt{0.04}=0.2$.
+
+The **off-diagonal elements** represent the estimated covariances between slope estimates from different cumulative splits. These are generally nonzero because the binary logistic regression models use the same observations.
+
+In practice, this covariance matrix is estimated using information from the fitted binary logistic regression models. The values shown here are hypothetical and are used only for illustration.
+
+**3. Calculating the Brant–Wald statistic**
+
+First, we obtain the covariance matrix of the slope differences:
+
+$$
+D\widehat{V}D^\top =
+\begin{pmatrix}
+0.06 & -0.03 \\
+-0.03 & 0.06
+\end{pmatrix}.
+$$
+
+We then calculate the Wald statistic:
+
+$$
+\begin{aligned}
+B &=
+(D\hat{\boldsymbol{\beta}})^\top
+(D\widehat{V}D^\top)^{-1}
+(D\hat{\boldsymbol{\beta}}) \\
+&\approx 2.67.
+\end{aligned}
+$$
+
+Under the null hypothesis, this statistic approximately follows a $\chi^2$ distribution with $J-2=2$ degrees of freedom. The corresponding p-value is approximately $0.264$.
+
+Since $0.264 > 0.05$, we **fail to reject the null hypothesis**. Although the three estimated slopes are different, the differences are not statistically significant at the 5% level.
+
+This example illustrates why comparing slope estimates alone is insufficient: we must also account for their uncertainty and covariance when evaluating the proportional odds assumption.
+
+The detailed derivation of the covariance matrix and the Brant–Wald test statistic is beyond the scope of this book. This example is provided for interested readers who want to understand the mathematical reasoning behind the test. In practice, we can perform these calculations and conduct the test using `R` or `Python` as shown in the following.
+
+::::
+:::
+
+In `R`, the `brant()` function from the `brant` package computes this test directly on a `polr` object. In `Python`, we implement the test manually by fitting three binary logistic regression models and constructing the covariance matrix of their estimated slopes.
 
 ::: {.panel-tabset}
 
