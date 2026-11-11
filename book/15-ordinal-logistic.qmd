@@ -2196,7 +2196,10 @@ cm_df |>
 # Metrics
 overall_accuracy <- conf_matrix_train$overall["Accuracy"]
 macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
-macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+# Include all four categories, assigning F1 = 0 when undefined
+f1_per_class <- conf_matrix_train$byClass[, "F1"]
+f1_per_class[is.na(f1_per_class)] <- 0
+macro_f1 <- mean(f1_per_class)
 cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
 cat("Macro Recall:",     round(macro_recall,     3), "\n")
 cat("Macro F1:",         round(macro_f1,         3), "\n")
@@ -2228,12 +2231,11 @@ plt.show()
 # Metrics
 acc    = accuracy_score(true_codes_train, pred_codes_train)
 recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(pred_codes_train)
-f1     = f1_score(true_codes_train, pred_codes_train,
-                  labels=predicted_labels, average="macro")
+# Macro F1 across all four response categories
+f1 = f1_score(
+    true_codes_train, pred_codes_train,
+    labels=range(4), average="macro", zero_division=0
+)
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall:     {recall:.3f}")
 print(f"Macro F1:         {f1:.3f}")
@@ -2282,7 +2284,10 @@ cm_df |>
 
 overall_accuracy <- conf_matrix_train$overall["Accuracy"]
 macro_recall     <- mean(conf_matrix_train$byClass[, "Recall"], na.rm = TRUE)
-macro_f1         <- mean(conf_matrix_train$byClass[, "F1"],     na.rm = TRUE)
+# Include all four categories, assigning F1 = 0 when undefined
+f1_per_class <- conf_matrix_train$byClass[, "F1"]
+f1_per_class[is.na(f1_per_class)] <- 0
+macro_f1 <- mean(f1_per_class)
 cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
 cat("Macro Recall:",     round(macro_recall,     3), "\n")
 cat("Macro F1:",         round(macro_f1,         3), "\n")
@@ -2316,12 +2321,11 @@ plt.show()
 
 acc    = accuracy_score(true_codes_train, pred_codes_train)
 recall = recall_score(true_codes_train,   pred_codes_train, average="macro")
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(pred_codes_train)
-f1     = f1_score(true_codes_train, pred_codes_train,
-                  labels=predicted_labels, average="macro")
+# Macro F1 across all four response categories
+f1 = f1_score(
+    true_codes_train, pred_codes_train,
+    labels=range(4), average="macro", zero_division=0
+)
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall:     {recall:.3f}")
 print(f"Macro F1:         {f1:.3f}")
@@ -2329,7 +2333,7 @@ print(f"Macro F1:         {f1:.3f}")
 
 :::
 
-On the training set, the model achieves an overall accuracy of **38.2%**, a macro recall of **34.3%**, and a macro F1 of **37.6%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model outperforms chance, but leaves substantial room for improvement.
+On the training set, the model achieves an overall accuracy of **38.2%**, a macro recall of **34.3%**, and a macro F1 of **28.2%**. As with any multi-class ordinal problem, these figures should be interpreted relative to the random-chance baseline of 25% for a four-category outcome, so the model outperforms chance, but leaves substantial room for improvement.
 
 The confusion matrix does not show the tidy near-diagonal pattern one might hope for in an ordinal model; instead, the model concentrates its predictions at the two ends of the scale by labelling students `Low` or `Very High`, and never assigns the `Medium` label at all. As the adjacent `Medium` category is never predicted, misclassified `Low` students skip it entirely and are sent to `High` $(25)$ or all the way to the opposite end at `Very High` (56), while `High` students are split between `Very High` $(104)$ and `Low` $(73)$. The model captures the broad low-versus-high contrast but resolves the interior of the ordinal scale poorly.
 
@@ -3645,7 +3649,10 @@ The corresponding performance metrics are computed below.
 ```{.r}
 overall_accuracy <- conf_matrix$overall["Accuracy"]
 macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
-macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+# Include all four categories, assigning F1 = 0 when undefined
+f1_per_class <- conf_matrix$byClass[, "F1"]
+f1_per_class[is.na(f1_per_class)] <- 0
+macro_f1 <- mean(f1_per_class)
 
 cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
 cat("Macro Recall:",     round(macro_recall,     3), "\n")
@@ -3659,12 +3666,11 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 
 acc    = accuracy_score(true_codes, pred_codes)
 recall = recall_score(true_codes, pred_codes, average="macro")
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(pred_codes)
-f1     = f1_score(true_codes, pred_codes,
-                  labels=predicted_labels, average="macro")
+# Macro F1 across all four response categories
+f1 = f1_score(
+    true_codes, pred_codes,
+    labels=range(4), average="macro", zero_division=0
+)
 
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall:     {recall:.3f}")
@@ -3683,7 +3689,10 @@ print(f"Macro F1:         {f1:.3f}")
 #| warning: false
 overall_accuracy <- conf_matrix$overall["Accuracy"]
 macro_recall     <- mean(conf_matrix$byClass[, "Recall"], na.rm = TRUE)
-macro_f1         <- mean(conf_matrix$byClass[, "F1"],     na.rm = TRUE)
+# Include all four categories, assigning F1 = 0 when undefined
+f1_per_class <- conf_matrix$byClass[, "F1"]
+f1_per_class[is.na(f1_per_class)] <- 0
+macro_f1 <- mean(f1_per_class)
 
 cat("Overall Accuracy:", round(overall_accuracy, 3), "\n")
 cat("Macro Recall:",     round(macro_recall,     3), "\n")
@@ -3700,12 +3709,11 @@ from sklearn.metrics import accuracy_score, recall_score, f1_score
 
 acc    = accuracy_score(true_codes, pred_codes)
 recall = recall_score(true_codes, pred_codes, average="macro")
-# Average F1 only over the classes the model actually predicts, so a
-# never-predicted class (undefined precision) is dropped rather than
-# counted as 0 — matching caret's byClass F1 with na.rm = TRUE in the R tab.
-predicted_labels = np.unique(pred_codes)
-f1     = f1_score(true_codes, pred_codes,
-                  labels=predicted_labels, average="macro")
+# Macro F1 across all four response categories
+f1 = f1_score(
+    true_codes, pred_codes,
+    labels=range(4), average="macro", zero_division=0
+)
 
 print(f"Overall Accuracy: {acc:.3f}")
 print(f"Macro Recall:     {recall:.3f}")
