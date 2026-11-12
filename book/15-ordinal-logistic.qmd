@@ -174,7 +174,7 @@ By the end of this chapter, you will be able to:
 
 - Define an **ordinal variable**, identify its key properties, and recognize examples of ordinal outcomes in practice.
 
-- Describe why **Ordinary Least Squares** and **Multinomial Logistic Regression** models are inappropriate for **ordered categorical outcomes**.
+- Describe why **Ordinary Least Squares** and **Multinomial Logistic Regression** models are not suitable for **ordered categorical outcomes**.
 
 - Write down the **likelihood function** for ordinal logistic regression and its **cumulative logit link** functions, express cumulative probabilities, and obtain category probabilities.
 
@@ -234,7 +234,7 @@ Ordinal Logistic regression is particularly useful when the outcome variable has
 
 3. **Educational Achievement Levels:** Educational researchers may study how study time, attendance in lectures and class activities, or prior preparation affects the probability of achieving higher results in exams (`F`/ `D` / `C` / `B` / `A`).
 
-4. **Clinical Severity Scales:** Ordinal models help quantify how treatments or patient characteristics influence the likelihood of more severe disease states. These status are often divided into categories such as `mild`, `moderate`, or `severe`.
+4. **Clinical Severity Scales:** Ordinal models help quantify how treatments or patient characteristics influence the likelihood of more severe disease states. These statuses are often divided into categories such as `mild`, `moderate`, or `severe`.
 
 5. **Credit Risk Ratings:** Financial institutions often assign borrowers to ordered credit grades (for example, `Poor` / `Fair` / `Good` / `Excellent`). Analysts may use ordinal regression to study how regressors such as income, debt-to-income ratio, or repayment history influence the probability of being assigned a higher credit rating.
 
@@ -322,7 +322,7 @@ head(college_data, n = 100) |>
 
 :::
 
-In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we explicitly tell `R` and `Python` that this variable is ordinal. This matters for two reasons. First, ordinal logistic regression is built on the cumulative probability of being at or below each category, so the correct ordering (`Low` < `Medium` < `High` < `Very High`) needs to be programmed in order form the correct cumulative splits. Second, if the categories were left as unordered nominal factors, the model would ignore their natural ranking and discard exactly the structure that we would like to model.
+In this example, the variable `inclination_to_apply` will be our response of interest. Before modelling, we explicitly tell `R` and `Python` that this variable is ordinal. This matters for two reasons. First, ordinal logistic regression is built on the cumulative probability of being at or below each category, so the correct ordering (`Low` < `Medium` < `High` < `Very High`) needs to be programmed in order to form the correct cumulative splits. Second, if the categories were left as unordered nominal factors, the model would ignore their natural ranking and discard exactly the structure that we would like to model.
 
 By default, both languages order categories alphabetically, which here would incorrectly place `High` before `Low` and `Medium`. We therefore set the levels manually for the `inclination_to_apply` variable. We do this with the `as.ordered()` function combined with `fct_relevel()` in `R`, and with `pd.Categorical()` using `ordered=True` in `Python`. After the conversion, we print the resulting levels to confirm that the ordering is exactly as intended.
 
@@ -1426,7 +1426,7 @@ $$
 \text{logit}(P(Y_i \le j \mid \mathbf{x}_i)) = \alpha_j - (\beta_1 x_{i,1} + \beta_2 x_{i,2} + \ldots + \beta_k x_{i,k}), \quad j = 1, \ldots, J-1,
 $$ {#eq-proportional-odds}
 
-where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_k$ are the shared slope coefficients. Note the sign convention - the regressor terms are subtracted from the intercept, such that that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
+where $\alpha_1 < \alpha_2 < \cdots < \alpha_{J-1}$ are the category-specific intercepts, which are also known as thresholds or cutpoints, and $\beta_1,\beta_2, \ldots, \beta_k$ are the shared slope coefficients. Note the sign convention - the regressor terms are subtracted from the intercept, such that a positive $\beta_k$ corresponds to higher values of $x_{i,k}$ shifting probability mass toward higher categories. This sign convention is standard in `R`'s `MASS::polr` and in most textbooks.
 
 The model therefore comprises $(J - 1) + k$ parameters: $J - 1$ threshold parameters $(\alpha_1, \alpha_2, \ldots, \alpha_{J-1})$ and $k$ regression coefficients $(\beta_1, \beta_2, \ldots, \beta_k)$ shared across all cumulative splits.
 
@@ -3361,7 +3361,8 @@ for $j = 1, 2, 3$ (i.e., the three cumulative splits `Low|Medium`, `Medium|High`
 
 After the Brant–Wald test revealed that GRE score's slope varies significantly across cutpoints, the partial proportional odds model (fitted via `vglm()` in `R`) produced cutpoint-specific GRE slopes of $\hat{\beta}_{\texttt{GRE},1} = 0.084$, $\hat{\beta}_{\texttt{GRE},2} = 0.126$, and $\hat{\beta}_{\texttt{GRE},3} = 0.135$ at the three cumulative splits respectively, with all other slope coefficients remaining shared. The interpretation of each significant coefficient is:
 
-- **GPA**: Holding GRE score and field of study constant, each additional GPA point is associated with 11.01 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously. This is by far the strongest regressor in the model.
+- **GPA**: Holding GRE score and field of study constant, each additional GPA point is associated with 11.01 times higher cumulative odds of being in a higher likelihood-to-apply category, at every cumulative threshold simultaneously.
+
 - **GRE score**: The effect of GRE score on the cumulative log-odds grows substantially across cutpoints. A one-point increase in GRE score is associated with an 8.8% increase in the odds of being above `Low` (OR = 1.088 at $j=1$), rising to a 13.4% increase in the odds of being above `Medium` (OR = 1.134 at $j=2$), and a 14.5% increase in the odds of being in the `Very High` category (OR = 1.145 at $j=3$), assuming that GPA and field of study are held constant. This confirms that GRE score primarily distinguishes students at the top of the ordinal scale.
 
 On the test set, all four field-of-study levels are statistically significant after adjusting for GPA and GRE score (all $p < 0.05$), with odds ratios between 2.8 and 3.7 relative to the `Arts` baseline. As this model is fitted on the test set, these field effects are estimated imprecisely and run larger than the corresponding effects in the training-set proportional odds model, where only `Business` is significant; they should be interpreted with that caveat in mind.
