@@ -174,7 +174,7 @@ By the end of this chapter, you will be able to:
 
 - Define an **ordinal variable**, identify its key properties, and recognize examples of ordinal outcomes in practice.
 
-- Describe why **Ordinary Least Squares** and **Multinomial Logistic Regression** models are not suitable for **ordered categorical outcomes**.
+- Explain why **Ordinary Least Squares** is generally inappropriate for ordered categorical outcomes and why **Ordinal Logistic Regression** is often preferred over **Multinomial Logistic Regression** which does not explicitly account for the ordering of response categories.
 
 - Write down the **likelihood function** for ordinal logistic regression and its **cumulative logit link** functions, express cumulative probabilities, and obtain category probabilities.
 
@@ -221,7 +221,7 @@ The following are the assumptions that we need to be aware of before fitting thi
 
 - **Proportional odds assumption:** The relationship between each regressor and the log-odds of being at or below any category is constant across all category thresholds (parallel slopes assumption).
 
-- If the proportional odds assumption is violated, a **non-proportional odds** model should be used because it allows for regressors to vary across thresholds.
+- If the **proportional odds assumption** is violated, alternative model specifications should be considered. These include a **partial proportional odds model**, which allows only selected regressors to have different coefficients across thresholds, or a **fully non-proportional odds model**, which allows all regression coefficients to vary across thresholds.
 
 
 ### Use Cases of Ordinal Logistic Regression
@@ -1265,10 +1265,10 @@ x_grid <- seq(-0.5, 3, length.out = 1200)
 # Different intercepts and coefficients
 param_vals <- tribble(
   ~curve,   ~a,   ~b,
-  "k = 4",  10,  -12,
-  "k = 3",  6.3,  -9,
-  "k = 2",  5.5,  -6,
-  "k = 1",  4,    -3
+  "k = 4",  4.5,  -1.5,
+  "k = 3",  3.0,  -1.2,
+  "k = 2",  1.5,  -0.9,
+  "k = 1",  0.0,  -0.6
 )
 
 df_np <- param_vals |>
@@ -1282,7 +1282,7 @@ df_np <- param_vals |>
 eq_df_np <- param_vals |>
   mutate(
     x = 3.1,
-    y = c(0.95, 0.70, 0.45, 0.15),
+    y = c(0.85, 0.60, 0.35, 0.15),
     lab = paste0(
       "P(Y <= ", 4:1, " ~ '|' ~ X)==",
       "frac(e^{", a, ifelse(b >= 0, "+", ""), b, "*x},",
@@ -1317,6 +1317,9 @@ ggplot(df_np, aes(x, y, color = curve)) +
     axis.title = element_text(size = 21)
   )
 ```
+
+
+Notice that the cumulative probability curves have different slopes on the logit scale, illustrating a violation of the proportional odds assumption. However, the cumulative probabilities remain correctly ordered across the displayed range of $x$, ensuring that the resulting category probabilities are valid.
 
 ### The Log-Likelihood Function
 
@@ -1428,11 +1431,12 @@ $$
 \begin{pmatrix} \boldsymbol{\alpha}^{(t+1)} \\ \boldsymbol{\beta}^{(t+1)} \end{pmatrix} \leftarrow \begin{pmatrix} \boldsymbol{\alpha}^{(t)} \\ \boldsymbol{\beta}^{(t)} \end{pmatrix} - \left[ H\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right) \right]^{-1} S\!\left(\boldsymbol{\alpha}^{(t)}, \boldsymbol{\beta}^{(t)}\right),
 $$
 
-where $S(\boldsymbol{\alpha}, \boldsymbol{\beta})$ is the stacked score vector holding the threshold derivatives followed by the slope derivatives. The algorithm is initialized at $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven starting point) and repeats until changes in $\ell$, $\boldsymbol{\alpha}$, and $\boldsymbol{\beta}$ fall below a convergence tolerance.
+where $S(\boldsymbol{\alpha}, \boldsymbol{\beta})$ is the stacked score vector holding the threshold derivatives followed by the slope derivatives. The algorithm is initialized with strictly increasing threshold values, such as $\boldsymbol{\alpha}^{(0)} = (-1, 0, 1)^\top$ for a four-category response, and slope coefficients $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or other suitable data-driven starting values). The algorithm then repeats until changes in $\ell$, $\boldsymbol{\alpha}$, and $\boldsymbol{\beta}$ fall below a convergence tolerance.
+
 
 The full Newton–Raphson/IRLS procedure is:
 
-1. Initialize $\boldsymbol{\alpha}^{(0)} = \mathbf{0}$ and $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (the thresholds and slopes).
+1. Initialize the thresholds with strictly increasing values, such as $\boldsymbol{\alpha}^{(0)} = (-1, 0, 1)^\top$ for a four-category response, and initialize the slopes at $\boldsymbol{\beta}^{(0)} = \mathbf{0}$.
 2. Repeat until convergence:
    - Compute the systematic components $\alpha_j - \boldsymbol{\beta}^\top \mathbf{x}_i$ for all $i$ and $j$.
    - Compute cumulative probabilities $P(Y_i \le j \mid \mathbf{x}_i)$ and category probabilities $p_{i,j}$.
@@ -2199,7 +2203,7 @@ print(f"BIC:                {ordinal_result.bic:.2f}")
 
 :::
 
-The residual deviance is smaller than the null deviance by $152.43$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 152.43$ on 6 degrees of freedom ($p < 0.001$), providing evidence that a model with at least one regressor fits the training data better than the null model. McFadden's $R^2 = 0.069$ is below the 0.2–0.4 range commonly associated with a good fit for ordinal models, which indicates that GPA, GRE score, and field of study together explain only a limited share of the variation in `inclination_to_apply` on the log-likelihood scale, even though their joint contribution is significant.
+The residual deviance is smaller than the null deviance by $152.43$ units. This reduction is captured by the likelihood-ratio statistic $G^2 = 152.43$ on 6 degrees of freedom ($p < 0.001$), providing evidence that a model with at least one regressor fits the training data better than the null model. McFadden's pseudo-$R^2 = 0.069$ indicates a modest improvement in log-likelihood relative to the intercept-only model. Unlike the ordinary $R^2$ in linear regression, McFadden's pseudo-$R^2$ does not represent the proportion of variation explained. Therefore, although the likelihood-ratio test indicates that the regressors collectively improve model fit, the improvement relative to the null model is modest.
 
 ### Classification-Based Measures
 
