@@ -1648,27 +1648,34 @@ Maximizing $\ell$ gives the estimate $\hat{\mathbf{B}}$, the parameters under wh
 Tip on the Newton–Raphson Method
 ::::
 ::::{.Tip-container}
-The parameters we ultimately estimate are the entries $\beta_{k,j}$ of $\mathbf{B}$. For the purposes of the iteration, these entries are collected into the stacked vector $\boldsymbol{\beta} \in \mathbb{R}^q$ with $q = (K+1)(m-1)$ (an intercept and $K$ slopes for each of the $m-1$ non-baseline categories). Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\beta}$ by iterating with the score function and Hessian matrix of the log-likelihood, in a compact matrix form known as multinomial iteratively reweighted least squares (IRLS).
+The parameters we ultimately estimate are the entries $\beta_{r,j}$ of $\mathbf{B}$. For the purposes of the iteration, these entries are collected into the stacked vector $\boldsymbol{\beta}\in\mathbb{R}^q$, where $q=(k+1)(m-1)$ represents an intercept and $k$ slopes for each of the $m-1$ non-reference categories. Since the log-likelihood has no closed-form maximizer, the Newton–Raphson procedure estimates $\boldsymbol{\beta}$ iteratively using the score function and Hessian matrix of the log-likelihood. For multinomial logistic regression, Newton–Raphson is equivalent to Fisher scoring, and the estimation procedure can also be expressed as **Iteratively Reweighted Least Squares (IRLS)**.
 
-**Score function:** For category $j$ and regressor $k$, the corresponding component of the score vector $S(\boldsymbol{\beta}) \in \mathbb{R}^q$ (the first-order partial derivative of $\ell$) is
-
-$$
-\frac{\partial \ell(\boldsymbol{\beta})}{\partial \beta_{k,j}} = \sum_{i=1}^n \left( y_{i,j} - p_{i,j} \right) x_{i,k}.
-$$
-
-Each component compares the observed indicator $y_{i,j}$ with the model-implied probability $p_{i,j}$, weighted by the regressor value $x_{i,k}$; at the maximum, these differences balance out so that the score is zero.
-
-**Hessian matrix:** The Hessian $H(\boldsymbol{\beta}) \in \mathbb{R}^{q \times q}$ collects the second-order partial derivatives of $\ell$. For the row indexed by category $j$ and regressor $k$, and the column indexed by category $j'$ and regressor $k'$, its entry is
+**Score function:** For each non-reference category $j=1,\ldots,m-1$ and coefficient index $r=0,\ldots,k$, the corresponding component of the score vector $S(\boldsymbol{\beta})\in\mathbb{R}^q$ is
 
 $$
-\frac{\partial^2 \ell(\boldsymbol{\beta})}{\partial \beta_{k,j} \partial \beta_{k',j'}} =
+\frac{\partial\ell(\boldsymbol{\beta})}{\partial\beta_{r,j}}
+=
+\sum_{i=1}^{n}
+\left(y_{i,j}-p_{i,j}\right)x_{i,r}.
+$$
+
+Each component compares the observed indicator $y_{i,j}$ with the model-implied probability $p_{i,j}$, weighted by the regressor value $x_{i,r}$. At an interior maximum, the score components equal zero.
+
+**Hessian matrix:** The Hessian $H(\boldsymbol{\beta})\in\mathbb{R}^{q\times q}$ collects the second-order partial derivatives of the log-likelihood. For coefficients $\beta_{r,j}$ and $\beta_{r',j'}$, its corresponding entry is
+
+$$
+\frac{\partial^2\ell(\boldsymbol{\beta})}
+{\partial\beta_{r,j}\partial\beta_{r',j'}}
+=
 \begin{cases}
--\sum_{i=1}^n x_{i,k}\, p_{i,j}(1 - p_{i,j})\, x_{i,k'} & \text{if } j' = j, \\
-\phantom{-}\sum_{i=1}^n x_{i,k}\, p_{i,j}\, p_{i,j'}\, x_{i,k'} & \text{if } j' \neq j,
+-\displaystyle\sum_{i=1}^{n}x_{i,r}\,p_{i,j}(1-p_{i,j})\,x_{i,r'}
+& \text{if }j'=j,\\[0.8em]
+\displaystyle\sum_{i=1}^{n}x_{i,r}\,p_{i,j}p_{i,j'}\,x_{i,r'}
+& \text{if }j'\neq j.
 \end{cases}
 $$
 
-for $j, j' = 2, \ldots, m$ and $k, k' = 0, \ldots, K$. As the non-baseline categories are coupled through the shared softmax denominator, the Hessian is a dense $q \times q$ matrix rather than block-diagonal. For a thorough treatment of the Hessian in the context of maximum likelihood estimation, refer to Chapter 4 of @agresti2013.
+Here, $j,j'=1,\ldots,m-1$ index the non-reference categories, and $r,r'=0,\ldots,k$ index the intercept and regressors. Because the non-reference categories are coupled through the shared softmax denominator, the Hessian generally contains nonzero cross-category derivatives and is not block-diagonal. For a thorough treatment of the Hessian in maximum likelihood estimation, refer to Chapter 4 of @agresti2013.
 
 **Iteration:** Collecting the score and Hessian above, the Newton–Raphson update at step $t$ is
 
@@ -1680,7 +1687,7 @@ initialized at $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (or a data-driven startin
 
 The full Newton–Raphson/IRLS procedure is:
 
-1. Choose the baseline category and initialize $\boldsymbol{\beta}^{(0)} = \mathbf{0}$ (stacked over all $(k,j)$).
+1. Choose the reference category and initialize $\boldsymbol{\beta}^{(0)}=\mathbf{0}$ (stacked over all coefficient indices $(r,j)$).
 2. Repeat until convergence:
    - Compute the logits $\eta_i^{(j,1)}$ and category probabilities $p_{i,j}$ for all individuals $i$ and categories $j$, and evaluate the log-likelihood $\ell(\boldsymbol{\beta}^{(t)})$.
    - Form the stacked score $S(\boldsymbol{\beta}^{(t)})$ and Hessian $H(\boldsymbol{\beta}^{(t)})$ using the expressions above.
