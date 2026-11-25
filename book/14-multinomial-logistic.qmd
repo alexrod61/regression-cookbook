@@ -1621,13 +1621,25 @@ $$
 y_{i,j}\log p_{i,j}.
 $$ {#eq-log-likelihood-multinomial}
 
-Substituting the softmax probabilities from @eq-prob-multinomial and using the reference-category constraint $y_{i,1} = 1 - \sum_{j=2}^m y_{i,j}$, the log-likelihood can be written explicitly in terms of the coefficients as
+
+Substituting the softmax probabilities from @eq-prob-multinomial and using the reference-category constraint $y_{i,0}=1-\sum_{j=1}^{m-1}y_{i,j}$, the log-likelihood can be written explicitly in terms of the regression coefficients as
 
 $$
-\ell(\mathbf{B}) = \sum_{i=1}^n \left[ \sum_{j=2}^m y_{i,j} \sum_{k=0}^K x_{i,k} \beta_{k,j} - \log\left( 1 + \sum_{j=2}^m e^{\sum_{k=0}^K x_{i,k} \beta_{k,j}} \right) \right],
+\ell(\mathbf{B}) =
+\sum_{i=1}^{n}
+\left[
+\sum_{j=1}^{m-1}
+y_{i,j}
+\sum_{r=0}^{k} x_{i,r}\beta_{r,j}
+-
+\log\left(
+1+\sum_{j=1}^{m-1}
+e^{\sum_{r=0}^{k}x_{i,r}\beta_{r,j}}
+\right)
+\right].
 $$ {#eq-log-likelihoood}
 
-where $x_{i,0} = 1$ corresponds to the intercept in the linear model.
+Here, $x_{i,0}=1$ corresponds to the intercept, $k$ is the number of regressors, and category $0$ is the reference category.
 
 Maximizing $\ell$ gives the estimate $\hat{\mathbf{B}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as is known as the **maximum likelihood estimation (MLE)**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
 
