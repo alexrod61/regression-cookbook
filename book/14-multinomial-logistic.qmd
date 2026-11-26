@@ -200,61 +200,49 @@ By the end of this chapter, you will be able to:
 
 ## Introduction
 
-Multinomial Logistic regression is a statistical modelling technique used to analyze relationships between a multi-class categorical response variable and a set of regressors. Unlike [Binary Logistic regression](http://localhost:54321/book/08-binary-logistic.html), which models outcomes with two categories, Multinomial Logistic regression extends the framework to outcomes with more than two unordered categories. It estimates the probability of each possible outcome as a function of the regressors by modelling the log-odds of each category relative to a reference category. This method is widely used in fields such as transportation, marketing, and social sciences where the goal is to understand or predict categorical choices among multiple alternatives.
+Multinomial Logistic regression is a statistical modelling technique used to analyze relationships between a multi-class nominal categorical response variable and a set of regressors. Unlike [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html), which models outcomes with two categories, Multinomial Logistic regression extends the framework to outcomes with more than two unordered categories.
+
+It estimates the probability of each possible outcome as a function of the regressors by modelling the log-odds of each non-reference category relative to a reference category. Unlike [Ordinal Logistic regression](https://alexrod61.github.io/regression-cookbook/book/15-ordinal-logistic.html), Multinomial Logistic regression does not assume a natural ordering among the outcome categories.
+
+This method is widely used in fields such as transportation, marketing, and social sciences, where the goal is to understand or predict categorical outcomes involving multiple alternatives.
 
 ### Assumptions
-The following are the assumptions that we need to be aware of before fitting this model:
 
-- The response or dependent variable should be **categorical** and **nominal** with more than two categories. 
-- There should be one or more independent variables that are continuous, ordinal or nominal (including dichotomous variables).
-- **Logit linearity assumption**: There is be a linear relationship between any continuous independent variables and the logit of the category-specific probabilities of the dependent variable. This assumption will be explained in detail in @sec-data-modelling.
-- **Independent observations**: The observations are independent, and the dependent variable consists of mutually exclusive and exhaustive categories (i.e. no individual belonging to two different categories).
-- **No Multicollinearity**: Multicollinearity occurs when you have two or more independent variables that are highly correlated with each other.
-- There should be no outliers, high leverage values or highly influential points.
+The following are the assumptions and conditions that we need to be aware of before fitting this model:
+
+- The response variable should be **categorical** and **nominal** with more than two categories. The outcome categories must be mutually exclusive.
+- There should be one or more regressors that may be continuous, ordinal, or nominal (including dichotomous variables).
+- **Logit linearity assumption**: In the standard model, there is a linear relationship between each continuous regressor and the log-odds of each non-reference outcome category relative to the reference outcome category, holding the other regressors constant. This assumption will be explained in detail in @sec-data-modelling of this chapter.
+- **Independent observations**: The sampled observations are assumed to be statistically independent.
+- **No perfect multicollinearity**: No regressor column should be an exact linear combination of the other columns in the model's design matrix, including the intercept. High multicollinearity, although not necessarily preventing model estimation but may lead to unstable coefficient estimates and large standard errors.
+- **Absence of complete or quasi-complete separation**: Complete or quasi-complete separation occurs when the regressors separate the observed outcome categories in such a way that some maximum likelihood coefficient estimates are not finite.
+- **Independence of Irrelevant Alternatives (IIA)**: Under the standard Multinomial Logistic regression model, the relative odds between any two outcome categories do not depend on the presence or characteristics of other outcome categories, holding the relevant regressor values and model coefficients fixed.
+
+In addition to these assumptions and conditions, we should investigate whether the dataset contains sparse outcome categories, outliers, high leverage observations, or highly influential observations. Although their presence does not necessarily invalidate the model, they may affect the stability of coefficient estimates and our statistical inference.
+
+The IIA assumption is particularly relevant in applications involving choices among competing alternatives. For example, consider a transportation study in which commuters choose between `Car` and `Bus`. If a new alternative, `Train`, is introduced, the standard Multinomial Logistic regression model assumes that the relative odds of choosing `Car` versus `Bus` remain unchanged, holding the relevant regressor values and model coefficients fixed. In practice, this assumption may be restrictive when some alternatives are more similar to one another than others.
+
+Alternative modelling approaches such as nested logit models can relax the IIA assumption, but they are beyond the scope of this textbook.
 
 ### Use Cases of Multinomial Logistic Regression
-Multinomial Logistic regression is particularly useful when the outcome
-variable has three or more categories with no inherent ranking. Some
-examples of this are:
 
-1.  **Travel Mode Choice:** Transportation planners model how commuters
-    select among alternatives such as `Bus`, `Car`,
-    `Bike`, and `Walk`. Regressors typically include travel time,
-    travel cost, distance, and household characteristics, and the fitted
-    probabilities are used to forecast shifts in commute patterns under proposed
-    infrastructure or pricing changes.
+Multinomial Logistic regression is particularly useful when the outcome variable has three or more categories with no inherent ranking. Some examples of this are:
 
-2.  **Voting and Party Choice:** Political scientists study how
-    individual characteristics such as age, income, gender, and
-    education influence which party a voter supports in a multiparty
-    election (for example, `Liberal` / `Conservative` / `NDP` / `Green`). No party is "higher" than another, so      the outcome categories are purely nominal.
+1. **Travel Mode Choice:** Transportation planners may study how commuters select among alternatives such as `Bus`, `Car`, `Bike`, and `Walk`. Regressors may include commute distance, age, car availability, and household characteristics. The fitted model can be used to study associations between these characteristics and transportation choices, as well as to predict the probability of choosing each transportation mode.
 
-3.  **Consumer Brand Choice:** Marketing analysts use scanner panel data
-    to model which brand a household purchases within a product
-    category. Regressors such as brand loyalty, regular shelf price,
-    promotional price cuts, and the presence of in-store promotions are
-    used to estimate price elasticities and predict market share.
+2. **Voting and Party Choice:** Political scientists may study how individual characteristics such as age, income, gender, and education are associated with the political party a voter supports in a multiparty election (for example, `Liberal` / `Conservative` / `NDP` / `Green`). There is no natural ordering among these outcome categories, so they are treated as nominal.
 
-4.  **Disease Subtype Classification:** Epidemiologists often treat a
-    heterogeneous disease as several distinct subtypes rather than a
-    single binary outcome. For instance, breast cancer may be modelled
-    across molecular subtypes defined by receptor status, with age,
-    family history, body mass index, and breast density as regressors,
-    allowing risk factors to act differently on each subtype.
+3. **Consumer Brand Choice:** Marketing analysts may model which brand a consumer purchases within a product category. Regressors such as age, income, previous purchasing behaviour, and brand preferences may be used to study associations with brand choice and predict the probability of purchasing each brand.
 
-5.  **Occupational Choice:** Labour economists model the occupational
-    category an individual enters (for example, `professional`,
-    `clerical`, `service`, or `manual`) as a function of education,
-    work experience, parental occupation, and other socioeconomic
-    characteristics.
+4. **Disease Subtype Classification:** Epidemiologists may study a heterogeneous disease by considering several distinct subtypes rather than a single disease category. For instance, among individuals diagnosed with breast cancer, the disease may be classified into molecular subtypes based on receptor status. Regressors such as age, family history, body mass index, and breast density may be used to investigate whether patient characteristics are differently associated with these subtypes.
 
-In all these examples, the categories are mutually exclusive and
-exhaustive but carry no natural ordering. Imposing an order, as [Ordinal Logistic regression](https://alexrod61.github.io/regression-cookbook/book/15-ordinal-logistic.html) does, would assume a progression between categories
-that does not exist, whereas fitting a separate [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html) model for each
-pair of categories would discard information and could yield predicted
-probabilities that do not sum to one. Multinomial Logistic regression
-provides a principled framework that models all categories jointly
-against a common reference level.
+5. **Occupational Choice:** Labour economists may model the occupational category an individual enters (for example, `professional`, `clerical`, `service`, or `manual`) as a function of education, work experience, parental occupation, and other socioeconomic characteristics.
+
+In all these examples, the outcome categories are defined to be mutually exclusive and exhaustive but carry no natural ordering. Imposing an order, as [Ordinal Logistic regression](https://alexrod61.github.io/regression-cookbook/book/15-ordinal-logistic.html) does would assume a ranking among categories that does not exist.
+
+Alternatively, fitting separate [Binary Logistic regression](https://alexrod61.github.io/regression-cookbook/book/08-binary-logistic.html) models for each pair of outcome categories would require excluding observations from the other categories in each model. Moreover, independently fitted binary models do not necessarily yield a coherent set of category-specific predicted probabilities that sum to one.
+
+Multinomial Logistic regression provides a principled framework that models all outcome categories jointly using a common reference category, ensuring that the predicted probabilities across all categories sum to one.
 
 ## Case Study: Understanding Commuting Behaviours
 
