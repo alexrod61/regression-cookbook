@@ -966,13 +966,13 @@ It is important to remember that the insights gained from EDA are preliminary an
 
 ## Data Modelling {#sec-data-modelling}
 
-After conducting [EDA](http://localhost:54321/book/14-multinomial-logistic.html#exploratory-data-analysis), we transition to the modelling stage, where we apply a structured approach to answer both the **inferential** and **predictive** inquiries from @sec-study-design.
+After conducting exploratory data analysis (@sec-eda), we transition to the modelling stage, where we apply a structured approach to answer both the **inferential** and **predictive** inquiries from @sec-study-design.
 
 A Multinomial Logistic Regression model is a suitable approach for our statistical inquiries, given that `transport_mode` is a categorical and unordered outcome variable subject to the numerical regressors `commute_distance` and `age`, and categorical regressors `has_car_available` and `weekend_commuter`.
 
 The EDA showed that the choice of primary transport mode varies across several commuter characteristics, but those empirical comparisons were still descriptive. We now need a probability model that respects the unordered categorical nature of the response while allowing the conditional probability of each mode to vary systematically with the regressors.
 
-Multinomial Logistic regression is a **GLM** with the following three-part structure:
+Multinomial Logistic regression extends the **GLM** framework to a multi-category response and has the following three-part structure:
 
 1. a **random component**, which specifies the conditional probability distribution of the response;
 2. a **systematic component**, which combines the regressors through linear predictors; and
@@ -996,7 +996,7 @@ The response variable, also known as the dependent variable, represents the prim
 
 #### Regressors (X):
 
-Each regressor is chosen based on its theoretical and statistical relevance in explaining the choice of primary transport mode:
+Each regressor is chosen based on its potential relevance to understanding the choice of primary transport mode:
 
 - `commute_distance` (Continuous) – Represents the one-way commuting distance in kilometers.
 - `age` (Continuous) – Represents the age of the individual in years.
@@ -1005,7 +1005,7 @@ Each regressor is chosen based on its theoretical and statistical relevance in e
 
 ### The Random Component
 
-The random component of multinomial logistic regression is based on the **Multinomial distribution**. Suppose the response variable has $m$ distinct categories, indexed by $0,1,\ldots,m-1$, where $m\geq2$. For observation $i$, let $p_{i,j}$ denote the probability of belonging to category $j$, such that
+The random component of Multinomial Logistic regression is based on the **Categorical distribution**, which is equivalent to a Multinomial distribution with a single trial. Suppose the response variable has $m$ distinct categories, indexed by $0,1,\ldots,m-1$, where $m\geq2$. For observation $i$, let $p_{i,j}$ denote the probability of belonging to category $j$, such that
 
 $$
 \begin{aligned}
@@ -1022,7 +1022,7 @@ $$
 \sum_{j = 0}^{m-1} p_{i,j} = p_{i,0} + \dots + p_{i,m-1} = 1.
 $$
 
-*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$.*
+*A particular highlight is that the Binomial distribution is a special case of the Multinomial distribution with two possible outcomes, i.e. $m=2$. For a single trial, this reduces to the Bernoulli distribution.*
 
 In our study, the response variable consists of $4$ possible categories, and therefore we assume a Multinomial distribution with $m=4$ for the random component. Let $Y_i$ denote the transport mode of the $i$th commuter in the training data, for $i=1,2,...,n$, such that $Y_i$ can be one of `Public_Transit`, `Car`, `Bicycle`, or `Walking`. We will use the following coding for $Y_i$ with `Car` as the reference category:
 
@@ -1051,7 +1051,7 @@ reference level, produces an equivalent reparametrization of the same model. The
 estimated probabilities for each category, the maximized log-likelihood function, and the
 resulting predictions are unchanged by either choice.
 
-The estimated regression coefficients, however, are defined as **log-odds** relative to the reference category. Changing the reference level therefore changes
+The estimated regression coefficients, however, describe changes in the **log-odds** of each non-reference category relative to the reference category. Changing the reference level therefore changes
 the numerical values of the coefficients and the comparisons they represent, along
 with the associated hypothesis tests and confidence intervals. The underlying
 inferential conclusions are equivalent, since any contrast between two categories can
@@ -1159,8 +1159,7 @@ Thus:
 
 Note that the regressor values $\mathbf{x}_i$ are the **same** across all three
 equations; however, each non-reference category
-has its own $\boldsymbol{\beta}_j$, which means that a regressor may push a commuter towards
-one transport mode and away from another. For a general case with $m$ categories in the response variable and $k$ regressors, the model estimates $(m-1)(k+1)$
+has its own $\boldsymbol{\beta}_j$. Without this constraint, adding the same linear function of the regressors to all $m$ linear predictors would leave every probability unchanged. For a general case with $m$ categories in the response variable and $k$ regressors, the model estimates $(m-1)(k+1)$
 parameters in total. In our case study with $k = 4$ regressors and
 $m = 4$ categories, there are $15$ parameters in total.
 
@@ -1208,10 +1207,7 @@ live on the probability scale.
 
 ![Image by [*Manfred Steger*](https://pixabay.com/users/manfredsteger-1848497/) via [*Pixabay*](https://pixabay.com/vectors/pixel-cells-emotion-bored-6230197/).](img/question-2.png){width="300"}
 
-Therefore, we still need a link function that connects the $m-1$ unrestricted
-real-valued linear predictors $\eta_{i,1}, \dots, \eta_{i,m-1}$ to $m$ valid
-probabilities. Each $p_{i,j}$ must lie between $0$ and $1$, and together they must
-sum to one across all $m$ categories, including the probability of belonging to the reference category `Car`.
+Therefore, we still need inverse link functions that connect the $m-1$ unrestricted real-valued linear predictors $\eta_{i,1}, \dots, \eta_{i,m-1}$ to $m$ valid probabilities. Each $p_{i,j}$ must lie between $0$ and $1$, and together they must sum to one across all $m$ categories, including the probability of belonging to the reference category `Car`.
 
 ::::
 
@@ -1247,7 +1243,7 @@ The logit link applied to each baseline-category
 comparison is given by
 
 $$
-\operatorname{logit}(p_{i,j})
+g_j(\boldsymbol{\pi}_i)
 =
 \log\left(
 \frac{p_{i,j}}{p_{i,0}}
@@ -1255,7 +1251,7 @@ $$
 =
 \eta_{i,j},
 \qquad j=1,\dots,m-1.
-$${#eq-multinomial-logistic-logit-link}
+$$ {#eq-multinomial-logistic-logit-link}
 
 Combining @eq-multinomial-logistic-logit-link with @eq-systematic-component gives
 the Multinomial Logistic regression model, which is a system of $m-1$ equations:
@@ -1302,7 +1298,7 @@ p_{i,j}=p_{i,0}
 \quad\Longrightarrow\quad
 \frac{p_{i,j}}{p_{i,0}}=1
 \quad\Longrightarrow\quad
-\operatorname{logit}(p_{i,j})=0.
+g_j(\boldsymbol{\pi}_i)=0.
 $$
 
 A commuter equally likely to choose mode $j$ or the baseline has log-odds of
@@ -1372,11 +1368,10 @@ Definition of the multinomial logit link
 :::: {.definition-container}
 
 For category probabilities $p_{i,0},\dots,p_{i,m-1}$ satisfying $0<p_{i,j}<1$ and
-$\sum_{j=0}^{m-1}p_{i,j}=1$, with category $0$ taken as the baseline, the
-**logit function** for category $j$ is
+$\sum_{j=0}^{m-1}p_{i,j}=1$, with category $0$ taken as the baseline, **baseline-category logit link function** for category $j$ is
 
 $$
-\operatorname{logit}(p_{i,j})
+g_j(\boldsymbol{\pi}_i)
 =
 \log\left(
 \frac{p_{i,j}}{p_{i,0}}
@@ -1391,7 +1386,7 @@ with $k$ regressors:
 
 $$
 \begin{aligned}
-\operatorname{logit}(p_{i,j})
+g_j(\boldsymbol{\pi}_i)
 &= \eta_{i,j} \\
 &=
 \beta_{0,j}
@@ -1475,6 +1470,8 @@ e^{\beta_{4,j}x_{i,4}},
 \qquad j=1,2,3.
 $$
 
+Note that a positive regression coefficient indicates an increase in the odds of choosing the corresponding category relative to the reference category, holding the other regressors fixed. However, it does not necessarily imply an increase in the probability of choosing that category, since the category-specific probabilities depend on all linear predictors through their common denominator.
+
 Finally, applying @eq-prob-multinomial with $m=4$ gives the four probabilities, and writing $D=1+e^{\eta_{i,1}}+e^{\eta_{i,2}}+e^{\eta_{i,3}}$ for the common
 denominator gives
 
@@ -1523,7 +1520,7 @@ their regression coefficients; therefore, the systematic component can be expres
 Let
 
 $$
-\mathbf{x}_i
+\widetilde{\mathbf{x}}_i
 =
 \begin{bmatrix}
 1 \\ x_{i,1} \\ x_{i,2} \\ x_{i,3} \\ x_{i,4}
@@ -1534,7 +1531,7 @@ be the regressor vector for the $i$th observation, **including the leading $1$
 for the intercept**. Then, let
 
 $$
-\boldsymbol{\beta}_j
+\widetilde{\boldsymbol{\beta}}_j
 =
 \begin{bmatrix}
 \beta_{0,j} \\ \beta_{1,j} \\ \beta_{2,j} \\ \beta_{3,j} \\ \beta_{4,j}
@@ -1546,7 +1543,8 @@ be the vector of regression coefficients associated with category $j$. Each
 systematic component can then be written compactly as
 
 $$
-\eta_{i,j} = \mathbf{x}_i^\top \boldsymbol{\beta}_j,
+\eta_{i,j} = \widetilde{\mathbf{x}}_i^\top
+\widetilde{\boldsymbol{\beta}}_j,
 \qquad j = 1, 2, 3,
 $$
 
@@ -1580,15 +1578,16 @@ $$
 \end{bmatrix},
 $$
 
-whose $i$th row is $\mathbf{x}_i^\top$. Unlike the single-response case, the
-model has one coefficient vector per non-baseline category, so the coefficients
+whose $i$th row is $\widetilde{\mathbf{x}}_i^\top$. Unlike the single-response case, the model has one coefficient vector per non-baseline category, so the coefficients
 are collected into the matrix
 
 $$
 \mathbf{B}
 =
 \begin{bmatrix}
-\boldsymbol{\beta}_1 & \boldsymbol{\beta}_2 & \boldsymbol{\beta}_3
+\widetilde{\boldsymbol{\beta}}_1 &
+\widetilde{\boldsymbol{\beta}}_2 &
+\widetilde{\boldsymbol{\beta}}_3
 \end{bmatrix}
 =
 \begin{bmatrix}
@@ -1625,7 +1624,7 @@ $$ {#eq-likelihood-multinomial}
 
 where $n$ is the number of individuals in the sample, $m$ is the number of categories, and $p_{i,j}$ is the model-implied softmax probability that individual $i$, with regressor values $x_{i,1}, \ldots, x_{i,k}$, falls in category $j$. The unknown parameters are collected in the matrix $\mathbf{B}$, which consists of an intercept and $k$ slopes for each of the $m-1$ non-baseline response categories.
 
-The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual; because of the indicator $y_{i,j}$ in the exponent, $\prod_{j=1}^m p_{i,j}^{y_{i,j}}$ is equal to just $p_{i,j}$ for the actual observed category of the $i$-th observation. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
+The two products have intuitive roles. The **inner product** over $j$ runs across the $m$ categories for a single individual; because of the indicator $y_{i,j}$ in the exponent, $\prod_{j=0}^{m-1} p_{i,j}^{y_{i,j}}$ is equal to just $p_{i,j}$ for the actual observed category of the $i$-th observation. The **outer product** over $i$ then multiplies these per-individual probabilities together across all $n$ people, which is valid because the observations are assumed independent. Overall, this is a **multinomial likelihood** evaluated at the softmax category probabilities.
 
 Taking the logarithm turns the products into sums, which is far easier to differentiate and optimize, and yields the **log-likelihood function**:
 
@@ -1657,7 +1656,7 @@ $$ {#eq-log-likelihoood}
 
 Here, $x_{i,0}=1$ corresponds to the intercept, $k$ is the number of regressors, and category $0$ is the reference category.
 
-Maximizing $\ell$ gives the estimate $\hat{\mathbf{B}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as is known as the **maximum likelihood estimation (MLE)**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. The standard choice is the **Newton–Raphson** method, described in the tip box below; the variant most statistical software uses replaces the observed Hessian with its expected value (the Fisher information), giving the **Fisher scoring** algorithm, which is equivalent to **iteratively reweighted least squares (IRLS)**. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
+Maximizing $\ell$ gives the estimate $\hat{\mathbf{B}}$, the parameters under which the observed data is the most plausible. This method of finding the best-fit parameters is known as the **maximum likelihood estimation (MLE)**. There is, however, no closed-form algebraic expression for the maximizer: the category probabilities $p_{i,j}$ enter the log-likelihood non-linearly through the softmax function, so setting the derivatives to zero does not yield equations we can solve directly. Instead, we rely on **iterative numerical optimization**, which starts from an initial guess and refines the estimates step by step until the log-likelihood can no longer be improved. One commonly used approach is the **Newton–Raphson** method, described in the tip box below. For Multinomial Logistic regression, Newton–Raphson and Fisher scoring are equivalent because the observed and expected information matrices coincide. The estimation procedure can also be expressed as **iteratively reweighted least squares (IRLS)**. Other numerical optimization algorithms may also be used to maximize the log-likelihood. Additional estimation details, including the generalization from one to $n_i$ observations per population $i$, can be found in Section 2.2 of [Czepiel (2002)](https://czep.net/stat/mlelr.pdf).
 
 ::: {.Tip}
 ::::{.Tip-header}
@@ -1705,7 +1704,7 @@ The full Newton–Raphson/IRLS procedure is:
 
 1. Choose the reference category and initialize $\boldsymbol{\beta}^{(0)}=\mathbf{0}$ (stacked over all coefficient indices $(r,j)$).
 2. Repeat until convergence:
-   - Compute the logits $\eta_i^{(j,1)}$ and category probabilities $p_{i,j}$ for all individuals $i$ and categories $j$, and evaluate the log-likelihood $\ell(\boldsymbol{\beta}^{(t)})$.
+   - Compute the logits $\eta_{i,j}$ and category probabilities $p_{i,j}$ for all individuals $i$ and categories $j$, and evaluate the log-likelihood $\ell(\boldsymbol{\beta}^{(t)})$.
    - Form the stacked score $S(\boldsymbol{\beta}^{(t)})$ and Hessian $H(\boldsymbol{\beta}^{(t)})$ using the expressions above.
    - Update $\boldsymbol{\beta}^{(t+1)}$ using the Newton–Raphson step above.
    - Check the convergence criteria.
