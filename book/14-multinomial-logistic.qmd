@@ -1713,14 +1713,14 @@ The full Newton–Raphson/IRLS procedure is:
 
 ## Estimation {#sec-estimation}
 
-The previous section established the Multinomial Logistic regression model mathematically. We will now fit the model to the training data using all four regressors (age, commute distance, car availability, and weekend commuter status), and obtain numerical estimates for their regression coefficients. These estimates quantify how much each regressor contributes to the systematic component of the model, allowing us to measure their individual effects on the conditional probability distribution of a commuter's primary mode of transport.
+The previous section established the Multinomial Logistic regression model mathematically. We will now fit the model to the training data using all four regressors (age, commute distance, car availability, and weekend commuter status), and obtain numerical estimates for their regression coefficients. These estimates quantify how each regressor is associated with the log-odds of choosing each non-reference transport mode relative to the reference category, holding the other regressors fixed.
 
-We will estimate the regression coefficients through **maximum likelihood estimation**, which gives the coefficient values for which the observed training data is the most compatible under a conditional Multinomial distribution for `transport_mode`, conditioned on the four regressors in the dataset. The fitted model serves two purposes. It lets us connect the mathematical framework from [Data Modelling](http://localhost:54321/book/14-multinomial-logistic.html#data-modelling) to an actual fitted model. Secondly it allows us to fit and inspect the model for stability and goodness of fit using the training data, while the testing data remains untouched. Following the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), the model fitted in this section is part of **model development** and is not yet the chapter's final inferential or final predictive evaluation.
+We will estimate the regression coefficients through **maximum likelihood estimation**, which finds the coefficient values that maximize the likelihood of the observed training data under the specified Multinomial Logistic regression model. The fitted model serves two purposes. It lets us connect the mathematical framework that we described in @sec-data-modelling to an actual fitted model. Secondly it allows us to fit and inspect the model for stability and goodness of fit using the training data, while the testing data remains untouched. Following the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow), the model fitted in this section is part of **model development** and is not yet the chapter's final inferential or final predictive evaluation.
 
 
 ### Fitting the Model
 
-We now fit the Multinomial Logistic regression model on `train_set` using the `nnet` package in `R` and the `statsmodel` package in `Python`. 
+We now fit the Multinomial Logistic regression model on `train_set` using the `nnet` package in `R` and the `statsmodels` package in `Python`. 
 
 ::: {.panel-tabset}
 
@@ -1728,7 +1728,10 @@ We now fit the Multinomial Logistic regression model on `train_set` using the `n
 
 ```{.r}
 # Set the baseline model
-train_set$transport_mode <- relevel(train_set$transport_mode, ref = "Car")
+train_set$transport_mode <- factor(
+  train_set$transport_mode,
+  levels = c("Car", "Public_Transit", "Bicycle", "Walking")
+)
 
 # Fit Multinomial Logistic regression
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
@@ -1751,7 +1754,7 @@ multinom_table |>
 # Factorize the response and set the baseline model
 train_set["transport_mode"] = pd.Categorical(
     train_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -1797,7 +1800,7 @@ multinom_fit_html = scrollable_table_html(multinom_table)
 
 :::
 
-Both languages have now estimated the Multinomial Logistic regression model from the same training data by maximum likelihood estimation through the Newton-Raphson method, which was discussed in [Section 14.5.5](https://alexrod61.github.io/regression-cookbook/book/14-multinomial-logistic.html#the-log-likelihood-function).
+Both languages have now estimated the Multinomial Logistic regression model from the same training data using maximum likelihood estimation. However, the two implementations use different numerical optimization algorithms. The `multinom()` function in `R` uses the Broyden–Fletcher–Goldfarb–Shanno (BFGS) method, whereas the `MNLogit().fit()` method in `Python` uses the Newton–Raphson method by default. Although the optimization algorithms differ, both aim to maximize the same log-likelihood function.
 
 ::: {.panel-tabset}
 
@@ -1811,7 +1814,10 @@ Both languages have now estimated the Multinomial Logistic regression model from
 #| tbl-cap: "Maximum likelihood estimates from the Multinomial Logistic regression model fitted on the training data."
 
 # Set the baseline model
-train_set$transport_mode <- relevel(train_set$transport_mode, ref = "Car")
+train_set$transport_mode <- factor(
+  train_set$transport_mode,
+  levels = c("Car", "Public_Transit", "Bicycle", "Walking")
+)
 
 # Fit Multinomial Logistic regression
 multinom_fit <- multinom(transport_mode ~ age + commute_distance + has_car_available + weekend_commuter, data = train_set)
@@ -1838,7 +1844,7 @@ multinom_table |>
 # Factorize the response and set the baseline model
 train_set["transport_mode"] = pd.Categorical(
     train_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -1900,14 +1906,15 @@ cat(
 
 :::
 
-The outputs in @tbl-multinom-fit-r and @tbl-multinom-fit-python report the estimated regression coefficients. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0}^{(j,1)}$ and the slope coefficients $\hat{\beta}_{1}^{(j,1)}, \ldots, \hat{\beta}_{k}^{(j,1)}$ are reported, each with its standard error. Since `Car` was set as the baseline category, the outputs contains one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`. With $m = 4$ response categories and $k = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the number of rows in @tbl-multinom-fit-r and @tbl-multinom-fit-python.
+The outputs in @tbl-multinom-fit-r and @tbl-multinom-fit-python report the estimated regression coefficients. For each non-baseline category $j$, a category-specific intercept $\hat{\beta}_{0,j}$ and the slope coefficients $\hat{\beta}_{1,j}, \ldots, \hat{\beta}_{k,j}$ are reported, each with its standard error. Since `Car` was set as the baseline category, the outputs contain one such set of estimates for each of `Public Transit`, `Bicycle`, and `Walking`, and all estimates are interpreted relative to `Car`. With $m = 4$ response categories and $k = 4$ regressors, the fitted model comprises $(m - 1) \times (k + 1) = 15$ estimated parameters, which is consistent with the number of rows in @tbl-multinom-fit-r and @tbl-multinom-fit-python.
 
-In Multinomial Logistic regression, we model the probability of each outcome category given regressors. The key assumption is that we have enough data for each category to estimate the model parameters reliably. If one category is much more frequent than the others (i.e., unbalanced outcomes), the model may:
+Although `R` and `Python` use different numerical optimization algorithms, the estimated regression coefficients, standard errors, and maximized log-likelihood values are in close agreement. Both algorithms report successful convergence.
 
-1. Bias coefficients toward the majority class because the likelihood function is dominated by majority observations.
-2. Underestimate uncertainty for rare categories (small sample size → large variance).
-3. Yield poor predictive performance for minority classes (the model tends to predict the majority class).
-4. In extreme cases, parameters for rare categories may not converge or may give infinite estimates because of complete or quasi-complete separation.
+In Multinomial Logistic regression, we model the probability of each outcome category given regressors. Having sufficient data for each category is important for estimating the model parameters reliably. If one category is much more frequent than the others (i.e., unbalanced outcomes), the model may:
+
+1. Produce less precise coefficient estimates for minority categories due to the limited number of observations.
+2. Yield poor predictive performance for minority classes when assigning observations to their most probable category.
+3. In extreme cases, particularly when complete or quasi-complete separation occurs, encounter convergence problems or produce non-finite maximum likelihood estimates.
 
 As a reminder, we just completed the estimation step of the [data science workflow](https://alexrod61.github.io/regression-cookbook/book/01-intro.html#sec-ds-workflow). For the **inferential inquiry**, we should not use the same dataset both to explore the model structure and to produce the final inferential claims. Recall that the train set is used for model development and goodness-of-fit assessment. Final inferential outputs will be produced later in @sec-regressors after the model building workflow has been completed.
 
@@ -1916,6 +1923,7 @@ As a reminder, we just completed the estimation step of the [data science workfl
 Now let's assess how well the fitted Multinomial Logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
 
 ### Convergence and Separation
+
 A particularly important problem for convergence of the maximum-likelihood estimation (MLE) solution is **separation**. 
 
 ::::: {.Heads-up}
@@ -2665,7 +2673,7 @@ results |>
 # Factorize the response and set the baseline model
 test_set["transport_mode"] = pd.Categorical(
     test_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -2759,7 +2767,7 @@ results |>
 # Factorize the response and set the baseline model
 test_set["transport_mode"] = pd.Categorical(
     test_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -3086,7 +3094,7 @@ cm_df |>
 # Factorize the response and set the baseline model
 train_set["transport_mode"] = pd.Categorical(
     train_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -3109,7 +3117,7 @@ multinom_fit = model.fit()
 # Predict on the test set using the fitted model
 test_set["transport_mode"] = pd.Categorical(
   test_set["transport_mode"],
-  categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+  categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 y_test = test_set["transport_mode"]
@@ -3183,7 +3191,7 @@ cm_df |>
 # Factorize the response and set the baseline model
 train_set["transport_mode"] = pd.Categorical(
     train_set["transport_mode"],
-    categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+    categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 
@@ -3205,7 +3213,7 @@ multinom_fit = model.fit()
 
 test_set["transport_mode"] = pd.Categorical(
   test_set["transport_mode"], 
-  categories=["Car", "Bicycle", "Public_Transit", "Walking"],
+  categories=["Car", "Public_Transit", "Bicycle", "Walking"],
     ordered=False
 )
 y_test = test_set["transport_mode"]
