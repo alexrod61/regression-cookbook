@@ -1920,7 +1920,7 @@ As a reminder, we just completed the estimation step of the [data science workfl
 
 ## Checking Goodness of Fit and Model Stability {#sec-goodness-of-fit}
 
-Now let's assess how well the fitted Multinomial Logistic regression explains and predicts the observed transport modes on the train set. We consider two complementary perspectives: **likelihood-based** measures that evaluate how much of the outcome's variation the model explains on the log-likelihood scale (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode.
+Now let's assess how well the fitted Multinomial Logistic regression model describes and predicts the observed transport modes in the training set. We consider two complementary perspectives: **likelihood-based** measures that assess model fit relative to alternative models (similar to @sec-poisson-goodness-of-fit in [Classical Poisson Regression](https://alexrod61.github.io/regression-cookbook/book/10-classical-poisson.html)), and **classification-based** measures that evaluate how accurately the model assigns observations to their correct transport mode. Before examining these measures, we will assess the stability of the model estimates by investigating convergence and separation.
 
 ### Convergence and Separation
 
@@ -1934,64 +1934,44 @@ Heads-up on complete and quasi-complete separation!
 
 :::: {.Heads-up-container}
 
-Consider a Multinomial Logistic regression model with an intercept-augmented regressor vector $\widetilde{\mathbf{x}}_i$. **Complete separation** occurs when there exists some nonzero vector $\mathbf{a}$ and a response category $j$ such that
+Consider a Multinomial Logistic regression model with an intercept-augmented regressor vector $\widetilde{\mathbf{x}}_i$.
+
+**Complete separation** occurs when there exist coefficient vectors $\mathbf{a}_0,\ldots,\mathbf{a}_{m-1}$, with $\mathbf{a}_0=\mathbf{0}$ for the reference category, such that
 
 $$
-\widetilde{\mathbf{x}}_i^\top\mathbf{a}>0
-\quad
-\text{for every observation with }Y_i=j,
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}_{Y_i}
+>
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}_j,
+\qquad \text{for all } i \text{ and } j\neq Y_i.
 $$
 
-and
+In other words, there exists a set of linear predictors that perfectly classifies every observation into its observed response category.
+
+**Quasi-complete separation** occurs when complete separation is not possible, but coefficient vectors can be found such that
 
 $$
-\widetilde{\mathbf{x}}_i^\top\mathbf{a}<0
-\quad
-\text{for every observation with }Y_i\neq j.
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}_{Y_i}
+\geq
+\widetilde{\mathbf{x}}_i^\top\mathbf{a}_j,
+\qquad \text{for all } i \text{ and } j\neq Y_i,
 $$
 
-In other words, a linear boundary in the regressor space perfectly separates a response category from the other response categories.
-
-**Quasi-complete separation** occurs when the same inequalities can be made non-strict,
-
-$$
-\widetilde{\mathbf{x}}_i^\top\mathbf{a}\geq0
-\quad\text{for }Y_i=j,
-$$
-
-and
-
-$$
-\widetilde{\mathbf{x}}_i^\top\mathbf{a}\leq0
-\quad\text{for }Y_i\neq j,
-$$
-
-with at least some observations lying exactly on the separating boundary.
+with strict inequality for at least one comparison and equality for at least one comparison. In this case, some observations lie exactly on the separating boundaries.
 
 ::::
 
 :::::
 
-Under complete separation, the multinomial likelihood function can keep increasing as one or more coefficient magnitudes grow without bound. A finite maximum likelihood therefore does not exist. Under quasi-complete separation, the same instability occurs along at least one coefficient direction. As a result:
+Under complete separation, the multinomial likelihood function can keep increasing as one or more coefficient magnitudes grow without bound. A finite maximum likelihood estimate of the full coefficient vector therefore does not exist. Under quasi-complete separation, the same instability occurs along at least one coefficient direction. As a result:
 
 - coefficient estimates may become extremely large;
 - standard errors based on the inverse Fisher information may become extremely large or unstable;
 - fitted probabilities can be pushed increasingly close to $0$ or $1$; and
 - ordinary Wald-type inference can become unreliable.
 
-Software often alerts us to the problem. In `R`, common warnings include messages such as
+Software may alert us to potential estimation problems. In `R`, the `multinom()` function from the `nnet` package provides a convergence indicator, where a value of `1` indicates that the maximum number of iterations has been reached. In `Python`, the `MNLogit()` implementation in the `statsmodels` package may report convergence warnings, numerical errors, or unstable coefficient estimates and standard errors.
 
-```text
-glm.fit: algorithm did not converge
-```
-
-or
-
-```text
-glm.fit: fitted probabilities numerically 0 or 1 occurred
-```
-
-depending on the severity of the problem. In `Python`'s [{statsmodels}](https://www.statsmodels.org/stable/index.html), a separated or nearly separated fit may generate a `PerfectSeparationWarning`, fail to converge, or produce extreme coefficient estimates and standard errors.
+However, the absence of warnings or an indication of successful convergence does not necessarily rule out complete or quasi-complete separation.
 
 These warnings are useful, but diagnostics should not rely on warning text alone. Convergence, finite coefficients, finite standard errors, fitted probabilities, regressor overlap, and information-matrix stability should be considered together.
 
