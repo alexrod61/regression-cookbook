@@ -515,6 +515,31 @@ print(f"Test set size: {len(test_set)}")
 
 Before diving into data modelling, it is crucial to develop a deep understanding of the relationships between variables in the dataset. We will use the **training data only** to describe the response, examine the commuter characteristics, and identify patterns that may be informative for later model specifications and diagnostic checks. The Exploratory Data Analysis (EDA) stage helps us visualize and summarize the data, uncover patterns, detect anomalies, and test key assumptions that will inform our modelling decisions. Let's recall that there are two types of regressors: **continuous** and **categorical**.
 
+
+### Distribution of the Response Variable
+
+Before examining the relationships between the regressors and the response variable, let's examine the distribution of `transport_mode` in the training set.
+
+::: {.panel-tabset}
+
+## **`R` Code**
+
+```{r}
+table(train_set$transport_mode)
+prop.table(table(train_set$transport_mode))
+```
+
+## **`Python` Code**
+
+```{python}
+print(train_set["transport_mode"].value_counts())
+print(train_set["transport_mode"].value_counts(normalize=True))
+```
+
+:::
+
+We observe that `Car` and `Public_Transit` are the two dominant categories, whereas `Bicycle` and `Walking` are considerably less common. This class imbalance is an important characteristic of our dataset that we will revisit when evaluating the model's inferential and predictive results.
+
 ### Continuous Regressors
 
 We begin by examining continuous variables. There are two continuous regressors: `age` and `commute_distance`, and we will examine their relationship with the response variable `transport_mode` through visualizations, such as box plots and violin plots. 
@@ -530,7 +555,7 @@ cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00",
 # Visualize boxplots and violin plots of commute_distance v.s. transport_mode
 p1 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
-    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_violin(alpha = 0.6, trim = TRUE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
     geom_boxplot(alpha = 1, fill = NA) +
     labs(x = "Transport Mode", y = "Commute Distance (km)", title =
@@ -542,7 +567,7 @@ p1 <- train_set %>%
 
 p2 <- train_set %>%
     ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
-    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_violin(alpha = 0.6, trim = TRUE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
     geom_boxplot(alpha = 1, fill = NA) +
     labs(x = "Transport Mode", y = "Age", title =
@@ -563,9 +588,8 @@ sns.set_theme(style="whitegrid")
 # Custom color palette `cbPalette` 
 cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
 
-# Sort transport_mode by frequency
-order = train_set['transport_mode'].value_counts().index
-train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
+# Use the existing category order for visualization
+order = list(train_set['transport_mode'].cat.categories)
 
 # Set up side-by-side subplots with shared layout
 fig = plt.figure(figsize=(8, 7))
@@ -583,7 +607,7 @@ sns.violinplot(
     alpha=0.6,
     inner=None,
     order=order,
-    cut=3
+    cut=0
 )
 sns.boxplot(
     data=train_set,
@@ -652,7 +676,7 @@ fig
 cbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 p1 <- train_set %>%
     ggplot(aes(x = transport_mode, y = commute_distance, fill = transport_mode)) +
-    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_violin(alpha = 0.6, trim = TRUE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
     geom_boxplot(alpha = 1, fill = NA) +
     labs(x = "Transport Mode", y = "Commute Distance (km)", title =
@@ -663,7 +687,7 @@ p1 <- train_set %>%
     guides(fill = guide_legend(title = "Transport Mode"))
 p2 <- train_set %>%
     ggplot(aes(x = transport_mode, y = age, fill = transport_mode)) +
-    geom_violin(alpha = 0.6, trim = FALSE) +
+    geom_violin(alpha = 0.6, trim = TRUE) +
     stat_boxplot(geom = "errorbar", width = 0.2) +
     geom_boxplot(alpha = 1, fill = NA) +
     labs(x = "Transport Mode", y = "Age", title =
@@ -689,9 +713,8 @@ sns.set_theme(style="whitegrid")
 # Custom color palette `cbPalette` 
 cbPalette = ["#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
 
-# Sort transport_mode by frequency
-order = train_set['transport_mode'].value_counts().index
-train_set['transport_mode'] = pd.Categorical(train_set['transport_mode'], categories=order, ordered=True)
+# Use the existing category order for visualization
+order = list(train_set['transport_mode'].cat.categories)
 
 # Set up side-by-side subplots with shared layout
 fig = plt.figure(figsize=(8, 7))
@@ -709,7 +732,7 @@ sns.violinplot(
     alpha=0.6,
     inner=None,
     order=order,
-    cut=3
+    cut=0
 )
 sns.boxplot(
     data=train_set,
@@ -764,9 +787,9 @@ fig
 
 :::
 
-The plots in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py show how commute distance and age vary across different transport modes. Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 21–22 km. For car users, the median commute distance is around 9 km and the spread is relatively broad in its distribution of commute distance. Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end. All transport modes show some long-distance commuters, which are shown by long tails and outliers in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py.
+The plots in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py show how commute distance and age vary across different transport modes. Public transit users tend to have the longest commute distance, on average, with a wide distribution and a median around 21–22 km. For car users, the median commute distance is around 9 km and the spread is relatively broad in its distribution of commute distance. Bicycle and Walking are associated with shorter commute distances (medians < 5 km), and their distributions are tightly concentrated near the lower end. The distributions also show variability in commute distance within each transport mode. However, the distributions for `Bicycle` and `Walking` should be interpreted cautiously due to their relatively small sample sizes which are shown by long tails and outliers in @fig-eda-transport-mode-continuous-R and @fig-eda-transport-mode-continuous-py.
 
-All transport modes have similar age distributions, with medians close to early 40s. Bicycle users have a wider age distribution with a median age around 40. Walking has a much wider spread in age, with a median around $45$ and some young walkers as well. All four violin and box plots for age are mostly overlapping with one another, which which shows that there are no noticeable differences in age distributions between transport modes.
+All transport modes have similar age distributions, with medians close to early 40s. Bicycle users have a wider age distribution with a median age around 40. Walking has a much wider spread in age, with a median around $45$ and some young walkers as well. The age distributions across the four transport modes largely overlap, suggesting no clear differences in age distributions between transport modes based on these visualizations.
 
 ### Categorical Regressors
 
@@ -937,7 +960,7 @@ Most weekend commuters do not significantly change their transport mode. The ove
 
 ### Key Takeaways from EDA
 
-Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, a correlation between `has_car_available` and `Car` versus `Public_Transit` as the transport mode signals that the availability of car can potentially be a factor for choosing car over public transit. Similarly the median commute distance increases across `Walking`, `Bicycle`, `Car`, and `Public Transit` in the training data, which suggests that can be a relationship between commute distance and primary mode of transport in the population of commuters.
+Conducting exploratory data analysis (EDA) allows us to gain an initial understanding of the data and its underlying patterns before moving on to model building. Through EDA, we identify the types of variables present, examine their distributions, and uncover potential issues such as skewness, outliers, or multicollinearity. This process helps to highlight which variables might be strong predictors and which may require additional transformation or treatment. For example, the observed relationship between `has_car_available` and `transport_mode` suggests that car availability may be associated with the choice of transport mode. Similarly, the median commute distance increases across `Walking` (1.5 km), `Bicycle` (3.4 km), `Car` (9.3 km), and `Public_Transit` (21.5 km) in the training data, suggesting an association between commute distance and primary mode of transport.
 
 It is important to remember that the insights gained from EDA are preliminary and primarily serve to inform further analysis. When we explore relationships between only two variables, we might overlook the influence of other factors, which could lead to misleading conclusions if taken in isolation. EDA is a crucial step for forming initial hypotheses and guiding decisions regarding data transformations, feature engineering, and the overall modelling strategy. With this foundation, we are better prepared to build a Multinomial Logistic regression model on data that has been carefully examined and understood.
 
